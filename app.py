@@ -257,7 +257,7 @@ async def test_tomtat(
         )
         return
 
-    await interaction.response.defer(ephemeral=False)
+    await interaction.response.defer(ephemeral=True)
     config.active_interactions.add(interaction)
     
     target_channel = channel or interaction.channel
@@ -281,14 +281,6 @@ async def test_tomtat(
 
     print(f"🔬 [Lệnh nhận - Test] /test_tomtat được gọi bởi @{interaction.user.display_name} tại kênh #{target_channel.name}", flush=True)
     print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}', focus='{clean_focus}'", flush=True)
-
-    # Gửi thông báo tạm thời ban đầu
-    mode_info = "Tóm tắt ngắn gọn" if summary_type == "short" else "Tóm tắt dài & Timeline chi tiết"
-    focus_info = f" | Tập trung: `{clean_focus}`" if clean_focus else ""
-    followup_msg = await interaction.followup.send(
-        f"🔬 **[Chế độ kiểm thử]** Đang thu thập dữ liệu và chạy phân tích tự động tại {target_channel.mention}...\n"
-        f"⚙️ Cấu hình: *{mode_info}*{focus_info} ({scan_info})"
-    )
 
     vn_tz = timezone(timedelta(hours=7))
     raw_messages = []
@@ -363,30 +355,32 @@ async def test_tomtat(
         if len(config.test_runs) > 20:
             config.test_runs = config.test_runs[:20]
 
-        # 3. Gửi thông báo kết quả tối giản lên Discord (không gửi kèm bản tóm tắt hay báo cáo chi tiết)
-        await interaction.followup.send(
-            f"✅ {interaction.user.mention} **Đã hoàn thành lượt tự đánh giá (Self-Audit) cuộc trò chuyện thành công!**\n"
-            f"📊 **Điểm số AI QA chấm**: **{score_val}/10**\n"
-            f"🔗 Chi tiết bản tóm tắt và báo cáo phản biện cụ thể đã được cập nhật trực tuyến lên Web Dashboard tại: https://discordmikebot.onrender.com"
-        )
+        # 3. Kết thúc kiểm thử âm thầm (Xóa thông báo "MikeDaBot is thinking...")
+        try:
+            await interaction.delete_original_response()
+        except Exception:
+            pass
 
         print(f"🎉 Kiểm thử thành công! Báo cáo test đã được đẩy lên Web Dashboard.", flush=True)
         config.summary_count += 1
-        
-        try:
-            await followup_msg.delete()
-        except Exception as delete_error:
-            print(f"⚠️ Không xóa được thông báo tải: {delete_error}", flush=True)
-
         config.active_interactions.discard(interaction)
 
-    except Exception as e:
-        print(f"❌ Lỗi trong quá trình xử lý lệnh /test_tomtat: {e}", flush=True)
+    except Exception as inner_e:
+        print(f"❌ Lỗi trong pha xử lý AI của /test_tomtat: {inner_e}", flush=True)
         traceback.print_exc(file=sys.stdout)
         try:
-            await interaction.followup.send("❌ Đã xảy ra lỗi trong quá trình chạy kiểm thử AI!")
-        except Exception as send_error:
-            print(f"⚠️ Không thể gửi thông báo lỗi đến Discord: {send_error}", flush=True)
+            await interaction.delete_original_response()
+        except Exception:
+            pass
+        config.active_interactions.discard(interaction)
+
+    except Exception as outer_e:
+        print(f"❌ Lỗi trong pha tải dữ liệu của /test_tomtat: {outer_e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        try:
+            await interaction.delete_original_response()
+        except Exception:
+            pass
         config.active_interactions.discard(interaction)
 
 @test_tomtat.error
