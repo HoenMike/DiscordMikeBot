@@ -9,23 +9,13 @@ from threading import Thread
 from flask import Flask
 
 # ==========================================
-# 1. KHỞI TẠO SERVER WEB GIẢ LẬP (DÀNH CHO RENDER)
+# 1. KHỞI TẠO SERVER WEB (Flask)
 # ==========================================
 app = Flask('')
 
 @app.route('/')
 def home():
     return "🚀 Bot Discord đang chạy ngầm và hoạt động tốt!"
-
-def run_web_server():
-    # Render sẽ cấp một cổng thông qua biến môi trường PORT, mặc định là 8080 nếu chạy local
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    """Chạy server web trên một luồng (Thread) riêng biệt để không làm nghẽn Bot Discord"""
-    t = Thread(target=run_web_server)
-    t.start()
 
 # ==========================================
 # 2. CẤU HÌNH BOT DISCORD & AI GEMINI / GEMMA
@@ -54,19 +44,18 @@ bot = SummaryBot()
 async def on_ready():
     print(f"🎉 Bot tóm tắt đã kết nối thành công: {bot.user}")
 
-# Định nghĩa Slash Command /tomtat
+# Lệnh Slash Command /tomtat
 @bot.tree.command(name="tomtat", description="Tóm tắt nội dung cuộc trò chuyện trong một kênh")
 @app_commands.describe(
     channel="Kênh chat cần tóm tắt (Mặc định là kênh hiện tại)",
     hours="Số giờ trước cần tóm tắt (Mặc định là 2.0 giờ)"
 )
 async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel = None, hours: float = 2.0):
-    # Phản hồi ngay để tránh Discord báo lỗi quá thời gian (3 giây)
     await interaction.response.defer(ephemeral=False)
     
     target_channel = channel or interaction.channel
     
-    # Gửi thông báo tạm thời ban đầu qua followup
+    # Gửi thông báo tạm thời ban đầu
     followup_msg = await interaction.followup.send(
         f"⏳ Đang thu thập tin nhắn trong kênh {target_channel.mention} trong {hours} giờ qua, đợi xíu nhé..."
     )
@@ -78,7 +67,6 @@ async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel 
     
     # Giới hạn trần 300 tin nhắn để tránh quá tải bộ nhớ trên gói Free của Render
     async for msg in target_channel.history(after=start_time_utc, limit=300):
-        # Không tóm tắt chính tin nhắn của bot hoặc tin nhắn từ bot khác
         if msg.author.bot:
             continue
         raw_messages.append(f"{msg.author.display_name}: {msg.content}")
@@ -122,7 +110,6 @@ async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel 
         embed.add_field(name="Số tin nhắn quét được", value=f"{len(raw_messages)} tin nhắn", inline=True)
         embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
 
-        # Gửi kết quả tóm tắt và xóa thông báo tạm thời ban đầu
         await interaction.followup.send(embed=embed)
         try:
             await followup_msg.delete()
@@ -136,8 +123,16 @@ async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel 
 # ==========================================
 # 3. KÍCH HOẠT VÀ CHẠY ĐỒNG THỜI
 # ==========================================
-if __name__ == "__main__":
-    # Kích hoạt server Web trước
-    keep_alive()
-    # Chạy Bot Discord sau
+def run_discord_bot():
     bot.run(DISCORD_TOKEN)
+
+# Khởi chạy luồng chạy Bot Discord ngay khi module được import (hỗ trợ cả Gunicorn)
+print("🚀 Khởi chạy Discord Bot trong luồng phụ...")
+bot_thread = Thread(target=run_discord_bot)
+bot_thread.daemon = True
+bot_thread.start()
+
+if __name__ == "__main__":
+    # Nếu chạy cục bộ: `python app.py`
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)

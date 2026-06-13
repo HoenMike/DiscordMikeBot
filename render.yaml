@@ -3,4 +3,4 @@ services:
     name: discord-summary-bot
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    startCommand: python app.py
