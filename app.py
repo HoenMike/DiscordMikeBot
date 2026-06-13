@@ -9,6 +9,7 @@ from discord.ext import commands
 from google import genai
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+import asyncio
 from threading import Thread
 from flask import Flask, jsonify, render_template_string
 
@@ -199,11 +200,15 @@ async def tomtat(
         
         Yêu cầu cấu trúc bài tóm tắt:
         1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
-        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (Tin nhắn MỚI NHẤT xếp lên ĐẦU danh sách, các tin nhắn CŨ HƠN xếp xuống DƯỚI) dưới dạng danh sách các dòng (bắt đầu trực tiếp bằng mốc thời gian, KHÔNG dùng dấu gạch đầu dòng `-` hay số thứ tự 1. 2. 3.), sử dụng các mốc thời gian [Ngày/Tháng Giờ:Phút] có sẵn trong dữ liệu. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
+        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (Tin nhắn MỚI NHẤT xếp lên ĐẦU danh sách, các tin nhắn CŨ HƠN xếp xuống DƯỚI).
+           - Bắt đầu mỗi dòng bằng dấu gạch đầu dòng `-` kèm mốc thời gian [Ngày/Tháng Giờ:Phút] có sẵn trong dữ liệu. Ví dụ: `- [Ngày/Tháng Giờ:Phút] @User: Nội dung chi tiết`. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
+           - BẮT BUỘC chèn một dòng phân cách `---` giữa các ngày khác nhau để phân chia rõ ràng hoạt động của từng ngày.
            Định dạng ví dụ:
-           [13/06 12:05] @Miraei: Nhận xét rằng bot chạy rất mượt.
-           [13/06 11:42] @Mike: Đề xuất test thử trên môi trường production.
-           [13/06 10:30] @Amamiya: Hỏi thăm về tình hình cấu hình game.
+           - [13/06 12:05] @Miraei: Nhận xét rằng bot chạy rất mượt.
+           - [13/06 11:42] @Mike: Đề xuất test thử trên môi trường production.
+           ---
+           - [12/06 23:11] @Amamiya: Rủ cả nhóm chơi game.
+           - [12/06 22:30] @FearsOfEvil: Hỏi về cấu hình máy.
         3. **KẾT LUẬN & THỐNG NHẤT**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được bàn giao (nếu có).
         
         Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
@@ -229,8 +234,9 @@ async def tomtat(
         """
 
     try:
-        print(f"🧠 Đang gửi dữ liệu đến AI Gemma 4 để phân tích...", flush=True)
-        response = ai_client.models.generate_content(
+        print(f"🧠 Đang gửi dữ liệu đến AI Gemma 4 để phân tích (không chặn event loop)...", flush=True)
+        response = await asyncio.to_thread(
+            ai_client.models.generate_content,
             model='gemma-4-31b-it',
             contents=prompt,
         )
