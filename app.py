@@ -136,6 +136,9 @@ async def tomtat(
     else:
         scan_info = f"tối đa {limit} tin nhắn trong {hours} giờ qua"
 
+    print(f"📥 [Lệnh nhận] /tomtat được gọi bởi @{interaction.user.display_name} tại kênh #{target_channel.name}", flush=True)
+    print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}'", flush=True)
+
     # Gửi thông báo tạm thời ban đầu
     followup_msg = await interaction.followup.send(
         f"⏳ Đang thu thập dữ liệu ({scan_info}) tại kênh {target_channel.mention}, đợi xíu nhé..."
@@ -145,6 +148,7 @@ async def tomtat(
     raw_messages = []
     
     try:
+        print(f"⏳ Đang tải lịch sử kênh #{target_channel.name}...", flush=True)
         if hours is not None:
             # Lọc theo mốc thời gian
             now_utc = datetime.now(timezone.utc)
@@ -155,7 +159,8 @@ async def tomtat(
             async for msg in target_channel.history(after=start_time_utc, limit=max_limit):
                 if msg.author.bot:
                     continue
-                local_time = msg.created_at.astimezone(vn_tz).strftime('%H:%M')
+                # Định dạng có ngày/tháng để đưa vào dữ liệu huấn luyện
+                local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
                 raw_messages.append(f"[{local_time}] {msg.author.display_name}: {msg.content}")
         else:
             # Chỉ lọc theo số lượng tin nhắn gần nhất (limit)
@@ -163,7 +168,7 @@ async def tomtat(
             async for msg in target_channel.history(limit=max_limit):
                 if msg.author.bot:
                     continue
-                local_time = msg.created_at.astimezone(vn_tz).strftime('%H:%M')
+                local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
                 # Lưu cùng created_at để sắp xếp theo trình tự thời gian sau
                 raw_messages.append((msg.created_at, f"[{local_time}] {msg.author.display_name}: {msg.content}"))
             
@@ -177,7 +182,10 @@ async def tomtat(
         await interaction.followup.send("❌ Không thể tải lịch sử kênh chat. Hãy kiểm tra quyền hạn của bot!")
         return
 
+    print(f"✅ Đã tải xong: Đọc được {len(raw_messages)} tin nhắn thích hợp.", flush=True)
+
     if not raw_messages:
+        print(f"⚠️ Hủy bỏ: Không tìm thấy tin nhắn nào trong kênh #{target_channel.name} để tóm tắt.", flush=True)
         await interaction.followup.send(f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}.")
         return
 
@@ -190,15 +198,15 @@ async def tomtat(
         Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT và ĐẦY ĐỦ nhất bằng Tiếng Việt.
         
         Yêu cầu cấu trúc bài tóm tắt:
-        1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung.
-        2. **TIMELINE DIỄN BIẾN**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự thời gian (danh sách đánh số), sử dụng các mốc thời gian [Giờ:Phút] có sẵn trong dữ liệu. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
+        1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
+        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (Tin nhắn MỚI NHẤT xếp lên ĐẦU danh sách, các tin nhắn CŨ HƠN xếp xuống DƯỚI) dưới dạng danh sách đánh số, sử dụng các mốc thời gian [Ngày/Tháng Giờ:Phút] có sẵn trong dữ liệu. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
            Định dạng ví dụ:
-           1. [09:15] @Hoang: Bắt đầu hỏi về lịch họp dự án.
-           2. [09:20] @Mike: Trả lời rằng cuộc họp sẽ diễn ra lúc 10h sáng.
-           3. [09:22] @Linh: Xác nhận tham gia và nhắc mang theo slide.
+           1. [13/06 12:05] @Miraei: Nhận xét rằng bot chạy rất mượt.
+           2. [13/06 11:42] @Mike: Đề xuất test thử trên môi trường production.
+           3. [13/06 10:30] @Amamiya: Hỏi thăm về tình hình cấu hình game.
         3. **KẾT LUẬN & THỐNG NHẤT**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được bàn giao (nếu có).
         
-        Dữ liệu trò chuyện (mốc thời gian Việt Nam [Giờ:Phút]):
+        Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
         \"\"\"
         {chat_history_text}
         \"\"\"
@@ -214,13 +222,14 @@ async def tomtat(
         - Liệt kê các quyết định quan trọng (nếu có).
         - Giữ độ dài bài tóm tắt ngắn gọn (dưới 1500 ký tự).
         
-        Dữ liệu trò chuyện (mốc thời gian Việt Nam [Giờ:Phút]):
+        Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
         \"\"\"
         {chat_history_text}
         \"\"\"
         """
 
     try:
+        print(f"🧠 Đang gửi dữ liệu đến AI Gemma 4 để phân tích...", flush=True)
         response = ai_client.models.generate_content(
             model='gemma-4-31b-it',
             contents=prompt,
@@ -241,14 +250,15 @@ async def tomtat(
         embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
 
         await interaction.followup.send(embed=embed)
-        
+        print(f"🎉 Tóm tắt thành công! Đã gửi kết quả Embed tới kênh #{target_channel.name}.", flush=True)
+
         # Tăng số lần tóm tắt thành công
         global summary_count
         summary_count += 1
         
         try:
             await followup_msg.delete()
-            print("ℹ️ Đã xóa thông báo tạm thời sau khi tóm tắt xong.", flush=True)
+            print("ℹ️ Đã xóa thông báo tạm thời sau khi gửi tóm tắt.", flush=True)
         except Exception as delete_error:
             print(f"⚠️ Không xóa được thông báo tải: {delete_error}", flush=True)
 
@@ -264,6 +274,18 @@ async def tomtat(
 # 2. KHỞI TẠO WEB DASHBOARD (Flask)
 # ==========================================
 app = Flask('')
+
+bot_started = False
+
+@app.before_request
+def start_bot_on_first_request():
+    global bot_started
+    if not bot_started:
+        bot_started = True
+        print("🚀 [Gunicorn Worker] Nhận request đầu tiên, bắt đầu khởi chạy Discord Bot trong luồng phụ...", flush=True)
+        bot_thread = Thread(target=run_discord_bot)
+        bot_thread.daemon = True
+        bot_thread.start()
 
 HTML_TEMPLATE = r"""
 <!DOCTYPE html>
@@ -880,14 +902,17 @@ def run_discord_bot():
         print(f"❌ Lỗi crash khi chạy bot.run(): {run_error}", flush=True)
         traceback.print_exc(file=sys.stdout)
 
-# Khởi chạy luồng chạy Bot Discord ngay khi module được import (hỗ trợ cả Gunicorn)
-print("🚀 Khởi chạy Discord Bot trong luồng phụ...", flush=True)
-bot_thread = Thread(target=run_discord_bot)
-bot_thread.daemon = True
-bot_thread.start()
-
 if __name__ == "__main__":
     # Nếu chạy cục bộ: `python app.py`
+    # Khởi chạy bot ngay lập tức mà không cần đợi request đầu tiên
+    global bot_started
+    if not bot_started:
+        bot_started = True
+        print("🚀 [Local Mode] Khởi chạy Discord Bot ngay lập tức...", flush=True)
+        bot_thread = Thread(target=run_discord_bot)
+        bot_thread.daemon = True
+        bot_thread.start()
+        
     port = int(os.environ.get("PORT", 8080))
     print(f"ℹ️ Khởi chạy Flask Server trên cổng {port}...", flush=True)
     app.run(host='0.0.0.0', port=port)
