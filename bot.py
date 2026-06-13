@@ -1,5 +1,6 @@
 import os
 import discord
+from discord import app_commands
 from discord.ext import commands
 from google import genai
 from dotenv import load_dotenv
@@ -27,7 +28,7 @@ def keep_alive():
     t.start()
 
 # ==========================================
-# 2. CẤU HÌNH BOT DISCORD & AI GEMINI
+# 2. CẤU HÌNH BOT DISCORD & AI GEMINI / GEMMA
 # ==========================================
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -37,32 +38,53 @@ ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+class SummaryBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        print("🔄 Đang đồng bộ hóa Slash Commands...")
+        await self.tree.sync()
+        print("🎉 Slash Commands đã được đồng bộ hóa toàn cầu!")
+
+bot = SummaryBot()
 
 @bot.event
 async def on_ready():
     print(f"🎉 Bot tóm tắt đã kết nối thành công: {bot.user}")
 
-@bot.command(name="tomtat")
-async def tomtat(ctx, hours: float = 2.0):
-    await ctx.send(f"⏳ Đang thu thập tin nhắn trong khoảng {hours} giờ qua, đợi xíu nhé...")
+# Định nghĩa Slash Command /tomtat
+@bot.tree.command(name="tomtat", description="Tóm tắt nội dung cuộc trò chuyện trong một kênh")
+@app_commands.describe(
+    channel="Kênh chat cần tóm tắt (Mặc định là kênh hiện tại)",
+    hours="Số giờ trước cần tóm tắt (Mặc định là 2.0 giờ)"
+)
+async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel = None, hours: float = 2.0):
+    # Phản hồi ngay để tránh Discord báo lỗi quá thời gian (3 giây)
+    await interaction.response.defer(ephemeral=False)
+    
+    target_channel = channel or interaction.channel
+    
+    # Gửi thông báo tạm thời ban đầu qua followup
+    followup_msg = await interaction.followup.send(
+        f"⏳ Đang thu thập tin nhắn trong kênh {target_channel.mention} trong {hours} giờ qua, đợi xíu nhé..."
+    )
 
     now_utc = datetime.now(timezone.utc)
     start_time_utc = now_utc - timedelta(hours=hours)
-    
-    tz_vietnam = timezone(timedelta(hours=7))
-    start_time_local = start_time_utc.astimezone(tz_vietnam)
 
     raw_messages = []
     
     # Giới hạn trần 300 tin nhắn để tránh quá tải bộ nhớ trên gói Free của Render
-    async for msg in ctx.channel.history(after=start_time_utc, limit=300):
-        if msg.id == ctx.message.id or msg.author.bot:
+    async for msg in target_channel.history(after=start_time_utc, limit=300):
+        # Không tóm tắt chính tin nhắn của bot hoặc tin nhắn từ bot khác
+        if msg.author.bot:
             continue
         raw_messages.append(f"{msg.author.display_name}: {msg.content}")
 
     if not raw_messages:
-        await ctx.send(f"❌ Không tìm thấy tin nhắn nào trong {hours} giờ qua.")
+        await interaction.followup.send(f"❌ Không tìm thấy tin nhắn nào trong kênh {target_channel.mention} trong {hours} giờ qua.")
         return
 
     chat_history_text = "\n".join(raw_messages)
@@ -95,15 +117,21 @@ async def tomtat(ctx, hours: float = 2.0):
             description=summary_result,
             color=discord.Color.green()
         )
+        embed.add_field(name="Kênh chat", value=target_channel.mention, inline=True)
         embed.add_field(name="Khoảng thời gian", value=f"{hours} giờ qua", inline=True)
         embed.add_field(name="Số tin nhắn quét được", value=f"{len(raw_messages)} tin nhắn", inline=True)
-        embed.set_footer(text=f"Yêu cầu bởi {ctx.author.display_name}")
+        embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
 
-        await ctx.send(embed=embed)
+        # Gửi kết quả tóm tắt và xóa thông báo tạm thời ban đầu
+        await interaction.followup.send(embed=embed)
+        try:
+            await followup_msg.delete()
+        except Exception as delete_error:
+            print(f"Không xóa được thông báo tải: {delete_error}")
 
     except Exception as e:
         print(f"Lỗi: {e}")
-        await ctx.send("❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!")
+        await interaction.followup.send("❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!")
 
 # ==========================================
 # 3. KÍCH HOẠT VÀ CHẠY ĐỒNG THỜI
