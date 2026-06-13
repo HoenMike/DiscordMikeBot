@@ -265,7 +265,7 @@ async def tomtat(
 # ==========================================
 app = Flask('')
 
-HTML_TEMPLATE = """
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="vi">
 <head>
