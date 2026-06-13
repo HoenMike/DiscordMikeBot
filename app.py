@@ -10,6 +10,7 @@ from google import genai
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 import asyncio
+import signal
 from threading import Thread
 from flask import Flask, jsonify, render_template_string
 
@@ -97,6 +98,10 @@ class SummaryBot(commands.Bot):
 
 bot = SummaryBot()
 
+# Quản lý trạng thái tắt máy (Graceful Shutdown)
+active_interactions = set()
+is_shutting_down = False
+
 @bot.event
 async def on_ready():
     print(f"🎉 Bot tóm tắt đã kết nối thành công: {bot.user}", flush=True)
@@ -122,7 +127,16 @@ async def tomtat(
     summary_type: str = "short",
     focus: str = None
 ):
+    global is_shutting_down
+    if is_shutting_down:
+        await interaction.response.send_message(
+            "❌ Bot đang được cập nhật hoặc tái khởi động hệ thống. Vui lòng thực hiện lại lệnh sau 15-30 giây!",
+            ephemeral=True
+        )
+        return
+
     await interaction.response.defer(ephemeral=False)
+    active_interactions.add(interaction)
     
     target_channel = channel or interaction.channel
     
@@ -183,6 +197,7 @@ async def tomtat(
         print(f"❌ Lỗi khi tải lịch sử chat: {fetch_error}", flush=True)
         traceback.print_exc(file=sys.stdout)
         await interaction.followup.send("❌ Không thể tải lịch sử kênh chat. Hãy kiểm tra quyền hạn của bot!")
+        active_interactions.discard(interaction)
         return
 
     print(f"✅ Đã tải xong: Đọc được {len(raw_messages)} tin nhắn thích hợp.", flush=True)
@@ -190,6 +205,7 @@ async def tomtat(
     if not raw_messages:
         print(f"⚠️ Hủy bỏ: Không tìm thấy tin nhắn nào trong kênh #{target_channel.name} để tóm tắt.", flush=True)
         await interaction.followup.send(f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}.")
+        active_interactions.discard(interaction)
         return
 
     chat_history_text = "\n".join(raw_messages)
@@ -281,6 +297,8 @@ async def tomtat(
         except Exception as delete_error:
             print(f"⚠️ Không xóa được thông báo tải: {delete_error}", flush=True)
 
+        active_interactions.discard(interaction)
+
     except Exception as e:
         print(f"❌ Lỗi trong quá trình xử lý lệnh /tomtat: {e}", flush=True)
         traceback.print_exc(file=sys.stdout)
@@ -288,6 +306,7 @@ async def tomtat(
             await interaction.followup.send("❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!")
         except Exception as send_error:
             print(f"⚠️ Không thể gửi thông báo lỗi đến Discord: {send_error}", flush=True)
+        active_interactions.discard(interaction)
 
 # ==========================================
 # 2. KHỞI TẠO WEB DASHBOARD (Flask)
@@ -939,6 +958,55 @@ def run_discord_bot():
     except Exception as run_error:
         print(f"❌ Lỗi crash khi chạy bot.run(): {run_error}", flush=True)
         traceback.print_exc(file=sys.stdout)
+
+# ==========================================
+# 4. GRACEFUL SHUTDOWN HANDLER
+# ==========================================
+async def graceful_shutdown():
+    global is_shutting_down
+    is_shutting_down = True
+    print("👋 Bắt đầu quy trình tắt bot graceful...", flush=True)
+    
+    # Gửi thông báo tới các user đang có lệnh xử lý dở
+    for interaction in list(active_interactions):
+        try:
+            print(f"   ↳ Gửi thông báo hủy lệnh tới user @{interaction.user.display_name}", flush=True)
+            await interaction.followup.send(
+                "❌ Bot đang được cập nhật/tái khởi động hệ thống. Vui lòng thực hiện lại lệnh sau 15-30 giây!",
+                ephemeral=True
+            )
+        except Exception as e:
+            print(f"⚠️ Không thể gửi thông báo shutdown tới user: {e}", flush=True)
+    
+    # Đóng kết nối bot
+    try:
+        await bot.close()
+        print("🔌 Đã đóng kết nối bot Discord thành công.", flush=True)
+    except Exception as e:
+        print(f"⚠️ Lỗi khi đóng bot: {e}", flush=True)
+
+def handle_sigterm(signum, frame):
+    global is_shutting_down
+    if is_shutting_down:
+        return
+    is_shutting_down = True
+    print(f"📥 Nhận được tín hiệu tắt máy (signal {signum}). Đang tắt máy dọn dẹp...", flush=True)
+    
+    if bot.loop and bot.loop.is_running():
+        # Chạy coroutine trong thread của bot
+        future = asyncio.run_coroutine_threadsafe(graceful_shutdown(), bot.loop)
+        try:
+            # Chờ tối đa 5 giây cho việc gửi thông báo và đóng kết nối hoàn tất
+            future.result(timeout=5)
+        except Exception as e:
+            print(f"⚠️ Hết thời gian chờ hoặc xảy ra lỗi khi tắt bot: {e}", flush=True)
+            
+    print("☠️ Tiến trình kết thúc.", flush=True)
+    sys.exit(0)
+
+# Đăng ký signal handler
+signal.signal(signal.SIGTERM, handle_sigterm)
+signal.signal(signal.SIGINT, handle_sigterm)
 
 if __name__ == "__main__":
     # Nếu chạy cục bộ: `python app.py`
