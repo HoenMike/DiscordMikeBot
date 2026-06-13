@@ -1043,15 +1043,16 @@ def api_clear_logs():
     return jsonify({"success": True})
 
 @app.route('/api/test/run', methods=['POST'])
-async def api_run_test():
-    try:
-        import ai_helper
-        import config
-        from bot_instance import bot
-        import discord
-        from datetime import timezone, timedelta
-        import re
-        
+def api_run_test():
+    import asyncio
+    import ai_helper
+    import config
+    from bot_instance import bot
+    import discord
+    from datetime import datetime, timezone, timedelta
+    import re
+    
+    async def run_test_logic():
         # 1. Thu thập tin nhắn (quét kênh thực tế nếu bot online hoặc dùng Mock Data)
         raw_messages = []
         source_info = "Mock Chat Data (Giả lập)"
@@ -1121,7 +1122,15 @@ async def api_run_test():
             
         print(f"🎉 [Test API] Đã chạy xong lượt test. AI QA chấm điểm: {score_val}.", flush=True)
         return jsonify({"success": True, "test_run": test_run})
-        
+
+    try:
+        if bot.is_ready() and bot.loop and bot.loop.is_running():
+            print("🔬 [Test API] Chạy test bằng loop của Discord Bot (threadsafe)...", flush=True)
+            future = asyncio.run_coroutine_threadsafe(run_test_logic(), bot.loop)
+            return future.result(timeout=60)
+        else:
+            print("🔬 [Test API] Chạy test bằng loop mới (bot offline)...", flush=True)
+            return asyncio.run(run_test_logic())
     except Exception as e:
         import traceback
         import sys
