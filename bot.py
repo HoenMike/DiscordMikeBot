@@ -85,7 +85,7 @@ async def tomtat(ctx, hours: float = 2.0):
 
     try:
         response = ai_client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemma-4-31b-it',
             contents=prompt,
         )
         summary_result = response.text
