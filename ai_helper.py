@@ -1,8 +1,19 @@
 import asyncio
 from google import genai
+from google.genai import types
 import config
 
 ai_client = genai.Client(api_key=config.GEMINI_API_KEY)
+
+# Cấu hình generation mặc định cho tất cả các lệnh gọi AI tóm tắt
+# temperature thấp để giảm thiểu hallucination, buộc AI bám sát dữ liệu
+SUMMARY_CONFIG = types.GenerateContentConfig(
+    temperature=0.1,
+)
+# QA Evaluator có thể linh hoạt hơn một chút
+QA_CONFIG = types.GenerateContentConfig(
+    temperature=0.3,
+)
 
 def split_text(text, limit=3500):
     chunks = []
@@ -28,6 +39,12 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     Dưới đây là một phần lịch sử trò chuyện của nhóm chat (phần {chunk_index + 1}/{total_chunks}, được sắp xếp theo thứ tự thời gian tăng dần).
     Hãy tóm tắt chi tiết các hoạt động diễn ra trong phần chat này.
 
+    🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC (ANTI-HALLUCINATION):
+    - CHỈ được phép tóm tắt các nội dung, sự kiện, mốc thời gian và tên người dùng THỰC SỰ xuất hiện trong văn bản được cung cấp dưới đây.
+    - TUYỆT ĐỐI KHÔNG được thêm thông tin từ kiến thức huấn luyện của bạn, các phiên trò chuyện khác, hoặc bất kỳ dữ liệu nào ngoài văn bản đầu vào.
+    - TUYỆT ĐỐI KHÔNG được bịa ra tên người dùng, ngày tháng, sự kiện hay quyết định không có trong văn bản.
+    - Nếu một thông tin không có trong văn bản → đừng đề cập đến nó.
+
     {focus_instruction}
 
     Yêu cầu đầu ra (BẮT BUỘC):
@@ -46,6 +63,7 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
             ai_client.models.generate_content,
             model='gemma-4-31b-it',
             contents=prompt,
+            config=SUMMARY_CONFIG,
         )
         print(f"✅ [MapReduce] Hoàn thành phân đoạn {chunk_index + 1}/{total_chunks}.", flush=True)
         return response.text
@@ -70,11 +88,17 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
         chat_history_text = "\n".join(raw_messages)
         if summary_type == "long":
             prompt = f"""
-            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
-            Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
+            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp.
+            Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}).
             Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT, ĐẦY ĐỦ và THÔNG MINH nhất bằng Tiếng Việt.
 
             {focus_instruction}
+
+            🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC (ANTI-HALLUCINATION) - VI PHẠM = THẤT BẠI HOÀN TOÀN:
+            - CHỈ được phép tóm tắt các nội dung, sự kiện, mốc thời gian và tên người dùng THỰC SỰ có trong văn bản dữ liệu đầu vào.
+            - TUYỆT ĐỐI KHÔNG thêm thông tin từ kiến thức huấn luyện, từ các phiên hội thoại trước, hoặc từ bất kỳ nguồn nào ngoài văn bản đầu vào.
+            - TUYỆT ĐỐI KHÔNG bịa ra ngày tháng, tên người dùng, sự kiện hay quyết định không xuất hiện trong văn bản.
+            - Nếu lịch sử trò chuyện chỉ có dữ liệu ngày X → tuyệt đối không đề cập đến ngày X+1 hay bất kỳ ngày nào khác.
 
             Yêu cầu nghiêm ngặt về định dạng và cấu trúc (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu (ví dụ: "Dưới đây là...", "Đây là tóm tắt...") hay lời chào kết, cảm ơn xã giao ở cuối. Đi thẳng vào nội dung chính.
@@ -93,7 +117,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
                    Ví dụ: `- [15:31 - 15:34] @Subeo, @Mike: Thảo luận về quán trà sữa Koi Thé.` (Tuyệt đối KHÔNG ghi `- [09/06 15:31 - 15:34]`).
 
               3. **KẾT LUẬN & QUYẾT ĐỊNH**: Tóm tắt ngắn gọn các quyết định, thống nhất hoặc công việc được chốt lại (nếu có).
-            
+
             Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
             \"\"\"
             {chat_history_text}
@@ -101,18 +125,21 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             """
         else:
             prompt = f"""
-            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
-            Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
+            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp.
+            Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}).
             Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách NGẮN GỌN, SÚC TÍCH và DỄ HIỂU nhất bằng Tiếng Việt.
 
             {focus_instruction}
+
+            🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC (ANTI-HALLUCINATION) - VI PHẠM = THẤT BẠI HOÀN TOÀN:
+            - CHỈ được phép tóm tắt các nội dung THỰC SỰ có trong văn bản đầu vào. TUYỆT ĐỐI KHÔNG thêm thông tin ngoài dữ liệu.
 
             Yêu cầu cấu trúc (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời kết luận xã giao. Đi thẳng vào nội dung tóm tắt.
             - Giữ độ dài bài tóm tắt ngắn gọn, súc tích (dưới 1000 ký tự).
             - Tóm tắt các chủ đề chính đang thảo luận dưới dạng các gạch đầu dòng ngắn gọn.
             - Liệt kê các quyết định, kết luận quan trọng (nếu có).
-            
+
             Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
             \"\"\"
             {chat_history_text}
@@ -123,6 +150,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             ai_client.models.generate_content,
             model='gemma-4-31b-it',
             contents=prompt,
+            config=SUMMARY_CONFIG,
         )
         return response.text
 
@@ -145,11 +173,16 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 
         if summary_type == "long":
             reduce_prompt = f"""
-            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
+            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp.
             Dưới đây là tổng hợp các bản tóm tắt phân đoạn từ lịch sử trò chuyện của một nhóm chat kéo dài trong thời gian qua.
             Hãy kết hợp chúng thành một bản tóm tắt toàn diện, CHI TIẾT, ĐẦY ĐỦ và THÔNG MINH nhất bằng Tiếng Việt.
 
             {focus_instruction}
+
+            🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC (ANTI-HALLUCINATION) - VI PHẠM = THẤT BẠI HOÀN TOÀN:
+            - CHỈ được phép tổng hợp lại nội dung từ các bản tóm tắt phân đoạn được cung cấp ở dưới.
+            - TUYỆT ĐỐI KHÔNG thêm nội dung mới, ngày tháng mới, sự kiện mới hay tên người dùng mới không có trong các bản tóm tắt đầu vào.
+            - Chỉ các ngày, giờ và tên người dùng xuất hiện trong các tóm tắt phân đoạn mới được phép đưa vào bản tổng hợp cuối.
 
             Yêu cầu nghiêm ngặt về định dạng và cấu trúc (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời kết luận xã giao. Đi thẳng vào nội dung chính.
@@ -175,11 +208,13 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             """
         else:
             reduce_prompt = f"""
-            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
+            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp.
             Dưới đây là tổng hợp các bản tóm tắt phân đoạn từ lịch sử trò chuyện của một nhóm chat.
             Hãy kết hợp chúng thành một bản tóm tắt NGẮN GỌN, SÚC TÍCH và DỄ HIỂU nhất bằng Tiếng Việt.
 
             {focus_instruction}
+
+            🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC: CHỈ tổng hợp nội dung từ các tóm tắt phân đoạn được cung cấp. KHÔNG thêm bất kỳ thông tin mới nào.
 
             Yêu cầu cấu trúc (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời kết luận xã giao. Đi thẳng vào nội dung tóm tắt.
@@ -197,6 +232,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             ai_client.models.generate_content,
             model='gemma-4-31b-it',
             contents=reduce_prompt,
+            config=SUMMARY_CONFIG,
         )
         print("✅ [MapReduce] Pha Reduce hoàn tất thành công.", flush=True)
         return response.text
@@ -216,6 +252,25 @@ MOCK_CHAT_HISTORY = [
 ]
 
 async def evaluate_summary(raw_history_text, generated_summary, summary_type, clean_focus):
+    # Trích xuất metadata từ raw history để QA có thể xác minh mà không cần đọc toàn bộ
+    raw_lines = raw_history_text.strip().split('\n')
+    total_msg_count = len(raw_lines)
+    # Lấy 15 dòng đầu, 15 dòng giữa, 15 dòng cuối làm mẫu đại diện
+    head_sample = raw_lines[:15]
+    mid_start = max(0, total_msg_count // 2 - 7)
+    mid_sample = raw_lines[mid_start:mid_start + 15]
+    tail_sample = raw_lines[max(0, total_msg_count - 15):]
+    raw_sample = (
+        "--- 15 TIN NHẮN ĐẦU ---\n" + '\n'.join(head_sample) +
+        "\n\n--- 15 TIN NHẮN GIỮA ---\n" + '\n'.join(mid_sample) +
+        "\n\n--- 15 TIN NHẮN CUỐI ---\n" + '\n'.join(tail_sample)
+    )
+    # Trích xuất tất cả các ngày/tháng duy nhất từ raw history (dạng [DD/MM])
+    import re as _re
+    date_pattern = _re.compile(r'\[(\d{2}/\d{2})')
+    dates_in_raw = sorted(set(date_pattern.findall(raw_history_text)))
+    dates_str = ', '.join(dates_in_raw) if dates_in_raw else 'Không xác định được'
+
     eval_prompt = f"""
     Bạn là một kỹ sư đảm bảo chất lượng AI (AI QA Engineer) khó tính.
     Nhiệm vụ của bạn là đánh giá và chấm điểm một bản tóm tắt được tạo bởi một AI Summary Bot từ lịch sử trò chuyện Discord.
