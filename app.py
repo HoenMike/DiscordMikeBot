@@ -363,43 +363,14 @@ async def test_tomtat(
         if len(config.test_runs) > 20:
             config.test_runs = config.test_runs[:20]
 
-        # 3. Gửi bản tóm tắt sang Discord
-        title_str = "🧪 [TEST] TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "🧪 [TEST] TÓM TẮT CUỘC TRÒ CHUYỆN"
-        embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
-        chunks = ai_helper.split_text(summary_result, limit=3500)
-        
-        for i, chunk in enumerate(chunks):
-            part_title = title_str
-            if len(chunks) > 1:
-                part_title += f" (Phần {i+1}/{len(chunks)})"
-            
-            embed = discord.Embed(
-                title=part_title,
-                description=chunk,
-                color=embed_color
-            )
-            
-            if i == 0:
-                embed.add_field(
-                    name="⚙️ Cấu hình quét", 
-                    value=f"Phạm vi: **{scan_info}** ({len(raw_messages)} tin nhắn thực tế)\nChế độ: **{mode_info}**{f' | Focus: **`{clean_focus}`**' if clean_focus else ''}", 
-                    inline=False
-                )
-            
-            embed.set_footer(text=f"Kiểm thử bởi {interaction.user.display_name}")
-            content = f"🔔 {interaction.user.mention} Đã chạy xong kiểm thử tóm tắt!" if i == 0 else None
-            await interaction.followup.send(content=content, embed=embed)
-
-        # 4. Gửi báo cáo đánh giá AI QA
-        embed_eval = discord.Embed(
-            title=f"🔬 BÁO CÁO TỰ ĐÁNH GIÁ AI (Điểm số: {score_val}/10)",
-            description=evaluation_report,
-            color=discord.Color.purple()
+        # 3. Gửi thông báo kết quả tối giản lên Discord (không gửi kèm bản tóm tắt hay báo cáo chi tiết)
+        await interaction.followup.send(
+            f"✅ {interaction.user.mention} **Đã hoàn thành lượt tự đánh giá (Self-Audit) cuộc trò chuyện thành công!**\n"
+            f"📊 **Điểm số AI QA chấm**: **{score_val}/10**\n"
+            f"🔗 Chi tiết bản tóm tắt và báo cáo phản biện cụ thể đã được cập nhật trực tuyến lên Web Dashboard tại: https://discordmikebot.onrender.com"
         )
-        embed_eval.set_footer(text="Hệ thống AI QA kiểm thử tự động")
-        await interaction.followup.send(embed=embed_eval)
 
-        print(f"🎉 Kiểm thử thành công! Đã gửi Bản tóm tắt & Báo cáo QA tới kênh #{target_channel.name}.", flush=True)
+        print(f"🎉 Kiểm thử thành công! Báo cáo test đã được đẩy lên Web Dashboard.", flush=True)
         config.summary_count += 1
         
         try:
