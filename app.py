@@ -208,11 +208,6 @@ async def tomtat_error(interaction: discord.Interaction, error: app_commands.App
         except Exception as send_error:
             print(f"⚠️ Không thể gửi thông báo lỗi: {send_error}", flush=True)
 
-# Lệnh Slash Command /test_tomtat
-@bot.tree.command(name="test_test_tomtat", description="Tạm thời tránh trùng lặp")
-async def dummy_test():
-    pass
-
 # Đăng ký lệnh /test_tomtat chính thức
 @bot.tree.command(name="test_tomtat", description="Chạy tóm tắt thử nghiệm kèm AI tự động đánh giá và chấm điểm chất lượng")
 @app_commands.describe(
