@@ -12,7 +12,7 @@ from discord import app_commands
 from datetime import datetime, timezone, timedelta
 import asyncio
 import signal
-from threading import Thread
+from threading import Thread, Lock
 
 # Quản lý trạng thái tắt máy (Graceful Shutdown)
 @bot.event
@@ -395,18 +395,21 @@ async def test_tomtat_error(interaction: discord.Interaction, error: app_command
         except Exception as send_error:
             print(f"⚠️ Không thể gửi thông báo lỗi: {send_error}", flush=True)
 
-# Khởi chạy Discord Bot trong luồng phụ
+# Khởi chạy Discord Bot trong luồng phụ (Đảm bảo Thread-safe dưới Gunicorn/multi-threads)
 bot_started = False
+bot_start_lock = Lock()
 
 @app.before_request
 def start_bot_on_first_request():
     global bot_started
     if not bot_started:
-        bot_started = True
-        print("🚀 [Gunicorn Worker] Nhận request đầu tiên, bắt đầu khởi chạy Discord Bot trong luồng phụ...", flush=True)
-        bot_thread = Thread(target=run_discord_bot)
-        bot_thread.daemon = True
-        bot_thread.start()
+        with bot_start_lock:
+            if not bot_started:
+                bot_started = True
+                print("🚀 [Gunicorn Worker] Nhận request đầu tiên, bắt đầu khởi chạy Discord Bot trong luồng phụ...", flush=True)
+                bot_thread = Thread(target=run_discord_bot)
+                bot_thread.daemon = True
+                bot_thread.start()
 
 def run_discord_bot():
     try:
