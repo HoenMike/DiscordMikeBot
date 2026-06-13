@@ -102,6 +102,24 @@ bot = SummaryBot()
 active_interactions = set()
 is_shutting_down = False
 
+def split_text(text, limit=3500):
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    for line in text.split('\n'):
+        # +1 cho ký tự xuống dòng
+        if current_length + len(line) + 1 > limit:
+            if current_chunk:
+                chunks.append('\n'.join(current_chunk))
+            current_chunk = [line]
+            current_length = len(line)
+        else:
+            current_chunk.append(line)
+            current_length += len(line) + 1
+    if current_chunk:
+        chunks.append('\n'.join(current_chunk))
+    return chunks
+
 @bot.event
 async def on_ready():
     print(f"🎉 Bot tóm tắt đã kết nối thành công: {bot.user}", flush=True)
@@ -119,6 +137,7 @@ async def on_ready():
     app_commands.Choice(name="Tóm tắt ngắn gọn (Mặc định)", value="short"),
     app_commands.Choice(name="Tóm tắt dài & Timeline chi tiết", value="long")
 ])
+@app_commands.checks.cooldown(1, 30.0, key=lambda i: i.user.id)
 async def tomtat(
     interaction: discord.Interaction, 
     channel: discord.TextChannel = None, 
@@ -131,6 +150,21 @@ async def tomtat(
     if is_shutting_down:
         await interaction.response.send_message(
             "❌ Bot đang được cập nhật hoặc tái khởi động hệ thống. Vui lòng thực hiện lại lệnh sau 15-30 giây!",
+            ephemeral=True
+        )
+        return
+
+    # Kiểm tra giới hạn trị số đầu vào để tránh quá tải quota của AI
+    if hours is not None and (hours <= 0 or hours > 168.0):
+        await interaction.response.send_message(
+            "❌ Số giờ quét phải lớn hơn 0 và không được vượt quá 168.0 giờ (7 ngày)!",
+            ephemeral=True
+        )
+        return
+
+    if limit is not None and (limit <= 0 or limit > 500):
+        await interaction.response.send_message(
+            "❌ Số lượng tin nhắn quét phải lớn hơn 0 và không được vượt quá 500 tin nhắn!",
             ephemeral=True
         )
         return
@@ -275,27 +309,36 @@ async def tomtat(
             contents=prompt,
         )
         summary_result = response.text
-        if summary_result and len(summary_result) > 4000:
-            print(f"⚠️ Cảnh báo: Kết quả tóm tắt vượt quá giới hạn Discord ({len(summary_result)} ký tự). Đang tiến hành cắt ngắn...", flush=True)
-            summary_result = summary_result[:3900] + "\n\n... *(Nội dung tiếp theo bị cắt bớt do vượt quá giới hạn ký tự hiển thị của Discord)*"
-
+        
         title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
         embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
 
-        embed = discord.Embed(
-            title=title_str,
-            description=summary_result,
-            color=embed_color
-        )
-        embed.add_field(name="Kênh chat", value=target_channel.mention, inline=True)
-        embed.add_field(name="Điều kiện quét", value=scan_info, inline=True)
-        embed.add_field(name="Số tin nhắn quét", value=f"{len(raw_messages)} tin nhắn", inline=True)
-        if focus:
-            embed.add_field(name="Chủ đề tập trung (Focus)", value=f"`{focus}`", inline=False)
-        embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
+        # Chia nhỏ kết quả thành nhiều phần nếu vượt quá giới hạn hiển thị của Discord
+        chunks = split_text(summary_result, limit=3500)
+        
+        for i, chunk in enumerate(chunks):
+            part_title = title_str
+            if len(chunks) > 1:
+                part_title += f" (Phần {i+1}/{len(chunks)})"
+            
+            embed = discord.Embed(
+                title=part_title,
+                description=chunk,
+                color=embed_color
+            )
+            
+            # Chỉ đính kèm các trường thông tin phụ vào phần đầu tiên để tránh lặp thông tin
+            if i == 0:
+                embed.add_field(name="Kênh chat", value=target_channel.mention, inline=True)
+                embed.add_field(name="Điều kiện quét", value=scan_info, inline=True)
+                embed.add_field(name="Số tin nhắn quét", value=f"{len(raw_messages)} tin nhắn", inline=True)
+                if focus:
+                    embed.add_field(name="Chủ đề tập trung (Focus)", value=f"`{focus}`", inline=False)
+            
+            embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
+            await interaction.followup.send(embed=embed)
 
-        await interaction.followup.send(embed=embed)
-        print(f"🎉 Tóm tắt thành công! Đã gửi kết quả Embed tới kênh #{target_channel.name}.", flush=True)
+        print(f"🎉 Tóm tắt thành công! Đã gửi {len(chunks)} Embed tới kênh #{target_channel.name}.", flush=True)
 
         # Tăng số lần tóm tắt thành công
         global summary_count
@@ -317,6 +360,23 @@ async def tomtat(
         except Exception as send_error:
             print(f"⚠️ Không thể gửi thông báo lỗi đến Discord: {send_error}", flush=True)
         active_interactions.discard(interaction)
+
+@tomtat.error
+async def tomtat_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            f"⏳ Bạn đang thao tác quá nhanh! Vui lòng đợi {round(error.retry_after, 1)} giây trước khi thử lại.",
+            ephemeral=True
+        )
+    else:
+        print(f"❌ Lỗi khi thực thi Slash Command /tomtat: {error}", flush=True)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ Đã xảy ra lỗi khi thực thi lệnh!", ephemeral=True)
+            else:
+                await interaction.followup.send("❌ Đã xảy ra lỗi khi thực thi lệnh!", ephemeral=True)
+        except Exception as send_error:
+            print(f"⚠️ Không thể gửi thông báo lỗi: {send_error}", flush=True)
 
 # ==========================================
 # 2. KHỞI TẠO WEB DASHBOARD (Flask)
