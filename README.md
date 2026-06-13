@@ -1,62 +1,52 @@
-# MikeDaBot - Discord Summary Agent 🤖
+# 🤖 MikeDaBot - Discord Summary Bot
 
-**MikeDaBot** là một bot Discord thông minh giúp tự động quét lịch sử trò chuyện trong một kênh và tạo bản tóm tắt súc tích, chi tiết kèm timeline hoặc tập trung vào một câu chuyện cụ thể sử dụng mô hình AI **Gemma 4** (`gemma-4-31b-it`). Dự án đi kèm một Web Dashboard tối giản để theo dõi trạng thái hoạt động thực tế của bot (Uptime, độ trễ API, dung lượng RAM sử dụng, log console trực tiếp).
+MikeDaBot là một bot Discord thông minh được tích hợp AI (Gemini/Gemma 4) chuyên tóm tắt nội dung các cuộc hội thoại trong các kênh chat một cách nhanh chóng, sạch sẽ và hiệu quả.
 
----
+## 🚀 Tính Năng Nổi Bật
 
-## ✨ Tính năng nổi bật
-- **Tóm tắt thông minh**: 
-  - Chế độ ngắn gọn (`short`) giúp nắm nhanh nội dung chính.
-  - Chế độ chi tiết (`long`) tạo Timeline diễn biến chia theo từng ngày rõ ràng, gộp nhóm các tin nhắn liên quan.
-- **Tập trung chủ đề (Focus)**: Cho phép truyền từ khóa (ví dụ: `drama`, `lỗi deploy`) để AI tập trung phân tích sâu vào chủ đề đó và bỏ qua nội dung rác ngoài lề.
-- **Tag người dùng**: Tự động thông báo (tag) cho người yêu cầu ngay khi tóm tắt xong.
-- **Web Dashboard**: Xem tài nguyên hệ thống (RAM, Uptime, Latency, Guilds/Users count) và theo dõi Live Console Logs trực tiếp trên giao diện Web.
-- **Graceful Shutdown**: Tự động chờ các tác vụ đang chạy dở hoàn tất (tối đa 15 giây) trước khi tắt máy hoặc cập nhật code mới, hạn chế lỗi treo bot.
+- **Tóm tắt cuộc trò chuyện thông minh**: Hỗ trợ hai chế độ tóm tắt:
+  - **Tóm tắt ngắn gọn (`short`)**: Tóm lược nhanh các chủ đề chính và quyết định quan trọng.
+  - **Tóm tắt dài & Timeline chi tiết (`long`)**: Bố cục các diễn biến hội thoại theo từng ngày, gộp nhóm tin nhắn thông minh và phân tách dòng thời gian bằng các mốc giờ hoạt động sôi nổi.
+- **Tập trung sâu (Focus Mode)**: Khả năng "laser-focus" vào một chủ đề hoặc câu chuyện cụ thể (ví dụ: drama, lỗi deploy, game mới) theo yêu cầu của người dùng để phân tích sâu hơn, lược bỏ bớt các thông tin ngoài lề.
+- **Web Dashboard trực quan**: Giao diện dashboard hiện đại giúp giám sát thời gian thực (Uptime, độ trễ API, số lượng máy chủ, RAM sử dụng, log console trực tiếp).
+- **Graceful Shutdown**: Tự động hoãn tắt máy tối đa 15 giây khi có lệnh cập nhật hệ thống để hoàn thành các tác vụ tóm tắt đang chạy dở.
+- **Thông báo thông minh**: Tự động tag người dùng khi tóm tắt xong, tinh giản tối đa các thông báo thừa.
 
----
+## 🛠️ Lệnh Slash Command
 
-## 🛠️ Yêu cầu hệ thống
-- Python 3.10 trở lên.
-- Tài khoản bot Discord (cần bật **Message Content Intent** trên Discord Developer Portal).
-- Google Gemini API Key.
+### `/tomtat`
+Dùng để tóm tắt lịch sử trò chuyện của kênh chat.
 
----
+**Các tham số tùy chọn:**
+- `channel`: Kênh chat cần tóm tắt (Mặc định là kênh hiện tại).
+- `hours`: Quét tin nhắn trong X giờ qua (Tối đa 168 giờ - 7 ngày).
+- `limit`: Giới hạn số lượng tin nhắn quét tối đa (Tối đa 500 tin nhắn).
+- `summary_type`: Chọn kiểu tóm tắt `short` (Ngắn gọn) hoặc `long` (Chi tiết kèm Timeline).
+- `focus`: Từ khóa/chủ đề cụ thể cần bot tập trung phân tích sâu.
 
-## 🚀 Hướng dẫn cài đặt & Chạy cục bộ
+## ⚙️ Cài Đặt và Khởi Chạy
 
-1. **Clone mã nguồn dự án**:
-   ```bash
-   git clone https://github.com/your-username/DiscordMikeBot.git
-   cd DiscordMikeBot
-   ```
+### 1. Yêu Cầu Hệ Thống
+- Python 3.10+
+- Các thư viện cần thiết trong `requirements.txt`
 
-2. **Cài đặt thư viện dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 2. Cấu Hình Environment
+Tạo file `.env` tại thư mục gốc với các khóa sau:
+```env
+DISCORD_TOKEN=your_discord_bot_token
+GEMINI_API_KEY=your_gemini_api_key
+PORT=8080
+```
 
-3. **Cấu hình môi trường**:
-   - Sao chép tệp mẫu cấu hình:
-     ```bash
-     cp .env.example .env
-     ```
-   - Mở tệp `.env` vừa tạo và điền các thông số Token và API Key của bạn.
+### 3. Chạy Cục Bộ (Local)
+Cài đặt dependencies:
+```bash
+pip install -r requirements.txt
+```
+Khởi chạy bot và máy chủ web:
+```bash
+python app.py
+```
 
-4. **Khởi chạy bot**:
-   ```bash
-   python app.py
-   ```
-   - Truy cập giao diện Dashboard tại: `http://localhost:8080`
-
----
-
-## 🌐 Deploy lên Render
-Dự án đã được cấu hình sẵn tệp `render.yaml`. Bạn chỉ cần:
-1. Đưa dự án lên kho lưu trữ GitHub của bạn.
-2. Kết nối tài khoản Render với kho lưu trữ GitHub.
-3. Render sẽ tự động nhận diện và deploy ứng dụng. Hãy nhớ thêm các biến môi trường (`DISCORD_TOKEN`, `GEMINI_API_KEY`) trong phần cấu hình Environment của Render.
-
----
-
-## 📜 Giấy phép
-Dự án được phân phối dưới giấy phép **MIT License**. Bạn hoàn toàn có thể sử dụng, sửa đổi và phân phối lại cho mục đích cá nhân hoặc thương mại.
+## 🌐 Triển Khai (Deployment)
+Dự án được tối ưu hóa cấu hình để chạy dễ dàng trên **Render** (hoặc bất kỳ nền tảng PaaS nào hỗ trợ Gunicorn/Flask và các tiến trình chạy ngầm). Cấu hình Render được khai báo sẵn tại file `render.yaml`.
