@@ -199,11 +199,11 @@ async def tomtat(
         
         Yêu cầu cấu trúc bài tóm tắt:
         1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
-        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (Tin nhắn MỚI NHẤT xếp lên ĐẦU danh sách, các tin nhắn CŨ HƠN xếp xuống DƯỚI) dưới dạng danh sách đánh số, sử dụng các mốc thời gian [Ngày/Tháng Giờ:Phút] có sẵn trong dữ liệu. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
+        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (Tin nhắn MỚI NHẤT xếp lên ĐẦU danh sách, các tin nhắn CŨ HƠN xếp xuống DƯỚI) dưới dạng danh sách gạch đầu dòng (sử dụng dấu gạch ngang `-`, KHÔNG dùng số thứ tự 1. 2. 3.), sử dụng các mốc thời gian [Ngày/Tháng Giờ:Phút] có sẵn trong dữ liệu. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
            Định dạng ví dụ:
-           1. [13/06 12:05] @Miraei: Nhận xét rằng bot chạy rất mượt.
-           2. [13/06 11:42] @Mike: Đề xuất test thử trên môi trường production.
-           3. [13/06 10:30] @Amamiya: Hỏi thăm về tình hình cấu hình game.
+           - [13/06 12:05] @Miraei: Nhận xét rằng bot chạy rất mượt.
+           - [13/06 11:42] @Mike: Đề xuất test thử trên môi trường production.
+           - [13/06 10:30] @Amamiya: Hỏi thăm về tình hình cấu hình game.
         3. **KẾT LUẬN & THỐNG NHẤT**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được bàn giao (nếu có).
         
         Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
