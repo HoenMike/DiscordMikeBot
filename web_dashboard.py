@@ -1046,29 +1046,27 @@ def api_clear_logs():
 def api_run_test():
     import asyncio
     import ai_helper
-    import config
+    import config as cfg
     from bot_instance import bot
-    import discord
     from datetime import datetime, timezone, timedelta
     import re
-    
+
     async def run_test_logic():
-        # 1. Thu thập tin nhắn (quét kênh thực tế nếu bot online hoặc dùng Mock Data)
+        """Thu thập tin nhắn, tóm tắt và đánh giá - trả về plain dict (không dùng Flask context)."""
         raw_messages = []
         source_info = "Mock Chat Data (Giả lập)"
-        
+
         if bot.is_ready() and len(bot.guilds) > 0:
             target_channel = None
             for guild in bot.guilds:
                 for channel in guild.text_channels:
-                    # Kiểm tra quyền đọc tin nhắn
                     permissions = channel.permissions_for(guild.me)
                     if permissions.read_messages and permissions.read_message_history:
                         target_channel = channel
                         break
                 if target_channel:
                     break
-            
+
             if target_channel:
                 source_info = f"Kênh thực tế: #{target_channel.name} ({target_channel.guild.name})"
                 vn_tz = timezone(timedelta(hours=7))
@@ -1078,32 +1076,28 @@ def api_run_test():
                         continue
                     local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
                     raw_messages.append(f"[{local_time}] {msg.author.display_name}: {msg.content}")
-                raw_messages.reverse() # Sắp xếp từ cũ đến mới
-        
+                raw_messages.reverse()
+
         if not raw_messages:
-            # Fallback sang Mock Data
             print(f"🔬 [Test API] Không có kênh online hoặc bot offline, sử dụng {source_info}...", flush=True)
             raw_messages = ai_helper.MOCK_CHAT_HISTORY
-        
+
         scan_info = "150 tin nhắn thử nghiệm"
         summary_type = "long"
-        clean_focus = "bot tóm tắt"  # Thử nghiệm focus vào bot tóm tắt
-        
-        # 2. Chạy tóm tắt
+        clean_focus = "bot tóm tắt"
+
         print("🔬 [Test API] Đang chạy tóm tắt...", flush=True)
         summary_result = await ai_helper.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
-        
-        # 3. Chạy đánh giá chất lượng tự động bằng AI QA
+
         print("🔬 [Test API] Đang gửi kết quả cho AI QA tự động chấm điểm...", flush=True)
         raw_history_text = "\n".join(raw_messages)
         evaluation_report = await ai_helper.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
-        
-        # Trích xuất điểm số từ báo cáo
+
         score_val = "N/A"
         score_match = re.search(r"-\s*\*\*Điểm số\*\*:\s*([\d\.\/\s]+)", evaluation_report, re.IGNORECASE)
         if score_match:
             score_val = score_match.group(1).strip()
-            
+
         test_run = {
             "timestamp": datetime.now(timezone(timedelta(hours=7))).strftime('%d/%m %H:%M:%S'),
             "source": source_info,
@@ -1115,25 +1109,30 @@ def api_run_test():
             "evaluation": evaluation_report,
             "score": score_val
         }
-        
-        config.test_runs.insert(0, test_run)
-        if len(config.test_runs) > 20:
-            config.test_runs = config.test_runs[:20]
-            
+
+        cfg.test_runs.insert(0, test_run)
+        if len(cfg.test_runs) > 20:
+            cfg.test_runs = cfg.test_runs[:20]
+
         print(f"🎉 [Test API] Đã chạy xong lượt test. AI QA chấm điểm: {score_val}.", flush=True)
-        return jsonify({"success": True, "test_run": test_run})
+        # Trả về plain dict — KHÔNG gọi jsonify() ở đây vì không có Flask context
+        return test_run
 
     try:
         if bot.is_ready() and bot.loop and bot.loop.is_running():
             print("🔬 [Test API] Chạy test bằng loop của Discord Bot (threadsafe)...", flush=True)
             future = asyncio.run_coroutine_threadsafe(run_test_logic(), bot.loop)
-            return future.result(timeout=60)
+            test_run = future.result(timeout=120)
         else:
             print("🔬 [Test API] Chạy test bằng loop mới (bot offline)...", flush=True)
-            return asyncio.run(run_test_logic())
+            test_run = asyncio.run(run_test_logic())
+
+        return jsonify({"success": True, "test_run": test_run})
+
     except Exception as e:
         import traceback
         import sys
         print(f"❌ [Test API] Gặp lỗi khi chạy vòng lặp kiểm thử: {e}", flush=True)
         traceback.print_exc(file=sys.stdout)
         return jsonify({"success": False, "error": str(e)}), 500
+

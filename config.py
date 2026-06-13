@@ -55,3 +55,4 @@ summary_count = 0
 active_interactions = set()
 is_shutting_down = False
 test_runs = []
+is_test_running = False
