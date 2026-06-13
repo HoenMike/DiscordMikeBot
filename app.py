@@ -157,8 +157,14 @@ async def tomtat(
     print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}', focus='{focus}'", flush=True)
 
     # Gửi thông báo tạm thời ban đầu
+    mode_info = "Tóm tắt ngắn gọn" if summary_type == "short" else "Tóm tắt dài & Timeline chi tiết"
+    focus_info = f" | Tập trung: `{focus}`" if focus else ""
     followup_msg = await interaction.followup.send(
-        f"⏳ Đang thu thập dữ liệu ({scan_info}) tại kênh {target_channel.mention}, đợi xíu nhé..."
+        f"⏳ **Đang thu thập dữ liệu và xử lý...**\n"
+        f"📍 Kênh: {target_channel.mention}\n"
+        f"⚙️ Chế độ: *{mode_info}*{focus_info}\n"
+        f"📊 Phạm vi: {scan_info}\n"
+        f"*Vui lòng đợi một lát nhé...*"
     )
 
     vn_tz = timezone(timedelta(hours=7))
@@ -224,6 +230,7 @@ async def tomtat(
         Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT và ĐẦY ĐỦ nhất bằng Tiếng Việt.
         {focus_instruction}
         Yêu cầu cấu trúc bài tóm tắt:
+        - ĐỘ DÀI BÀI VIẾT: BẮT BUỘC phải viết dưới 3500 ký tự để vừa vặn trong giới hạn hiển thị của Discord. Hãy viết cô đọng, tránh rườm rà.
         1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
         2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (các cuộc hội thoại MỚI NHẤT xếp lên ĐẦU, CŨ HƠN xếp xuống DƯỚI).
            - KHÔNG liệt kê máy móc từng tin nhắn riêng lẻ. Hãy **gộp nhóm các tin nhắn diễn ra liên tục/gần nhau (trong cùng một cuộc đối thoại hoặc chủ đề)** thành một mốc thời gian tổng hợp để tóm tắt một cách cô đọng và có ý nghĩa.
@@ -268,6 +275,9 @@ async def tomtat(
             contents=prompt,
         )
         summary_result = response.text
+        if summary_result and len(summary_result) > 4000:
+            print(f"⚠️ Cảnh báo: Kết quả tóm tắt vượt quá giới hạn Discord ({len(summary_result)} ký tự). Đang tiến hành cắt ngắn...", flush=True)
+            summary_result = summary_result[:3900] + "\n\n... *(Nội dung tiếp theo bị cắt bớt do vượt quá giới hạn ký tự hiển thị của Discord)*"
 
         title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
         embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
