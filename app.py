@@ -187,18 +187,18 @@ async def tomtat(
     else:
         scan_info = f"tối đa {limit} tin nhắn trong {hours} giờ qua"
 
-    print(f"📥 [Lệnh nhận] /tomtat được gọi bởi @{interaction.user.display_name} tại kênh #{target_channel.name}", flush=True)
-    print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}', focus='{focus}'", flush=True)
+    clean_focus = None
+    if focus and focus.strip() and focus.strip().lower() not in ["none", "null", "undefined"]:
+        clean_focus = focus.strip()
 
-    # Gửi thông báo tạm thời ban đầu
+    print(f"📥 [Lệnh nhận] /tomtat được gọi bởi @{interaction.user.display_name} tại kênh #{target_channel.name}", flush=True)
+    print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}', focus='{clean_focus}'", flush=True)
+
+    # Gửi thông báo tạm thời ban đầu (rút gọn)
     mode_info = "Tóm tắt ngắn gọn" if summary_type == "short" else "Tóm tắt dài & Timeline chi tiết"
-    focus_info = f" | Tập trung: `{focus}`" if focus else ""
+    focus_info = f" | Tập trung: `{clean_focus}`" if clean_focus else ""
     followup_msg = await interaction.followup.send(
-        f"⏳ **Đang thu thập dữ liệu và xử lý...**\n"
-        f"📍 Kênh: {target_channel.mention}\n"
-        f"⚙️ Chế độ: *{mode_info}*{focus_info}\n"
-        f"📊 Phạm vi: {scan_info}\n"
-        f"*Vui lòng đợi một lát nhé...*"
+        f"⏳ Đang thu thập và phân tích dữ liệu tại {target_channel.mention} (chế độ: *{mode_info}*{focus_info}). Vui lòng đợi một lát..."
     )
 
     vn_tz = timezone(timedelta(hours=7))
@@ -206,32 +206,28 @@ async def tomtat(
     
     try:
         print(f"⏳ Đang tải lịch sử kênh #{target_channel.name}...", flush=True)
+        # Giới hạn tối đa tin nhắn quét để tránh quá tải quota của AI
+        max_limit = min(limit, 500) if limit is not None else 300
+        
+        # Xác định mốc thời gian lọc
+        start_time_utc = None
         if hours is not None:
-            # Lọc theo mốc thời gian
             now_utc = datetime.now(timezone.utc)
             start_time_utc = now_utc - timedelta(hours=hours)
             
-            # Quét tin nhắn (giới hạn tối đa 500 tin nhắn để tránh quá tải)
-            max_limit = min(limit, 500) if limit is not None else 300
-            async for msg in target_channel.history(after=start_time_utc, limit=max_limit):
-                if msg.author.bot:
-                    continue
-                # Định dạng có ngày/tháng để đưa vào dữ liệu huấn luyện
-                local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
-                raw_messages.append(f"[{local_time}] {msg.author.display_name}: {msg.content}")
-        else:
-            # Chỉ lọc theo số lượng tin nhắn gần nhất (limit)
-            max_limit = min(limit, 500)
-            async for msg in target_channel.history(limit=max_limit):
-                if msg.author.bot:
-                    continue
-                local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
-                # Lưu cùng created_at để sắp xếp theo trình tự thời gian sau
-                raw_messages.append((msg.created_at, f"[{local_time}] {msg.author.display_name}: {msg.content}"))
+        # Quét từ mới nhất trở về trước
+        async for msg in target_channel.history(limit=max_limit):
+            if start_time_utc and msg.created_at < start_time_utc:
+                break
+            if msg.author.bot:
+                continue
+            local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
+            # Lưu kèm theo created_at để sắp xếp theo trình tự thời gian (cũ -> mới) sau đó
+            raw_messages.append((msg.created_at, f"[{local_time}] {msg.author.display_name}: {msg.content}"))
             
-            # Sắp xếp lại từ cũ đến mới (chính xác theo dòng thời gian hội thoại)
-            raw_messages.sort(key=lambda x: x[0])
-            raw_messages = [item[1] for item in raw_messages]
+        # Sắp xếp lại từ cũ đến mới để AI hiểu dòng thời gian hội thoại đúng trình tự
+        raw_messages.sort(key=lambda x: x[0])
+        raw_messages = [item[1] for item in raw_messages]
 
     except Exception as fetch_error:
         print(f"❌ Lỗi khi tải lịch sử chat: {fetch_error}", flush=True)
@@ -251,33 +247,40 @@ async def tomtat(
     chat_history_text = "\n".join(raw_messages)
 
     focus_instruction = ""
-    if focus:
+    if clean_focus:
         focus_instruction = f"""
-        ⚠️ BẮT BUỘC TẬP TRUNG (FOCUS): Người dùng yêu cầu bạn tập trung đặc biệt sâu vào chủ đề/sự kiện: "{focus}".
-        Hãy phân tích kỹ hơn, dành nhiều dung lượng để mô tả chi tiết diễn biến, các quan điểm, phản ứng của các thành viên và kết quả xung quanh chủ đề này trong cuộc trò chuyện (nếu có).
+        ⚠️ BẮT BUỘC TẬP TRUNG SÂU (FOCUS): Người dùng yêu cầu tập trung phân tích đặc biệt sâu vào chủ đề/câu chuyện: "{clean_focus}".
+        Yêu cầu:
+        1. Trọng tâm toàn bộ bài tóm tắt phải hướng về chủ đề này.
+        2. Dành phần lớn nội dung của cả phần Tổng quan, Timeline và Kết luận để làm rõ diễn biến, các tình tiết, ý kiến, tranh luận và phản ứng của các thành viên xoay quanh câu chuyện này.
+        3. Các đoạn hội thoại khác không liên quan đến chủ đề "{clean_focus}" hãy bỏ qua hoặc chỉ tóm tắt cực kỳ ngắn gọn (1-2 câu) để tránh làm loãng thông tin.
         """
 
     if summary_type == "long":
         prompt = f"""
         Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
         Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
-        Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT và ĐẦY ĐỦ nhất bằng Tiếng Việt.
+        Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT, ĐẦY ĐỦ và THÔNG MINH nhất bằng Tiếng Việt.
+
         {focus_instruction}
-        Yêu cầu cấu trúc bài tóm tắt:
-        - ĐỘ DÀI BÀI VIẾT: BẮT BUỘC phải viết dưới 3500 ký tự để vừa vặn trong giới hạn hiển thị của Discord. Hãy viết cô đọng, tránh rườm rà.
-        1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
-        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (các cuộc hội thoại MỚI NHẤT xếp lên ĐẦU, CŨ HƠN xếp xuống DƯỚI).
-           - KHÔNG liệt kê máy móc từng tin nhắn riêng lẻ. Hãy **gộp nhóm các tin nhắn diễn ra liên tục/gần nhau (trong cùng một cuộc đối thoại hoặc chủ đề)** thành một mốc thời gian tổng hợp để tóm tắt một cách cô đọng và có ý nghĩa.
-           - Bắt đầu mỗi dòng bằng dấu gạch đầu dòng `-` kèm khoảng thời gian [Ngày/Tháng Giờ_bắt_đầu - Giờ_kết_thúc] (hoặc mốc giờ cụ thể nếu chỉ có 1 tin nhắn đơn lẻ) và danh sách các thành viên tham gia hội thoại, sau đó tóm tắt diễn biến cuộc thảo luận đó (ai nói gì, phản hồi ra sao, ý kiến chính là gì).
-           - Bỏ qua hoặc tóm gọn tối đa các tin nhắn không mang giá trị nội dung thực tế (chỉ chứa emoji đơn lẻ, cười đùa xã giao không có chủ đề, hoặc báo gửi ảnh/tệp không hiển thị được) để dòng thời gian tập trung vào các câu chuyện chính.
-           - BẮT BUỘC chèn một dòng phân cách `---` giữa các ngày khác nhau để phân chia rõ ràng hoạt động của từng ngày.
-           
-           Định dạng ví dụ:
-           - [13/06 11:42 - 12:05] @Miraei, @Mike: Bàn luận về việc triển khai hệ thống. @Miraei đề xuất chạy thử nghiệm (test) trực tiếp trên môi trường production, @Mike tuy cảnh báo rủi ro nhưng vẫn ủng hộ tinh thần làm liều.
-           ---
-           - [12/06 22:30 - 23:11] @Amamiya, @FearsOfEvil, @Miraei: Rủ nhau chơi game và tán gẫu. @Amamiya hỏi thăm hoạt động của mọi người và rủ chơi chế độ ARAM nhưng @Miraei từ chối do bận. @FearsOfEvil bức xúc vì bỗng dưng bị thêm vào nhóm chat Messenger.
-           - [12/06 18:15] @Amamiya: Chia sẻ thông tin cập nhật mới về game Monster Hunter World.
-        3. **KẾT LUẬN & THỐNG NHẤT**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được bàn giao (nếu có).
+
+        Yêu cầu nghiêm ngặt về định dạng và cấu trúc (BẮT BUỘC TUÂN THỦ):
+        - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu (ví dụ: "Dưới đây là...", "Đây là tóm tắt...") hay lời chào kết, cảm ơn xã giao ở cuối. Đi thẳng vào nội dung chính.
+        - ĐỘ DÀI BÀI VIẾT: Dưới 3500 ký tự. Viết cô đọng, súc tích, tránh rườm rà hay lặp từ.
+        - BỐ CỤC BÀI VIẾT:
+          1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
+          2. **TIMELINE DIỄN BIẾN**:
+             - PHÂN CHIA THEO NGÀY: Nếu lịch sử trò chuyện kéo dài nhiều ngày, bạn PHẢI nhóm các timeline theo từng ngày. Dù chỉ có 1 ngày duy nhất hay nhiều ngày, bạn đều phải sử dụng cấu trúc nhóm theo ngày.
+             - Mỗi ngày bắt đầu bằng tiêu đề định dạng: `### 📅 NGÀY DD/MM` (Ví dụ: `### 📅 NGÀY 09/06`).
+             - GIỮA CÁC NGÀY KHÁC NHAU: Phải ngăn cách bằng một dòng kẻ ngang markdown `---` (để phân tách rõ ràng).
+             - CÁC MỐC THỜI GIAN TRONG NGÀY: Sắp xếp theo trình tự THỜI GIAN ĐẢO NGƯỢC (mốc mới nhất lên đầu ngày, mốc cũ hơn xuống dưới).
+             - GỘP TIN NHẮN THÔNG MINH: KHÔNG liệt kê máy móc từng tin nhắn riêng lẻ. Hãy gộp nhóm các tin nhắn diễn ra liên tục/gần nhau (cùng một cuộc đối thoại hoặc chủ đề) thành một mốc thời gian.
+             - CHỈ TẬP TRUNG vào những khoảng thời gian mọi người hoạt động nhiều (lúc thảo luận sôi nổi). Tránh liệt kê các tin nhắn đơn lẻ, tán gẫu xã giao vô thưởng vô phạt hoặc các mốc thời gian không có hoạt động đáng kể.
+             - ĐỊNH DẠNG MỐC THỜI GIAN: Vì tiêu đề ngày đã có `DD/MM`, mốc thời gian ở các gạch đầu dòng CHỈ ghi giờ và phút.
+               Định dạng: `- [Giờ_bắt_đầu - Giờ_kết_thúc] @ThànhViên1, @ThànhViên2: Nội dung tóm tắt diễn biến.` (hoặc `- [Giờ:Phút]` nếu chỉ là 1 mốc ngắn).
+               Ví dụ: `- [15:31 - 15:34] @Subeo, @Mike: Thảo luận về quán trà sữa Koi Thé.` (Tuyệt đối KHÔNG ghi `- [09/06 15:31 - 15:34]`).
+
+          3. **KẾT LUẬN & QUYẾT ĐỊNH**: Tóm tắt ngắn gọn các quyết định, thống nhất hoặc công việc được chốt lại (nếu có).
         
         Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
         \"\"\"
@@ -288,12 +291,15 @@ async def tomtat(
         prompt = f"""
         Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
         Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
-        Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách NGẮN GỌN, SÚC TÍCH và DỄ HIỂU bằng Tiếng Việt.
+        Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách NGẮN GỌN, SÚC TÍCH và DỄ HIỂU nhất bằng Tiếng Việt.
+
         {focus_instruction}
-        Yêu cầu cấu trúc bài tóm tắt:
+
+        Yêu cầu cấu trúc (BẮT BUỘC TUÂN THỦ):
+        - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời kết luận xã giao. Đi thẳng vào nội dung tóm tắt.
+        - Giữ độ dài bài tóm tắt ngắn gọn, súc tích (dưới 1000 ký tự).
         - Tóm tắt các chủ đề chính đang thảo luận dưới dạng các gạch đầu dòng ngắn gọn.
-        - Liệt kê các quyết định quan trọng (nếu có).
-        - Giữ độ dài bài tóm tắt ngắn gọn (dưới 1500 ký tự).
+        - Liệt kê các quyết định, kết luận quan trọng (nếu có).
         
         Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
         \"\"\"
@@ -327,16 +333,15 @@ async def tomtat(
                 color=embed_color
             )
             
-            # Chỉ đính kèm các trường thông tin phụ vào phần đầu tiên để tránh lặp thông tin
-            if i == 0:
-                embed.add_field(name="Kênh chat", value=target_channel.mention, inline=True)
-                embed.add_field(name="Điều kiện quét", value=scan_info, inline=True)
-                embed.add_field(name="Số tin nhắn quét", value=f"{len(raw_messages)} tin nhắn", inline=True)
-                if focus:
-                    embed.add_field(name="Chủ đề tập trung (Focus)", value=f"`{focus}`", inline=False)
+            # Chỉ đính kèm chủ đề tập trung vào phần đầu tiên nếu có sử dụng
+            if i == 0 and clean_focus:
+                embed.add_field(name="Chủ đề tập trung (Focus)", value=f"`{clean_focus}`", inline=False)
             
             embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
-            await interaction.followup.send(embed=embed)
+            
+            # Tag người dùng đã yêu cầu ở tin nhắn đầu tiên để họ nhận thông báo
+            content = f"🔔 {interaction.user.mention} Đã tóm tắt xong cuộc trò chuyện!" if i == 0 else None
+            await interaction.followup.send(content=content, embed=embed)
 
         print(f"🎉 Tóm tắt thành công! Đã gửi {len(chunks)} Embed tới kênh #{target_channel.name}.", flush=True)
 
