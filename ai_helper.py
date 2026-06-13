@@ -200,3 +200,75 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
         )
         print("✅ [MapReduce] Pha Reduce hoàn tất thành công.", flush=True)
         return response.text
+
+MOCK_CHAT_HISTORY = [
+    "[13/06 09:15] @Miraei: Chào mọi người, hôm nay chúng ta bàn về dự án bot nhé.",
+    "[13/06 09:17] @Tuan\ud83d\udc24: Ok, bot hiện tại đang chạy tốt nhưng tôi thấy hình như nếu quét dài quá nó chỉ lấy được ngày cũ nhất thôi.",
+    "[13/06 09:18] @Miraei: Đúng rồi, đó là do discord history query sử dụng after=start_time_utc, nó bị giới hạn ở 300 tin đầu tiên tính từ ngày cũ. Để tôi sửa lại.",
+    "[13/06 09:20] @FearsOfEvil: Nên tách code ra nữa Miraei ơi, app.py giờ phình to hơn 1000 dòng rồi, khó đọc lắm.",
+    "[13/06 09:22] @Miraei: Đồng ý. Tôi sẽ tách thành config, bot_instance, ai_helper, và web_dashboard.",
+    "[13/06 10:05] @jun: Mọi người ơi có ai làm bài Lab 10 môn Machine Learning của thầy Dũ chưa?",
+    "[13/06 10:08] @Mizu: Bài đó chia 10 dataset theo số cuối MSSV đúng không? Hạn nộp là 1 tuần nữa.",
+    "[13/06 10:10] @jun: Đúng rồi lo quá, phần này tôi chưa hiểu thuật toán lắm.",
+    "[13/06 15:30] @Poop: Có ai làm ván ARAM LoL không? Lên đồ Velkoz kiểu mới vui cực.",
+    "[13/06 15:32] @jun: Đi ông ơi, đợi tôi mở máy.",
+    "[13/06 15:35] @Poop: Ok vào game thôi."
+]
+
+async def evaluate_summary(raw_history_text, generated_summary, summary_type, clean_focus):
+    eval_prompt = f"""
+    Bạn là một kỹ sư đảm bảo chất lượng AI (AI QA Engineer) khó tính.
+    Nhiệm vụ của bạn là đánh giá và chấm điểm một bản tóm tắt được tạo bởi một AI Summary Bot từ lịch sử trò chuyện Discord.
+
+    Dưới đây là cấu hình quét:
+    - Kiểu tóm tắt: {summary_type}
+    - Chủ đề tập trung (Focus): {clean_focus or "Không có"}
+
+    Lịch sử trò chuyện gốc:
+    \"\"\"
+    {raw_history_text[:4000]} (đã lược bớt nếu quá dài)
+    \"\"\"
+
+    Bản tóm tắt cần đánh giá:
+    \"\"\"
+    {generated_summary}
+    \"\"\"
+
+    Hãy kiểm tra nghiêm ngặt bản tóm tắt dựa trên các tiêu chí sau:
+    1. **Lời mở đầu & Lời kết rườm rà (Fluff Check)**: Bản tóm tắt có chứa các câu xã giao, chào hỏi hoặc dẫn dắt thừa thãi ở đầu hoặc cuối không? (Quy định là phải đi thẳng vào nội dung).
+    2. **Định dạng Timeline (Timeline Check)**:
+       - Có phân chia theo ngày dạng `### 📅 NGÀY DD/MM` không?
+       - Mốc thời gian gạch đầu dòng có bị thừa phần ngày không? (Mốc thời gian đúng phải là `- [Giờ:Phút]` hoặc `- [Giờ_bắt_đầu - Giờ_kết_thúc]`, tuyệt đối không được ghi ngày ở đây).
+       - Có dòng kẻ ngang `---` để chia tách giữa các ngày không?
+    3. **Chất lượng nội dung & Focus (Content & Focus Check)**:
+       - AI có gộp tin nhắn thông minh không, hay chỉ liệt kê máy móc?
+       - Nếu có chủ đề Focus, bản tóm tắt có tập trung cao độ vào chủ đề đó và bỏ qua các nội dung rác khác không?
+       - Bản tóm tắt có bỏ sót quyết định hay kết luận quan trọng nào không?
+    4. **Độ dài & Trực quan (Length & Readability Check)**: Bản tóm tắt có quá dài (vượt 3500 ký tự) hay khó đọc không?
+
+    Định dạng báo cáo đánh giá của bạn (BẮT BUỘC bằng Tiếng Việt, định dạng Markdown):
+    ### \ud83d\udcca BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TÓM TẮT
+    - **Điểm số**: [Chấm điểm từ 1 đến 10]
+    - **Fluff Check**: [ĐẠT / KHÔNG ĐẠT - Lý do ngắn gọn]
+    - **Timeline Check**: [ĐẠT / KHÔNG ĐẠT - Lý do ngắn gọn]
+    - **Focus Check**: [ĐẠT / KHÔNG ĐẠT / KHÔNG ÁP DỤNG - Lý do ngắn gọn]
+
+    #### \ud83d\udcdd Chi tiết đánh giá:
+    - [Ghi chú chi tiết về những điểm tốt]
+    - [Ghi chú chi tiết về những điểm lỗi hoặc chưa tốt]
+
+    #### \ud83d\udca1 Đề xuất cải tiến cụ thể:
+    - [Gợi ý cải tiến cụ thể cho AI để cấu hình prompt khôn hơn hoặc xử lý tốt hơn]
+    """
+
+    try:
+        response = await asyncio.to_thread(
+            ai_client.models.generate_content,
+            model='gemma-4-31b-it',
+            contents=eval_prompt,
+        )
+        return response.text
+    except Exception as e:
+        print(f"❌ [AI Critique] Lỗi khi đánh giá bản tóm tắt: {e}", flush=True)
+        return f"### \ud83d\udcca BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TÓM TẮT\n- **Điểm số**: N/A\n- **Lỗi hệ thống**: Không thể đánh giá do lỗi gọi API: {e}"
+

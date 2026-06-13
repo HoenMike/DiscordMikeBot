@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, render_template_string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import psutil
 import platform
 import math
@@ -258,10 +258,45 @@ HTML_TEMPLATE = r"""
             border-top: 1px solid rgba(255, 255, 255, 0.04);
         }
 
+        /* TABS NAVIGATION */
+        .tabs-header {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+        }
+
         .console-container {
             display: flex;
             flex-direction: column;
-            height: 100%;
+            height: calc(100% - 50px);
             overflow: hidden;
         }
 
@@ -362,6 +397,168 @@ HTML_TEMPLATE = r"""
             background: var(--status-offline);
             border-color: var(--status-offline);
         }
+
+        /* AUDIT PANEL CSS */
+        .audit-split-panel {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.25rem;
+            flex: 1;
+            height: calc(100% - 50px);
+            overflow: hidden;
+        }
+
+        @media (max-width: 900px) {
+            .audit-split-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .test-list-pane {
+            background: rgba(11, 15, 25, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            overflow-y: auto;
+        }
+
+        .test-list-header {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.5rem;
+        }
+
+        .test-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .test-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .test-item:hover {
+            border-color: rgba(139, 92, 246, 0.4);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .test-item.active {
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.08);
+            box-shadow: inset 0 0 10px rgba(139, 92, 246, 0.15);
+        }
+
+        .test-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .score-badge {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--status-online);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+
+        .score-badge.low {
+            background: rgba(239, 44, 44, 0.1);
+            color: var(--status-offline);
+        }
+
+        .score-badge.mid {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .test-detail-pane {
+            background: var(--terminal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            overflow-y: auto;
+            height: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #f1f5f9;
+        }
+
+        .test-detail-section {
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1.25rem;
+        }
+
+        .test-detail-section:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--accent-purple);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .code-block {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 0.75rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .markdown-text {
+            white-space: pre-wrap;
+            color: #e2e8f0;
+        }
+
+        .markdown-text h3 {
+            font-size: 1.05rem;
+            margin-bottom: 0.5rem;
+            color: #c084fc;
+        }
+
+        .markdown-text h4 {
+            font-size: 0.95rem;
+            margin-top: 0.75rem;
+            margin-bottom: 0.25rem;
+            color: #38bdf8;
+        }
+
+        .markdown-text ul {
+            margin-left: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -442,28 +639,63 @@ HTML_TEMPLATE = r"""
             </div>
         </div>
 
-        <div class="console-container">
-            <div class="console-header">
-                <div class="console-title">
-                    <span>💻 Console Logs</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <button class="btn-action copy" onclick="copyConsoleLogs()">Sao chép log</button>
-                    <button class="btn-action clear" onclick="clearConsoleLogs()">Xóa log</button>
-                    <div class="live-indicator" style="margin-left: 0.5rem;">
-                        <span class="live-dot"></span>
-                        <span>Live</span>
+        <div style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
+            <div class="tabs-header">
+                <button id="tab-logs-btn" class="tab-btn active" onclick="switchTab('logs')">💻 Logs & Stats</button>
+                <button id="tab-audit-btn" class="tab-btn" onclick="switchTab('audit')">🔬 AI Self-Audit & Test</button>
+            </div>
+
+            <!-- TAB LOGS CONTENT -->
+            <div id="tab-logs-content" class="console-container">
+                <div class="console-header">
+                    <div class="console-title">
+                        <span>💻 Console Logs</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button class="btn-action copy" onclick="copyConsoleLogs()">Sao chép log</button>
+                        <button class="btn-action clear" onclick="clearConsoleLogs()">Xóa log</button>
+                        <div class="live-indicator" style="margin-left: 0.5rem;">
+                            <span class="live-dot"></span>
+                            <span>Live</span>
+                        </div>
                     </div>
                 </div>
+                <div id="console-body" class="console-body">
+                    <div class="log-line"><span class="log-timestamp">[--:--:--]</span> Đang tải log từ máy chủ...</div>
+                </div>
             </div>
-            <div id="console-body" class="console-body">
-                <div class="log-line"><span class="log-timestamp">[--:--:--]</span> Đang tải log từ máy chủ...</div>
+
+            <!-- TAB AUDIT CONTENT -->
+            <div id="tab-audit-content" class="audit-split-panel" style="display: none;">
+                <div class="test-list-pane">
+                    <div style="display: flex; justify-content: space-between; align-items: center;" class="test-list-header">
+                        <span>Lịch sử Test ({20 gần nhất})</span>
+                        <button class="btn-action copy" id="run-test-btn" onclick="runSelfAuditTest()">Chạy Test AI</button>
+                    </div>
+                    <div id="test-loading" style="display:none; color: #a855f7; font-size: 0.75rem; text-align: center; padding: 0.5rem; background: rgba(139, 92, 246, 0.05); border-radius: 6px; border: 1px dashed rgba(139, 92, 246, 0.2);">
+                        ⏳ Đang chạy tóm tắt & AI QA đánh giá (khoảng 10-15s)...
+                    </div>
+                    <div id="test-runs-list" class="test-list-container">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 1rem;">Chưa có lượt test nào được ghi nhận. Hãy bấm "Chạy Test AI".</div>
+                    </div>
+                </div>
+
+                <div id="test-details-pane" class="test-detail-pane">
+                    <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: var(--text-secondary); text-align: center; gap: 0.5rem;">
+                        <span style="font-size: 2rem;">🔬</span>
+                        <p style="font-weight: 500;">AI Self-Audit Playground</p>
+                        <p style="font-size: 0.75rem; max-width: 300px;">Chọn một lượt chạy thử nghiệm bên trái hoặc bấm nút "Chạy Test AI" để chạy phân tích đánh giá chất lượng tự động.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
 
     <script>
         let autoScroll = true;
+        let activeTab = 'logs';
+        let testRunsData = [];
+        let selectedTestIndex = null;
         const consoleBody = document.getElementById('console-body');
 
         // Phát hiện cuộn chuột để khóa auto scroll
@@ -472,6 +704,20 @@ HTML_TEMPLATE = r"""
             const isAtBottom = consoleBody.scrollHeight - consoleBody.clientHeight - consoleBody.scrollTop < threshold;
             autoScroll = isAtBottom;
         });
+
+        // Tab switcher
+        function switchTab(tabName) {
+            activeTab = tabName;
+            document.getElementById('tab-logs-btn').className = tabName === 'logs' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tab-audit-btn').className = tabName === 'audit' ? 'tab-btn active' : 'tab-btn';
+            
+            document.getElementById('tab-logs-content').style.display = tabName === 'logs' ? 'flex' : 'none';
+            document.getElementById('tab-audit-content').style.display = tabName === 'audit' ? 'grid' : 'none';
+            
+            if (tabName === 'audit') {
+                renderTestRuns();
+            }
+        }
 
         function formatLogLine(line) {
             if (!line || typeof line !== 'string') return '';
@@ -536,6 +782,131 @@ HTML_TEMPLATE = r"""
             }
         }
 
+        // Render danh sách các lượt test runs
+        function renderTestRuns() {
+            const listContainer = document.getElementById('test-runs-list');
+            if (testRunsData.length === 0) {
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 1rem;">Chưa có lượt test nào được ghi nhận. Hãy bấm "Chạy Test AI".</div>`;
+                return;
+            }
+            
+            listContainer.innerHTML = testRunsData.map((run, idx) => {
+                const isActive = idx === selectedTestIndex ? 'active' : '';
+                const score = parseFloat(run.score) || 0;
+                let scoreClass = 'green';
+                if (score < 5) scoreClass = 'low';
+                else if (score < 8) scoreClass = 'mid';
+                
+                return `
+                    <div class="test-item ${isActive}" onclick="selectTestRun(${idx})">
+                        <div class="test-meta">
+                            <span>${run.timestamp}</span>
+                            <span class="score-badge ${scoreClass}">${run.score} / 10</span>
+                        </div>
+                        <div style="font-size: 0.8rem; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${escapeHtml(run.source)}
+                        </div>
+                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                            Mode: ${run.mode} | Focus: ${run.focus ? run.focus : 'Không'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Chọn xem chi tiết một lượt test
+        function selectTestRun(index) {
+            selectedTestIndex = index;
+            renderTestRuns();
+            
+            const detailPane = document.getElementById('test-details-pane');
+            const run = testRunsData[index];
+            if (!run) return;
+            
+            const scoreNum = parseFloat(run.score) || 0;
+            let scoreColor = 'var(--status-online)';
+            if (scoreNum < 5) scoreColor = 'var(--status-offline)';
+            else if (scoreNum < 8) scoreColor = '#f59e0b';
+            
+            // Format report Markdown to simple HTML elements
+            let htmlReport = escapeHtml(run.evaluation)
+                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
+                .replace(/^\s*-\s*\*\*(.*?)\*\*:\s*(.*$)/gim, '<li><strong>$1</strong>: $2</li>')
+                .replace(/^\s*-\s*(.*$)/gim, '<li>$1</li>');
+                
+            // Wrap <li> into <ul>
+            htmlReport = htmlReport.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+            // Clean consecutive <ul> tags
+            htmlReport = htmlReport.replace(/<\/ul>\s*<ul>/g, '');
+
+            detailPane.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.75rem; margin-bottom:1rem;">
+                    <div>
+                        <h2 style="font-size:1.1rem; font-weight:700; color:#f1f5f9;">🔬 Kết Quả Kiểm Thử AI</h2>
+                        <p style="font-size:0.75rem; color:var(--text-secondary);">${run.timestamp} | Nguồn: ${run.source}</p>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:1.3rem; font-weight:700; color:${scoreColor};">${run.score}</span>
+                        <span style="font-size:0.8rem; color:var(--text-secondary);"> / 10</span>
+                    </div>
+                </div>
+                
+                <div class="test-detail-section">
+                    <div class="section-title">⚙️ Cấu Hình Chạy Test</div>
+                    <div style="font-size:0.8rem; display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; color:#cbd5e1;">
+                        <div>Phạm vi quét: <strong>${run.scan_info}</strong></div>
+                        <div>Số tin nhắn thực tế: <strong>${run.raw_count} tin nhắn</strong></div>
+                        <div>Chế độ tóm tắt: <strong>${run.mode}</strong></div>
+                        <div>Từ khóa focus: <strong>${run.focus ? run.focus : 'Không'}</strong></div>
+                    </div>
+                </div>
+
+                <div class="test-detail-section">
+                    <div class="section-title">🤖 AI QA Engineer Đánh Giá (Critique)</div>
+                    <div class="markdown-text">${htmlReport}</div>
+                </div>
+
+                <div class="test-detail-section">
+                    <div class="section-title">📝 Bản Tóm Tắt Được Tạo (Generated Summary)</div>
+                    <div class="code-block" style="background:#090d16; color:#f8fafc; border:1px solid rgba(255,255,255,0.05); max-height:400px;">${escapeHtml(run.summary)}</div>
+                </div>
+            `;
+        }
+
+        // Kích hoạt API chạy test từ dashboard
+        async function runSelfAuditTest() {
+            const btn = document.getElementById('run-test-btn');
+            const loading = document.getElementById('test-loading');
+            
+            btn.disabled = true;
+            btn.style.opacity = 0.5;
+            loading.style.display = 'block';
+            
+            try {
+                const response = await fetch('/api/test/run', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    // Cập nhật dữ liệu dashboard lập tức
+                    await updateDashboard();
+                    // Chọn phần tử test đầu tiên (vừa mới tạo)
+                    selectedTestIndex = 0;
+                    renderTestRuns();
+                    selectTestRun(0);
+                    alert("🎉 Đã chạy xong lượt test tự động! Xem chi tiết đánh giá ở bảng điều khiển.");
+                } else {
+                    alert("❌ Lỗi kiểm thử: " + result.error);
+                }
+            } catch (err) {
+                console.error("Test error:", err);
+                alert("❌ Lỗi kết nối máy chủ khi chạy kiểm thử.");
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = 1;
+                loading.style.display = 'none';
+            }
+        }
+
         async function updateDashboard() {
             try {
                 const response = await fetch('/api/stats');
@@ -578,6 +949,18 @@ HTML_TEMPLATE = r"""
                     }
                 } else {
                     consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
+                }
+
+                // Cập nhật lịch sử test runs
+                if (data.test_runs) {
+                    testRunsData = data.test_runs;
+                    if (activeTab === 'audit') {
+                        renderTestRuns();
+                        // Giữ nguyên hiển thị chi tiết test nếu đang chọn
+                        if (selectedTestIndex !== null && selectedTestIndex < testRunsData.length) {
+                            selectTestRun(selectedTestIndex);
+                        }
+                    }
                 }
 
             } catch (error) {
@@ -649,7 +1032,8 @@ def api_stats():
         "os_info": f"{platform.system()} ({platform.release()})",
         "summaries": config.summary_count,
         "model": "Gemma 4 (gemma-4-31b-it)",
-        "logs": list(config.log_buffer)
+        "logs": list(config.log_buffer),
+        "test_runs": config.test_runs
     })
 
 @app.route('/api/logs/clear', methods=['POST'])
@@ -657,3 +1041,90 @@ def api_clear_logs():
     config.log_buffer.clear()
     print("🧹 Đã xóa toàn bộ logs hệ thống theo yêu cầu từ Dashboard.", flush=True)
     return jsonify({"success": True})
+
+@app.route('/api/test/run', methods=['POST'])
+async def api_run_test():
+    try:
+        import ai_helper
+        import config
+        from bot_instance import bot
+        import discord
+        from datetime import timezone, timedelta
+        import re
+        
+        # 1. Thu thập tin nhắn (quét kênh thực tế nếu bot online hoặc dùng Mock Data)
+        raw_messages = []
+        source_info = "Mock Chat Data (Giả lập)"
+        
+        if bot.is_ready() and len(bot.guilds) > 0:
+            target_channel = None
+            for guild in bot.guilds:
+                for channel in guild.text_channels:
+                    # Kiểm tra quyền đọc tin nhắn
+                    permissions = channel.permissions_for(guild.me)
+                    if permissions.read_messages and permissions.read_message_history:
+                        target_channel = channel
+                        break
+                if target_channel:
+                    break
+            
+            if target_channel:
+                source_info = f"Kênh thực tế: #{target_channel.name} ({target_channel.guild.name})"
+                vn_tz = timezone(timedelta(hours=7))
+                print(f"🔬 [Test API] Đang lấy tin nhắn test từ kênh Discord {source_info}...", flush=True)
+                async for msg in target_channel.history(limit=150):
+                    if msg.author.bot:
+                        continue
+                    local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
+                    raw_messages.append(f"[{local_time}] {msg.author.display_name}: {msg.content}")
+                raw_messages.reverse() # Sắp xếp từ cũ đến mới
+        
+        if not raw_messages:
+            # Fallback sang Mock Data
+            print(f"🔬 [Test API] Không có kênh online hoặc bot offline, sử dụng {source_info}...", flush=True)
+            raw_messages = ai_helper.MOCK_CHAT_HISTORY
+        
+        scan_info = "150 tin nhắn thử nghiệm"
+        summary_type = "long"
+        clean_focus = "bot tóm tắt"  # Thử nghiệm focus vào bot tóm tắt
+        
+        # 2. Chạy tóm tắt
+        print("🔬 [Test API] Đang chạy tóm tắt...", flush=True)
+        summary_result = await ai_helper.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
+        
+        # 3. Chạy đánh giá chất lượng tự động bằng AI QA
+        print("🔬 [Test API] Đang gửi kết quả cho AI QA tự động chấm điểm...", flush=True)
+        raw_history_text = "\n".join(raw_messages)
+        evaluation_report = await ai_helper.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
+        
+        # Trích xuất điểm số từ báo cáo
+        score_val = "N/A"
+        score_match = re.search(r"-\s*\*\*Điểm số\*\*:\s*([\d\.\/\s]+)", evaluation_report, re.IGNORECASE)
+        if score_match:
+            score_val = score_match.group(1).strip()
+            
+        test_run = {
+            "timestamp": datetime.now(timezone(timedelta(hours=7))).strftime('%d/%m %H:%M:%S'),
+            "source": source_info,
+            "scan_info": scan_info,
+            "mode": summary_type,
+            "focus": clean_focus,
+            "raw_count": len(raw_messages),
+            "summary": summary_result,
+            "evaluation": evaluation_report,
+            "score": score_val
+        }
+        
+        config.test_runs.insert(0, test_run)
+        if len(config.test_runs) > 20:
+            config.test_runs = config.test_runs[:20]
+            
+        print(f"🎉 [Test API] Đã chạy xong lượt test. AI QA chấm điểm: {score_val}.", flush=True)
+        return jsonify({"success": True, "test_run": test_run})
+        
+    except Exception as e:
+        import traceback
+        import sys
+        print(f"❌ [Test API] Gặp lỗi khi chạy vòng lặp kiểm thử: {e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        return jsonify({"success": False, "error": str(e)}), 500
