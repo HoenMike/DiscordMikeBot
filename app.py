@@ -1068,16 +1068,25 @@ async def graceful_shutdown():
     is_shutting_down = True
     print("👋 Bắt đầu quy trình tắt bot graceful...", flush=True)
     
-    # Gửi thông báo tới các user đang có lệnh xử lý dở
-    for interaction in list(active_interactions):
-        try:
-            print(f"   ↳ Gửi thông báo hủy lệnh tới user @{interaction.user.display_name}", flush=True)
-            await interaction.followup.send(
-                "❌ Bot đang được cập nhật/tái khởi động hệ thống. Vui lòng thực hiện lại lệnh sau 15-30 giây!",
-                ephemeral=True
-            )
-        except Exception as e:
-            print(f"⚠️ Không thể gửi thông báo shutdown tới user: {e}", flush=True)
+    # Chờ các lệnh đang chạy dở hoàn thành nốt (tối đa 15 giây)
+    wait_time = 0
+    while active_interactions and wait_time < 15:
+        print(f"⏳ Đang chờ {len(active_interactions)} lệnh dở hoàn thành... ({wait_time}s)", flush=True)
+        await asyncio.sleep(1)
+        wait_time += 1
+
+    # Nếu sau 15 giây vẫn còn lệnh chưa xong, gửi thông báo hủy cho các lệnh đó
+    if active_interactions:
+        print(f"⚠️ Hết thời gian chờ. Hủy bỏ {len(active_interactions)} lệnh còn lại...", flush=True)
+        for interaction in list(active_interactions):
+            try:
+                print(f"   ↳ Gửi thông báo hủy lệnh tới user @{interaction.user.display_name}", flush=True)
+                await interaction.followup.send(
+                    "❌ Bot đang tái khởi động hệ thống. Vui lòng thực hiện lại lệnh sau 15-30 giây!",
+                    ephemeral=True
+                )
+            except Exception as e:
+                print(f"⚠️ Không thể gửi thông báo shutdown tới user: {e}", flush=True)
     
     # Đóng kết nối bot
     try:
@@ -1097,8 +1106,8 @@ def handle_sigterm(signum, frame):
         # Chạy coroutine trong thread của bot
         future = asyncio.run_coroutine_threadsafe(graceful_shutdown(), bot.loop)
         try:
-            # Chờ tối đa 5 giây cho việc gửi thông báo và đóng kết nối hoàn tất
-            future.result(timeout=5)
+            # Chờ tối đa 20 giây cho việc hoàn tất các lệnh dở và đóng bot
+            future.result(timeout=20)
         except Exception as e:
             print(f"⚠️ Hết thời gian chờ hoặc xảy ra lỗi khi tắt bot: {e}", flush=True)
             
