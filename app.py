@@ -104,50 +104,121 @@ async def on_ready():
 @bot.tree.command(name="tomtat", description="Tóm tắt nội dung cuộc trò chuyện trong một kênh")
 @app_commands.describe(
     channel="Kênh chat cần tóm tắt (Mặc định là kênh hiện tại)",
-    hours="Số giờ trước cần tóm tắt (Mặc định là 2.0 giờ)"
+    hours="Quét tin nhắn trong X giờ qua (Ví dụ: 2.0)",
+    limit="Giới hạn số lượng tin nhắn quét tối đa (Ví dụ: 100)",
+    summary_type="Kiểu tóm tắt: Ngắn gọn hoặc Chi tiết kèm Timeline"
 )
-async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel = None, hours: float = 2.0):
+@app_commands.choices(summary_type=[
+    app_commands.Choice(name="Tóm tắt ngắn gọn (Mặc định)", value="short"),
+    app_commands.Choice(name="Tóm tắt dài & Timeline chi tiết", value="long")
+])
+async def tomtat(
+    interaction: discord.Interaction, 
+    channel: discord.TextChannel = None, 
+    hours: float = None, 
+    limit: int = None,
+    summary_type: str = "short"
+):
     await interaction.response.defer(ephemeral=False)
     
     target_channel = channel or interaction.channel
     
+    # Xác định các giá trị mặc định nếu người dùng bỏ trống
+    if hours is None and limit is None:
+        hours = 2.0
+        limit = 100
+        scan_info = "100 tin nhắn trong 2.0 giờ qua"
+    elif hours is not None and limit is None:
+        limit = 300  # Giới hạn trần an toàn khi lọc theo giờ
+        scan_info = f"tin nhắn trong {hours} giờ qua"
+    elif limit is not None and hours is None:
+        scan_info = f"{limit} tin nhắn gần nhất"
+    else:
+        scan_info = f"tối đa {limit} tin nhắn trong {hours} giờ qua"
+
     # Gửi thông báo tạm thời ban đầu
     followup_msg = await interaction.followup.send(
-        f"⏳ Đang thu thập tin nhắn trong kênh {target_channel.mention} trong {hours} giờ qua, đợi xíu nhé..."
+        f"⏳ Đang thu thập dữ liệu ({scan_info}) tại kênh {target_channel.mention}, đợi xíu nhé..."
     )
 
-    now_utc = datetime.now(timezone.utc)
-    start_time_utc = now_utc - timedelta(hours=hours)
-
+    vn_tz = timezone(timedelta(hours=7))
     raw_messages = []
     
-    # Giới hạn trần 300 tin nhắn để tránh quá tải bộ nhớ trên gói Free của Render
-    async for msg in target_channel.history(after=start_time_utc, limit=300):
-        if msg.author.bot:
-            continue
-        raw_messages.append(f"{msg.author.display_name}: {msg.content}")
+    try:
+        if hours is not None:
+            # Lọc theo mốc thời gian
+            now_utc = datetime.now(timezone.utc)
+            start_time_utc = now_utc - timedelta(hours=hours)
+            
+            # Quét tin nhắn (giới hạn tối đa 500 tin nhắn để tránh quá tải)
+            max_limit = min(limit, 500) if limit is not None else 300
+            async for msg in target_channel.history(after=start_time_utc, limit=max_limit):
+                if msg.author.bot:
+                    continue
+                local_time = msg.created_at.astimezone(vn_tz).strftime('%H:%M')
+                raw_messages.append(f"[{local_time}] {msg.author.display_name}: {msg.content}")
+        else:
+            # Chỉ lọc theo số lượng tin nhắn gần nhất (limit)
+            max_limit = min(limit, 500)
+            async for msg in target_channel.history(limit=max_limit):
+                if msg.author.bot:
+                    continue
+                local_time = msg.created_at.astimezone(vn_tz).strftime('%H:%M')
+                # Lưu cùng created_at để sắp xếp theo trình tự thời gian sau
+                raw_messages.append((msg.created_at, f"[{local_time}] {msg.author.display_name}: {msg.content}"))
+            
+            # Sắp xếp lại từ cũ đến mới (chính xác theo dòng thời gian hội thoại)
+            raw_messages.sort(key=lambda x: x[0])
+            raw_messages = [item[1] for item in raw_messages]
+
+    except Exception as fetch_error:
+        print(f"❌ Lỗi khi tải lịch sử chat: {fetch_error}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        await interaction.followup.send("❌ Không thể tải lịch sử kênh chat. Hãy kiểm tra quyền hạn của bot!")
+        return
 
     if not raw_messages:
-        await interaction.followup.send(f"❌ Không tìm thấy tin nhắn nào trong kênh {target_channel.mention} trong {hours} giờ qua.")
+        await interaction.followup.send(f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}.")
         return
 
     chat_history_text = "\n".join(raw_messages)
 
-    prompt = f"""
-    Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
-    Dưới đây là lịch sử trò chuyện của một nhóm chat trong vòng {hours} giờ qua. 
-    Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách ngắn gọn, súc tích và dễ hiểu bằng Tiếng Việt.
-    
-    Yêu cầu:
-    - Nêu rõ các chủ đề chính mà mọi người đang thảo luận.
-    - Nếu có kết luận hoặc thống nhất nào quan trọng, hãy liệt kê ra.
-    - Giữ độ dài bài tóm tắt ngắn gọn (dưới 1500 ký tự).
-    
-    Dữ liệu trò chuyện:
-    \"\"\"
-    {chat_history_text}
-    \"\"\"
-    """
+    if summary_type == "long":
+        prompt = f"""
+        Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
+        Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
+        Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT và ĐẦY ĐỦ nhất bằng Tiếng Việt.
+        
+        Yêu cầu cấu trúc bài tóm tắt:
+        1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung.
+        2. **TIMELINE DIỄN BIẾN**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự thời gian (danh sách đánh số), sử dụng các mốc thời gian [Giờ:Phút] có sẵn trong dữ liệu. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
+           Định dạng ví dụ:
+           1. [09:15] @Hoang: Bắt đầu hỏi về lịch họp dự án.
+           2. [09:20] @Mike: Trả lời rằng cuộc họp sẽ diễn ra lúc 10h sáng.
+           3. [09:22] @Linh: Xác nhận tham gia và nhắc mang theo slide.
+        3. **KẾT LUẬN & THỐNG NHẤT**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được bàn giao (nếu có).
+        
+        Dữ liệu trò chuyện (mốc thời gian Việt Nam [Giờ:Phút]):
+        \"\"\"
+        {chat_history_text}
+        \"\"\"
+        """
+    else:
+        prompt = f"""
+        Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
+        Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
+        Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách NGẮN GỌN, SÚC TÍCH và DỄ HIỂU bằng Tiếng Việt.
+        
+        Yêu cầu cấu trúc bài tóm tắt:
+        - Tóm tắt các chủ đề chính đang thảo luận dưới dạng các gạch đầu dòng ngắn gọn.
+        - Liệt kê các quyết định quan trọng (nếu có).
+        - Giữ độ dài bài tóm tắt ngắn gọn (dưới 1500 ký tự).
+        
+        Dữ liệu trò chuyện (mốc thời gian Việt Nam [Giờ:Phút]):
+        \"\"\"
+        {chat_history_text}
+        \"\"\"
+        """
 
     try:
         response = ai_client.models.generate_content(
@@ -156,14 +227,17 @@ async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel 
         )
         summary_result = response.text
 
+        title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
+        embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
+
         embed = discord.Embed(
-            title="📝 TÓM TẮT CUỘC TRÒ CHUYỆN",
+            title=title_str,
             description=summary_result,
-            color=discord.Color.green()
+            color=embed_color
         )
         embed.add_field(name="Kênh chat", value=target_channel.mention, inline=True)
-        embed.add_field(name="Khoảng thời gian", value=f"{hours} giờ qua", inline=True)
-        embed.add_field(name="Số tin nhắn quét được", value=f"{len(raw_messages)} tin nhắn", inline=True)
+        embed.add_field(name="Điều kiện quét", value=scan_info, inline=True)
+        embed.add_field(name="Số tin nhắn quét", value=f"{len(raw_messages)} tin nhắn", inline=True)
         embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
 
         await interaction.followup.send(embed=embed)
