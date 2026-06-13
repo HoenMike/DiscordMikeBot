@@ -200,15 +200,17 @@ async def tomtat(
         
         Yêu cầu cấu trúc bài tóm tắt:
         1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
-        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến chi tiết cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (Tin nhắn MỚI NHẤT xếp lên ĐẦU danh sách, các tin nhắn CŨ HƠN xếp xuống DƯỚI).
-           - Bắt đầu mỗi dòng bằng dấu gạch đầu dòng `-` kèm mốc thời gian [Ngày/Tháng Giờ:Phút] có sẵn trong dữ liệu. Ví dụ: `- [Ngày/Tháng Giờ:Phút] @User: Nội dung chi tiết`. Ghi rõ ai nói gì, phản hồi/tranh luận của người khác ra sao một cách chi tiết và logic.
+        2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (các cuộc hội thoại MỚI NHẤT xếp lên ĐẦU, CŨ HƠN xếp xuống DƯỚI).
+           - KHÔNG liệt kê máy móc từng tin nhắn riêng lẻ. Hãy **gộp nhóm các tin nhắn diễn ra liên tục/gần nhau (trong cùng một cuộc đối thoại hoặc chủ đề)** thành một mốc thời gian tổng hợp để tóm tắt một cách cô đọng và có ý nghĩa.
+           - Bắt đầu mỗi dòng bằng dấu gạch đầu dòng `-` kèm khoảng thời gian [Ngày/Tháng Giờ_bắt_đầu - Giờ_kết_thúc] (hoặc mốc giờ cụ thể nếu chỉ có 1 tin nhắn đơn lẻ) và danh sách các thành viên tham gia hội thoại, sau đó tóm tắt diễn biến cuộc thảo luận đó (ai nói gì, phản hồi ra sao, ý kiến chính là gì).
+           - Bỏ qua hoặc tóm gọn tối đa các tin nhắn không mang giá trị nội dung thực tế (chỉ chứa emoji đơn lẻ, cười đùa xã giao không có chủ đề, hoặc báo gửi ảnh/tệp không hiển thị được) để dòng thời gian tập trung vào các câu chuyện chính.
            - BẮT BUỘC chèn một dòng phân cách `---` giữa các ngày khác nhau để phân chia rõ ràng hoạt động của từng ngày.
+           
            Định dạng ví dụ:
-           - [13/06 12:05] @Miraei: Nhận xét rằng bot chạy rất mượt.
-           - [13/06 11:42] @Mike: Đề xuất test thử trên môi trường production.
+           - [13/06 11:42 - 12:05] @Miraei, @Mike: Bàn luận về việc triển khai hệ thống. @Miraei đề xuất chạy thử nghiệm (test) trực tiếp trên môi trường production, @Mike tuy cảnh báo rủi ro nhưng vẫn ủng hộ tinh thần làm liều.
            ---
-           - [12/06 23:11] @Amamiya: Rủ cả nhóm chơi game.
-           - [12/06 22:30] @FearsOfEvil: Hỏi về cấu hình máy.
+           - [12/06 22:30 - 23:11] @Amamiya, @FearsOfEvil, @Miraei: Rủ nhau chơi game và tán gẫu. @Amamiya hỏi thăm hoạt động của mọi người và rủ chơi chế độ ARAM nhưng @Miraei từ chối do bận. @FearsOfEvil bức xúc vì bỗng dưng bị thêm vào nhóm chat Messenger.
+           - [12/06 18:15] @Amamiya: Chia sẻ thông tin cập nhật mới về game Monster Hunter World.
         3. **KẾT LUẬN & THỐNG NHẤT**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được bàn giao (nếu có).
         
         Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
