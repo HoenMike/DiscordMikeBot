@@ -300,25 +300,24 @@ HTML_TEMPLATE = """
             font-family: 'Outfit', sans-serif;
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
+            overflow: hidden; /* Khóa cuộn trang chính */
             background-image: 
-                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 40%);
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.12) 0%, transparent 40%);
         }
 
         header {
-            padding: 1.5rem 4rem;
+            padding: 1rem 2rem;
+            height: 70px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border-color);
             background: rgba(11, 15, 25, 0.8);
             backdrop-filter: blur(12px);
-            position: sticky;
-            top: 0;
             z-index: 10;
         }
 
@@ -329,19 +328,19 @@ HTML_TEMPLATE = """
         }
 
         .bot-avatar {
-            width: 48px;
-            height: 48px;
+            width: 42px;
+            height: 42px;
             background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            border-radius: 12px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
+            font-size: 1.3rem;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2);
         }
 
         h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 700;
             letter-spacing: -0.5px;
             background: linear-gradient(to right, #ffffff, #94a3b8);
@@ -353,11 +352,11 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            padding: 0.4rem 0.8rem;
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border-color);
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 500;
         }
 
@@ -387,70 +386,81 @@ HTML_TEMPLATE = """
 
         main {
             flex: 1;
-            max-width: 1400px;
+            max-width: 1600px;
             width: 100%;
             margin: 0 auto;
-            padding: 2rem 4rem;
+            padding: 1.5rem 2rem;
             display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 2rem;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+            height: calc(100vh - 70px);
+            overflow: hidden; /* Khóa cuộn container chính */
         }
 
         @media (max-width: 1024px) {
             main {
                 grid-template-columns: 1fr;
-                padding: 1.5rem;
+                height: calc(100vh - 70px);
+                overflow-y: auto; /* Cho phép cuộn trên mobile */
             }
-            header {
-                padding: 1rem 1.5rem;
+            body {
+                overflow: auto;
+                height: auto;
             }
         }
 
         .sidebar {
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 1.25rem;
+            height: 100%;
         }
 
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 16px;
-            padding: 1.5rem;
+            padding: 1.25rem;
             backdrop-filter: blur(12px);
             transition: all 0.3s ease;
         }
 
         .card:hover {
             border-color: rgba(139, 92, 246, 0.2);
-            transform: translateY(-2px);
+        }
+
+        .card.flex-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         .stat-card {
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 1rem;
+            padding: 0.85rem;
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
         }
 
         .stat-label {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .stat-value {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--text-primary);
         }
@@ -459,26 +469,31 @@ HTML_TEMPLATE = """
         .stat-value.purple { color: #c084fc; }
 
         .info-title {
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             display: flex;
             align-items: center;
             gap: 0.5rem;
             color: #f1f5f9;
         }
 
+        .info-row-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 0.5rem;
+        }
+
         .info-row {
             display: flex;
             justify-content: space-between;
-            padding: 0.75rem 0;
+            padding: 0.6rem 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
 
         .info-row:last-child {
             border-bottom: none;
-            padding-bottom: 0;
         }
 
         .info-label {
@@ -490,24 +505,27 @@ HTML_TEMPLATE = """
             color: #e2e8f0;
         }
 
+        .sidebar-footer {
+            margin-top: auto;
+            padding-top: 0.75rem;
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
         .console-container {
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 200px);
-            min-height: 500px;
-        }
-
-        @media (max-width: 1024px) {
-            .console-container {
-                height: 500px;
-            }
+            height: 100%;
+            overflow: hidden;
         }
 
         .console-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.5rem;
+            padding: 0.75rem 1.25rem;
             background: #111827;
             border: 1px solid var(--border-color);
             border-bottom: none;
@@ -519,7 +537,7 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: #94a3b8;
         }
@@ -528,7 +546,7 @@ HTML_TEMPLATE = """
             display: flex;
             align-items: center;
             gap: 0.25rem;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--status-online);
             font-weight: 500;
             text-transform: uppercase;
@@ -553,16 +571,16 @@ HTML_TEMPLATE = """
             border: 1px solid var(--border-color);
             border-bottom-left-radius: 16px;
             border-bottom-right-radius: 16px;
-            padding: 1.5rem;
+            padding: 1.25rem;
             font-family: 'Fira Code', monospace;
-            font-size: 0.875rem;
-            line-height: 1.6;
+            font-size: 0.8rem;
+            line-height: 1.5;
             overflow-y: auto;
             color: #38bdf8;
             box-shadow: inset 0 4px 20px rgba(0, 0, 0, 0.5);
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.4rem;
         }
 
         .log-line {
@@ -584,9 +602,9 @@ HTML_TEMPLATE = """
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 0.35rem 0.75rem;
+            padding: 0.3rem 0.6rem;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -594,16 +612,6 @@ HTML_TEMPLATE = """
         .btn-copy:hover {
             background: var(--accent-purple);
             border-color: var(--accent-purple);
-        }
-
-        footer {
-            padding: 2rem;
-            text-align: center;
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            border-top: 1px solid var(--border-color);
-            background: rgba(11, 15, 25, 0.5);
-            margin-top: auto;
         }
     </style>
 </head>
@@ -614,7 +622,7 @@ HTML_TEMPLATE = """
             <div class="bot-avatar">🤖</div>
             <div>
                 <h1 id="header-bot-name">MikeDaBot</h1>
-                <p style="font-size: 0.75rem; color: var(--text-secondary);">Gemma 4 Summary Agent</p>
+                <p style="font-size: 0.7rem; color: var(--text-secondary);">Gemma 4 Summary Agent</p>
             </div>
         </div>
         <div class="status-badge">
@@ -647,27 +655,32 @@ HTML_TEMPLATE = """
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card flex-card">
                 <div class="info-title">⚙️ Thông tin Cấu hình</div>
-                <div class="info-row">
-                    <span class="info-label">Trí tuệ nhân tạo</span>
-                    <span class="info-value">Gemma 4</span>
+                <div class="info-row-container">
+                    <div class="info-row">
+                        <span class="info-label">Trí tuệ nhân tạo</span>
+                        <span class="info-value">Gemma 4</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Model ID</span>
+                        <span class="info-value">gemma-4-31b-it</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Uptime</span>
+                        <span id="info-uptime" class="info-value">00h 00m 00s</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Lệnh Slash</span>
+                        <span class="info-value">/tomtat</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Python Version</span>
+                        <span class="info-value">3.14.3</span>
+                    </div>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Model ID</span>
-                    <span class="info-value">gemma-4-31b-it</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Uptime</span>
-                    <span id="info-uptime" class="info-value">00h 00m 00s</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Lệnh Slash</span>
-                    <span class="info-value">/tomtat</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Python Version</span>
-                    <span class="info-value">3.14.3</span>
+                <div class="sidebar-footer">
+                    <p>© 2026 MikeDaBot - Made with ❤️</p>
                 </div>
             </div>
         </div>
@@ -691,23 +704,20 @@ HTML_TEMPLATE = """
         </div>
     </main>
 
-    <footer>
-        <p>© 2026 MikeDaBot - Phát triển với ❤️ để tóm tắt các cuộc trò chuyện Discord</p>
-    </footer>
-
     <script>
         let autoScroll = true;
         const consoleBody = document.getElementById('console-body');
 
-        // Detect user manual scroll to turn off autoscroll
+        // Phát hiện cuộn chuột để khóa auto scroll
         consoleBody.addEventListener('scroll', () => {
-            const threshold = 40; // px
+            const threshold = 40; 
             const isAtBottom = consoleBody.scrollHeight - consoleBody.clientHeight - consoleBody.scrollTop < threshold;
             autoScroll = isAtBottom;
         });
 
         function formatLogLine(line) {
-            // Check if line contains a timestamp like [11:42:00]
+            if (!line || typeof line !== 'string') return '';
+            
             const timestampMatch = line.match(/^\[\d{2}:\d{2}:\d{2}\]/);
             let timestamp = "";
             let content = line;
@@ -719,7 +729,6 @@ HTML_TEMPLATE = """
 
             let styleClass = "log-info";
             
-            // Detect logs level and styles
             if (content.includes("❌") || content.includes("Lỗi") || content.includes("error") || content.includes("Exception") || content.includes("[ERROR]")) {
                 styleClass = "log-error";
             } else if (content.includes("⚠️") || content.includes("warning") || content.includes("[WARNING]")) {
@@ -732,6 +741,7 @@ HTML_TEMPLATE = """
         }
 
         function escapeHtml(unsafe) {
+            if (!unsafe) return '';
             return unsafe
                  .replace(/&/g, "&amp;")
                  .replace(/</g, "&lt;")
@@ -754,9 +764,12 @@ HTML_TEMPLATE = """
         async function updateDashboard() {
             try {
                 const response = await fetch('/api/stats');
+                if (!response.ok) {
+                    throw new Error("HTTP error " + response.status);
+                }
                 const data = await response.json();
 
-                // Update Status Bar
+                // Cập nhật trạng thái
                 const isOnline = data.bot_status === "Online";
                 const statusDot = document.getElementById('header-status-dot');
                 const statusText = document.getElementById('header-status-text');
@@ -764,29 +777,26 @@ HTML_TEMPLATE = """
                 if (isOnline) {
                     statusDot.className = "dot online";
                     statusText.textContent = "Online";
-                    
                     document.getElementById('stat-bot-status').textContent = "Online";
                     document.getElementById('stat-bot-status').style.color = "var(--status-online)";
                 } else {
                     statusDot.className = "dot offline";
                     statusText.textContent = "Offline";
-                    
                     document.getElementById('stat-bot-status').textContent = "Offline";
                     document.getElementById('stat-bot-status').style.color = "var(--status-offline)";
                 }
 
-                // Update Bot Name
-                if (data.bot_name !== "N/A") {
+                if (data.bot_name !== "N/A" && data.bot_name) {
                     document.getElementById('header-bot-name').textContent = data.bot_name;
                 }
 
-                // Update Stats values
+                // Cập nhật giá trị
                 document.getElementById('stat-latency').textContent = data.latency;
                 document.getElementById('stat-guilds').textContent = data.guilds;
                 document.getElementById('stat-summaries').textContent = data.summaries;
                 document.getElementById('info-uptime').textContent = data.uptime;
 
-                // Update logs
+                // Cập nhật logs
                 if (data.logs && data.logs.length > 0) {
                     consoleBody.innerHTML = data.logs.map(formatLogLine).join('');
                     if (autoScroll) {
@@ -798,8 +808,6 @@ HTML_TEMPLATE = """
 
             } catch (error) {
                 console.error("Error updating dashboard:", error);
-                
-                // Set to offline states
                 document.getElementById('header-status-dot').className = "dot offline";
                 document.getElementById('header-status-text').textContent = "Lỗi kết nối API";
                 document.getElementById('stat-bot-status').textContent = "Offline";
@@ -807,7 +815,7 @@ HTML_TEMPLATE = """
             }
         }
 
-        // Run immediately and then poll every 3 seconds
+        // Chạy ngay lập tức và thăm dò mỗi 3 giây
         updateDashboard();
         setInterval(updateDashboard, 3000);
     </script>
@@ -837,9 +845,18 @@ def api_stats():
     
     if bot.is_ready():
         bot_status = "Online"
-        bot_latency = f"{round(bot.latency * 1000)}ms"
+        try:
+            import math
+            latency = bot.latency
+            if latency is not None and not math.isnan(latency):
+                bot_latency = f"{round(latency * 1000)}ms"
+            else:
+                bot_latency = "N/A"
+        except Exception:
+            bot_latency = "N/A"
+            
         guild_count = len(bot.guilds)
-        bot_name = bot.user.name
+        bot_name = bot.user.name if bot.user else "N/A"
 
     return jsonify({
         "bot_status": bot_status,
