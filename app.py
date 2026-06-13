@@ -597,6 +597,7 @@ HTML_TEMPLATE = r"""
 
         .stat-value.green { color: var(--status-online); }
         .stat-value.purple { color: #c084fc; }
+        .stat-value.sky { color: #38bdf8; }
 
         .info-title {
             font-size: 0.95rem;
@@ -784,8 +785,16 @@ HTML_TEMPLATE = r"""
                         <span id="stat-guilds" class="stat-value">0</span>
                     </div>
                     <div class="stat-card">
+                        <span class="stat-label">Thành Viên</span>
+                        <span id="stat-users" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-card">
                         <span class="stat-label">Đã tóm tắt</span>
                         <span id="stat-summaries" class="stat-value purple">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">RAM Sử Dụng</span>
+                        <span id="stat-ram" class="stat-value sky">0.0 MB</span>
                     </div>
                 </div>
             </div>
@@ -804,6 +813,10 @@ HTML_TEMPLATE = r"""
                     <div class="info-row">
                         <span class="info-label">Lệnh Slash</span>
                         <span class="info-value">/tomtat</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Nền tảng / OS</span>
+                        <span id="info-os" class="info-value">Loading...</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Python Version</span>
@@ -938,8 +951,11 @@ HTML_TEMPLATE = r"""
                 // Cập nhật giá trị
                 document.getElementById('stat-latency').textContent = data.latency;
                 document.getElementById('stat-guilds').textContent = data.guilds;
+                document.getElementById('stat-users').textContent = data.total_users;
                 document.getElementById('stat-summaries').textContent = data.summaries;
                 document.getElementById('stat-uptime').textContent = data.uptime;
+                document.getElementById('stat-ram').textContent = data.ram_usage;
+                document.getElementById('info-os').textContent = data.os_info;
 
                 // Cập nhật logs
                 if (data.logs && data.logs.length > 0) {
@@ -973,6 +989,9 @@ def home():
 
 @app.route('/api/stats')
 def api_stats():
+    import psutil
+    import platform
+
     now = datetime.now(timezone.utc)
     uptime_delta = now - start_time
     
@@ -984,8 +1003,16 @@ def api_stats():
     bot_latency = "N/A"
     bot_status = "Offline"
     guild_count = 0
+    total_users = 0
     bot_name = "N/A"
     
+    # Đo RAM sử dụng
+    try:
+        ram_usage = psutil.Process().memory_info().rss / (1024 * 1024) # MB
+        ram_str = f"{ram_usage:.1f} MB"
+    except Exception:
+        ram_str = "N/A"
+        
     if bot.is_ready():
         bot_status = "Online"
         try:
@@ -999,6 +1026,7 @@ def api_stats():
             bot_latency = "N/A"
             
         guild_count = len(bot.guilds)
+        total_users = sum(g.member_count for g in bot.guilds if g.member_count)
         bot_name = bot.user.name if bot.user else "N/A"
 
     return jsonify({
@@ -1007,6 +1035,9 @@ def api_stats():
         "uptime": uptime_str,
         "latency": bot_latency,
         "guilds": guild_count,
+        "total_users": total_users,
+        "ram_usage": ram_str,
+        "os_info": f"{platform.system()} ({platform.release()})",
         "summaries": summary_count,
         "model": "Gemma 4 (gemma-4-31b-it)",
         "logs": list(log_buffer)
