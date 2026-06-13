@@ -628,7 +628,7 @@ HTML_TEMPLATE = r"""
         .log-error { color: #ef4444; }
         .log-success { color: #10b981; }
 
-        .btn-copy {
+        .btn-action {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
@@ -639,9 +639,14 @@ HTML_TEMPLATE = r"""
             transition: all 0.2s ease;
         }
 
-        .btn-copy:hover {
+        .btn-action.copy:hover {
             background: var(--accent-purple);
             border-color: var(--accent-purple);
+        }
+
+        .btn-action.clear:hover {
+            background: var(--status-offline);
+            border-color: var(--status-offline);
         }
     </style>
 </head>
@@ -667,8 +672,8 @@ HTML_TEMPLATE = r"""
                 <div class="info-title">📊 Trạng thái Hệ thống</div>
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <span class="stat-label">Bot Status</span>
-                        <span id="stat-bot-status" class="stat-value" style="color: var(--status-offline);">Offline</span>
+                        <span class="stat-label">Uptime</span>
+                        <span id="stat-uptime" class="stat-value">00h 00m 00s</span>
                     </div>
                     <div class="stat-card">
                         <span class="stat-label">Độ trễ API</span>
@@ -697,10 +702,6 @@ HTML_TEMPLATE = r"""
                         <span class="info-value">gemma-4-31b-it</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Uptime</span>
-                        <span id="info-uptime" class="info-value">00h 00m 00s</span>
-                    </div>
-                    <div class="info-row">
                         <span class="info-label">Lệnh Slash</span>
                         <span class="info-value">/tomtat</span>
                     </div>
@@ -720,9 +721,10 @@ HTML_TEMPLATE = r"""
                 <div class="console-title">
                     <span>💻 Console Logs</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <button class="btn-copy" onclick="copyConsoleLogs()">Sao chép log</button>
-                    <div class="live-indicator">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button class="btn-action copy" onclick="copyConsoleLogs()">Sao chép log</button>
+                    <button class="btn-action clear" onclick="clearConsoleLogs()">Xóa log</button>
+                    <div class="live-indicator" style="margin-left: 0.5rem;">
                         <span class="live-dot"></span>
                         <span>Live</span>
                     </div>
@@ -791,6 +793,23 @@ HTML_TEMPLATE = r"""
             });
         }
 
+        async function clearConsoleLogs() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ logs trên máy chủ không?")) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/logs/clear', { method: 'POST' });
+                if (response.ok) {
+                    consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Logs đã được xóa sạch.</div>';
+                } else {
+                    alert("Không thể xóa logs trên máy chủ.");
+                }
+            } catch (err) {
+                console.error("Lỗi khi xóa logs: ", err);
+                alert("Lỗi kết nối khi xóa logs.");
+            }
+        }
+
         async function updateDashboard() {
             try {
                 const response = await fetch('/api/stats');
@@ -807,13 +826,9 @@ HTML_TEMPLATE = r"""
                 if (isOnline) {
                     statusDot.className = "dot online";
                     statusText.textContent = "Online";
-                    document.getElementById('stat-bot-status').textContent = "Online";
-                    document.getElementById('stat-bot-status').style.color = "var(--status-online)";
                 } else {
                     statusDot.className = "dot offline";
                     statusText.textContent = "Offline";
-                    document.getElementById('stat-bot-status').textContent = "Offline";
-                    document.getElementById('stat-bot-status').style.color = "var(--status-offline)";
                 }
 
                 if (data.bot_name !== "N/A" && data.bot_name) {
@@ -824,7 +839,7 @@ HTML_TEMPLATE = r"""
                 document.getElementById('stat-latency').textContent = data.latency;
                 document.getElementById('stat-guilds').textContent = data.guilds;
                 document.getElementById('stat-summaries').textContent = data.summaries;
-                document.getElementById('info-uptime').textContent = data.uptime;
+                document.getElementById('stat-uptime').textContent = data.uptime;
 
                 // Cập nhật logs
                 if (data.logs && data.logs.length > 0) {
@@ -840,8 +855,6 @@ HTML_TEMPLATE = r"""
                 console.error("Error updating dashboard:", error);
                 document.getElementById('header-status-dot').className = "dot offline";
                 document.getElementById('header-status-text').textContent = "Lỗi kết nối API";
-                document.getElementById('stat-bot-status').textContent = "Offline";
-                document.getElementById('stat-bot-status').style.color = "var(--status-offline)";
             }
         }
 
@@ -898,6 +911,12 @@ def api_stats():
         "model": "Gemma 4 (gemma-4-31b-it)",
         "logs": list(log_buffer)
     })
+
+@app.route('/api/logs/clear', methods=['POST'])
+def api_clear_logs():
+    log_buffer.clear()
+    print("🧹 Đã xóa toàn bộ logs hệ thống theo yêu cầu từ Dashboard.", flush=True)
+    return jsonify({"success": True})
 
 # ==========================================
 # 3. KÍCH HOẠT VÀ CHẠY ĐỒNG THỜI
