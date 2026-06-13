@@ -107,7 +107,8 @@ async def on_ready():
     channel="Kênh chat cần tóm tắt (Mặc định là kênh hiện tại)",
     hours="Quét tin nhắn trong X giờ qua (Ví dụ: 2.0)",
     limit="Giới hạn số lượng tin nhắn quét tối đa (Ví dụ: 100)",
-    summary_type="Kiểu tóm tắt: Ngắn gọn hoặc Chi tiết kèm Timeline"
+    summary_type="Kiểu tóm tắt: Ngắn gọn hoặc Chi tiết kèm Timeline",
+    focus="Chủ đề hoặc từ khóa cần tập trung phân tích sâu (Ví dụ: drama, lỗi deploy, game mới)"
 )
 @app_commands.choices(summary_type=[
     app_commands.Choice(name="Tóm tắt ngắn gọn (Mặc định)", value="short"),
@@ -118,7 +119,8 @@ async def tomtat(
     channel: discord.TextChannel = None, 
     hours: float = None, 
     limit: int = None,
-    summary_type: str = "short"
+    summary_type: str = "short",
+    focus: str = None
 ):
     await interaction.response.defer(ephemeral=False)
     
@@ -138,7 +140,7 @@ async def tomtat(
         scan_info = f"tối đa {limit} tin nhắn trong {hours} giờ qua"
 
     print(f"📥 [Lệnh nhận] /tomtat được gọi bởi @{interaction.user.display_name} tại kênh #{target_channel.name}", flush=True)
-    print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}'", flush=True)
+    print(f"   ↳ Tham số quét: hours={hours}, limit={limit}, kiểu='{summary_type}', focus='{focus}'", flush=True)
 
     # Gửi thông báo tạm thời ban đầu
     followup_msg = await interaction.followup.send(
@@ -192,12 +194,19 @@ async def tomtat(
 
     chat_history_text = "\n".join(raw_messages)
 
+    focus_instruction = ""
+    if focus:
+        focus_instruction = f"""
+        ⚠️ BẮT BUỘC TẬP TRUNG (FOCUS): Người dùng yêu cầu bạn tập trung đặc biệt sâu vào chủ đề/sự kiện: "{focus}".
+        Hãy phân tích kỹ hơn, dành nhiều dung lượng để mô tả chi tiết diễn biến, các quan điểm, phản ứng của các thành viên và kết quả xung quanh chủ đề này trong cuộc trò chuyện (nếu có).
+        """
+
     if summary_type == "long":
         prompt = f"""
         Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
         Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
         Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách CHI TIẾT và ĐẦY ĐỦ nhất bằng Tiếng Việt.
-        
+        {focus_instruction}
         Yêu cầu cấu trúc bài tóm tắt:
         1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
         2. **TIMELINE DIỄN BIẾN (MỚI NHẤT ĐẾN CŨ NHẤT)**: Liệt kê diễn biến cuộc trò chuyện theo trình tự THỜI GIAN ĐẢO NGƯỢC (các cuộc hội thoại MỚI NHẤT xếp lên ĐẦU, CŨ HƠN xếp xuống DƯỚI).
@@ -223,7 +232,7 @@ async def tomtat(
         Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp. 
         Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}). 
         Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách NGẮN GỌN, SÚC TÍCH và DỄ HIỂU bằng Tiếng Việt.
-        
+        {focus_instruction}
         Yêu cầu cấu trúc bài tóm tắt:
         - Tóm tắt các chủ đề chính đang thảo luận dưới dạng các gạch đầu dòng ngắn gọn.
         - Liệt kê các quyết định quan trọng (nếu có).
@@ -255,6 +264,8 @@ async def tomtat(
         embed.add_field(name="Kênh chat", value=target_channel.mention, inline=True)
         embed.add_field(name="Điều kiện quét", value=scan_info, inline=True)
         embed.add_field(name="Số tin nhắn quét", value=f"{len(raw_messages)} tin nhắn", inline=True)
+        if focus:
+            embed.add_field(name="Chủ đề tập trung (Focus)", value=f"`{focus}`", inline=False)
         embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
 
         await interaction.followup.send(embed=embed)
