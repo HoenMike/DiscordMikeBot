@@ -1,4 +1,7 @@
 import os
+import sys
+import logging
+import traceback
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -9,12 +12,29 @@ from threading import Thread
 from flask import Flask
 
 # ==========================================
+# 0. CẤU HÌNH LOGGING & UNBUFFERED OUTPUT
+# ==========================================
+# Cấu hình logging để in thẳng ra stdout lập tức (Render Logs)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+
+# Ép đầu ra của python flush ngay lập tức
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
+print("ℹ️ Hệ thống Logging đã được kích hoạt.", flush=True)
+
+# ==========================================
 # 1. KHỞI TẠO SERVER WEB (Flask)
 # ==========================================
 app = Flask('')
 
 @app.route('/')
 def home():
+    print("ℹ️ Web server nhận được ping từ UptimeRobot hoặc trình duyệt.", flush=True)
     return "🚀 Bot Discord đang chạy ngầm và hoạt động tốt!"
 
 # ==========================================
@@ -23,6 +43,9 @@ def home():
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+print(f"ℹ️ [Cấu hình] DISCORD_TOKEN: {'Đã nhập (Độ dài: ' + str(len(DISCORD_TOKEN)) + ')' if DISCORD_TOKEN else 'TRỐNG (None)'}", flush=True)
+print(f"ℹ️ [Cấu hình] GEMINI_API_KEY: {'Đã nhập (Độ dài: ' + str(len(GEMINI_API_KEY)) + ')' if GEMINI_API_KEY else 'TRỐNG (None)'}", flush=True)
 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -34,15 +57,19 @@ class SummaryBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        print("🔄 Đang đồng bộ hóa Slash Commands...")
-        await self.tree.sync()
-        print("🎉 Slash Commands đã được đồng bộ hóa toàn cầu!")
+        print("🔄 Đang đồng bộ hóa Slash Commands...", flush=True)
+        try:
+            synced = await self.tree.sync()
+            print(f"🎉 Đã đồng bộ hóa {len(synced)} Slash Commands toàn cầu thành công!", flush=True)
+        except Exception as sync_error:
+            print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
+            traceback.print_exc(file=sys.stdout)
 
 bot = SummaryBot()
 
 @bot.event
 async def on_ready():
-    print(f"🎉 Bot tóm tắt đã kết nối thành công: {bot.user}")
+    print(f"🎉 Bot tóm tắt đã kết nối thành công: {bot.user}", flush=True)
 
 # Lệnh Slash Command /tomtat
 @bot.tree.command(name="tomtat", description="Tóm tắt nội dung cuộc trò chuyện trong một kênh")
@@ -113,21 +140,31 @@ async def tomtat(interaction: discord.Interaction, channel: discord.TextChannel 
         await interaction.followup.send(embed=embed)
         try:
             await followup_msg.delete()
+            print("ℹ️ Đã xóa thông báo tạm thời sau khi tóm tắt xong.", flush=True)
         except Exception as delete_error:
-            print(f"Không xóa được thông báo tải: {delete_error}")
+            print(f"⚠️ Không xóa được thông báo tải: {delete_error}", flush=True)
 
     except Exception as e:
-        print(f"Lỗi: {e}")
-        await interaction.followup.send("❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!")
+        print(f"❌ Lỗi trong quá trình xử lý lệnh /tomtat: {e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        try:
+            await interaction.followup.send("❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!")
+        except Exception as send_error:
+            print(f"⚠️ Không thể gửi thông báo lỗi đến Discord: {send_error}", flush=True)
 
 # ==========================================
 # 3. KÍCH HOẠT VÀ CHẠY ĐỒNG THỜI
 # ==========================================
 def run_discord_bot():
-    bot.run(DISCORD_TOKEN)
+    try:
+        print("🤖 Bắt đầu chạy bot.run()...", flush=True)
+        bot.run(DISCORD_TOKEN)
+    except Exception as run_error:
+        print(f"❌ Lỗi crash khi chạy bot.run(): {run_error}", flush=True)
+        traceback.print_exc(file=sys.stdout)
 
 # Khởi chạy luồng chạy Bot Discord ngay khi module được import (hỗ trợ cả Gunicorn)
-print("🚀 Khởi chạy Discord Bot trong luồng phụ...")
+print("🚀 Khởi chạy Discord Bot trong luồng phụ...", flush=True)
 bot_thread = Thread(target=run_discord_bot)
 bot_thread.daemon = True
 bot_thread.start()
@@ -135,4 +172,5 @@ bot_thread.start()
 if __name__ == "__main__":
     # Nếu chạy cục bộ: `python app.py`
     port = int(os.environ.get("PORT", 8080))
+    print(f"ℹ️ Khởi chạy Flask Server trên cổng {port}...", flush=True)
     app.run(host='0.0.0.0', port=port)
