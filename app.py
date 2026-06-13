@@ -198,7 +198,7 @@ async def tomtat(
     mode_info = "Tóm tắt ngắn gọn" if summary_type == "short" else "Tóm tắt dài & Timeline chi tiết"
     focus_info = f" | Tập trung: `{clean_focus}`" if clean_focus else ""
     followup_msg = await interaction.followup.send(
-        f"⏳ Đang thu thập và phân tích dữ liệu tại {target_channel.mention} (chế độ: *{mode_info}*{focus_info}). Vui lòng đợi một lát..."
+        f"⏳ Đang thu thập và phân tích dữ liệu tại {target_channel.mention} ({scan_info} | chế độ: *{mode_info}*{focus_info}). Vui lòng đợi một lát..."
     )
 
     vn_tz = timezone(timedelta(hours=7))
@@ -333,9 +333,13 @@ async def tomtat(
                 color=embed_color
             )
             
-            # Chỉ đính kèm chủ đề tập trung vào phần đầu tiên nếu có sử dụng
-            if i == 0 and clean_focus:
-                embed.add_field(name="Chủ đề tập trung (Focus)", value=f"`{clean_focus}`", inline=False)
+            # Đính kèm thông tin cấu hình quét ở phần đầu tiên để rõ ràng
+            if i == 0:
+                embed.add_field(
+                    name="⚙️ Cấu hình quét", 
+                    value=f"Phạm vi: **{scan_info}** ({len(raw_messages)} tin nhắn thực tế)\nChế độ: **{mode_info}**{f' | Focus: **`{clean_focus}`**' if clean_focus else ''}", 
+                    inline=False
+                )
             
             embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
             
