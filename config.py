@@ -43,11 +43,16 @@ sys.stderr = LogStreamRedirector(sys.stderr)
 print("ℹ️ Hệ thống Logging và Dashboard Buffer đã hoạt động từ config.py.", flush=True)
 
 # Config variables
+import pathlib
 from dotenv import load_dotenv
 load_dotenv()
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+DATA_DIR = pathlib.Path(__file__).parent / "data"
+DATA_DIR.mkdir(exist_ok=True)
+DB_PATH = DATA_DIR / "bot_config.db"
 
 # Stats variables
 start_time = datetime.now(timezone.utc)

@@ -5,3 +5,5 @@ Flask==3.0.3
 gunicorn==22.0.0
 audioop-lts
 psutil==5.9.8
+aiohttp>=3.9.0
+aiosqlite>=0.20.0
