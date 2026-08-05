@@ -22,12 +22,12 @@ class SummaryBot(commands.Bot):
             print(f"Lỗi khi tải cog: {cog_error}", flush=True)
             traceback.print_exc(file=sys.stdout)
 
-        print("🔄 Đang đồng bộ hóa Slash Commands...", flush=True)
+        print("Dang dong bo hoa Slash Commands...", flush=True)
         try:
             synced = await self.tree.sync()
-            print(f"🎉 Đã đồng bộ hóa {len(synced)} Slash Commands toàn cầu thành công!", flush=True)
+            print(f"Da dong bo hoa {len(synced)} Slash Commands toan cau thanh cong.", flush=True)
         except Exception as sync_error:
-            print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
+            print(f"Loi khi dong bo hoa Slash Commands: {sync_error}", flush=True)
             traceback.print_exc(file=sys.stdout)
 
 bot = SummaryBot()
