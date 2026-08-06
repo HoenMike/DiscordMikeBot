@@ -227,8 +227,13 @@ async def find_valid_proxy(
     session: aiohttp.ClientSession,
     original_url: str,
     platform_key: str,
+    guild_proxy_domains: list[str] | None = None,
 ) -> str | None:
     """Thực hiện Chain of Responsibility: thử từng proxy domain theo thứ tự ưu tiên.
+
+    Nếu guild_proxy_domains được cung cấp (không phải None), sử dụng danh sách đó
+    thay vì danh sách mặc định toàn cục. Điều này cho phép mỗi máy chủ tuỳ chỉnh
+    thứ tự ưu tiên proxy riêng.
 
     Với mỗi proxy domain:
       1. Viết lại URL gốc sang proxy URL
@@ -238,7 +243,11 @@ async def find_valid_proxy(
 
     Trả về proxy URL đầu tiên hợp lệ, hoặc None nếu tất cả đều thất bại.
     """
-    proxy_domains = PROXY_DOMAINS.get(platform_key, [])
+    if guild_proxy_domains is not None:
+        proxy_domains = guild_proxy_domains
+    else:
+        proxy_domains = PROXY_DOMAINS.get(platform_key, [])
+
     if not proxy_domains:
         print(
             f"[ProxyValidator] Không có proxy nào được cấu hình cho nền tảng '{platform_key}'",

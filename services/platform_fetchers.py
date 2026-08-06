@@ -407,10 +407,10 @@ async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> Post
         post_id = match.group(2)
         original_url = f"https://www.threads.net/@{username}/post/{post_id}"
 
-        # Threads khong co API cong khai on dinh, su dung oembed endpoint
+        # Threads không có API công khai ổn định, sử dụng oembed endpoint
         api_url = f"https://www.threads.net/api/graphql"
 
-        # Fallback: thu dung oembed tuong tu Instagram
+        # Fallback: thử dùng oembed tương tự Instagram
         oembed_url = f"https://www.threads.net/oembed/?url={quote(original_url, safe='')}"
 
         async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
@@ -436,7 +436,7 @@ async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> Post
             timestamp=None,
         )
     except Exception as e:
-        print(f"[Fetcher/Threads] Loi khi tai du lieu {url}: {e}", flush=True)
+        print(f"[Fetcher/Threads] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
 
 
@@ -455,7 +455,7 @@ async def fetch_youtube(session: aiohttp.ClientSession, url: str, match) -> Post
         if data.get("thumbnail_url"):
             media_urls.append(data["thumbnail_url"])
         else:
-            # Fallback: su dung thumbnail mac dinh cua YouTube
+            # Fallback: sử dụng thumbnail mặc định của YouTube
             media_urls.append(f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg")
 
         return PostData(
@@ -470,7 +470,7 @@ async def fetch_youtube(session: aiohttp.ClientSession, url: str, match) -> Post
             timestamp=None,
         )
     except Exception as e:
-        print(f"[Fetcher/YouTube] Loi khi tai du lieu {url}: {e}", flush=True)
+        print(f"[Fetcher/YouTube] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
 
 

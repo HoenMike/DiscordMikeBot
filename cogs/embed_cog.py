@@ -13,6 +13,7 @@ from services.embed_builder import build_embed, build_gallery_embeds
 from services.proxy_validator import find_valid_proxy
 from services.ytdlp_fallback import extract_media_ytdlp
 from services.webhook_sender import send_via_webhook
+from services.platform_ui import create_platform_view
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
 MAX_LINKS_PER_MESSAGE = 3
@@ -82,16 +83,16 @@ class EmbedCog(commands.Cog):
             if success:
                 any_success = True
 
-        # Xóa tin nhắn gốc nếu ít nhất một URL được xử lý thành công
+        # Xoá tin nhắn gốc nếu ít nhất một URL được xử lý thành công
         if any_success:
             try:
                 await message.delete()
             except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
                 print(
-                    f"[EmbedCog] Không thể xóa tin nhắn gốc: {e}",
+                    f"[EmbedCog] Không thể xoá tin nhắn gốc: {e}",
                     flush=True,
                 )
-                # Fallback: ẩn embed gốc nếu không xóa được
+                # Fallback: ẩn embed gốc nếu không xoá được
                 if config.get("suppress_original_embed", True):
                     try:
                         await message.edit(suppress=True)
@@ -209,11 +210,16 @@ class EmbedCog(commands.Cog):
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
 
+            # Tạo View với nút liên kết tới bài viết gốc
+            view = create_platform_view(platform_key, post_data.url or url)
+
             success = await send_via_webhook(
                 channel=message.channel,
                 user=message.author,
                 embeds=embeds,
                 file=file,
+                view=view,
+                original_message=message,
             )
 
             if success:
@@ -236,16 +242,32 @@ class EmbedCog(commands.Cog):
         platform_key: str,
         url: str,
     ) -> bool:
-        """Tier 1: Tìm proxy hợp lệ và gửi URL đã viết lại qua webhook."""
+        """Tier 1: Tìm proxy hợp lệ và gửi URL đã viết lại qua webhook.
+
+        Lấy danh sách proxy tùy chỉnh của guild nếu có, ngược lại dùng mặc định.
+        """
         try:
-            proxy_url = await find_valid_proxy(self.session, url, platform_key)
+            # Lấy danh sách proxy tùy chỉnh của guild (nếu đã cấu hình)
+            guild_proxy_domains = await self.config_manager.get_guild_proxy_domains(
+                message.guild.id, platform_key
+            )
+
+            proxy_url = await find_valid_proxy(
+                self.session, url, platform_key,
+                guild_proxy_domains=guild_proxy_domains,
+            )
             if not proxy_url:
                 return False
+
+            # Tạo View với nút liên kết tới bài viết gốc
+            view = create_platform_view(platform_key, url)
 
             success = await send_via_webhook(
                 channel=message.channel,
                 user=message.author,
                 content=proxy_url,
+                view=view,
+                original_message=message,
             )
 
             if success:
@@ -269,7 +291,11 @@ class EmbedCog(commands.Cog):
         url: str,
         config: dict,
     ) -> bool:
-        """Tier 2: Sử dụng yt-dlp để trích xuất media và tạo embed."""
+        """Tier 2: Sử dụng yt-dlp để trích xuất media và tạo embed.
+
+        Embed tạo từ yt-dlp tự động áp dụng màu thương hiệu và icon
+        của nền tảng tương ứng từ PLATFORMS trong constants.py.
+        """
         try:
             post_data = await extract_media_ytdlp(url, platform_key)
             if post_data is None:
@@ -283,7 +309,7 @@ class EmbedCog(commands.Cog):
             if not single_embed:
                 return False
 
-            # Thêm ghi chú nguồn fallback
+            # Thêm ghi chú nguồn fallback vào footer
             if single_embed.footer and single_embed.footer.text:
                 single_embed.set_footer(
                     text=f"{single_embed.footer.text} (yt-dlp fallback)",
@@ -294,11 +320,16 @@ class EmbedCog(commands.Cog):
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
 
+            # Tạo View với nút liên kết tới bài viết gốc
+            view = create_platform_view(platform_key, url)
+
             success = await send_via_webhook(
                 channel=message.channel,
                 user=message.author,
                 embeds=[single_embed],
                 file=file,
+                view=view,
+                original_message=message,
             )
 
             if success:

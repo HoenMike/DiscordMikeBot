@@ -22,6 +22,7 @@ PLATFORMS = {
         "color": 0x000000,
         "icon_url": "https://abs.twimg.com/icons/apple-touch-icon-192x192.png",
         "footer_text": "Twitter / X",
+        "button_label": "Xem b\u1ea3n g\u1ed1c tr\u00ean X",
         "api_base": "https://api.fxtwitter.com",
         "patterns": [
             re.compile(r"https://(www\.)?twitter\.com/[a-zA-Z0-9_]+/status/\d+(/photo|video/\d+)?/?"),
@@ -33,6 +34,7 @@ PLATFORMS = {
         "color": 0x0096FA,
         "icon_url": "https://www.pixiv.net/favicon.ico",
         "footer_text": "Pixiv",
+        "button_label": "Xem tr\u00ean Pixiv",
         "api_base": "https://phixiv.net",
         "patterns": [
             re.compile(r"https://(www\.)?pixiv\.net(/[a-zA-Z]+)?/artworks/\d+/?"),
@@ -43,6 +45,7 @@ PLATFORMS = {
         "color": 0x010101,
         "icon_url": "https://sf-tb-sg.ibytedtos.com/obj/eden-sg/uhtyvueh7nulogpoguhm/tiktok-icon2.png",
         "footer_text": "TikTok",
+        "button_label": "Xem tr\u00ean TikTok",
         "api_base": "https://api.vxtiktok.com",
         "patterns": [
             re.compile(r"https://(www\.)?tiktok\.com/(t/\w+|@[\w.]+/video/\d+)/?"),
@@ -55,6 +58,7 @@ PLATFORMS = {
         "color": 0xFF4500,
         "icon_url": "https://www.redditstatic.com/desktop2x/img/favicon/android-icon-192x192.png",
         "footer_text": "Reddit",
+        "button_label": "Xem tr\u00ean Reddit",
         "api_base": None,
         "patterns": [
             re.compile(r"https://(www\.|old\.)?reddit\.com/r/[\w]+/comments/[\w]+/[\w]+/?"),
@@ -67,6 +71,7 @@ PLATFORMS = {
         "color": 0xE1306C,
         "icon_url": "https://static.cdninstagram.com/rsrc.php/v3/yR/r/lam-fZmwmvn.png",
         "footer_text": "Instagram",
+        "button_label": "Xem tr\u00ean Instagram",
         "api_base": "https://api.ddinstagram.com",
         "patterns": [
             re.compile(r"https://(www\.)?instagram\.com/share/[\w]+/?"),
@@ -79,6 +84,7 @@ PLATFORMS = {
         "color": 0x1877F2,
         "icon_url": "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZBER7gFRe.ico",
         "footer_text": "Facebook",
+        "button_label": "Xem tr\u00ean Facebook",
         "api_base": None,
         "patterns": [
             re.compile(r"https://(www\.)?facebook\.com/share/r/[\w]+/?"),
@@ -93,6 +99,7 @@ PLATFORMS = {
         "color": 0x0085FF,
         "icon_url": "https://bsky.app/static/apple-touch-icon.png",
         "footer_text": "Bluesky",
+        "button_label": "Xem tr\u00ean Bluesky",
         "api_base": "https://public.api.bsky.app",
         "patterns": [
             re.compile(r"https://(www\.)?bsky\.app/profile/[\w.\-]+/post/[\w]+/?"),
@@ -103,6 +110,7 @@ PLATFORMS = {
         "color": 0x9146FF,
         "icon_url": "https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png",
         "footer_text": "Twitch",
+        "button_label": "Xem tr\u00ean Twitch",
         "api_base": None,
         "patterns": [
             re.compile(r"https://m\.twitch\.tv/clip/[\w]+/?"),
@@ -115,6 +123,7 @@ PLATFORMS = {
         "color": 0x000000,
         "icon_url": "https://static.cdninstagram.com/rsrc.php/v3/yS/r/ajlEU-wEDyo.png",
         "footer_text": "Threads",
+        "button_label": "Xem tr\u00ean Threads",
         "api_base": None,
         "patterns": [
             re.compile(r"https://(www\.)?threads\.(net|com)/@[\w.]+/?"),
@@ -127,6 +136,7 @@ PLATFORMS = {
         "color": 0xFF0000,
         "icon_url": "https://www.youtube.com/s/desktop/acce624e/img/favicon_144x144.png",
         "footer_text": "YouTube",
+        "button_label": "Xem tr\u00ean YouTube",
         "api_base": "https://www.youtube.com/oembed",
         "patterns": [
             re.compile(r"https://(www\.)?youtube\.com/watch\?v=[\w\-]+/?"),

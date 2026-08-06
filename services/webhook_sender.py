@@ -2,74 +2,81 @@ import discord
 
 from utils.constants import sanitize_username
 
-# Cache webhook theo channel ID de tranh tao lai moi lan
+# ---------------------------------------------------------------------------
+# Cache webhook theo channel ID để tránh tạo lại mỗi lần gửi.
+# Chỉ xác nhận lại webhook khi gặp lỗi gửi, không fetch() trên mỗi request.
+# ---------------------------------------------------------------------------
 _webhook_cache: dict[int, discord.Webhook] = {}
 
 WEBHOOK_NAME = "MikeDaBot Proxy"
 
+# Giới hạn ký tự tối đa cho content gửi qua Discord API
+_MAX_CONTENT_LENGTH = 2000
+
+
+def _truncate_content(content: str) -> str:
+    """Cắt ngắn content nếu vượt quá giới hạn 2000 ký tự của Discord."""
+    if len(content) <= _MAX_CONTENT_LENGTH:
+        return content
+    return content[:_MAX_CONTENT_LENGTH - 3] + "..."
+
 
 async def get_or_create_webhook(channel: discord.TextChannel) -> discord.Webhook | None:
-    """Tim hoac tao webhook thuoc bot trong kenh.
+    """Tìm hoặc tạo webhook thuộc bot trong kênh.
 
-    Uu tien su dung webhook da cache. Neu chua co, tim trong danh sach webhook
-    cua kenh. Neu khong tim thay, tao moi.
-    Tra ve None neu khong co quyen manage_webhooks.
+    Ưu tiên sử dụng webhook đã cache. Nếu chưa có, tìm trong danh sách webhook
+    của kênh. Nếu không tìm thấy, tạo mới.
+    Trả về None nếu không có quyền manage_webhooks.
     """
     channel_id = channel.id
 
-    # Kiem tra cache truoc
+    # Kiểm tra cache trước, không gọi fetch() xác nhận để giảm request thừa
     cached = _webhook_cache.get(channel_id)
     if cached is not None:
-        try:
-            # Xac nhan webhook van con hoat dong
-            await cached.fetch()
-            return cached
-        except (discord.NotFound, discord.HTTPException):
-            # Webhook da bi xoa hoac khong truy cap duoc, xoa cache
-            _webhook_cache.pop(channel_id, None)
+        return cached
 
     try:
         webhooks = await channel.webhooks()
     except discord.Forbidden:
         print(
-            f"[WebhookSender] Khong co quyen manage_webhooks trong kenh #{channel.name} "
+            f"[WebhookSender] Không có quyền manage_webhooks trong kênh #{channel.name} "
             f"(ID: {channel_id})",
             flush=True,
         )
         return None
     except discord.HTTPException as e:
         print(
-            f"[WebhookSender] Loi khi lay danh sach webhook: kenh #{channel.name} - {e}",
+            f"[WebhookSender] Lỗi khi lấy danh sách webhook: kênh #{channel.name} - {e}",
             flush=True,
         )
         return None
 
-    # Tim webhook da ton tai thuoc bot
+    # Tìm webhook đã tồn tại thuộc bot
     bot_user_id = channel.guild.me.id if channel.guild.me else None
     for wh in webhooks:
         if wh.name == WEBHOOK_NAME and wh.user and wh.user.id == bot_user_id:
             _webhook_cache[channel_id] = wh
             return wh
 
-    # Tao webhook moi
+    # Tạo webhook mới
     try:
         new_wh = await channel.create_webhook(name=WEBHOOK_NAME)
         _webhook_cache[channel_id] = new_wh
         print(
-            f"[WebhookSender] Da tao webhook moi trong kenh #{channel.name} "
+            f"[WebhookSender] Đã tạo webhook mới trong kênh #{channel.name} "
             f"(ID: {channel_id})",
             flush=True,
         )
         return new_wh
     except discord.Forbidden:
         print(
-            f"[WebhookSender] Khong co quyen tao webhook trong kenh #{channel.name}",
+            f"[WebhookSender] Không có quyền tạo webhook trong kênh #{channel.name}",
             flush=True,
         )
         return None
     except discord.HTTPException as e:
         print(
-            f"[WebhookSender] Loi khi tao webhook: kenh #{channel.name} - {e}",
+            f"[WebhookSender] Lỗi khi tạo webhook: kênh #{channel.name} - {e}",
             flush=True,
         )
         return None
@@ -81,15 +88,23 @@ async def send_via_webhook(
     content: str | None = None,
     embeds: list[discord.Embed] | None = None,
     file: discord.File | None = None,
+    view: discord.ui.View | None = None,
+    original_message: discord.Message | None = None,
 ) -> bool:
-    """Gui tin nhan qua webhook, gia lap nguoi dung goc.
+    """Gửi tin nhắn qua webhook, giả lập người dùng gốc.
 
-    Su dung sanitize_username() de xu ly ten hien thi.
-    Tra ve True neu gui thanh cong, False neu that bai.
-    Neu webhook khong kha dung, fallback sang channel.send().
+    Sử dụng sanitize_username() để xử lý tên hiển thị.
+    Nếu content vượt quá 2000 ký tự, tự động cắt ngắn.
+    Nếu webhook không khả dụng, fallback sang message.reply() (nếu có)
+    hoặc channel.send().
+    Trả về True nếu gửi thành công, False nếu thất bại.
     """
     safe_name = sanitize_username(user.display_name)
     avatar_url = user.display_avatar.url if user.display_avatar else None
+
+    # Cắt ngắn content nếu cần
+    if content:
+        content = _truncate_content(content)
 
     webhook = await get_or_create_webhook(channel)
 
@@ -106,21 +121,57 @@ async def send_via_webhook(
                 kwargs["embeds"] = embeds
             if file:
                 kwargs["file"] = file
+            if view:
+                kwargs["view"] = view
 
             await webhook.send(**kwargs)
             return True
 
-        except discord.HTTPException as e:
+        except discord.NotFound:
+            # Webhook đã bị xoá, xoá cache và thử tạo lại
+            _webhook_cache.pop(channel.id, None)
             print(
-                f"[WebhookSender] Loi khi gui qua webhook: {e}",
+                f"[WebhookSender] Webhook đã bị xoá, đang thử tạo lại cho kênh #{channel.name}",
                 flush=True,
             )
-            # Xoa cache neu webhook bi loi
+
+        except discord.HTTPException as e:
+            print(
+                f"[WebhookSender] Lỗi khi gửi qua webhook: {e}",
+                flush=True,
+            )
+            # Xoá cache nếu webhook bị lỗi
             _webhook_cache.pop(channel.id, None)
 
-    # Fallback: gui truc tiep qua kenh
+    # Fallback: ưu tiên reply() vào tin nhắn gốc nếu có
+    if original_message is not None:
+        print(
+            f"[WebhookSender] Fallback sang message.reply() cho kênh #{channel.name}",
+            flush=True,
+        )
+        try:
+            kwargs = {"suppress_embeds": True}
+            if content:
+                kwargs["content"] = content
+            if embeds:
+                kwargs["embeds"] = embeds
+            if file:
+                kwargs["file"] = file
+            if view:
+                kwargs["view"] = view
+
+            await original_message.reply(**kwargs)
+            return True
+
+        except discord.HTTPException as e:
+            print(
+                f"[WebhookSender] Lỗi khi fallback message.reply(): {e}",
+                flush=True,
+            )
+
+    # Fallback cuối cùng: gửi trực tiếp qua kênh
     print(
-        f"[WebhookSender] Fallback sang channel.send() cho kenh #{channel.name}",
+        f"[WebhookSender] Fallback sang channel.send() cho kênh #{channel.name}",
         flush=True,
     )
     try:
@@ -131,6 +182,8 @@ async def send_via_webhook(
             kwargs["embeds"] = embeds
         if file:
             kwargs["file"] = file
+        if view:
+            kwargs["view"] = view
 
         if kwargs:
             await channel.send(**kwargs)
@@ -139,12 +192,12 @@ async def send_via_webhook(
 
     except discord.HTTPException as e:
         print(
-            f"[WebhookSender] Loi khi fallback channel.send(): {e}",
+            f"[WebhookSender] Lỗi khi fallback channel.send(): {e}",
             flush=True,
         )
         return False
 
 
 def invalidate_webhook_cache(channel_id: int) -> None:
-    """Xoa webhook khoi cache (su dung khi kenh bi xoa hoac cau hinh thay doi)."""
+    """Xoá webhook khỏi cache (sử dụng khi kênh bị xoá hoặc cấu hình thay đổi)."""
     _webhook_cache.pop(channel_id, None)

@@ -1,6 +1,6 @@
-# MikeDaBot - Discord Summary Bot
+# MikeDaBot
 
-Bot Discord tích hợp AI (Gemini / Gemma 4) chuyên tóm tắt lịch sử trò chuyện và tự động nhúng nội dung mạng xã hội.
+Bot Discord tích hợp AI (Gemini / Gemma 4) chuyên tóm tắt lịch sử trò chuyện và tự động nhúng nội dung mạng xã hội với hệ thống fallback đa tầng.
 
 ---
 
@@ -18,22 +18,63 @@ Bot quét lịch sử tin nhắn trong kênh chat và sử dụng mô hình Gemm
 
 ### Nhúng nội dung mạng xã hội (Social Media Embeds)
 
-Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và tạo embed tùy chỉnh thay thế embed mặc định của Discord. Người dùng chỉ cần dán link, không cần sử dụng lệnh.
+Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và tạo embed tuỳ chỉnh thay thế embed mặc định của Discord. Người dùng chỉ cần dán link, không cần sử dụng lệnh.
 
-**Các nền tảng được hỗ trợ:**
+Hệ thống xử lý theo kiến trúc **Chain of Responsibility** với ba tầng fallback tuần tự. Nếu tầng trước thất bại, tầng sau sẽ được thử tự động cho đến khi thành công hoặc hết phương án.
 
-| Nền tảng       | Dịch vụ proxy sử dụng          | Dữ liệu hiển thị                     |
-|----------------|--------------------------------|---------------------------------------|
-| Twitter / X    | `api.fxtwitter.com`            | Nội dung, ảnh, video, lượt tương tác  |
-| Reddit         | Reddit JSON API                | Tiêu đề, nội dung, ảnh, gallery       |
-| TikTok         | `api.vxtiktok.com`             | Mô tả, thumbnail, lượt tương tác     |
-| Instagram      | `api.ddinstagram.com`          | Nội dung, ảnh/video                   |
-| Facebook       | Facebook oEmbed                | Tiêu đề, tác giả                     |
-| Bluesky        | `public.api.bsky.app`          | Nội dung, ảnh, lượt tương tác         |
-| Twitch         | Twitch oEmbed                  | Tiêu đề clip, thumbnail              |
-| Pixiv          | `phixiv.net`                   | Tiêu đề, ảnh, gallery, tag NSFW      |
+#### Tier 0 -- API Fetcher (dữ liệu có cấu trúc)
 
-Tất cả đều sử dụng các dịch vụ proxy nhẹ, không phụ thuộc vào `yt-dlp` hay API key riêng của từng nền tảng.
+Gọi trực tiếp JSON API của các dịch vụ proxy (VD: `api.fxtwitter.com`, `api.vxtiktok.com`) để lấy dữ liệu có cấu trúc: nội dung bài viết, media URL, thống kê tương tác, thông tin tác giả. Dữ liệu được dùng để xây dựng Discord Embed chi tiết với đầy đủ thông tin.
+
+#### Tier 1 -- Proxy Chain Validation (xác thực OG metadata)
+
+Duyệt tuần tự danh sách proxy domain theo thứ tự ưu tiên giảm dần. Với mỗi proxy:
+
+1. Viết lại URL gốc sang proxy domain (VD: `twitter.com` -> `fxtwitter.com`).
+2. Nếu proxy có JSON API: xác thực qua API trước.
+3. Nếu không có API hoặc API thất bại: gửi HTTP request tới proxy URL, đọc 16KB đầu tiên, phân tích HTML tìm OpenGraph / Twitter Card meta tags (`og:image`, `og:video`, `twitter:card`).
+4. Proxy đầu tiên trả về metadata hợp lệ sẽ được sử dụng. URL đã viết lại được gửi trực tiếp qua webhook.
+
+Danh sách proxy mặc định có thể được ghi đè cho từng máy chủ thông qua lệnh `/proxy set`.
+
+#### Tier 2 -- yt-dlp Fallback (trích xuất media trực tiếp)
+
+Khi cả API lẫn proxy chain đều thất bại, bot sử dụng `yt-dlp` để trích xuất URL media trực tiếp từ trang gốc. Quá trình chạy trong thread riêng (`asyncio.to_thread()`) với timeout cố định để không chặn event loop. Embed tạo từ yt-dlp tự động áp dụng màu thương hiệu và icon của nền tảng tương ứng.
+
+Toàn bộ pipeline được bọc trong `asyncio.wait_for()` với timeout 45 giây.
+
+#### Nền tảng được hỗ trợ
+
+| Nền tảng    | API Fetcher (Tier 0)      | Proxy Chain (Tier 1)                                  |
+|-------------|---------------------------|-------------------------------------------------------|
+| Twitter / X | `api.fxtwitter.com`       | `fxtwitter.com`, `vxtwitter.com`, `fixupx.com`        |
+| Reddit      | Reddit JSON API           | `rxddit.com`, `fxreddit.seria.moe`, `vxreddit.com`    |
+| TikTok      | `api.vxtiktok.com`        | `vxtiktok.com`, `tnktok.com`, `kktiktok.com`          |
+| Instagram   | `api.ddinstagram.com`     | `ddinstagram.com`, `eeinstagram.com`, `oginstagram.com` |
+| Facebook    | Facebook oEmbed           | `facebed.seria.moe`, `fxfb.seria.moe`                |
+| Bluesky     | `public.api.bsky.app`     | `bskx.app`, `fxbsky.app`                             |
+| Twitch      | Twitch oEmbed             | `fxtwitch.seria.moe`                                 |
+| Pixiv       | `phixiv.net`              | `phixiv.net`                                         |
+| Threads     | Threads oEmbed            | `fixthreads.seria.moe`, `vxthreads.net`              |
+| YouTube     | YouTube oEmbed            | `koutube.com`                                        |
+
+Tất cả 10 nền tảng đều được hỗ trợ qua cả ba tầng fallback. Tier 2 (yt-dlp) hoạt động chung cho mọi nền tảng mà yt-dlp hỗ trợ.
+
+#### Giao diện theo nền tảng (Platform-Specific UI)
+
+Mỗi tin nhắn embed đều đính kèm một `discord.ui.View` chứa nút liên kết (`ButtonStyle.link`) tới bài viết gốc, với nhãn phù hợp theo nền tảng:
+
+| Nền tảng    | Nhãn nút                   |
+|-------------|-----------------------------|
+| Twitter / X | Xem bản gốc trên X         |
+| TikTok      | Xem trên TikTok             |
+| Reddit      | Xem trên Reddit             |
+| Instagram   | Xem trên Instagram          |
+| Bluesky     | Xem trên Bluesky            |
+| YouTube     | Xem trên YouTube            |
+| ...         | (tương tự cho các nền tảng khác) |
+
+Embed tạo từ Tier 0 và Tier 2 tự động áp dụng màu thương hiệu (`color`) và icon (`icon_url`) của nền tảng tương ứng, được định nghĩa trong `utils/constants.py`.
 
 ### Bộ lọc NSFW / Spoiler
 
@@ -55,7 +96,18 @@ Mặc định -> Ghi đè bởi Máy chủ -> Ghi đè bởi Kênh
 
 Cài đặt của kênh có độ ưu tiên cao nhất. Nếu kênh không có cài đặt riêng, cấu hình máy chủ được áp dụng. Nếu máy chủ cũng không có, giá trị mặc định được sử dụng.
 
-Dữ liệu cấu hình được cache trong bộ nhớ với TTL 300 giây.
+Bot sử dụng kết nối SQLite persistent (WAL mode) thay vì mở/đóng trên mỗi query. Dữ liệu cấu hình được cache trong bộ nhớ theo ba tầng riêng biệt (guild, channel, proxy domains) với TTL 300 giây.
+
+### Hệ thống gửi tin nhắn (Webhook Sender)
+
+Tin nhắn embed được gửi qua webhook giả lập người dùng gốc. Chuỗi fallback khi gặp lỗi:
+
+1. Gửi qua webhook (ưu tiên).
+2. Nếu webhook bị xoá (`NotFound`): xoá cache, thử tạo lại.
+3. Nếu không có quyền webhook (`Forbidden`): fallback sang `message.reply()`.
+4. Nếu reply thất bại: fallback sang `channel.send()`.
+
+Nội dung (`content`) vượt quá 2000 ký tự sẽ tự động bị cắt ngắn.
 
 ### Web Dashboard
 
@@ -111,7 +163,7 @@ Xem cấu hình hiện tại đang áp dụng cho kênh, bao gồm trạng thái
 
 ### `/config channel_reset`
 
-Xóa toàn bộ cấu hình riêng của kênh hiện tại, đưa về áp dụng cấu hình máy chủ. Yêu cầu quyền `Manage Channels`.
+Xoá toàn bộ cấu hình riêng của kênh hiện tại, đưa về áp dụng cấu hình máy chủ. Yêu cầu quyền `Manage Channels`.
 
 ### `/config reset`
 
@@ -121,33 +173,63 @@ Reset toàn bộ cấu hình máy chủ về giá trị mặc định. Yêu cầ
 
 Mở giao diện chọn (dropdown) để bật hoặc tắt từng nền tảng mạng xã hội. Có thể áp dụng cho toàn máy chủ hoặc kênh hiện tại. Yêu cầu quyền `Manage Server`.
 
+### `/proxy view`
+
+Xem danh sách proxy đang được sử dụng cho một nền tảng cụ thể, bao gồm thứ tự ưu tiên. Hiển thị rõ danh sách đang là tuỳ chỉnh hay mặc định. Yêu cầu quyền `Manage Server`.
+
+| Tham số    | Mô tả                                   |
+|------------|------------------------------------------|
+| `platform` | Nền tảng cần xem (dropdown có autocomplete) |
+
+### `/proxy set`
+
+Ghi đè danh sách proxy fallback cho một nền tảng bằng danh sách tuỳ chỉnh. Các domain được phân cách bằng dấu phẩy, thử theo thứ tự từ trái sang phải. Tối đa 10 domain mỗi nền tảng. Yêu cầu quyền `Manage Server`.
+
+| Tham số    | Mô tả                                                                          |
+|------------|---------------------------------------------------------------------------------|
+| `platform` | Nền tảng cần thay đổi                                                           |
+| `domains`  | Danh sách domain, phân cách bằng dấu phẩy (VD: `fxtwitter.com,vxtwitter.com`)  |
+
+### `/proxy reset`
+
+Khôi phục danh sách proxy của một nền tảng về mặc định toàn cục, xoá cấu hình tuỳ chỉnh. Yêu cầu quyền `Manage Server`.
+
+| Tham số    | Mô tả                          |
+|------------|---------------------------------|
+| `platform` | Nền tảng cần khôi phục mặc định |
+
 ---
 
 ## Cấu trúc dự án
 
 ```
 MikeDaBot/
-  app.py                  # Điểm khởi chạy, đăng ký slash commands, graceful shutdown
-  bot_instance.py         # Khởi tạo SummaryBot, tải cogs
-  config.py               # Biến môi trường, log redirection, đường dẫn database
-  ai_helper.py            # Xử lý AI: prompt engineering, MapReduce, QA evaluator
-  web_dashboard.py        # Flask dashboard (HTML/CSS/JS inline)
-  gunicorn.conf.py        # Cấu hình Gunicorn cho production
-  render.yaml             # Cấu hình deploy trên Render
-  requirements.txt        # Dependencies
-  .env.example            # Mẫu file biến môi trường
+  app.py                    # Điểm khởi chạy, đăng ký slash commands, graceful shutdown
+  bot_instance.py           # Khởi tạo SummaryBot, tải cogs
+  config.py                 # Biến môi trường, log redirection, đường dẫn database
+  ai_helper.py              # Xử lý AI: prompt engineering, MapReduce, QA evaluator
+  web_dashboard.py          # Flask dashboard (HTML/CSS/JS inline)
+  gunicorn.conf.py          # Cấu hình Gunicorn cho production
+  render.yaml               # Cấu hình deploy trên Render
+  requirements.txt          # Dependencies
+  .env.example              # Mẫu file biến môi trường
   cogs/
-    config_cog.py         # Nhóm lệnh /config (view, set, reset, platforms)
-    embed_cog.py          # Listener on_message, phát hiện URL, tạo embed
+    config_cog.py           # Nhóm lệnh /config (view, set, reset, platforms)
+    embed_cog.py            # Listener on_message, pipeline fallback 3 tầng
+    proxy_cog.py            # Nhóm lệnh /proxy (view, set, reset)
   services/
-    config_manager.py     # Quản lý cấu hình SQLite, cache, CRUD
-    embed_builder.py      # Xây dựng Discord Embed thống nhất
-    nsfw_filter.py        # Bộ lọc NSFW / Spoiler
-    platform_fetchers.py  # Hàm fetch dữ liệu từ các nền tảng qua proxy API
+    config_manager.py       # Quản lý cấu hình SQLite, cache phân tầng, CRUD proxy domains
+    embed_builder.py        # Xây dựng Discord Embed thống nhất
+    nsfw_filter.py          # Bộ lọc NSFW / Spoiler
+    platform_fetchers.py    # Hàm fetch dữ liệu từ các nền tảng qua API (Tier 0)
+    platform_ui.py          # discord.ui.View với nút liên kết theo nền tảng
+    proxy_validator.py      # Xác thực proxy qua JSON API và OG metadata (Tier 1)
+    webhook_sender.py       # Gửi tin nhắn qua webhook với chuỗi fallback
+    ytdlp_fallback.py       # Trích xuất media bằng yt-dlp trong thread riêng (Tier 2)
   utils/
-    constants.py          # Registry nền tảng, regex patterns, cấu hình mặc định
+    constants.py            # Registry nền tảng, proxy domains, regex patterns, cấu hình mặc định
   data/
-    bot_config.db         # SQLite database (tự động tạo, nằm trong .gitignore)
+    bot_config.db           # SQLite database (tự động tạo, nằm trong .gitignore)
 ```
 
 ---
@@ -196,7 +278,7 @@ Bot Discord và Flask Dashboard sẽ cùng khởi động. Dashboard mặc đị
 Dự án được cấu hình sẵn để chạy trên Render hoặc các nền tảng PaaS hỗ trợ Gunicorn/Flask:
 
 - `render.yaml`: Cấu hình dịch vụ Render.
-- `gunicorn.conf.py`: 1 worker, 4 threads, timeout 120 giây (đủ thời gian để bot đăng nhập và đồng bộ slash commands).
+- `gunicorn.conf.py`: 1 worker, 4 threads, timeout 120 giây.
 
 Đặt các biến môi trường (`DISCORD_TOKEN`, `GEMINI_API_KEY`, `PORT`) trong phần Environment Variables của nền tảng deploy.
 
@@ -204,16 +286,17 @@ Dự án được cấu hình sẵn để chạy trên Render hoặc các nền 
 
 ## Dependencies
 
-| Package         | Mục đích                                   |
-|-----------------|-------------------------------------------|
-| `discord.py`    | Discord API wrapper                       |
-| `google-genai`  | Google Gemini / Gemma API client          |
-| `python-dotenv` | Đọc biến môi trường từ file `.env`        |
-| `Flask`         | Web Dashboard                             |
-| `gunicorn`      | WSGI server cho production                |
-| `psutil`        | Đọc thông số hệ thống (RAM, CPU)         |
-| `aiohttp`       | HTTP client cho các proxy API             |
-| `aiosqlite`     | Async SQLite cho hệ thống cấu hình       |
+| Package         | Mục đích                                                  |
+|-----------------|-----------------------------------------------------------|
+| `discord.py`    | Discord API wrapper                                       |
+| `google-genai`  | Google Gemini / Gemma API client                          |
+| `python-dotenv` | Đọc biến môi trường từ file `.env`                        |
+| `Flask`         | Web Dashboard                                             |
+| `gunicorn`      | WSGI server cho production                                |
+| `psutil`        | Đọc thông số hệ thống (RAM, CPU)                         |
+| `aiohttp`       | HTTP client bất đồng bộ cho API fetcher và proxy validator |
+| `aiosqlite`     | Async SQLite cho hệ thống cấu hình và proxy domains      |
+| `yt-dlp`        | Trích xuất media trực tiếp, fallback tầng cuối (Tier 2)  |
 
 ---
 
@@ -226,7 +309,8 @@ Bot cần các quyền sau trong máy chủ Discord:
 - `Embed Links`
 - `Attach Files`
 - `Read Message History`
-- `Manage Messages` (để ẩn embed mặc định)
+- `Manage Messages` (để xoá tin nhắn gốc và ẩn embed mặc định)
+- `Manage Webhooks` (để tạo và sử dụng webhook giả lập người dùng)
 - `Use Slash Commands`
 
 **Intent bắt buộc**: `Message Content Intent` (bật trong Discord Developer Portal).
