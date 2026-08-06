@@ -49,19 +49,19 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
 
     Yêu cầu đầu ra (BẮT BUỘC):
     1. **Các chủ đề chính**: Liệt kê các chủ đề chính được thảo luận trong đoạn này.
-    2. **Diễn biến chính & Timeline**: Ghi nhận các sự kiện chính kèm theo mốc thời gian [DD/MM HH:MM] và các thành viên tham gia thảo luận. Nhóm các tin nhắn liên tục lại thành các mốc chính.
+    2. **Diễn biến chính & Timeline**: Ghi nhận các sự kiện chính kèm theo mốc thời gian [DD/MM HH:MM] và các thành viên tham gia thảo luận. Nhóm các tin nhắn liên t...
     3. **Quyết định & Kết luận**: Các quyết định, thống nhất hoặc công việc được chốt (nếu có).
 
     Lịch sử trò chuyện cần phân tích:
-    \"\"\"
+    """
     {chunk_text}
-    \"\"\"
+    """
     """
     print(f"🧠 [MapReduce] Đang phân tích phân đoạn {chunk_index + 1}/{total_chunks} ({len(chunk_messages)} tin nhắn)...", flush=True)
     try:
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemma-4-31b-it',
+            model='gemini-3.6-flash',
             contents=prompt,
             config=SUMMARY_CONFIG,
         )
@@ -78,8 +78,8 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
         ⚠️ BẮT BUỘC TẬP TRUNG SÂU (FOCUS): Người dùng yêu cầu tập trung phân tích đặc biệt sâu vào chủ đề/câu chuyện: "{clean_focus}".
         Yêu cầu:
         1. Trọng tâm toàn bộ bài tóm tắt phải hướng về chủ đề này.
-        2. Dành phần lớn nội dung của cả phần Tổng quan, Timeline và Kết luận để làm rõ diễn biến, các tình tiết, ý kiến, tranh luận và phản ứng của các thành viên xoay quanh câu chuyện này.
-        3. Các đoạn hội thoại khác không liên quan đến chủ đề "{clean_focus}" hãy bỏ qua hoặc chỉ tóm tắt cực kỳ ngắn gọn (1-2 câu) để tránh làm loãng thông tin.
+        2. Dành phần lớn nội dung của cả phần Tổng quan, Timeline và Kết luận để làm rõ diễn biến, các tình tiết, ý kiến, tranh luận và phản ứng của c...
+        3. Các đoạn hội thoại khác không liên quan đến chủ đề "{clean_focus}" hãy bỏ qua hoặc chỉ tóm tắt cực kỳ ngắn gọn (1-2 câu) để tránh làm loãng t...
         """
 
     # Phân chia luồng xử lý: Single-Pass (nếu <= 300 tin nhắn) hoặc MapReduce (nếu > 300 tin nhắn)
@@ -101,27 +101,27 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             - Nếu lịch sử trò chuyện chỉ có dữ liệu ngày X → tuyệt đối không đề cập đến ngày X+1 hay bất kỳ ngày nào khác.
 
             Yêu cầu nghiêm ngặt về định dạng và cấu trúc (BẮT BUỘC TUÂN THỦ):
-            - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu (ví dụ: "Dưới đây là...", "Đây là tóm tắt...") hay lời chào kết, cảm ơn xã giao ở cuối. Đi thẳng vào nội dung chính.
+            - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu (ví dụ: "Dưới đây là...", "Đây là tóm tắt...") hay lời chào kết, cảm ơn xã giao ở cuối. Đi t...
             - ĐỘ DÀI BÀI VIẾT: Dưới 3500 ký tự. Viết cô đọng, súc tích, tránh rườm rà hay lặp từ.
             - BỐ CỤC BÀI VIẾT:
               1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn các chủ đề chính đang được thảo luận và không khí chung của cuộc trò chuyện.
               2. **TIMELINE DIỄN BIẾN**:
-                 - PHÂN CHIA THEO NGÀY: Nếu lịch sử trò chuyện kéo dài nhiều ngày, bạn PHẢI nhóm các timeline theo từng ngày. Dù chỉ có 1 ngày duy nhất hay nhiều ngày, bạn đều phải sử dụng cấu trúc nhóm theo ngày.
+                 - PHÂN CHIA THEO NGÀY: Nếu lịch sử trò chuyện kéo dài nhiều ngày, bạn PHẢI nhóm các timeline theo từng ngày. Dù chỉ có 1 ngày duy nhất hay nhiều[...]
                  - Mỗi ngày bắt đầu bằng tiêu đề định dạng: `### 📅 NGÀY DD/MM` (Ví dụ: `### 📅 NGÀY 09/06`).
                  - GIỮA CÁC NGÀY KHÁC NHAU: Phải ngăn cách bằng một dòng kẻ ngang markdown `---` (để phân tách rõ ràng).
                  - CÁC MỐC THỜI GIAN TRONG NGÀY: Sắp xếp theo trình tự THỜI GIAN ĐẢO NGƯỢC (mốc mới nhất lên đầu ngày, mốc cũ hơn xuống dưới).
-                 - GỘP TIN NHẮN THÔNG MINH: KHÔNG liệt kê máy móc từng tin nhắn riêng lẻ. Hãy gộp nhóm các tin nhắn diễn ra liên tục/gần nhau (cùng một cuộc đối thoại hoặc chủ đề) thành một mốc thời gian.
-                 - CHỈ TẬP TRUNG vào những khoảng thời gian mọi người hoạt động nhiều (lúc thảo luận sôi nổi). Tránh liệt kê các tin nhắn đơn lẻ, tán gẫu xã giao vô thưởng vô phạt hoặc các mốc thời gian không có hoạt động đáng kể.
+                 - GỘP TIN NHẮN THÔNG MINH: KHÔNG liệt kê máy móc từng tin nhắn riêng lẻ. Hãy gộp nhóm các tin nhắn diễn ra liên tục/gần nhau (cùng một cuộc ...
+                 - CHỈ TẬP TRUNG vào những khoảng thời gian mọi người hoạt động nhiều (lúc thảo luận sôi nổi). Tránh liệt kê các tin nhắn đơn lẻ, tán g...
                  - ĐỊNH DẠNG MỐC THỜI GIAN: Vì tiêu đề ngày đã có `DD/MM`, mốc thời gian ở các gạch đầu dòng CHỈ ghi giờ và phút.
-                   Định dạng: `- [Giờ_bắt_đầu - Giờ_kết_thúc] @ThànhViên1, @ThànhViên2: Nội dung tóm tắt diễn biến.` (hoặc `- [Giờ:Phút]` nếu chỉ là 1 mốc ngắn).
+                   Định dạng: `- [Giờ_bắt_đầu - Giờ_kết_thúc] @ThànhViên1, @ThànhViên2: Nội dung tóm tắt diễn biến.` (hoặc `- [Giờ:Phút]` nếu chỉ là 1 mố...)
                    Ví dụ: `- [15:31 - 15:34] @Subeo, @Mike: Thảo luận về quán trà sữa Koi Thé.` (Tuyệt đối KHÔNG ghi `- [09/06 15:31 - 15:34]`).
 
               3. **KẾT LUẬN & QUYẾT ĐỊNH**: Tóm tắt ngắn gọn các quyết định, thống nhất hoặc công việc được chốt lại (nếu có).
 
             Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
-            \"\"\"
+            """
             {chat_history_text}
-            \"\"\"
+            """
             """
         else:
             prompt = f"""
@@ -141,14 +141,14 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             - Liệt kê các quyết định, kết luận quan trọng (nếu có).
 
             Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
-            \"\"\"
+            """
             {chat_history_text}
-            \"\"\"
+            """
             """
 
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemma-4-31b-it',
+            model='gemini-3.6-flash',
             contents=prompt,
             config=SUMMARY_CONFIG,
         )
@@ -190,21 +190,21 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             - BỐ CỤC BÀI VIẾT:
               1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt tổng thể các chủ đề chính đã thảo luận trong suốt toàn bộ cuộc trò chuyện và không khí chung.
               2. **TIMELINE DIỄN BIẾN**:
-                 - PHÂN CHIA THEO NGÀY: Bạn PHẢI nhóm các timeline theo từng ngày. Dù chỉ có 1 ngày duy nhất hay nhiều ngày, bạn đều phải sử dụng cấu trúc nhóm theo ngày.
+                 - PHÂN CHIA THEO NGÀY: Bạn PHẢI nhóm các timeline theo từng ngày. Dù chỉ có 1 ngày duy nhất hay nhiều ngày, bạn đều phải sử dụng cấu trúc nhóm[...]
                  - Mỗi ngày bắt đầu bằng tiêu đề định dạng: `### 📅 NGÀY DD/MM` (Ví dụ: `### 📅 NGÀY 09/06`).
                  - GIỮA CÁC NGÀY KHÁC NHAU: Phải ngăn cách bằng một dòng kẻ ngang markdown `---` (để phân tách rõ ràng).
                  - CÁC MỐC THỜI GIAN TRONG NGÀY: Sắp xếp theo trình tự THỜI GIAN ĐẢO NGƯỢC (mốc mới nhất lên đầu ngày, mốc cũ hơn xuống dưới).
-                 - GỘP TIN NHẮN THÔNG MINH: Hãy tổng hợp và gộp các mốc thời gian tương tự hoặc liên quan với nhau từ các bản tóm tắt phân đoạn thành các mốc thời gian lớn có ý nghĩa. Chỉ giữ lại những khoảng thời gian thảo luận sôi nổi nhất.
+                 - GỘP TIN NHẮN THÔNG MINH: Hãy tổng hợp và gộp các mốc thời gian tương tự hoặc liên quan với nhau từ các bản tóm tắt phân đoạn thành các [...]
                  - ĐỊNH DẠNG MỐC THỜI GIAN: Mốc thời gian ở các gạch đầu dòng CHỈ ghi giờ và phút.
-                   Định dạng: `- [Giờ_bắt_đầu - Giờ_kết_thúc] @ThànhViên1, @ThànhViên2: Nội dung tóm tắt diễn biến.` (hoặc `- [Giờ:Phút]` nếu chỉ là 1 mốc ngắn).
+                   Định dạng: `- [Giờ_bắt_đầu - Giờ_kết_thúc] @ThànhViên1, @ThànhViên2: Nội dung tóm tắt diễn biến.` (hoặc `- [Giờ:Phút]` nếu chỉ là 1 mố...)
                    Ví dụ: `- [15:31 - 15:34] @Subeo, @Mike: Thảo luận về quán trà sữa Koi Thé.` (Tuyệt đối KHÔNG ghi `- [09/06 15:31 - 15:34]`).
 
               3. **KẾT LUẬN & QUYẾT ĐỊNH**: Tổng hợp tất cả các quyết định, thống nhất hoặc công việc được chốt lại trong suốt cuộc trò chuyện.
 
             Dữ liệu tóm tắt phân đoạn:
-            \"\"\"
+            """
             {intermediate_summaries}
-            \"\"\"
+            """
             """
         else:
             reduce_prompt = f"""
@@ -214,7 +214,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 
             {focus_instruction}
 
-            🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC: CHỈ tổng hợp nội dung từ các tóm tắt phân đoạn được cung cấp. KHÔNG thêm bất kỳ thông tin mới nào.
+            🚨 QUY TẮC TUYỆT ĐỐI - CHỐNG ẢO GIÁC: CHỈ tổng hợp nội dung từ các tóm tắt phân đoạn được cung cấp. KHÔNG thêm bất kỳ thông tin mới nào[...]
 
             Yêu cầu cấu trúc (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời kết luận xã giao. Đi thẳng vào nội dung tóm tắt.
@@ -223,14 +223,14 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             - Liệt kê các quyết định, kết luận quan trọng (nếu có).
 
             Dữ liệu tóm tắt phân đoạn:
-            \"\"\"
+            """
             {intermediate_summaries}
-            \"\"\"
+            """
             """
 
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemma-4-31b-it',
+            model='gemini-3.6-flash',
             contents=reduce_prompt,
             config=SUMMARY_CONFIG,
         )
@@ -240,7 +240,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 MOCK_CHAT_HISTORY = [
     "[13/06 09:15] @Miraei: Chào mọi người, hôm nay chúng ta bàn về dự án bot nhé.",
     "[13/06 09:17] @Tuan\ud83d\udc24: Ok, bot hiện tại đang chạy tốt nhưng tôi thấy hình như nếu quét dài quá nó chỉ lấy được ngày cũ nhất thôi.",
-    "[13/06 09:18] @Miraei: Đúng rồi, đó là do discord history query sử dụng after=start_time_utc, nó bị giới hạn ở 300 tin đầu tiên tính từ ngày cũ. Để tôi sửa lại.",
+    "[13/06 09:18] @Miraei: Đúng rồi, đó là do discord history query sử dụng after=start_time_utc, nó bị giới hạn ở 300 tin đầu tiên tính từ ngày cũ. Để tôi sửa[...]",
     "[13/06 09:20] @FearsOfEvil: Nên tách code ra nữa Miraei ơi, app.py giờ phình to hơn 1000 dòng rồi, khó đọc lắm.",
     "[13/06 09:22] @Miraei: Đồng ý. Tôi sẽ tách thành config, bot_instance, ai_helper, và web_dashboard.",
     "[13/06 10:05] @jun: Mọi người ơi có ai làm bài Lab 10 môn Machine Learning của thầy Dũ chưa?",
@@ -280,20 +280,20 @@ async def evaluate_summary(raw_history_text, generated_summary, summary_type, cl
     - Chủ đề tập trung (Focus): {clean_focus or "Không có"}
 
     Lịch sử trò chuyện gốc:
-    \"\"\"
+    """
     {raw_history_text[:4000]} (đã lược bớt nếu quá dài)
-    \"\"\"
+    """
 
     Bản tóm tắt cần đánh giá:
-    \"\"\"
+    """
     {generated_summary}
-    \"\"\"
+    """
 
     Hãy kiểm tra nghiêm ngặt bản tóm tắt dựa trên các tiêu chí sau:
-    1. **Lời mở đầu & Lời kết rườm rà (Fluff Check)**: Bản tóm tắt có chứa các câu xã giao, chào hỏi hoặc dẫn dắt thừa thãi ở đầu hoặc cuối không? (Quy định là phải đi thẳng vào nội dung).
+    1. **Lời mở đầu & Lời kết rườm rà (Fluff Check)**: Bản tóm tắt có chứa các câu xã giao, chào hỏi hoặc dẫn dắt thừa thãi ở đầu hoặc cuối không? [...]
     2. **Định dạng Timeline (Timeline Check)**:
        - Có phân chia theo ngày dạng `### 📅 NGÀY DD/MM` không?
-       - Mốc thời gian gạch đầu dòng có bị thừa phần ngày không? (Mốc thời gian đúng phải là `- [Giờ:Phút]` hoặc `- [Giờ_bắt_đầu - Giờ_kết_thúc]`, tuyệt đối không được ghi ngày ở đây).
+       - Mốc thời gian gạch đầu dòng có bị thừa phần ngày không? (Mốc thời gian đúng phải là `- [Giờ:Phút]` hoặc `- [Giờ_bắt_đầu - Giờ_kết_thúc]`, tuy[...]
        - Có dòng kẻ ngang `---` để chia tách giữa các ngày không?
     3. **Chất lượng nội dung & Focus (Content & Focus Check)**:
        - AI có gộp tin nhắn thông minh không, hay chỉ liệt kê máy móc?
@@ -319,11 +319,10 @@ async def evaluate_summary(raw_history_text, generated_summary, summary_type, cl
     try:
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemma-4-31b-it',
+            model='gemini-3.6-flash',
             contents=eval_prompt,
         )
         return response.text
     except Exception as e:
         print(f"❌ [AI Critique] Lỗi khi đánh giá bản tóm tắt: {e}", flush=True)
         return f"### \ud83d\udcca BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TÓM TẮT\n- **Điểm số**: N/A\n- **Lỗi hệ thống**: Không thể đánh giá do lỗi gọi API: {e}"
-
