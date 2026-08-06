@@ -61,7 +61,7 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     try:
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemini-3.6-flash',
+            model='gemini-3.5-flash-lite',
             contents=prompt,
             config=SUMMARY_CONFIG,
         )
@@ -148,7 +148,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemini-3.6-flash',
+            model='gemini-3.5-flash-lite',
             contents=prompt,
             config=SUMMARY_CONFIG,
         )
@@ -230,7 +230,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemini-3.6-flash',
+            model='gemini-3.5-flash-lite',
             contents=reduce_prompt,
             config=SUMMARY_CONFIG,
         )
@@ -319,7 +319,7 @@ async def evaluate_summary(raw_history_text, generated_summary, summary_type, cl
     try:
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
-            model='gemini-3.6-flash',
+            model='gemini-3.5-flash-lite',
             contents=eval_prompt,
         )
         return response.text
