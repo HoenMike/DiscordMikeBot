@@ -40,7 +40,7 @@ sys.stderr.reconfigure(line_buffering=True)
 sys.stdout = LogStreamRedirector(sys.stdout)
 sys.stderr = LogStreamRedirector(sys.stderr)
 
-print("ℹ️ Hệ thống Logging và Dashboard Buffer đã hoạt động từ config.py.", flush=True)
+print("He thong Logging va Dashboard Buffer da hoat dong tu config.py.", flush=True)
 
 # Config variables
 import pathlib
