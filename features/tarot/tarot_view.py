@@ -3,7 +3,7 @@ import io
 from typing import List, Optional, Set
 import discord
 
-from features.tarot.deck import DrawnCard, get_yes_no_verdict
+from features.tarot.deck import DrawnCard, get_yes_no_verdict, READER_STYLES
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.manager import TarotManager
 from services.ai_service import split_text
@@ -31,6 +31,7 @@ class TarotFlipView(discord.ui.View):
         guild_id: Optional[int] = None,
         channel_id: Optional[int] = None,
         context: Optional[str] = None,
+        reader_style: str = "neutral",
         timeout: float = 300.0,
     ):
         super().__init__(timeout=timeout)
@@ -42,6 +43,8 @@ class TarotFlipView(discord.ui.View):
         self.drawn_cards = drawn_cards
         self.question = question
         self.context = context
+        self.reader_style = reader_style
+        self.style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
         self.ai_task = ai_task
         self.tarot_manager = tarot_manager
         self.guild_id = guild_id
@@ -51,8 +54,8 @@ class TarotFlipView(discord.ui.View):
         self._has_completed: bool = False
         self.message: Optional[discord.Message] = None
 
-        # Màu embed
-        self.embed_color = 0x7851A9
+        # Màu embed theo phong cách hoặc Yes/No phán quyết
+        self.embed_color = self.style_info.get("color", 0x7851A9)
         if self.spread_key == "yes_no":
             _, _, verdict_color = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
             self.embed_color = verdict_color
@@ -175,6 +178,8 @@ class TarotFlipView(discord.ui.View):
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
             if self.context:
                 desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
+            if self.reader_style != "neutral":
+                desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
@@ -192,8 +197,8 @@ class TarotFlipView(discord.ui.View):
             # Nếu luận giải chưa sẵn sàng: CẬP NHẬT NGAY để người dùng thấy ảnh bài đã lật tức thì (Instant Visual Flip)
             if not self.ai_task.done():
                 embed_loading = discord.Embed(
-                    title="✨ ĐANG ĐÓN NHẬN THÔNG ĐIỆP...",
-                    description="🌌 *Đang kết nối năng lượng và giải mã tín hiệu từ vũ trụ, xin chờ trong giây lát...*",
+                    title=self.style_info.get("loading_title", "✨ ĐANG ĐÓN NHẬN THÔNG ĐIỆP..."),
+                    description=self.style_info.get("loading_desc", "🌌 *Đang kết nối năng lượng và giải mã tín hiệu từ vũ trụ, xin chờ trong giây lát...*"),
                     color=self.embed_color
                 )
                 embed_loading.set_footer(
@@ -242,9 +247,9 @@ class TarotFlipView(discord.ui.View):
             final_embeds = [embed_cards]
             for idx_chunk, chunk in enumerate(chunks):
                 title = (
-                    "📖 THÔNG ĐIỆP TỪ VŨ TRỤ"
+                    self.style_info.get("embed_title", "📖 THÔNG ĐIỆP TỪ VŨ TRỤ")
                     if idx_chunk == 0
-                    else f"📖 Thông Điệp (Tiếp theo - Phần {idx_chunk + 1})"
+                    else f"{self.style_info.get('embed_title', '📖 Thông Điệp')} (Tiếp theo - Phần {idx_chunk + 1})"
                 )
                 emb_reading = discord.Embed(
                     title=title,
@@ -365,6 +370,8 @@ class TarotFlipView(discord.ui.View):
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
             if self.context:
                 desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
+            if self.reader_style != "neutral":
+                desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
@@ -386,9 +393,9 @@ class TarotFlipView(discord.ui.View):
             final_embeds = [embed_cards]
             for idx_chunk, chunk in enumerate(chunks):
                 title = (
-                    "📖 THÔNG ĐIỆP TỪ VŨ TRỤ"
+                    self.style_info.get("embed_title", "📖 THÔNG ĐIỆP TỪ VŨ TRỤ")
                     if idx_chunk == 0
-                    else f"📖 Thông Điệp (Tiếp theo - Phần {idx_chunk + 1})"
+                    else f"{self.style_info.get('embed_title', '📖 Thông Điệp')} (Tiếp theo - Phần {idx_chunk + 1})"
                 )
                 emb_reading = discord.Embed(
                     title=title,

@@ -80,16 +80,33 @@ class TarotCog(commands.Cog):
     @app_commands.describe(
         spread="Kiểu trải bài Tarot bạn muốn thực hiện",
         question="Câu hỏi hoặc chủ đề bạn muốn hỏi bài (Bắt buộc với hầu hết các trải bài)",
-        context="Bối cảnh/hoàn cảnh hiện tại (Ví dụ: đang có crush, sắp chuyển việc...) để bài giải chuẩn xác hơn"
+        context="Bối cảnh/hoàn cảnh hiện tại (Ví dụ: đang có crush, sắp chuyển việc...) để bài giải chuẩn xác hơn",
+        reader="Người giải bài bạn muốn tham vấn (Orion, Celeste hoặc Jester)"
     )
+    @app_commands.choices(reader=[
+        app_commands.Choice(
+            name="⚖️ Orion (Điềm tĩnh & Khách quan - Mặc định)",
+            value="neutral",
+        ),
+        app_commands.Choice(
+            name="🌸 Celeste (Ấm áp & Dịu dàng)",
+            value="healer",
+        ),
+        app_commands.Choice(
+            name="🃏 Jester (Quái lạ & Khó đoán)",
+            value="chaos",
+        ),
+    ])
     async def tarot(
         self,
         interaction: discord.Interaction,
         spread: app_commands.Choice[str],
         question: str | None = None,
-        context: str | None = None
+        context: str | None = None,
+        reader: app_commands.Choice[str] | None = None
     ):
         spread_key = spread.value
+        reader_key = reader.value if reader else "neutral"
         spread_info = SPREAD_DEFINITIONS.get(spread_key)
         if not spread_info:
             await interaction.response.send_message(
@@ -139,6 +156,7 @@ class TarotCog(commands.Cog):
                     drawn_cards=drawn_cards,
                     question=clean_question if clean_question else None,
                     context=clean_context if clean_context else None,
+                    reader_style=reader_key,
                     user_name=interaction.user.display_name
                 )
             )
@@ -154,6 +172,7 @@ class TarotCog(commands.Cog):
                 drawn_cards=drawn_cards,
                 question=clean_question if clean_question else None,
                 context=clean_context if clean_context else None,
+                reader_style=reader_key,
                 ai_task=ai_task,
                 tarot_manager=self.tarot_manager,
                 guild_id=interaction.guild.id if interaction.guild else None,
@@ -175,6 +194,8 @@ class TarotCog(commands.Cog):
                 desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{clean_question}*\n")
             if clean_context:
                 desc_lines.append(f"**📝 Bối cảnh:**\n*{clean_context}*\n")
+            if reader_key != "neutral":
+                desc_lines.append(f"**🎭 Người trải bài:** {view.style_info['name']}\n")
 
             desc_lines.append(WIDE_DIVIDER)
 

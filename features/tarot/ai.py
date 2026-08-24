@@ -3,11 +3,11 @@ from typing import List, Optional
 from google.genai import types
 import config
 from services.ai_service import get_ai_client
-from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict
+from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict, READER_STYLES
 
-# Cấu hình AI Tarot: Nhiệt độ 0.5 để câu trả lời súc tích, tập trung, chuẩn xác
+# Cấu hình AI Tarot: Nhiệt độ 0.65 để câu trả lời sinh động, giàu cá tính
 TAROT_GEN_CONFIG = types.GenerateContentConfig(
-    temperature=0.5,
+    temperature=0.65,
 )
 
 
@@ -29,20 +29,18 @@ def _build_tarot_prompt(
     drawn_cards: List[DrawnCard],
     question: Optional[str],
     user_name: str,
-    context: Optional[str] = None
+    context: Optional[str] = None,
+    reader_style: str = "neutral"
 ) -> str:
     """Xây dựng prompt ngắn gọn, kết luận ngay trên đầu, súc tích, trực diện và tràn đầy năng lượng xây dựng tích cực."""
     cards_context = _format_cards_context(drawn_cards)
-    q_str = f'"{question}"' if question else "Không có câu hỏi cụ thể (Xem năng lượng tổng quan)"
+    style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
+    persona_prompt = style_info["persona_prompt"]
 
-    common_rules = """
+    common_rules = f"""
     🚨 NGUYÊN TẮC LUẬN GIẢI BẮT BUỘC:
     1. TUYỆT ĐỐI KHÔNG xưng hô mở đầu (như "Chào bạn...", "Tên thân mến...", "Dưới đây là..."). BẮT ĐẦU NGAY LẬP TỨC bằng tiêu đề mục 1.
-    2. TỈNH TÁO, THỰC TẾ & KHÁCH QUAN (GROUNDED & REALISTIC - TUYỆT ĐỐI KHÔNG BỢ / KHÔNG HỨA HÃO):
-       - Luận giải phải dựa trên góc nhìn thực tế cuộc sống, khoa học và tâm lý học.
-       - Với các câu hỏi phi thực tế hoặc giả tưởng (như công nghệ teleport, viễn tưởng, trúng độc đắc...): Thẳng thắn nhìn nhận thực trạng khách quan thay vì vẽ ra viễn cảnh hão huyền vô lý.
-       - Không vùi dập tiêu cực, nhưng cũng KHÔNG nịnh bợ, tô hồng hay khẳng định những điều viển vông.
-       - Giữ giọng văn điềm tĩnh, thông tuệ, sắc sảo, khách quan và đưa ra góc nhìn khai sáng, thực tế.
+    2. {persona_prompt}
     """.strip()
 
     # Xử lý thông tin bối cảnh
@@ -160,6 +158,7 @@ async def generate_tarot_reading(
     drawn_cards: List[DrawnCard],
     question: Optional[str] = None,
     context: Optional[str] = None,
+    reader_style: str = "neutral",
     user_name: str = "Bạn"
 ) -> str:
     """
@@ -168,7 +167,7 @@ async def generate_tarot_reading(
     """
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
     spread_name = spread_info["name"]
-    prompt = _build_tarot_prompt(spread_key, spread_name, drawn_cards, question, user_name, context)
+    prompt = _build_tarot_prompt(spread_key, spread_name, drawn_cards, question, user_name, context, reader_style)
 
     client = get_ai_client()
 
