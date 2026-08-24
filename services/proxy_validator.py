@@ -170,7 +170,7 @@ async def validate_via_og_metadata(
     """
     try:
         headers = {
-            "User-Agent": "MikeDaBot/1.0 (Discord Bot; embed validator)",
+            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)",
             "Range": "bytes=0-16383",
         }
         async with session.get(

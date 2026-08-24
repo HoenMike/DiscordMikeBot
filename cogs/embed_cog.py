@@ -87,6 +87,18 @@ class EmbedCog(commands.Cog):
             )
             if success:
                 any_success = True
+            else:
+                # Thông báo cho người dùng khi liên kết bị khoá/riêng tư/lỗi
+                platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
+                try:
+                    await message.reply(
+                        f"⚠️ Không thể tạo bản xem trước cho liên kết **{platform_name}** này "
+                        f"(nội dung có thể ở chế độ riêng tư, nhóm kín hoặc yêu cầu đăng nhập).",
+                        mention_author=False,
+                        delete_after=15,
+                    )
+                except Exception:
+                    pass
 
         # Xoá tin nhắn gốc nếu ít nhất một URL được xử lý thành công
         if any_success:
