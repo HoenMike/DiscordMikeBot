@@ -40,9 +40,15 @@ class EmbedCog(commands.Cog):
     def _detect_urls(self, content: str) -> list[tuple[str, str, object]]:
         """Phát hiện URL của các nền tảng được hỗ trợ trong nội dung tin nhắn."""
         detected = []
+        seen_spans = []
         for platform_key, platform_info in PLATFORMS.items():
             for pattern in platform_info["patterns"]:
                 for match in pattern.finditer(content):
+                    span = (match.start(), match.end())
+                    # Tránh duplicate hoặc overlapping sub-match
+                    if any(s[0] <= span[0] and span[1] <= s[1] for s in seen_spans):
+                        continue
+                    seen_spans.append(span)
                     detected.append((platform_key, match.group(0), match))
         return detected
 

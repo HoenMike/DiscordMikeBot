@@ -93,8 +93,7 @@ PLATFORMS = {
         "button_label": "Xem trên Facebook",
         "api_base": None,
         "patterns": [
-            re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/share/(?:p|r|v|[\w]+)/[\w]+/?"),
-            re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/share/[\w]+/?"),
+            re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/share/(?:(?:p|r|v)/)?[\w]+/?"),
             re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/(?:reel|reels)/\d+/?"),
             re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/watch/?\?(?:[\w=&]+)?v=\d+"),
             re.compile(r"https?://(?:www\.|m\.|web\.)?facebook\.com/[^/\s]+/(?:posts|videos|photos)/[^/\s]+/?"),

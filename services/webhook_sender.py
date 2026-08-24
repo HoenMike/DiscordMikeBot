@@ -127,8 +127,15 @@ async def send_via_webhook(
             if view:
                 kwargs["view"] = view
 
-            await webhook.send(**kwargs)
-            return True
+            try:
+                await webhook.send(**kwargs)
+                return True
+            except discord.HTTPException as e:
+                if view is not None and ("components" in str(e).lower() or e.code == 50035):
+                    kwargs.pop("view", None)
+                    await webhook.send(**kwargs)
+                    return True
+                raise e
 
         except discord.NotFound:
             # Webhook đã bị xoá, xoá cache và thử tạo lại
@@ -163,8 +170,15 @@ async def send_via_webhook(
             if view:
                 kwargs["view"] = view
 
-            await original_message.reply(**kwargs, mention_author=False)
-            return True
+            try:
+                await original_message.reply(**kwargs, mention_author=False)
+                return True
+            except discord.HTTPException as e:
+                if view is not None and ("components" in str(e).lower() or e.code == 50035):
+                    kwargs.pop("view", None)
+                    await original_message.reply(**kwargs, mention_author=False)
+                    return True
+                raise e
 
         except discord.HTTPException as e:
             print(
@@ -189,8 +203,15 @@ async def send_via_webhook(
             kwargs["view"] = view
 
         if kwargs:
-            await channel.send(**kwargs)
-            return True
+            try:
+                await channel.send(**kwargs)
+                return True
+            except discord.HTTPException as e:
+                if view is not None and ("components" in str(e).lower() or e.code == 50035):
+                    kwargs.pop("view", None)
+                    await channel.send(**kwargs)
+                    return True
+                raise e
         return False
 
     except discord.HTTPException as e:
