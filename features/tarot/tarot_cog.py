@@ -12,6 +12,7 @@ from features.tarot.deck import (
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
 from features.tarot.manager import TarotManager
+from features.tarot.tarot_view import TarotFlipView
 from services.ai_service import split_text
 
 
@@ -117,91 +118,73 @@ class TarotCog(commands.Cog):
                 )
                 return
 
-        # 3. Defer response để bot có thời gian ghép ảnh và gọi AI
+        # 3. Defer response để bot có thời gian chuẩn bị giao diện
         await interaction.response.defer(thinking=True)
 
         try:
-            # Rút bài ngẫu nhiên
+            # 1. Rút bài ngẫu nhiên
             drawn_cards = draw_spread(spread_key)
 
-            # Ghép ảnh trải bài bằng Pillow trên thread riêng
-            image_buffer = await asyncio.to_thread(render_spread_to_bytes, spread_key, drawn_cards)
+            # 2. Zero-Latency Pre-fetch: Gọi Gemini AI tạo bài luận giải ngầm ngay từ bây giờ trong lúc người dùng lật bài
+            ai_task = asyncio.create_task(
+                generate_tarot_reading(
+                    spread_key=spread_key,
+                    drawn_cards=drawn_cards,
+                    question=clean_question if clean_question else None,
+                    user_name=interaction.user.display_name
+                )
+            )
 
-            # Gọi Gemini AI tạo bài luận giải
-            ai_reading = await generate_tarot_reading(
+            # 3. Khởi tạo View tương tác lật bài
+            user_avatar = interaction.user.display_avatar.url if interaction.user.display_avatar else None
+            view = TarotFlipView(
+                author_id=interaction.user.id,
+                author_name=interaction.user.display_name,
+                author_avatar_url=user_avatar,
                 spread_key=spread_key,
+                spread_info=spread_info,
                 drawn_cards=drawn_cards,
                 question=clean_question if clean_question else None,
-                user_name=interaction.user.display_name
-            )
-
-            # Lưu vào database
-            if spread_key == "daily":
-                await self.tarot_manager.record_daily_draw(interaction.user.id, drawn_cards[0])
-
-            await self.tarot_manager.save_tarot_history(
-                user_id=interaction.user.id,
+                ai_task=ai_task,
+                tarot_manager=self.tarot_manager,
                 guild_id=interaction.guild.id if interaction.guild else None,
-                channel_id=interaction.channel.id if interaction.channel else None,
-                spread_type=spread_key,
-                question=clean_question if clean_question else None,
-                drawn_cards=drawn_cards,
-                ai_reading=ai_reading
+                channel_id=interaction.channel.id if interaction.channel else None
             )
 
-            # Xây dựng Discord Embed (Sử dụng description để chiếm trọn chiều rộng của Discord)
-            embed_color = 0x7851A9  # Tím hoàng gia mặc định
-            if spread_key == "yes_no":
-                _, _, verdict_color = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
-                embed_color = verdict_color
+            # 4. Render ảnh trải bài ban đầu (Tất cả các lá đều đang ÚP: revealed_indices=set())
+            image_buffer = await asyncio.to_thread(
+                render_spread_to_bytes,
+                spread_key,
+                drawn_cards,
+                set()
+            )
+            file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
+            # 5. Xây dựng Embed ban đầu
             desc_lines = []
             if clean_question:
                 desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{clean_question}*\n")
 
-            if spread_key == "yes_no":
-                badge, verdict_desc, _ = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
-                desc_lines.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
-
-            # Liệt kê tóm tắt các lá bài
             cards_summary_lines = []
             for drawn in drawn_cards:
-                orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
-                cards_summary_lines.append(
-                    f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
-                )
+                cards_summary_lines.append(f"• **{drawn.position_title}**: *✦ Đang chờ lật mở... ✦*")
 
-            desc_lines.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines) + "\n")
-            desc_lines.append(ai_reading)
+            desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
+            desc_lines.append("⏳ *Hãy bấm vào các nút bên dưới để lật mở từng lá bài...*")
 
-            full_description = "\n".join(desc_lines)
+            embed = discord.Embed(
+                title=f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}",
+                description="\n".join(desc_lines),
+                color=view.embed_color
+            )
+            embed.set_image(url="attachment://tarot_spread.png")
+            embed.set_footer(
+                text=f"Quẻ bài của {interaction.user.display_name} (Đang bốc bài...)",
+                icon_url=user_avatar
+            )
 
-            # Chia nhỏ theo đoạn văn an toàn (không bao giờ cắt ngang chữ) nếu vượt quá 4000 ký tự
-            chunks = split_text(full_description, limit=4000)
-            if not chunks:
-                chunks = [full_description]
-
-            embeds = []
-            for idx, chunk in enumerate(chunks):
-                title = f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}" if idx == 0 else f"🔮 Luận Giải (Tiếp theo - Phần {idx+1})"
-                emb = discord.Embed(
-                    title=title,
-                    description=chunk,
-                    color=embed_color
-                )
-                if idx == len(chunks) - 1:
-                    # Gắn footer gọn gàng theo yêu cầu
-                    emb.set_footer(
-                        text=f"Quẻ bài của {interaction.user.display_name}",
-                        icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None
-                    )
-                embeds.append(emb)
-
-            # Đính kèm ảnh trải bài vào embed đầu tiên
-            file = discord.File(fp=image_buffer, filename="tarot_spread.png")
-            embeds[0].set_image(url="attachment://tarot_spread.png")
-
-            await interaction.followup.send(embeds=embeds, file=file)
+            sent_msg = await interaction.followup.send(embed=embed, file=file, view=view)
+            view.message = sent_msg
 
         except Exception as e:
             print(f"❌ [TarotCog] Lỗi trong quá trình bốc bài: {e}", flush=True)

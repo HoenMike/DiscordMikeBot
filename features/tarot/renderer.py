@@ -181,6 +181,46 @@ def _generate_procedural_card(card: TarotCard, target_w: int, target_h: int) -> 
     return img
 
 
+def _generate_card_back(target_w: int, target_h: int) -> Image.Image:
+    """Vẽ mặt lưng bài Tarot huyền bí với hoa văn hoàng gia vàng kim và tinh tú."""
+    img = Image.new("RGBA", (target_w, target_h), (18, 14, 30))
+    draw = ImageDraw.Draw(img)
+
+    # Khung viền kép vàng kim
+    draw.rectangle([(4, 4), (target_w - 5, target_h - 5)], outline=COLOR_GOLD_PRIMARY, width=2)
+    draw.rectangle([(8, 8), (target_w - 9, target_h - 9)], outline=COLOR_GOLD_DARK, width=1)
+    draw.rectangle([(12, 12), (target_w - 13, target_h - 13)], outline=COLOR_GOLD_PRIMARY, width=1)
+
+    # 4 góc ornate
+    _draw_ornate_corner(draw, 8, 8, radius=12, quadrant=1)
+    _draw_ornate_corner(draw, target_w - 8, 8, radius=12, quadrant=2)
+    _draw_ornate_corner(draw, 8, target_h - 8, radius=12, quadrant=3)
+    _draw_ornate_corner(draw, target_w - 8, target_h - 8, radius=12, quadrant=4)
+
+    # Họa tiết Sacred Geometry ở trung tâm
+    cx, cy = target_w // 2, target_h // 2
+    r_outer = min(target_w, target_h) // 3
+    r_inner = r_outer // 2
+
+    # Vòng tròn ma thuật
+    draw.ellipse([(cx - r_outer, cy - r_outer), (cx + r_outer, cy + r_outer)], outline=COLOR_GOLD_DARK, width=1)
+    draw.ellipse([(cx - r_inner, cy - r_inner), (cx + r_inner, cy + r_inner)], outline=COLOR_GOLD_PRIMARY, width=1)
+
+    # Ngôi sao trung tâm
+    _draw_sparkle_star(draw, cx, cy, size=int(r_inner * 0.9), color=COLOR_GOLD_LIGHT)
+
+    # 4 ngôi sao vệ tinh nhỏ ở 4 góc trong
+    star_dist = int(r_outer * 0.75)
+    _draw_sparkle_star(draw, cx, cy - star_dist, size=4, color=COLOR_GOLD_LIGHT)
+    _draw_sparkle_star(draw, cx, cy + star_dist, size=4, color=COLOR_GOLD_LIGHT)
+    _draw_sparkle_star(draw, cx - star_dist, cy, size=4, color=COLOR_GOLD_LIGHT)
+    _draw_sparkle_star(draw, cx + star_dist, cy, size=4, color=COLOR_GOLD_LIGHT)
+
+    # Khung viền ngoài
+    draw.rectangle([(0, 0), (target_w - 1, target_h - 1)], outline=COLOR_GOLD_PRIMARY, width=2)
+    return img
+
+
 def _load_and_prepare_card_image(drawn: DrawnCard, target_w: int, target_h: int) -> Image.Image:
     """Tải ảnh lá bài từ assets hoặc tạo procedural, xoay 180° nếu reversed."""
     card = drawn.card
@@ -216,12 +256,17 @@ def _draw_card_with_meta(
     card_h: int,
     custom_pos_title: Optional[str] = None,
     font_size_scale: float = 1.0,
-    wrap_name: bool = False
+    wrap_name: bool = False,
+    is_revealed: bool = True,
 ):
-    """Vẽ 1 lá bài hoàn chỉnh kèm nhãn vị trí và tên lá bài trên canvas."""
+    """Vẽ 1 lá bài (hoặc lưng bài nếu chưa lật) kèm nhãn vị trí trên canvas."""
     draw = ImageDraw.Draw(canvas)
 
-    card_img = _load_and_prepare_card_image(drawn, card_w, card_h)
+    if is_revealed:
+        card_img = _load_and_prepare_card_image(drawn, card_w, card_h)
+    else:
+        card_img = _generate_card_back(card_w, card_h)
+
     top_left_x = center_x - card_w // 2
     top_left_y = center_y - card_h // 2
 
@@ -231,7 +276,7 @@ def _draw_card_with_meta(
 
     canvas.paste(card_img, (top_left_x, top_left_y), card_img)
 
-    # Position Header
+    # Position Header (Luôn hiển thị để người xem biết ý nghĩa vị trí)
     pos_title = custom_pos_title or drawn.position_title
     pos_font_size = max(10, int(12 * font_size_scale))
     font_pos = _get_font(pos_font_size, bold=True)
@@ -252,13 +297,21 @@ def _draw_card_with_meta(
     orient_font_size = max(9, int(10 * font_size_scale))
     font_name = _get_font(name_font_size, bold=True)
     font_orient = _get_font(orient_font_size, bold=True)
+    footer_y = top_left_y + card_h + 4
 
+    if not is_revealed:
+        # Nếu lá bài đang úp: hiển thị nhãn chờ lật
+        secret_text = "• ĐANG CHỜ LẬT •"
+        bbox_secret = draw.textbbox((0, 0), secret_text, font=font_orient)
+        sec_w = bbox_secret[2] - bbox_secret[0]
+        draw.text((center_x - sec_w // 2, footer_y + 2), secret_text, fill=COLOR_GOLD_LIGHT, font=font_orient)
+        return
+
+    # Nếu đã lật: hiển thị tên lá bài và chiều Xuôi/Ngược
     orient_str = "[NGƯỢC]" if drawn.is_reversed else "[XUÔI]"
     orient_color = COLOR_REVERSED if drawn.is_reversed else COLOR_UPRIGHT
     bbox_orient = draw.textbbox((0, 0), orient_str, font=font_orient)
     orient_w = bbox_orient[2] - bbox_orient[0]
-
-    footer_y = top_left_y + card_h + 4
 
     if wrap_name:
         vi_name = drawn.card.name_vi
@@ -278,8 +331,11 @@ def _draw_card_with_meta(
         draw.text((center_x - orient_w // 2, footer_y + name_font_size + 2), orient_str, fill=orient_color, font=font_orient)
 
 
-def render_1_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image.Image:
+def render_1_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
     """Render layout cho trải bài 1 lá (daily, yes_no, single)."""
+    if revealed_indices is None:
+        revealed_indices = {0}
+
     spread_name = SPREAD_DEFINITIONS[spread_key]["name"]
     width = 520
     height = 760
@@ -290,41 +346,47 @@ def render_1_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
     center_x = width // 2
     center_y = 395
 
-    _draw_card_with_meta(canvas, drawn_cards[0], center_x, center_y, card_w, card_h, font_size_scale=1.1)
+    _draw_card_with_meta(
+        canvas, drawn_cards[0], center_x, center_y, card_w, card_h,
+        font_size_scale=1.1, is_revealed=(0 in revealed_indices)
+    )
     return canvas
 
 
-def render_3_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image.Image:
+def render_3_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
     """Render layout cho trải bài 3 lá hàng ngang (choices, ppf, mbs)."""
+    if revealed_indices is None:
+        revealed_indices = {0, 1, 2}
+
     spread_name = SPREAD_DEFINITIONS[spread_key]["name"]
     width = 980
-    height = 640
+    height = 600
     canvas = _draw_mystic_background(width, height, spread_name)
 
-    card_w = 260
-    card_h = 450
-    spacing = 35
-    start_x = (width - (3 * card_w + 2 * spacing)) // 2 + card_w // 2
-    center_y = 345
+    card_w = 200
+    card_h = 344
+    center_y = 330
+    xs = [190, 490, 790]
 
-    for i, drawn in enumerate(drawn_cards):
-        cx = start_x + i * (card_w + spacing)
-        _draw_card_with_meta(canvas, drawn, cx, center_y, card_w, card_h)
+    for idx, (card, cx) in enumerate(zip(drawn_cards, xs)):
+        _draw_card_with_meta(
+            canvas, card, cx, center_y, card_w, card_h,
+            wrap_name=True, is_revealed=(idx in revealed_indices)
+        )
 
     return canvas
 
 
-def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image.Image:
-    """
-    Render layout cho trải bài 5 lá:
-    - Nếu là 'two_paths': Cây phân nhánh (Decision Tree) với Lá 1 ở trên, 2 lá Nhánh A bên trái, 2 lá Nhánh B bên phải.
-    - Nếu là 'horseshoe' hoặc khác: Cánh cung móng ngựa (Horseshoe arc).
-    """
+def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
+    """Render layout cho trải bài 5 lá: Two Paths (Cây phân nhánh) hoặc Horseshoe (Cánh cung móng ngựa)."""
+    if revealed_indices is None:
+        revealed_indices = set(range(len(drawn_cards)))
+
     spread_name = SPREAD_DEFINITIONS.get(spread_key, {}).get("name", "TRẢI BÀI 5 LÁ")
 
     if spread_key == "two_paths":
         width = 1140
-        height = 840
+        height = 800
         canvas = _draw_mystic_background(width, height, "TWO PATHS (SO SÁNH 2 LỰA CHỌN)")
         draw = ImageDraw.Draw(canvas)
 
@@ -332,7 +394,11 @@ def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
         card_h = 258
 
         # 1. Lá 1: Bối cảnh chung (Ở đỉnh chính giữa)
-        _draw_card_with_meta(canvas, drawn_cards[0], width // 2, 235, card_w, card_h, "LÁ 1: BỐI CẢNH CHUNG", font_size_scale=0.9, wrap_name=True)
+        _draw_card_with_meta(
+            canvas, drawn_cards[0], width // 2, 235, card_w, card_h,
+            "LÁ 1: BỐI CẢNH CHUNG", font_size_scale=0.9, wrap_name=True,
+            is_revealed=(0 in revealed_indices)
+        )
 
         # Hàm vẽ Banner nhánh cân đối tuyệt đối theo tọa độ tâm
         def _draw_branch_header(center_x: int, top_y: int, text: str, border_color, text_color):
@@ -360,14 +426,14 @@ def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
         # Nhánh A (Trái): Tâm giữa 2 lá là cx = 295
         center_a = 295
         _draw_branch_header(center_a, 405, "HƯỚNG ĐI A", COLOR_BRANCH_A, (130, 200, 255))
-        _draw_card_with_meta(canvas, drawn_cards[1], 200, 580, card_w, card_h, "LÁ 2: THUẬN LỢI A", font_size_scale=0.85, wrap_name=True)
-        _draw_card_with_meta(canvas, drawn_cards[2], 390, 580, card_w, card_h, "LÁ 3: RỦI RO A", font_size_scale=0.85, wrap_name=True)
+        _draw_card_with_meta(canvas, drawn_cards[1], 200, 580, card_w, card_h, "LÁ 2: THUẬN LỢI A", font_size_scale=0.85, wrap_name=True, is_revealed=(1 in revealed_indices))
+        _draw_card_with_meta(canvas, drawn_cards[2], 390, 580, card_w, card_h, "LÁ 3: RỦI RO A", font_size_scale=0.85, wrap_name=True, is_revealed=(2 in revealed_indices))
 
         # Nhánh B (Phải): Tâm giữa 2 lá là cx = 845
         center_b = 845
         _draw_branch_header(center_b, 405, "HƯỚNG ĐI B", COLOR_BRANCH_B, (225, 160, 255))
-        _draw_card_with_meta(canvas, drawn_cards[3], 750, 580, card_w, card_h, "LÁ 4: THUẬN LỢI B", font_size_scale=0.85, wrap_name=True)
-        _draw_card_with_meta(canvas, drawn_cards[4], 940, 580, card_w, card_h, "LÁ 5: RỦI RO B", font_size_scale=0.85, wrap_name=True)
+        _draw_card_with_meta(canvas, drawn_cards[3], 750, 580, card_w, card_h, "LÁ 4: THUẬN LỢI B", font_size_scale=0.85, wrap_name=True, is_revealed=(3 in revealed_indices))
+        _draw_card_with_meta(canvas, drawn_cards[4], 940, 580, card_w, card_h, "LÁ 5: RỦI RO B", font_size_scale=0.85, wrap_name=True, is_revealed=(4 in revealed_indices))
 
         return canvas
 
@@ -381,24 +447,30 @@ def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
         card_h = 275
 
         positions = [
-            (drawn_cards[0], 160, 290, "LÁ 1: QUÁ KHỨ ẢNH HƯỞNG"),
-            (drawn_cards[1], 380, 385, "LÁ 2: HIỆN TRẠNG VẤN ĐỀ"),
-            (drawn_cards[2], 600, 445, "LÁ 3: TRỞ NGẠI / YẾU TỐ ẨN"),
-            (drawn_cards[3], 820, 385, "LÁ 4: LỜI KHUYÊN HÀNH ĐỘNG"),
-            (drawn_cards[4], 1040, 290, "LÁ 5: KẾT QUẢ TIỀM NĂNG"),
+            (0, drawn_cards[0], 160, 290, "LÁ 1: QUÁ KHỨ ẢNH HƯỞNG"),
+            (1, drawn_cards[1], 380, 385, "LÁ 2: HIỆN TRẠNG VẤN ĐỀ"),
+            (2, drawn_cards[2], 600, 445, "LÁ 3: TRỞ NGẠI / YẾU TỐ ẨN"),
+            (3, drawn_cards[3], 820, 385, "LÁ 4: LỜI KHUYÊN HÀNH ĐỘNG"),
+            (4, drawn_cards[4], 1040, 290, "LÁ 5: KẾT QUẢ TIỀM NĂNG"),
         ]
 
-        for card, cx, cy, pos_title in positions:
-            _draw_card_with_meta(canvas, card, cx, cy, card_w, card_h, pos_title, font_size_scale=0.85, wrap_name=True)
+        for idx, card, cx, cy, pos_title in positions:
+            _draw_card_with_meta(
+                canvas, card, cx, cy, card_w, card_h, pos_title,
+                font_size_scale=0.85, wrap_name=True, is_revealed=(idx in revealed_indices)
+            )
 
         return canvas
 
 
-def render_celtic_cross_spread(drawn_cards: List[DrawnCard]) -> Image.Image:
+def render_celtic_cross_spread(drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
     """
     Render layout Celtic Cross 10 lá chuẩn truyền thống với không gian chặt chẽ,
     cân đối hài hòa giữa Cụm Chữ Thập và Cột Quyền Trượng, không có khoảng trống thừa.
     """
+    if revealed_indices is None:
+        revealed_indices = set(range(len(drawn_cards)))
+
     width = 1140
     height = 1000
     canvas = _draw_mystic_background(width, height, "CELTIC CROSS (TRẢI BÀI 10 LÁ)")
@@ -408,62 +480,78 @@ def render_celtic_cross_spread(drawn_cards: List[DrawnCard]) -> Image.Image:
     card_h = 164
 
     # Cross Area (Bên trái): Tâm cx = 410, cy = 500
-    cross_cx = 410
-    cross_cy = 500
+    cx_cross = 410
+    cy_cross = 500
 
-    # 1. Lá 1: Hiện tại (Trung tâm bên trái)
-    _draw_card_with_meta(canvas, drawn_cards[0], cross_cx - 55, cross_cy, card_w, card_h, "LÁ 1: HIỆN TẠI", font_size_scale=0.85, wrap_name=True)
+    # 1. Lá 1: Hiện tại (Trung tâm Cross)
+    _draw_card_with_meta(canvas, drawn_cards[0], cx_cross, cy_cross, card_w, card_h, "1. HIỆN TẠI", font_size_scale=0.72, wrap_name=True, is_revealed=(0 in revealed_indices))
 
-    # 2. Lá 2: Thách thức / Trở ngại (Đặt cạnh song song trung tâm bên phải)
-    _draw_card_with_meta(canvas, drawn_cards[1], cross_cx + 55, cross_cy, card_w, card_h, "LÁ 2: THÁCH THỨC", font_size_scale=0.85, wrap_name=True)
+    # 2. Lá 2: Thử thách (Đè ngang qua lá 1)
+    if 1 in revealed_indices:
+        card2_img = _load_and_prepare_card_image(drawn_cards[1], card_w, card_h)
+    else:
+        card2_img = _generate_card_back(card_w, card_h)
+    card2_img = card2_img.rotate(90, expand=True)
+    w_rot, h_rot = card2_img.size
+    shadow2 = Image.new("RGBA", (w_rot + 10, h_rot + 10), (0, 0, 0, 180))
+    canvas.paste(shadow2, (cx_cross - w_rot // 2 - 5, cy_cross - h_rot // 2 - 2), shadow2)
+    canvas.paste(card2_img, (cx_cross - w_rot // 2, cy_cross - h_rot // 2), card2_img)
 
-    # 3. Lá 4: Quá khứ gần (Bên trái của Cross)
-    _draw_card_with_meta(canvas, drawn_cards[3], cross_cx - 230, cross_cy, card_w, card_h, "LÁ 4: QUÁ KHỨ", font_size_scale=0.85, wrap_name=True)
+    # 3. Lá 3: Tiềm thức / Gốc rễ (Bên DƯỚI)
+    _draw_card_with_meta(canvas, drawn_cards[2], cx_cross, cy_cross + 250, card_w, card_h, "3. GỐC RỄ", font_size_scale=0.72, wrap_name=True, is_revealed=(2 in revealed_indices))
 
-    # 4. Lá 6: Tương lai gần (Bên phải của Cross)
-    _draw_card_with_meta(canvas, drawn_cards[5], cross_cx + 230, cross_cy, card_w, card_h, "LÁ 6: TƯƠNG LAI", font_size_scale=0.85, wrap_name=True)
+    # 4. Lá 4: Quá khứ gần (Bên TRÁI)
+    _draw_card_with_meta(canvas, drawn_cards[3], cx_cross - 240, cy_cross, card_w, card_h, "4. QUÁ KHỨ", font_size_scale=0.72, wrap_name=True, is_revealed=(3 in revealed_indices))
 
-    # 5. Lá 5: Mục tiêu / Ý thức (Trên đỉnh của Cross)
-    _draw_card_with_meta(canvas, drawn_cards[4], cross_cx, cross_cy - 245, card_w, card_h, "LÁ 5: Ý THỨC", font_size_scale=0.85, wrap_name=True)
+    # 5. Lá 5: Nhận thức / Mục tiêu (Bên TRÊN)
+    _draw_card_with_meta(canvas, drawn_cards[4], cx_cross, cy_cross - 250, card_w, card_h, "5. NHẬN THỨC", font_size_scale=0.72, wrap_name=True, is_revealed=(4 in revealed_indices))
 
-    # 6. Lá 3: Căn nguyên / Tiềm thức (Dưới đáy của Cross)
-    _draw_card_with_meta(canvas, drawn_cards[2], cross_cx, cross_cy + 245, card_w, card_h, "LÁ 3: TIỀM THỨC", font_size_scale=0.85, wrap_name=True)
+    # 6. Lá 6: Tương lai gần (Bên PHẢI)
+    _draw_card_with_meta(canvas, drawn_cards[5], cx_cross + 240, cy_cross, card_w, card_h, "6. TƯƠNG LAI GẦN", font_size_scale=0.72, wrap_name=True, is_revealed=(5 in revealed_indices))
 
-    # Staff Area (Cột 4 lá bên phải): staff_x = 960
-    staff_x = 960
-    staff_positions = [
-        (drawn_cards[9], 140, "LÁ 10: KẾT QUẢ"),
-        (drawn_cards[8], 380, "LÁ 9: HY VỌNG & SỢ"),
-        (drawn_cards[7], 620, "LÁ 8: MÔI TRƯỜNG"),
-        (drawn_cards[6], 860, "LÁ 7: THÁI ĐỘ"),
+    # Cột Quyền Trượng (Staff Column - Bên phải): cx = 950
+    cx_staff = 950
+    staff_ys = [800, 600, 400, 200]
+    staff_cards = [
+        (6, drawn_cards[6], "7. BẢN THÂN"),
+        (7, drawn_cards[7], "8. MÔI TRƯỜNG"),
+        (8, drawn_cards[8], "9. HY VỌNG & NỖI SỢ"),
+        (9, drawn_cards[9], "10. KẾT QUẢ TỔNG THỂ"),
     ]
 
-    for card, sy, custom_title in staff_positions:
-        _draw_card_with_meta(canvas, card, staff_x, sy, card_w, card_h, custom_title, font_size_scale=0.85, wrap_name=True)
+    for (orig_idx, card, pos_title), cy in zip(staff_cards, staff_ys):
+        _draw_card_with_meta(
+            canvas, card, cx_staff, cy, card_w, card_h, pos_title,
+            font_size_scale=0.72, wrap_name=True, is_revealed=(orig_idx in revealed_indices)
+        )
 
     return canvas
 
 
-def render_spread_to_bytes(spread_key: str, drawn_cards: List[DrawnCard]) -> io.BytesIO:
+def render_spread_to_bytes(
+    spread_key: str,
+    drawn_cards: List[DrawnCard],
+    revealed_indices: Optional[Set[int]] = None
+) -> io.BytesIO:
     """Tạo ảnh trải bài và đóng gói vào io.BytesIO gửi thẳng lên Discord."""
     count = len(drawn_cards)
     if count == 1:
-        img = render_1_card_spread(spread_key, drawn_cards)
+        img = render_1_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
     elif count == 3:
-        img = render_3_card_spread(spread_key, drawn_cards)
+        img = render_3_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
     elif count == 5:
-        img = render_5_card_spread(spread_key, drawn_cards)
+        img = render_5_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
     elif count == 10 or spread_key == "celtic":
-        img = render_celtic_cross_spread(drawn_cards)
+        img = render_celtic_cross_spread(drawn_cards, revealed_indices=revealed_indices)
     else:
         if count <= 2:
-            img = render_1_card_spread(spread_key, drawn_cards)
+            img = render_1_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
         elif count <= 4:
-            img = render_3_card_spread(spread_key, drawn_cards)
+            img = render_3_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
         elif count <= 6:
-            img = render_5_card_spread(spread_key, drawn_cards)
+            img = render_5_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
         else:
-            img = render_celtic_cross_spread(drawn_cards)
+            img = render_celtic_cross_spread(drawn_cards, revealed_indices=revealed_indices)
 
     buffer = io.BytesIO()
     img.save(buffer, format="PNG", optimize=True)

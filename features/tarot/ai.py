@@ -35,11 +35,13 @@ def _build_tarot_prompt(
     q_str = f'"{question}"' if question else "Không có câu hỏi cụ thể (Xem năng lượng tổng quan)"
 
     common_rules = """
-    🚨 NGUYÊN TẮC BẮT BUỘC:
-    1. TUYỆT ĐỐI KHÔNG chào hỏi, KHÔNG viết câu mở đầu như "Chào...", "Dưới đây là...". Hãy BẮT ĐẦU NGAY LẬP TỨC bằng mục 1.
-    2. TÂM THẾ TÍCH CỰC & XÂY DỰNG (EMPOWERING & SUPPORTIVE):
-       - Khi gặp lá bài ngược/năng lượng thử thách: Hãy nhìn nhận đó là "điểm nghẽn cần tháo gỡ", "bài học cần hoàn thiện" hoặc "giai đoạn tích lũy nội lực". TUYỆT ĐỐI KHÔNG dùng từ ngữ tiêu cực, vùi dập hay dập tắt hy vọng của người hỏi (VD: Thay vì phán xét "bạn không thể làm được / thiếu thực tế", hãy hướng dẫn "bạn cần thêm thời gian để củng cố nền tảng và điều chỉnh kế hoạch trước khi bứt phá").
-       - Luôn thấu cảm, khích lệ và trao giải pháp hành động thực tế để người hỏi tự tin làm chủ tương lai.
+    🚨 NGUYÊN TẮC LUẬN GIẢI BẮT BUỘC:
+    1. TUYỆT ĐỐI KHÔNG xưng hô mở đầu (như "Chào bạn...", "Tên thân mến...", "Dưới đây là..."). BẮT ĐẦU NGAY LẬP TỨC bằng tiêu đề mục 1.
+    2. TỈNH TÁO, THỰC TẾ & KHÁCH QUAN (GROUNDED & REALISTIC - TUYỆT ĐỐI KHÔNG BỢ / KHÔNG HỨA HÃO):
+       - Luận giải phải dựa trên góc nhìn thực tế cuộc sống, khoa học và tâm lý học.
+       - Với các câu hỏi phi thực tế hoặc giả tưởng (như công nghệ teleport, viễn tưởng, trúng độc đắc...): Thẳng thắn nhìn nhận thực trạng khách quan thay vì vẽ ra viễn cảnh hão huyền vô lý.
+       - Không vùi dập tiêu cực, nhưng cũng KHÔNG nịnh bợ, tô hồng hay khẳng định những điều viển vông.
+       - Giữ giọng văn điềm tĩnh, thông tuệ, sắc sảo, khách quan và đưa ra góc nhìn khai sáng, thực tế.
     """.strip()
 
     # 1. Prompt cho kiểu Yes/No (1 lá)
@@ -168,25 +170,34 @@ async def generate_tarot_reading(
 
     last_error = None
     for model_name in ordered_models:
-        try:
-            print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'...", flush=True)
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=model_name,
-                contents=prompt,
-                config=TAROT_GEN_CONFIG,
-            )
-            if response and response.text:
-                text = response.text.strip()
-                # Loại bỏ câu chào mở đầu nếu AI vô tình sinh ra
-                import re
-                text = re.sub(r"^(Chào\s+[^,\n]+,\s*(dưới đây là.*?\n+|đây là.*?\n+)?|Dưới đây là.*?\n+)", "", text, flags=re.IGNORECASE).strip()
-                print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}'.", flush=True)
-                return text
-        except Exception as e:
-            last_error = e
-            print(f"⚠️ [Tarot AI] Model '{model_name}' gặp sự cố ({type(e).__name__}): {e}. Chuyển sang model tiếp theo...", flush=True)
-            await asyncio.sleep(0.5)
+        # Thử tối đa 2 lần cho mỗi model nếu gặp sự cố tạm thời (503 High Demand)
+        for attempt in range(1, 3):
+            try:
+                attempt_str = f" (Lần {attempt})" if attempt > 1 else ""
+                print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'{attempt_str}...", flush=True)
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=model_name,
+                    contents=prompt,
+                    config=TAROT_GEN_CONFIG,
+                )
+                if response and response.text:
+                    import re
+                    # Loại bỏ bất kỳ dòng xưng hô/chào hỏi mở đầu nào trước tiêu đề mục 1
+                    text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", text, flags=re.IGNORECASE).strip()
+                    print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}'.", flush=True)
+                    return text
+            except Exception as e:
+                last_error = e
+                is_server_busy = "503" in str(e) or "high demand" in str(e).lower() or "unavailable" in str(e).lower()
+                if is_server_busy and attempt == 1:
+                    print(f"⏳ [Tarot AI] Model '{model_name}' tạm thời quá tải từ phía Google ({e}). Thử lại sau 1.5s...", flush=True)
+                    await asyncio.sleep(1.5)
+                    continue
+                else:
+                    print(f"⚠️ [Tarot AI] Model '{model_name}' gặp sự cố ({type(e).__name__}): {e}. Chuyển sang model tiếp theo...", flush=True)
+                    await asyncio.sleep(0.5)
+                    break
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Lỗi cuối: {last_error}", flush=True)
     return (
