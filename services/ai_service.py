@@ -93,15 +93,18 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     2. **GIÀU DỮ KIỆN, LÝ DO & QUAN ĐIỂM CỤ THỂ**:
        - Tránh tóm tắt chung chung vô hồn kiểu "A và B bàn về game".
        - Hãy ghi rõ: Ai nói gì, thích/chê điều gì, vì lý do gì, số liệu/dẫn chứng cụ thể ra sao để người đọc hiểu ngay bối cảnh mà không cần cuộn lại chat gốc.
-    3. **BỌC 100% TÊN THÀNH VIÊN TRONG DẤU BACKTICK**: Luôn dùng `Tên` (ví dụ: `Vũ Lưu`, `Tuan🐤`). TUYỆT ĐỐI KHÔNG dùng ký tự `@`.
+    3. **PHÂN BIỆT ĐÙA CỢT, NÓI KHÁY & TỪ NGỮ CÔNG SỞ MỈA MAI (BANTER & SARCASM DETECTION)**:
+       - Các thành viên Discord thường xuyên trêu chọc, nói kháy, châm biếm hoặc mượn các thuật ngữ công sở/chính trị một cách hài hước (ví dụ: "viết request ticket gửi BA PM", "ngon vô code đê", "cán bộ", "người có tiền góp tiền người có sức góp sức").
+       - Phải hiểu đúng ngầm ý (subtext) của câu đùa thay vì hiểu nghĩa đen cứng nhắc. Tuyệt đối không biến câu nói đùa thành quyết định công việc thực tế.
+    4. **BỌC 100% TÊN THÀNH VIÊN TRONG DẤU BACKTICK**: Luôn dùng `Tên` (ví dụ: `Vũ Lưu`, `Tuan🐤`). TUYỆT ĐỐI KHÔNG dùng ký tự `@`.
 
     Yêu cầu đầu ra (BẮT BUỘC):
     1. **Các chủ đề chính**: Liệt kê các chủ đề chính được thảo luận trong đoạn này.
     2. **Diễn biến chính & Timeline (Sắp xếp theo thứ tự thời gian TĂNG DẦN - từ cũ nhất đến mới nhất)**:
-       - Phân nhóm rõ theo từng ngày nếu đoạn chat trải qua nhiều ngày (dạng `### 📅 NGÀY DD/MM`).
+       - Phân nhóm rõ theo từng ngày nếu đoạn chat trải qua nhiều ngày (dạng `### 📅 [Thứ], DD/MM`).
        - Mốc thời gian dạng: `• [HH:MM - HH:MM] **Chủ đề**: Tường thuật giàu dữ kiện, lý do và quan điểm cụ thể, bọc 100% tên thành viên trong `Tên`.`
        - Giữ chính xác mốc ngày/tháng để pha tổng hợp không bị nhầm lẫn.
-    3. **Quyết định & Kết luận**: Các quyết định, thống nhất hoặc công việc được chốt (nếu có).
+    3. **Quyết định & Kết luận**: Các quyết định, thống nhất hoặc công việc thực tế được chốt (nếu có).
 
     Lịch sử trò chuyện cần phân tích:
     \"\"\"
@@ -151,7 +154,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             - TUYỆT ĐỐI KHÔNG bịa ra ngày tháng, tên người dùng, sự kiện hay quyết định không xuất hiện trong văn bản.
             - Nếu lịch sử trò chuyện chỉ có dữ liệu ngày X → tuyệt đối không đề cập đến ngày X+1 hay bất kỳ ngày nào khác.
 
-            🧠 NGUYÊN TẮC TÓM TẮT THÔNG MINH & GIÀU DỮ KIỆN (SMART & SUBSTANTIVE CONTEXT):
+            🧠 NGUYÊN TẮC TÓM TẮT THÔNG MINH, TINH TẾ & GIÀU DỮ KIỆN (SMART & SUBSTANTIVE CONTEXT):
             1. **GỠ RỐI HỘI THOẠI SONG SONG (DISENTANGLE CONVERSATIONS)**:
                - Các thành viên Discord thường nói chuyện chéo, chêm vào nhau hoặc bàn nhiều chủ đề cùng lúc.
                - Hãy phân tích và hiểu rõ từng mạch câu chuyện riêng biệt. KHÔNG ĐƯỢC trộn lẫn (blend context) các chủ đề không liên quan vào nhau.
@@ -162,13 +165,20 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
                  • Ai chia sẻ thông tin gì và NỘI DUNG/SỐ LIỆU CỤ THỂ là gì? (Ví dụ: `Vũ Lưu` tìm thấy phím cơ giá siêu rẻ trên Facebook gửi `jun` xem; `Regiko` thắc mắc câu hỏi Microservices vs Monolith của thầy Việt được `129600` giải đáp để làm slide).
                  • Ai có dự định gì, TÍNH TOÁN CỤ THỂ THẾ NÀO? (Ví dụ: `Tuan🐤` tính mua đất ở Vĩnh Long rẻ hơn và xuống Cần Thơ lập nghiệp gần gia đình vì sợ layoff ở TP.HCM; `Stelle` nhắc lưu ý quy hoạch).
                - **MỤC TIÊU**: Người đọc đọc xong bản tóm tắt là hiểu trọn vẹn diễn biến và lý do của từng bên mà **KHÔNG CẦN cuộn lên đọc lại tin nhắn gốc**.
-            3. **LỌC BỎ NHIỄU**:
+            3. **PHÂN BIỆT ĐÙA CỢT, NÓI KHÁY & TỪ NGỮ CÔNG SỞ MỈA MAI (BANTER & SARCASM DETECTION)**:
+               - Thành viên Discord thường nói đùa, cà khịa, châm biếm hoặc mượn các thuật ngữ công sở/chính trị một cách hài hước (ví dụ: "viết request ticket gửi BA PM", "ngon vô code đê", "cán bộ", "người có tiền góp tiền người có sức góp sức", "quy trình").
+               - **HIỂU ĐÚNG NGẦM Ý (SUBTEXT)**:
+                 • Hãy nhận diện và tường thuật đúng bản chất là trêu đùa/nói kháy thay vì chép lại nguyên văn thô kệch hoặc hiểu theo nghĩa đen.
+                 • Ví dụ: Khi một thành viên chê bot và người tạo bot nói *"vậy thì viết request ticket đi để BA PM review rồi đẩy cho dev"* hay *"m ngon m vô code đê"*, bản chất là người tạo bot đang **kháy lại rằng muốn góp ý thì phải nói chi tiết cụ thể ra chứ đừng nhận xét chung chung/suông**.
+               - **TUYỆT ĐỐI KHÔNG BIẾN CÂU ĐÙA THÀNH QUYẾT ĐỊNH CÔNG VIỆC**: Trong phần **KẾT LUẬN & QUYẾT ĐỊNH**, tuyệt đối KHÔNG liệt kê các câu đùa công sở/kháy nhau thành quyết định công việc chính thức!
+            4. **LỌC BỎ NHIỄU**:
                - Tự động bỏ qua các câu chào hỏi xã giao, đùa cụt lủn hoặc chêm lời vô nghĩa không mang lại thông tin.
 
             🎨 QUY ĐỊNH ĐỊNH DẠNG & HIỂN THỊ TÊN THÀNH VIÊN (BẮT BUỘC):
             - TUYỆT ĐỐI KHÔNG DÙNG KÝ TỰ `@` trước tên thành viên (không dùng `@User`).
+            - TUYỆT ĐỐI KHÔNG để sót ID mention thô của Discord (như `<@123456789>`).
             - TUYỆT ĐỐI KHÔNG liệt kê một danh sách dài tên người ở đầu mốc thời gian (ví dụ cấm viết: `[15:30] @A, @B, @C, @D: ...`).
-            - BỌC 100% TÊN THÀNH VIÊN TRONG DẤU BACKTICK: Mọi lần nhắc đến bất kỳ thành viên nào (dù ở đầu câu, thân câu hay sau liên từ), BẮT BUỘC phải bọc trong dấu backtick như `Tên` (ví dụ: `Vũ Lưu`, `Tuan🐤`, `129600`) để làm nổi bật trên Discord. Tuyệt đối không để sót tên dạng plain text.
+            - BỌC 100% TÊN THÀNH VIÊN TRONG DẤU BACKTICK: MỌI LẦN nhắc đến bất kỳ thành viên nào (ở đầu câu, thân câu, sau liên từ, sau "nhắc đến...", "được..."), BẮT BUỘC phải bọc trong dấu backtick như `Tên` (ví dụ: `Vũ Lưu`, `Tuan🐤`, `129600`, `jun`, `Poop`, `Miraei`, `Stelle`, `Regiko`) để làm nổi bật trên Discord. Tuyệt đối không để sót tên nào dạng plain text không có backtick.
 
             📐 BỐ CỤC BÀI VIẾT (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời cảm ơn xã giao. Đi thẳng vào nội dung.
@@ -177,30 +187,32 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
               1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt ngắn gọn bức tranh toàn cảnh, các chủ đề nổi bật và không khí chung của cuộc trò chuyện. (TUYỆT ĐỐI KHÔNG liệt kê toàn bộ danh sách thành viên trong ngoặc đơn ở đầu bài).
               2. **TIMELINE DIỄN BIẾN**:
                  - **SẮP XẾP THỜI GIAN XUÔI (CHRONOLOGICAL: TỪ CŨ NHẤT ĐẾN MỚI NHẤT)**:
-                   - Thứ tự ngày: Bắt đầu từ ngày cũ nhất và tiến dần đến ngày mới nhất (ví dụ: `### 📅 NGÀY 23/08` trước, sau đó mới đến `### 📅 NGÀY 24/08`).
+                   - Thứ tự ngày: Bắt đầu từ ngày cũ nhất và tiến dần đến ngày mới nhất (ví dụ: `### 📅 T7, 23/08` trước, sau đó mới đến `### 📅 CN, 24/08`).
                    - Thứ tự mốc giờ trong từng ngày: Bắt đầu từ mốc giờ sớm nhất đến mốc giờ muộn nhất (ví dụ: `16:13` ➔ `17:05` ➔ `19:08` ➔ `21:40` ➔ `23:19` ➔ `23:54`... sang ngày mới: `00:05` ➔ `00:13` ➔ `00:26` ➔ `00:39`).
-                 - **PHÂN CHIA THEO NGÀY & RANH GIỚI NỬA ĐÊM**:
-                   - Tiêu đề mỗi ngày: `### 📅 NGÀY DD/MM` (Ví dụ: `### 📅 NGÀY 23/08`).
+                 - **PHÂN CHIA THEO NGÀY (KÈM THỨ) & RANH GIỚI NỬA ĐÊM**:
+                   - Tiêu đề mỗi ngày (CÓ KÈM THỨ TRONG TUẦN): `### 📅 [Thứ], DD/MM` (Ví dụ: `### 📅 T7, 23/08`, `### 📅 CN, 24/08`, `### 📅 T2, 25/08`...). Thứ trong tuần lấy từ mốc thời gian của tin nhắn.
                    - GIỮA CÁC NGÀY KHÁC NHAU: Phải có một dòng kẻ ngang markdown `---`.
                    - Ranh giới ngày chuẩn xác: Mọi tin nhắn từ `00:00` đến `23:59` của ngày nào BẮT BUỘC phải nằm trọn vẹn dưới tiêu đề của ngày đó. Không được để lẫn tin nhắn 23:xx sang ngày hôm sau.
                  - **ĐỊNH DẠNG MỐC THỜI GIAN**:
                    - Mỗi mốc thời gian bắt đầu bằng dấu chấm tròn `•`.
-                   - Nếu là một khoảng thời gian: `• [Giờ_bắt_đầu - Giờ_kết_thúc] **Chủ đề chính ngắn gọn**: Nội dung tường thuật giàu dữ kiện, lý do và quan điểm cụ thể, bọc toàn bộ tên thành viên trong `Tên`.`
+                   - Nếu là một khoảng thời gian: `• [Giờ_bắt_đầu - Giờ_kết_thúc] **Chủ đề chính ngắn gọn**: Nội dung tường thuật giàu dữ kiện, lý do và quan điểm cụ thể, bọc 100% tên thành viên trong `Tên`.`
                    - Nếu là một mốc/tin nhắn đơn lẻ (hoặc bắt đầu và kết thúc cùng 1 phút): CHỈ ghi `• [HH:MM] **Chủ đề**: ...` (TUYỆT ĐỐI KHÔNG ghi `[HH:MM - HH:MM]` nếu 2 giờ giống nhau).
                    - Ví dụ đúng:
                      `• [16:13 - 16:15] **Chia sẻ code**: `Yato` gửi đoạn code try-catch nhờ mọi người xem giúp, `Poop` thả cảm xúc hưởng ứng và nhận xét vui.`
                      `• [22:10] **Chênh lệch mức lương**: `Miraei` chia sẻ bài báo phản ánh mức lương khởi điểm của fresher khối Big4 kiểm toán và IT hiện đang phân hóa mạnh.`
                      `• [23:19 - 23:58] **Hoàn thành bài tập & Đánh giá công cụ làm việc**: `Regiko` thông báo đã hoàn thành slide phản biện môn Kiến trúc phần mềm và được `129600` khích lệ. `Vũ Lưu`, `Tuan🐤` và `fearsofevil` cùng thảo luận, so sánh các nền tảng công việc, trong đó chê bai sự nặng nề của Slack và sự bất tiện của Zalo, đồng thời ca ngợi Discord là chân ái để làm việc và chill.`
-              3. **KẾT LUẬN & QUYẾT ĐỊNH**: Tóm tắt ngắn gọn các quyết định, thống nhất, dự định cá nhân hoặc việc cần làm được chốt lại (nếu có).
+              3. **KẾT LUẬN & QUYẾT ĐỊNH**:
+                 - CHỈ ghi nhận các quyết định, thống nhất, lịch hẹn hoặc dự định THỰC TẾ (ví dụ: chốt kèo đi chơi, thống nhất giờ nộp bài, quyết định học chứng chỉ/chuyển việc).
+                 - Nếu toàn bộ cuộc trò chuyện chỉ là trò chuyện phiếm, đùa giỡn, cà khịa hoặc tâm sự mà KHÔNG có quyết định thực tế nào được chốt lại, HÃY GHI RÕ: "Cuộc trò chuyện chủ yếu là trò chuyện phiếm, chia sẻ quan điểm cá nhân và trêu đùa giữa các thành viên, không có quyết định hoặc công việc quan trọng nào được chốt lại."
 
-            Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
+            Dữ liệu trò chuyện (mốc thời gian Việt Nam [Thứ Ngày/Tháng Giờ:Phút]):
             \"\"\"
             {chat_history_text}
             \"\"\"
             """
         else:
             prompt = f"""
-            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp.
+            Bạn là một trợ lý ảo quản lý cộng đồng Discord chuyên nghiệp, tinh tế.
             Dưới đây là lịch sử trò chuyện của một nhóm chat ({scan_info}).
             Hãy tóm tắt lại nội dung cuộc trò chuyện này một cách NGẮN GỌN, SÚC TÍCH, MẠCH LẠC và DỄ HIỂU nhất bằng Tiếng Việt.
 
@@ -211,12 +223,13 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 
             🧠 NGUYÊN TẮC TÓM TẮT:
             - Tường thuật ngắn gọn, mượt mà theo diễn biến câu chuyện, nêu rõ chi tiết/lý do cốt lõi, lọc bỏ tán gẫu vụn vặt.
-            - Bọc 100% tên thành viên trong dấu backtick `Tên` (tuyệt đối không dùng @).
+            - Hiểu đúng ngữ cảnh đùa cợt, cà khịa, châm biếm thay vì hiểu nghĩa đen cứng nhắc.
+            - Bọc 100% tên thành viên trong dấu backtick `Tên` (tuyệt đối không dùng @ và không để sót ID mention).
             - Không chứa lời chào hay kết luận xã giao. Đi thẳng vào nội dung.
             - Giữ độ dài dưới 1000 ký tự.
-            - Tóm tắt các chủ đề chính dưới dạng các gạch đầu dòng ngắn gọn kèm kết luận/quyết định (nếu có).
+            - Tóm tắt các chủ đề chính dưới dạng các gạch đầu dòng ngắn gọn kèm kết luận/quyết định thực tế (nếu có).
 
-            Dữ liệu trò chuyện (mốc thời gian Việt Nam [Ngày/Tháng Giờ:Phút]):
+            Dữ liệu trò chuyện (mốc thời gian Việt Nam [Thứ Ngày/Tháng Giờ:Phút]):
             \"\"\"
             {chat_history_text}
             \"\"\"
@@ -263,7 +276,10 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             🧠 NGUYÊN TẮC TỔNG HỢP THÔNG MINH & GIÀU DỮ KIỆN (SMART & SUBSTANTIVE SYNTHESIS):
             1. **GỠ RỐI HỘI THOẠI SONG SONG**: Tách bạch các chủ đề diễn ra cùng lúc, không trộn lẫn ngữ cảnh.
             2. **GIÀU DỮ KIỆN, LÝ DO & QUAN ĐIỂM CỤ THỂ**: Nêu rõ ai nói gì, lý do/quan điểm cụ thể, chi tiết cốt lõi của cuộc trò chuyện để người đọc hiểu trọn vẹn mà không cần đọc lại tin nhắn gốc.
-            3. **BỌC 100% TÊN THÀNH VIÊN TRONG DẤU BACKTICK**: Luôn dùng `Tên` (ví dụ: `Vũ Lưu`, `Tuan🐤`, `129600`). Tuyệt đối KHÔNG dùng ký tự `@` và KHÔNG liệt kê danh sách tên thô ở đầu mốc thời gian.
+            3. **PHÂN BIỆT ĐÙA CỢT, NÓI KHÁY & TỪ NGỮ CÔNG SỞ MỈA MAI (BANTER & SARCASM DETECTION)**:
+               - Hiểu đúng ngầm ý các màn trêu đùa, cà khịa, dùng từ công sở châm biếm ("viết ticket gửi BA PM", "ngon vô code", "cán bộ").
+               - Tuyệt đối KHÔNG biến các câu đùa thành quyết định công việc chính thức trong phần kết luận.
+            4. **BỌC 100% TÊN THÀNH VIÊN TRONG DẤU BACKTICK**: Luôn dùng `Tên` (ví dụ: `Vũ Lưu`, `Tuan🐤`, `129600`, `jun`, `Poop`, `Miraei`). Tuyệt đối KHÔNG dùng ký tự `@`, không để sót ID mention `<@...>` và KHÔNG liệt kê danh sách tên thô ở đầu mốc thời gian.
 
             📐 BỐ CỤC BÀI VIẾT (BẮT BUỘC TUÂN THỦ):
             - TUYỆT ĐỐI KHÔNG chứa lời chào, lời mở đầu hay lời kết xã giao. Đi thẳng vào nội dung.
@@ -272,18 +288,20 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
               1. **TỔNG QUAN CHỦ ĐỀ**: Tóm tắt tổng thể các chủ đề chính đã thảo luận trong suốt toàn bộ cuộc trò chuyện và không khí chung. (Không liệt kê danh sách thành viên trong ngoặc đơn ở đầu bài).
               2. **TIMELINE DIỄN BIẾN**:
                  - **SẮP XẾP THỜI GIAN XUÔI (CHRONOLOGICAL: TỪ CŨ NHẤT ĐẾN MỚI NHẤT)**:
-                   - Thứ tự ngày: Bắt đầu từ ngày cũ nhất và tiến dần đến ngày mới nhất (ví dụ: `### 📅 NGÀY 23/08` trước, sau đó mới đến `### 📅 NGÀY 24/08`).
+                   - Thứ tự ngày: Bắt đầu từ ngày cũ nhất và tiến dần đến ngày mới nhất (ví dụ: `### 📅 T7, 23/08` trước, sau đó mới đến `### 📅 CN, 24/08`).
                    - Thứ tự mốc giờ trong từng ngày: Bắt đầu từ mốc giờ sớm nhất đến mốc giờ muộn nhất (ví dụ: `16:13` ➔ `17:05` ➔ `19:08` ➔ `21:40` ➔ `23:19` ➔ `23:54`... sang ngày mới: `00:05` ➔ `00:13` ➔ `00:26` ➔ `00:39`).
-                 - **PHÂN CHIA THEO NGÀY & RANH GIỚI NỬA ĐÊM**:
-                   - Tiêu đề mỗi ngày: `### 📅 NGÀY DD/MM` (Ví dụ: `### 📅 NGÀY 23/08`).
+                 - **PHÂN CHIA THEO NGÀY (KÈM THỨ) & RANH GIỚI NỬA ĐÊM**:
+                   - Tiêu đề mỗi ngày (CÓ KÈM THỨ TRONG TUẦN): `### 📅 [Thứ], DD/MM` (Ví dụ: `### 📅 T7, 23/08`, `### 📅 CN, 24/08`, `### 📅 T2, 25/08`...).
                    - GIỮA CÁC NGÀY KHÁC NHAU: Phải có một dòng kẻ ngang markdown `---`.
                    - Ranh giới ngày chuẩn xác: Mọi tin nhắn từ `00:00` đến `23:59` của ngày nào BẮT BUỘC phải nằm trọn vẹn dưới tiêu đề của ngày đó. Không được để lẫn tin nhắn 23:xx sang ngày hôm sau.
                  - **GỘP & TỔNG HỢP TIMELINE THÔNG MINH**:
                    - Hợp nhất các mốc thời gian từ các phân đoạn thành các mốc thảo luận lớn, liền mạch, giàu dữ kiện và có ý nghĩa.
-                   - Nếu là khoảng thời gian: `• [Giờ_bắt_đầu - Giờ_kết_thúc] **Chủ đề chính ngắn gọn**: Nội dung tường thuật giàu dữ kiện, lý do và quan điểm cụ thể, bọc toàn bộ tên thành viên trong `Tên`.`
+                   - Nếu là khoảng thời gian: `• [Giờ_bắt_đầu - Giờ_kết_thúc] **Chủ đề chính ngắn gọn**: Nội dung tường thuật giàu dữ kiện, lý do và quan điểm cụ thể, bọc 100% tên thành viên trong `Tên`.`
                    - Nếu là mốc/tin nhắn đơn lẻ (cùng phút): CHỈ ghi `• [HH:MM] **Chủ đề**: ...` (tuyệt đối không ghi `[HH:MM - HH:MM]`).
                    - Ví dụ đúng: `• [23:19 - 23:58] **Hoàn thành bài tập & Đánh giá công cụ làm việc**: `Regiko` thông báo đã hoàn thành slide phản biện và được `129600` khích lệ. `Vũ Lưu`, `Tuan🐤` và `fearsofevil` cùng thảo luận, so sánh các nền tảng công việc, trong đó chê bai sự nặng nề của Slack và sự bất tiện của Zalo, đồng thời ca ngợi Discord là chân ái để làm việc và chill.`
-              3. **KẾT LUẬN & QUYẾT ĐỊNH**: Tổng hợp tất cả các quyết định, thống nhất, dự định cá nhân hoặc công việc được chốt lại.
+              3. **KẾT LUẬN & QUYẾT ĐỊNH**:
+                 - CHỈ ghi nhận các quyết định, thống nhất, lịch hẹn hoặc dự định THỰC TẾ.
+                 - Nếu toàn bộ cuộc trò chuyện chỉ là trò chuyện phiếm, đùa giỡn, cà khịa hoặc tâm sự mà KHÔNG có quyết định thực tế nào được chốt lại, HÃY GHI RÕ: "Cuộc trò chuyện chủ yếu là trò chuyện phiếm, chia sẻ quan điểm cá nhân và trêu đùa giữa các thành viên, không có quyết định hoặc công việc quan trọng nào được chốt lại."
 
             Dữ liệu tóm tắt phân đoạn:
             \"\"\"
@@ -322,17 +340,17 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
         return response.text
 
 MOCK_CHAT_HISTORY = [
-    "[13/06 09:15] Miraei: Chào mọi người, hôm nay chúng ta bàn về dự án bot nhé.",
-    "[13/06 09:17] Tuan🐤: Ok, bot hiện tại đang chạy tốt nhưng tôi thấy hình như nếu quét dài quá nó chỉ lấy được ngày cũ nhất thôi.",
-    "[13/06 09:18] Miraei: Đúng rồi, đó là do discord history query sử dụng after=start_time_utc, nó bị giới hạn ở 300 tin đầu tiên tính từ ngày cũ. Để tôi sửa lại.",
-    "[13/06 09:20] FearsOfEvil: Nên tách code ra nữa Miraei ơi, app.py giờ phình to hơn 1000 dòng rồi, khó đọc lắm.",
-    "[13/06 09:22] Miraei: Đồng ý. Tôi sẽ tách thành config, bot_instance, ai_helper, và web_dashboard.",
-    "[13/06 10:05] jun: Mọi người ơi có ai làm bài Lab 10 môn Machine Learning của thầy Dũ chưa?",
-    "[13/06 10:08] Mizu: Bài đó chia 10 dataset theo số cuối MSSV đúng không? Hạn nộp là 1 tuần nữa.",
-    "[13/06 10:10] jun: Đúng rồi lo quá, phần này tôi chưa hiểu thuật toán lắm.",
-    "[13/06 15:30] Poop: Có ai làm ván ARAM LoL không? Lên đồ Velkoz kiểu mới vui cực.",
-    "[13/06 15:32] jun: Đi ông ơi, đợi tôi mở máy.",
-    "[13/06 15:35] Poop: Ok vào game thôi."
+    "[T6 13/06 09:15] Miraei: Chào mọi người, hôm nay chúng ta bàn về dự án bot nhé.",
+    "[T6 13/06 09:17] Tuan🐤: Ok, bot hiện tại đang chạy tốt nhưng tôi thấy hình như nếu quét dài quá nó chỉ lấy được ngày cũ nhất thôi.",
+    "[T6 13/06 09:18] Miraei: Đúng rồi, đó là do discord history query sử dụng after=start_time_utc, nó bị giới hạn ở 300 tin đầu tiên tính từ ngày cũ. Để tôi sửa lại.",
+    "[T6 13/06 09:20] FearsOfEvil: Nên tách code ra nữa Miraei ơi, app.py giờ phình to hơn 1000 dòng rồi, khó đọc lắm.",
+    "[T6 13/06 09:22] Miraei: Đồng ý. Tôi sẽ tách thành config, bot_instance, ai_service, và web_dashboard.",
+    "[T6 13/06 10:05] jun: Mọi người ơi có ai làm bài Lab 10 môn Machine Learning của thầy Dũ chưa?",
+    "[T6 13/06 10:08] Mizu: Bài đó chia 10 dataset theo số cuối MSSV đúng không? Hạn nộp là 1 tuần nữa.",
+    "[T6 13/06 10:10] jun: Đúng rồi lo quá, phần này tôi chưa hiểu thuật toán lắm.",
+    "[T6 13/06 15:30] Poop: Có ai làm ván ARAM LoL không? Lên đồ Velkoz kiểu mới vui cực.",
+    "[T6 13/06 15:32] jun: Đi ông ơi, đợi tôi mở máy.",
+    "[T6 13/06 15:35] Poop: Ok vào game thôi."
 ]
 
 async def evaluate_summary(raw_history_text, generated_summary, summary_type, clean_focus):

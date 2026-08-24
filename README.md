@@ -126,24 +126,27 @@ Mở giao diện chọn (dropdown) để bật hoặc tắt từng nền tảng 
 ## Cấu trúc dự án
 
 ```
-MikeDaBot/
-  app.py                  # Điểm khởi chạy, đăng ký slash commands, graceful shutdown
-  bot_instance.py         # Khởi tạo SummaryBot, tải cogs
-  config.py               # Biến môi trường, log redirection, đường dẫn database
-  ai_helper.py            # Xử lý AI: prompt engineering, MapReduce, QA evaluator
-  web_dashboard.py        # Flask dashboard (HTML/CSS/JS inline)
+DiscordMikeBot/
+  app.py                  # Entry point tinh gọn: lifecycle bot, background runner, graceful shutdown
+  bot_instance.py         # Khởi tạo SummaryBot, đồng bộ Slash Commands, tải extensions
+  config.py               # Biến môi trường, hằng số AI, log redirection, state bộ đệm
   gunicorn.conf.py        # Cấu hình Gunicorn cho production
   render.yaml             # Cấu hình deploy trên Render
   requirements.txt        # Dependencies
   .env.example            # Mẫu file biến môi trường
   cogs/
-    config_cog.py         # Nhóm lệnh /config (view, set, reset, platforms)
-    embed_cog.py          # Listener on_message, phát hiện URL, tạo embed
+    config_cog.py         # Nhóm lệnh /config (view, set, channel_set, reset, platforms)
+    embed_cog.py          # Listener on_message, phát hiện URL mạng xã hội, tạo embed
+    summary_cog.py        # Lệnh /tomtat và /test_tomtat tóm tắt AI
   services/
-    config_manager.py     # Quản lý cấu hình SQLite, cache, CRUD
-    embed_builder.py      # Xây dựng Discord Embed thống nhất
-    nsfw_filter.py        # Bộ lọc NSFW / Spoiler
-    platform_fetchers.py  # Hàm fetch dữ liệu từ các nền tảng qua proxy API
+    ai_service.py         # Xử lý AI: Single-Pass, MapReduce, QA Evaluator
+    config_manager.py     # Quản lý cấu hình SQLite, in-memory cache, deep merge
+    embed_builder.py      # Xây dựng Discord Embed & Bộ lọc NSFW/Spoiler
+    platform_fetchers.py  # Fetcher dữ liệu mạng xã hội (Twitter, Reddit, TikTok, Pixiv...)
+  web/
+    app.py                # Backend Flask Server & REST API endpoints
+    templates/
+      dashboard.html      # Giao diện Web Dashboard (HTML/CSS/JS tách riêng)
   utils/
     constants.py          # Registry nền tảng, regex patterns, cấu hình mặc định
   data/
