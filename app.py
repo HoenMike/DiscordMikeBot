@@ -32,7 +32,7 @@ async def on_ready():
     app_commands.Choice(name="Tóm tắt ngắn gọn (Mặc định)", value="short"),
     app_commands.Choice(name="Tóm tắt dài & Timeline chi tiết", value="long")
 ])
-@app_commands.checks.cooldown(1, 30.0, key=lambda i: i.user.id)
+@app_commands.checks.cooldown(1, config.COMMAND_COOLDOWN_SECONDS, key=lambda i: i.user.id)
 async def tomtat(
     interaction: discord.Interaction, 
     channel: discord.TextChannel = None, 
@@ -56,9 +56,9 @@ async def tomtat(
         )
         return
 
-    if limit is not None and (limit <= 0 or limit > 2500):
+    if limit is not None and (limit <= 0 or limit > config.MAX_FETCH_MESSAGES_LIMIT):
         await interaction.response.send_message(
-            "❌ Số lượng tin nhắn quét phải lớn hơn 0 và không được vượt quá 2500 tin nhắn!",
+            f"❌ Số lượng tin nhắn quét phải lớn hơn 0 và không được vượt quá {config.MAX_FETCH_MESSAGES_LIMIT} tin nhắn!",
             ephemeral=True
         )
         return
@@ -70,11 +70,11 @@ async def tomtat(
     
     # Xác định các giá trị mặc định nếu người dùng bỏ trống
     if hours is None and limit is None:
-        hours = 2.0
-        limit = 150
-        scan_info = "150 tin nhắn trong 2.0 giờ qua"
+        hours = config.DEFAULT_SCAN_HOURS
+        limit = config.DEFAULT_SCAN_LIMIT
+        scan_info = f"{limit} tin nhắn trong {hours} giờ qua"
     elif hours is not None and limit is None:
-        limit = 1500  # Giới hạn trần an toàn lên 1500 khi lọc theo giờ
+        limit = min(1500, config.MAX_FETCH_MESSAGES_LIMIT)  # Giới hạn trần an toàn khi lọc theo giờ
         scan_info = f"tin nhắn trong {hours} giờ qua"
     elif limit is not None and hours is None:
         scan_info = f"{limit} tin nhắn gần nhất"
@@ -100,7 +100,7 @@ async def tomtat(
     
     try:
         print(f"⏳ Đang tải lịch sử kênh #{target_channel.name}...", flush=True)
-        max_limit = min(limit, 2500) if limit is not None else 1000
+        max_limit = min(limit, config.MAX_FETCH_MESSAGES_LIMIT) if limit is not None else 1000
         
         # Xác định mốc thời gian lọc
         start_time_utc = None
@@ -144,7 +144,7 @@ async def tomtat(
         embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
 
         # Chia nhỏ kết quả thành nhiều phần nếu vượt quá giới hạn hiển thị của Discord
-        chunks = ai_helper.split_text(summary_result, limit=3500)
+        chunks = ai_helper.split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
         
         for i, chunk in enumerate(chunks):
             part_title = title_str
@@ -221,7 +221,7 @@ async def tomtat_error(interaction: discord.Interaction, error: app_commands.App
     app_commands.Choice(name="Tóm tắt ngắn gọn", value="short"),
     app_commands.Choice(name="Tóm tắt dài & Timeline chi tiết", value="long")
 ])
-@app_commands.checks.cooldown(1, 30.0, key=lambda i: i.user.id)
+@app_commands.checks.cooldown(1, config.COMMAND_COOLDOWN_SECONDS, key=lambda i: i.user.id)
 async def test_tomtat(
     interaction: discord.Interaction, 
     channel: discord.TextChannel = None, 
@@ -245,9 +245,9 @@ async def test_tomtat(
         )
         return
 
-    if limit is not None and (limit <= 0 or limit > 2500):
+    if limit is not None and (limit <= 0 or limit > config.MAX_FETCH_MESSAGES_LIMIT):
         await interaction.response.send_message(
-            "❌ Số lượng tin nhắn quét phải lớn hơn 0 và không được vượt quá 2500 tin nhắn!",
+            f"❌ Số lượng tin nhắn quét phải lớn hơn 0 và không được vượt quá {config.MAX_FETCH_MESSAGES_LIMIT} tin nhắn!",
             ephemeral=True
         )
         return
@@ -259,11 +259,11 @@ async def test_tomtat(
     
     # Xác định các giá trị mặc định nếu người dùng bỏ trống
     if hours is None and limit is None:
-        hours = 2.0
-        limit = 150
-        scan_info = "150 tin nhắn trong 2.0 giờ qua"
+        hours = config.DEFAULT_SCAN_HOURS
+        limit = config.DEFAULT_SCAN_LIMIT
+        scan_info = f"{limit} tin nhắn trong {hours} giờ qua"
     elif hours is not None and limit is None:
-        limit = 1500  # Giới hạn trần an toàn lên 1500 khi lọc theo giờ
+        limit = min(1500, config.MAX_FETCH_MESSAGES_LIMIT)  # Giới hạn trần an toàn khi lọc theo giờ
         scan_info = f"tin nhắn trong {hours} giờ qua"
     elif limit is not None and hours is None:
         scan_info = f"{limit} tin nhắn gần nhất"
@@ -282,7 +282,7 @@ async def test_tomtat(
     
     try:
         print(f"⏳ Đang tải lịch sử kênh #{target_channel.name}...", flush=True)
-        max_limit = min(limit, 2500) if limit is not None else 1000
+        max_limit = min(limit, config.MAX_FETCH_MESSAGES_LIMIT) if limit is not None else 1000
         
         # Xác định mốc thời gian lọc
         start_time_utc = None
