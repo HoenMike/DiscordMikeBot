@@ -87,8 +87,13 @@ def build_embed(post: PostData, filter_result: NSFWFilterResult) -> discord.Embe
     if description_parts:
         embed.description = "\n".join(description_parts)
 
-    if post.media_urls and not filter_result.should_spoiler_media:
-        embed.set_image(url=post.media_urls[0])
+    # Đặt ảnh xem trước (ưu tiên thumbnail_url cho video vì Discord embed không nhận link video MP4 trong set_image)
+    image_url_to_set = post.thumbnail_url if post.media_type == "video" else (post.media_urls[0] if post.media_urls else None)
+    if not image_url_to_set and post.media_urls and not post.media_urls[0].lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
+        image_url_to_set = post.media_urls[0]
+
+    if image_url_to_set and not filter_result.should_spoiler_media:
+        embed.set_image(url=image_url_to_set)
 
     stats_parts = []
     if post.likes is not None:

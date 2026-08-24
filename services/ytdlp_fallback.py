@@ -83,9 +83,21 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
         )
         return None
 
-    # Xác định URL media trực tiếp
+    # Xác định URL media trực tiếp và thumbnail
     media_url = info.get("url")
     thumbnail = info.get("thumbnail")
+
+    # Tìm thumbnail có độ phân giải cao nhất
+    thumbnails = info.get("thumbnails", [])
+    best_thumb = thumbnail
+    if thumbnails:
+        thumb_obj = max(
+            thumbnails,
+            key=lambda t: (t.get("height", 0) or 0) * (t.get("width", 0) or 0),
+            default=None,
+        )
+        if thumb_obj and thumb_obj.get("url"):
+            best_thumb = thumb_obj["url"]
 
     media_urls = []
     media_type = "text"
@@ -94,22 +106,9 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
     if media_url:
         media_urls.append(media_url)
         media_type = "video"
-    elif thumbnail:
-        media_urls.append(thumbnail)
+    elif best_thumb:
+        media_urls.append(best_thumb)
         media_type = "image"
-
-    # Kiểm tra thumbnails bổ sung nếu chưa có media
-    thumbnails = info.get("thumbnails", [])
-    if not media_urls and thumbnails:
-        # Lấy thumbnail có độ phân giải cao nhất
-        best_thumb = max(
-            thumbnails,
-            key=lambda t: (t.get("height", 0) or 0) * (t.get("width", 0) or 0),
-            default=None,
-        )
-        if best_thumb and best_thumb.get("url"):
-            media_urls.append(best_thumb["url"])
-            media_type = "image"
 
     title = info.get("title", "")
     uploader = info.get("uploader") or info.get("channel") or "Unknown"
@@ -129,6 +128,7 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
         retweets=None,
         url=info.get("webpage_url", url),
         timestamp=info.get("upload_date"),
+        thumbnail_url=best_thumb,
     )
 
     print(

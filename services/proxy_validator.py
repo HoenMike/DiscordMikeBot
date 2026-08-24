@@ -24,15 +24,15 @@ _OG_META_PATTERN = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-# Kích thước tối đa đọc từ response (16KB) để giảm tải băng thông
-_MAX_READ_BYTES = 16384
+# Kích thước tối đa đọc từ response (64KB) để đảm bảo không bỏ sót thẻ meta
+_MAX_READ_BYTES = 65536
 
 # Timeout cho mỗi request xác thực đơn lẻ
-_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=8)
+_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=12)
 
-# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 3 phút)
+# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 30 giây)
 _FAILED_DOMAINS_CACHE: dict[str, float] = {}
-_FAILED_DOMAIN_TTL = 180.0  # 3 phút
+_FAILED_DOMAIN_TTL = 30.0  # 30 giây
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,6 @@ async def validate_via_og_metadata(
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)",
-            "Range": "bytes=0-16383",
         }
         async with session.get(
             proxy_url,

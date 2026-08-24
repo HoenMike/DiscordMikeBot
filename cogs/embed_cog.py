@@ -385,6 +385,23 @@ class EmbedCog(commands.Cog):
             file = None
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
+            elif post_data.media_type == "video" and post_data.media_urls and self.session:
+                # Cố gắng tải file video trực tiếp nếu <= 25MB để phát trực tiếp trong Discord
+                video_url = post_data.media_urls[0]
+                try:
+                    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                    async with self.session.get(video_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                        if resp.status == 200:
+                            content_len = resp.headers.get("Content-Length")
+                            if not content_len or int(content_len) <= 25 * 1024 * 1024:
+                                video_data = await resp.read()
+                                if len(video_data) <= 25 * 1024 * 1024:
+                                    file = discord.File(
+                                        fp=io.BytesIO(video_data),
+                                        filename=f"{platform_key}_video.mp4",
+                                    )
+                except Exception as dl_err:
+                    print(f"[EmbedCog] Không thể tải video fallback {url}: {dl_err}", flush=True)
 
             # Tạo View với nút liên kết tới bài viết gốc
             view = create_platform_view(platform_key, url)

@@ -74,7 +74,7 @@ PLATFORMS = {
     "instagram": {
         "name": "Instagram",
         "color": 0xE1306C,
-        "icon_url": "https://static.cdninstagram.com/rsrc.php/v3/yR/r/lam-fZmwmvn.png",
+        "icon_url": "https://cdn-icons-png.flaticon.com/512/174/174855.png",
         "footer_text": "Instagram",
         "button_label": "Xem trên Instagram",
         "api_base": None,
@@ -85,7 +85,7 @@ PLATFORMS = {
     "facebook": {
         "name": "Facebook",
         "color": 0x1877F2,
-        "icon_url": "https://static.xx.fbcdn.net/rsrc.php/yD/r/d4ZBER7gFRe.ico",
+        "icon_url": "https://cdn-icons-png.flaticon.com/512/124/124010.png",
         "footer_text": "Facebook",
         "button_label": "Xem trên Facebook",
         "api_base": None,
@@ -126,7 +126,7 @@ PLATFORMS = {
     "threads": {
         "name": "Threads",
         "color": 0x000000,
-        "icon_url": "https://static.cdninstagram.com/rsrc.php/v3/yS/r/ajlEU-wEDyo.png",
+        "icon_url": "https://cdn-icons-png.flaticon.com/512/11104/11104255.png",
         "footer_text": "Threads",
         "button_label": "Xem trên Threads",
         "api_base": None,
@@ -146,13 +146,13 @@ PLATFORMS = {
 PROXY_DOMAINS = {
     "twitter": ["fxtwitter.com", "vxtwitter.com", "fixupx.com"],
     "pixiv": ["phixiv.net"],
-    "tiktok": ["vxtiktok.com", "tnktok.com", "kktiktok.com"],
+    "tiktok": ["vxtiktok.com", "tnktok.com"],
     "reddit": ["rxddit.com", "fxreddit.seria.moe", "vxreddit.com"],
-    "instagram": ["vxinstagram.com", "eeinstagram.com", "oginstagram.com"],
-    "facebook": ["facebed.seria.moe", "fxfb.seria.moe", "facebed.com"],
+    "instagram": ["vxinstagram.com", "fxig.seria.moe"],
+    "facebook": ["facebed.seria.moe", "facebed.com"],
     "bluesky": ["fxbsky.app", "bskx.app"],
     "twitch": ["fxtwitch.seria.moe"],
-    "threads": ["vxthreads.net", "fixthreads.seria.moe"],
+    "threads": ["fixthreads.seria.moe"],
 }
 
 

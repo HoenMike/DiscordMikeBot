@@ -19,6 +19,7 @@ class PostData:
     retweets: int | None = None
     url: str = ""
     timestamp: str | None = None
+    thumbnail_url: str | None = None
 
 
 async def fetch_twitter(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
@@ -190,36 +191,10 @@ async def fetch_tiktok(session: aiohttp.ClientSession, url: str, match) -> PostD
 
 
 async def fetch_instagram(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    try:
-        shortcode = match.group(1)
-        original_url = f"https://www.instagram.com/p/{shortcode}/"
-        api_url = f"https://api.ddinstagram.com/oembed?url={quote(original_url, safe='')}"
-
-        async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-
-        media_urls = []
-        if data.get("thumbnail_url"):
-            media_urls.append(data["thumbnail_url"])
-
-        media_type = "video" if data.get("type") == "video" else "image"
-
-        return PostData(
-            platform="instagram",
-            author=data.get("author_name", "Unknown"),
-            author_url=data.get("author_url"),
-            text=data.get("title"),
-            media_urls=media_urls,
-            media_type=media_type,
-            is_nsfw=False,
-            url=original_url,
-            timestamp=None,
-        )
-    except Exception as e:
-        print(f"[Fetcher/Instagram] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
-        return None
+    # Instagram không còn cung cấp oEmbed công khai không cần auth.
+    # Trả về None để chuỗi xử lý tự động chuyển sang Tier 1 (Proxy URL như vxinstagram/fxig),
+    # giúp Discord nhúng trình phát video trực tiếp kèm âm thanh và điều khiển phát mượt mà.
+    return None
 
 
 async def fetch_facebook(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
