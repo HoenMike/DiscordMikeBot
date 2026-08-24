@@ -77,12 +77,9 @@ PLATFORMS = {
         "icon_url": "https://static.cdninstagram.com/rsrc.php/v3/yR/r/lam-fZmwmvn.png",
         "footer_text": "Instagram",
         "button_label": "Xem trên Instagram",
-        "api_base": "https://api.ddinstagram.com",
+        "api_base": None,
         "patterns": [
-            re.compile(r"https://(www\.)?instagram\.com/share/([\w-]+)/?"),
-            re.compile(r"https://(www\.)?instagram\.com/(?:p|reels?)/([\w-]+)/?"),
-            re.compile(r"https://(www\.)?instagram\.com/share/(?:p|reels?)/([\w-]+)/?"),
-            re.compile(r"https?://(?:www\.)?instagram\.com/(?:p|reel|tv)/([\w-]+)\S*"),
+            re.compile(r"https?://(?:www\.)?instagram\.com/(?:share/(?:p|reels?)/|share/|(?:p|reels?|tv)/)([\w-]+)"),
         ],
     },
     "facebook": {
@@ -151,7 +148,7 @@ PROXY_DOMAINS = {
     "pixiv": ["phixiv.net"],
     "tiktok": ["vxtiktok.com", "tnktok.com", "kktiktok.com"],
     "reddit": ["rxddit.com", "fxreddit.seria.moe", "vxreddit.com"],
-    "instagram": ["ddinstagram.com", "eeinstagram.com", "oginstagram.com"],
+    "instagram": ["eeinstagram.com", "oginstagram.com", "ddinstagram.com"],
     "facebook": ["facebed.seria.moe", "fxfb.seria.moe"],
     "bluesky": ["bskx.app", "fxbsky.app"],
     "twitch": ["fxtwitch.seria.moe"],

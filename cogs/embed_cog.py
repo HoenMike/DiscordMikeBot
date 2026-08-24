@@ -6,7 +6,7 @@ import aiohttp
 import discord
 from discord.ext import commands
 
-from utils.constants import PLATFORMS
+from utils.constants import PLATFORMS, extract_urls
 from services.platform_fetchers import FETCHER_MAP
 from services.embed_builder import NSFWFilter, build_embed, build_gallery_embeds
 from services.proxy_validator import find_valid_proxy
@@ -30,7 +30,7 @@ class EmbedCog(commands.Cog):
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession(
-            headers={"User-Agent": "MikeDaBot/1.0"}
+            headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)"}
         )
 
     async def cog_unload(self):
@@ -38,18 +38,24 @@ class EmbedCog(commands.Cog):
             await self.session.close()
 
     def _detect_urls(self, content: str) -> list[tuple[str, str, object]]:
-        """Phát hiện URL của các nền tảng được hỗ trợ trong nội dung tin nhắn."""
+        """Phát hiện URL của các nền tảng được hỗ trợ trong nội dung tin nhắn.
+
+        Trích xuất danh sách URL duy nhất từ tin nhắn trước, sau đó so khớp
+        với từng nền tảng để tuyệt đối tránh tình trạng gửi link 2 lần do trùng lặp pattern.
+        """
+        raw_urls = extract_urls(content)
         detected = []
-        seen_spans = []
-        for platform_key, platform_info in PLATFORMS.items():
-            for pattern in platform_info["patterns"]:
-                for match in pattern.finditer(content):
-                    span = (match.start(), match.end())
-                    # Tránh duplicate hoặc overlapping sub-match
-                    if any(s[0] <= span[0] and span[1] <= s[1] for s in seen_spans):
-                        continue
-                    seen_spans.append(span)
-                    detected.append((platform_key, match.group(0), match))
+        for url, is_spoiler in raw_urls:
+            for platform_key, platform_info in PLATFORMS.items():
+                matched = False
+                for pattern in platform_info["patterns"]:
+                    m = pattern.search(url)
+                    if m:
+                        detected.append((platform_key, url, m))
+                        matched = True
+                        break
+                if matched:
+                    break
         return detected
 
     @commands.Cog.listener()
