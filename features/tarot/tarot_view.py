@@ -158,6 +158,55 @@ class TarotFlipView(discord.ui.View):
         # 6. Xây dựng Embed tương ứng
         if is_completed:
             self._has_completed = True
+
+            # Xây dựng danh sách lá bài rút được
+            cards_summary_lines = []
+            for drawn in self.drawn_cards:
+                orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
+                cards_summary_lines.append(
+                    f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
+                )
+
+            sent_image_already = False
+            # Nếu AI chưa xong: CẬP NHẬT NGAY LẬP TỨC để người dùng thấy ảnh bài đã lật tức thì (Instant Visual Flip)
+            if not self.ai_task.done():
+                loading_desc = []
+                if self.question:
+                    loading_desc.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
+                if self.spread_key == "yes_no":
+                    badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
+                    loading_desc.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
+                loading_desc.append(WIDE_DIVIDER)
+                loading_desc.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines) + "\n")
+                loading_desc.append(WIDE_DIVIDER)
+                loading_desc.append("✨ *Vũ trụ đang kết nối và truyền tải bài luận giải từ AI, xin chờ trong giây lát...*")
+
+                emb_loading = discord.Embed(
+                    title=f"🔮 TRẢI BÀI TAROT: {self.spread_info['name'].upper()}",
+                    description="\n".join(loading_desc),
+                    color=self.embed_color
+                )
+                emb_loading.set_image(url="attachment://tarot_spread.png")
+                emb_loading.set_footer(
+                    text=f"Quẻ bài của {self.author_name}",
+                    icon_url=self.author_avatar_url
+                )
+
+                try:
+                    await interaction.edit_original_response(
+                        embed=emb_loading,
+                        attachments=[file],
+                        view=None
+                    )
+                    sent_image_already = True
+                except Exception:
+                    if self.message:
+                        try:
+                            await self.message.edit(embed=emb_loading, attachments=[file], view=None)
+                            sent_image_already = True
+                        except Exception:
+                            pass
+
             # Await bài luận giải AI chạy ngầm
             ai_reading = await self.ai_task
 
@@ -185,14 +234,6 @@ class TarotFlipView(discord.ui.View):
                 desc_lines.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
 
             desc_lines.append(WIDE_DIVIDER)
-
-            cards_summary_lines = []
-            for drawn in self.drawn_cards:
-                orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
-                cards_summary_lines.append(
-                    f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
-                )
-
             desc_lines.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines) + "\n")
             desc_lines.append(WIDE_DIVIDER)
             desc_lines.append(ai_reading)
@@ -219,17 +260,26 @@ class TarotFlipView(discord.ui.View):
 
             embeds[0].set_image(url="attachment://tarot_spread.png")
 
-            # Khi đã lật xong, xóa bỏ hoàn toàn View (nút bấm) để giao diện sạch đẹp
+            # Cập nhật kết quả bài giải đầy đủ lên Discord
             try:
-                await interaction.edit_original_response(
-                    embeds=embeds,
-                    attachments=[file],
-                    view=None
-                )
+                if not sent_image_already:
+                    await interaction.edit_original_response(
+                        embeds=embeds,
+                        attachments=[file],
+                        view=None
+                    )
+                else:
+                    await interaction.edit_original_response(
+                        embeds=embeds,
+                        view=None
+                    )
             except Exception:
                 if self.message:
                     try:
-                        await self.message.edit(embeds=embeds, attachments=[file], view=None)
+                        if not sent_image_already:
+                            await self.message.edit(embeds=embeds, attachments=[file], view=None)
+                        else:
+                            await self.message.edit(embeds=embeds, view=None)
                     except Exception as ex:
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
             self.stop()

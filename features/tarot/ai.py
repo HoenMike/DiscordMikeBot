@@ -170,35 +170,29 @@ async def generate_tarot_reading(
 
     last_error = None
     for model_name in ordered_models:
-        # Thử tối đa 2 lần cho mỗi model nếu gặp sự cố tạm thời (503 High Demand)
-        for attempt in range(1, 3):
-            try:
-                attempt_str = f" (Lần {attempt})" if attempt > 1 else ""
-                print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'{attempt_str}...", flush=True)
-                response = await asyncio.to_thread(
+        try:
+            print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'...", flush=True)
+            # Timeout tối đa 12s cho mỗi model để nếu nghẽn/chậm thì lập tức fallback, không bắt người dùng chờ
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
                     client.models.generate_content,
                     model=model_name,
                     contents=prompt,
                     config=TAROT_GEN_CONFIG,
-                )
-                if response and response.text:
-                    import re
-                    # Loại bỏ bất kỳ dòng xưng hô/chào hỏi mở đầu nào trước tiêu đề mục 1
-                    raw_text = response.text
-                    clean_text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", raw_text, flags=re.IGNORECASE).strip()
-                    print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}'.", flush=True)
-                    return clean_text
-            except Exception as e:
-                last_error = e
-                is_server_busy = "503" in str(e) or "high demand" in str(e).lower() or "unavailable" in str(e).lower()
-                if is_server_busy and attempt == 1:
-                    print(f"⏳ [Tarot AI] Model '{model_name}' tạm thời quá tải từ phía Google ({e}). Thử lại sau 1.5s...", flush=True)
-                    await asyncio.sleep(1.5)
-                    continue
-                else:
-                    print(f"⚠️ [Tarot AI] Model '{model_name}' gặp sự cố ({type(e).__name__}): {e}. Chuyển sang model tiếp theo...", flush=True)
-                    await asyncio.sleep(0.5)
-                    break
+                ),
+                timeout=12.0
+            )
+            if response and response.text:
+                import re
+                raw_text = response.text
+                clean_text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", raw_text, flags=re.IGNORECASE).strip()
+                print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}'.", flush=True)
+                return clean_text
+        except asyncio.TimeoutError:
+            print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>12s), lập tức chuyển sang model tiếp theo...", flush=True)
+        except Exception as e:
+            last_error = e
+            print(f"⚠️ [Tarot AI] Model '{model_name}' gặp sự cố ({type(e).__name__}): {e}. Chuyển sang model tiếp theo...", flush=True)
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Lỗi cuối: {last_error}", flush=True)
     return (
