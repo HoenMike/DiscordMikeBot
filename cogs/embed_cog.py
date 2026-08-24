@@ -285,6 +285,15 @@ class EmbedCog(commands.Cog):
             )
             return False
 
+    def _replace_url_in_content(self, content: str, original_url: str, new_url: str) -> str:
+        """Thay thế chính xác URL gốc bằng proxy_url ngay tại vị trí ban đầu trong tin nhắn."""
+        if not content:
+            return new_url
+        if original_url in content:
+            return content.replace(original_url, new_url, 1)
+        escaped = re.escape(original_url)
+        return re.sub(escaped, new_url, content, count=1)
+
     async def _try_proxy_chain(
         self,
         message: discord.Message,
@@ -315,7 +324,8 @@ class EmbedCog(commands.Cog):
             # Tạo View với nút liên kết tới bài viết gốc
             view = create_platform_view(platform_key, url)
 
-            full_content = f"{user_comment}\n{proxy_url}" if user_comment else proxy_url
+            # Thay thế URL gốc bằng proxy_url ngay tại đúng vị trí xuất hiện trong tin nhắn
+            full_content = self._replace_url_in_content(message.content, url, proxy_url)
 
             success = await send_via_webhook(
                 channel=message.channel,

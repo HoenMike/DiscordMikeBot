@@ -172,7 +172,7 @@ class TarotCog(commands.Cog):
                 )
 
             desc_lines.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines) + "\n")
-            desc_lines.append(f"**📖 Luận Giải Từ Vũ Trụ:**\n{ai_reading}")
+            desc_lines.append(ai_reading)
 
             full_description = "\n".join(desc_lines)
 

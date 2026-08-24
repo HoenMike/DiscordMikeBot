@@ -33,5 +33,26 @@ def test_comment_extraction():
 
     print("🎉 TẤT CẢ TEST TRÍCH XUẤT COMMENT ĐỀU ĐẠT CHUẨN!")
 
+def _replace_url_in_content(content: str, original_url: str, new_url: str) -> str:
+    """Thay thế chính xác URL gốc bằng proxy_url ngay tại vị trí ban đầu trong tin nhắn."""
+    if not content:
+        return new_url
+    if original_url in content:
+        return content.replace(original_url, new_url, 1)
+    escaped = re.escape(original_url)
+    return re.sub(escaped, new_url, content, count=1)
+
+def test_in_place_replacement():
+    raw = "test lại api liên kết thử? https://www.instagram.com/reel/DcVX1KrxAdS/ chữ dới này thì sao?"
+    orig_url = "https://www.instagram.com/reel/DcVX1KrxAdS/"
+    proxy_url = "https://vxinstagram.com/reel/DcVX1KrxAdS/"
+    
+    result = _replace_url_in_content(raw, orig_url, proxy_url)
+    expected = "test lại api liên kết thử? https://vxinstagram.com/reel/DcVX1KrxAdS/ chữ dới này thì sao?"
+    print(f"In-place Raw: {raw!r}\n=> Result: {result!r}")
+    assert result == expected, f"Failed: {result!r} != {expected!r}"
+    print("🎉 TEST IN-PLACE URL REPLACEMENT ĐẠT CHUẨN!")
+
 if __name__ == "__main__":
     test_comment_extraction()
+    test_in_place_replacement()
