@@ -1,7 +1,6 @@
 import asyncio
-from services.platform_fetchers import PostData
+from features.embed.builder import PostData
 
-# Cấu hình yt-dlp: chỉ trích xuất thông tin, không tải file
 _YTDLP_OPTS = {
     "quiet": True,
     "no_warnings": True,
@@ -13,15 +12,10 @@ _YTDLP_OPTS = {
     "noplaylist": True,
 }
 
-# Thời gian chờ tối đa cho toàn bộ tiến trình yt-dlp (giây)
 _YTDLP_TIMEOUT = 30
 
 
 def _extract_sync(url: str) -> dict | None:
-    """Đồng bộ: chạy yt-dlp để trích xuất thông tin media.
-
-    Hàm này được gọi trong thread riêng qua asyncio.to_thread().
-    """
     try:
         import yt_dlp
     except ImportError:
@@ -47,12 +41,6 @@ def _extract_sync(url: str) -> dict | None:
 
 
 async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
-    """Trích xuất media URL trực tiếp bằng yt-dlp (fallback cuối cùng).
-
-    Chạy trong thread riêng để không chặn event loop.
-    Bọc trong asyncio.wait_for() với timeout cố định để tránh treo vĩnh viễn.
-    Trả về PostData nếu thành công, None nếu thất bại hoặc hết thời gian.
-    """
     print(
         f"[yt-dlp] Bắt đầu trích xuất từ {url} (nền tảng: {platform_key})",
         flush=True,
@@ -83,11 +71,9 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
         )
         return None
 
-    # Xác định URL media trực tiếp và thumbnail
     media_url = info.get("url")
     thumbnail = info.get("thumbnail")
 
-    # Tìm thumbnail có độ phân giải cao nhất
     thumbnails = info.get("thumbnails", [])
     best_thumb = thumbnail
     if thumbnails:
@@ -102,7 +88,6 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
     media_urls = []
     media_type = "text"
 
-    # Ưu tiên video URL trực tiếp
     if media_url:
         media_urls.append(media_url)
         media_type = "video"

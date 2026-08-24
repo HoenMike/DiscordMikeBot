@@ -6,7 +6,7 @@ import discord
 from features.tarot.deck import DrawnCard, get_yes_no_verdict, READER_STYLES
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.manager import TarotManager
-from services.ai_service import split_text
+from core.ai import split_text
 
 WIDE_DIVIDER = "---"
 

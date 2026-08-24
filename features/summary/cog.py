@@ -8,7 +8,8 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
-from services import ai_service
+from features.summary import ai_summary
+from core.ai import split_text
 
 
 class SummaryCog(commands.Cog):
@@ -155,12 +156,12 @@ class SummaryCog(commands.Cog):
             return
 
         try:
-            summary_result = await ai_service.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
+            summary_result = await ai_summary.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
 
             title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
             embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
 
-            chunks = ai_service.split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
+            chunks = split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
 
             # Dòng cấu hình ngắn gọn 1 hàng ngang nằm ngay trên cùng của phần 1
             focus_part = f" • Focus: `{clean_focus}`" if clean_focus else ""
@@ -259,11 +260,11 @@ class SummaryCog(commands.Cog):
             return
 
         try:
-            summary_result = await ai_service.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
+            summary_result = await ai_summary.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
 
             print("🔬 [Test Command] Đang gửi kết quả cho AI QA tự động chấm điểm...", flush=True)
             raw_history_text = "\n".join(raw_messages)
-            evaluation_report = await ai_service.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
+            evaluation_report = await ai_summary.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
 
             score_val = "N/A"
             score_match = re.search(r"-\s*\*\*Điểm số\*\*:\s*([\d\.\/\s]+)", evaluation_report, re.IGNORECASE)

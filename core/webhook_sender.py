@@ -1,17 +1,29 @@
+import re
 import discord
 
-from utils.constants import sanitize_username
-
-# ---------------------------------------------------------------------------
 # Cache webhook theo channel ID để tránh tạo lại mỗi lần gửi.
-# Chỉ xác nhận lại webhook khi gặp lỗi gửi, không fetch() trên mỗi request.
-# ---------------------------------------------------------------------------
 _webhook_cache: dict[int, discord.Webhook] = {}
 
 WEBHOOK_NAME = "MikeDaBot Proxy"
 
 # Giới hạn ký tự tối đa cho content gửi qua Discord API
 _MAX_CONTENT_LENGTH = 2000
+
+
+def sanitize_username(display_name: str) -> str:
+    """Thay thế 'discord' trong tên hiển thị để tránh API từ chối webhook.
+
+    Discord API từ chối webhook message khi username chứa từ 'discord'
+    (không phân biệt hoa thường). Thay thế bằng ký tự tương tự về hình thức
+    (U+0257, Latin small letter d with hook) để giữ nguyên giao diện.
+    """
+    if not display_name:
+        return "User"
+    sanitized = re.sub(r"(?i)discord", "discor\u0257", display_name)
+    sanitized = sanitized.strip()
+    if not sanitized:
+        return "User"
+    return sanitized[:80]
 
 
 def _truncate_content(content: str) -> str:

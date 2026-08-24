@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 from urllib.parse import quote, urlparse
 
-from utils.constants import (
+from features.embed.constants import (
     PROXY_DOMAINS,
     PLATFORM_ORIGINAL_DOMAINS,
     PROXY_API_ENDPOINTS,
@@ -24,6 +24,17 @@ _OG_META_PATTERN = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
+# Regex phát hiện nội dung NSFW / nhạy cảm trong HTML metadata của Proxy
+_NSFW_PATTERN = re.compile(
+    r'(?:'
+    r'name=["\']twitter:creator["\']\s+content=["\']nsfw["\']'
+    r'|property=["\']og:rating["\']\s+content=["\'](?:adult|R-?18)["\']'
+    r'|property=["\']og:title["\']\s+content=["\'][^"\']*\b(?:nsfw|18\+|r-18|r-18g)\b[^"\']*["\']'
+    r'|content=["\'][^"\']*\b(?:nsfw|18\+|r-18|r-18g)\b[^"\']*["\']'
+    r')',
+    re.IGNORECASE,
+)
+
 # Kích thước tối đa đọc từ response (64KB) để đảm bảo không bỏ sót thẻ meta
 _MAX_READ_BYTES = 65536
 
@@ -35,24 +46,12 @@ _FAILED_DOMAINS_CACHE: dict[str, float] = {}
 _FAILED_DOMAIN_TTL = 30.0  # 30 giây
 
 
-# ---------------------------------------------------------------------------
-# Xây dựng proxy URL từ URL gốc
-# ---------------------------------------------------------------------------
-
 def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> str | None:
-    """Thay thế domain gốc trong URL bằng proxy domain.
-
-    Sử dụng replace_domain() (urlparse-based) thay vì thay thế chuỗi thủ công.
-    Xử lý các trường hợp đặc biệt: subdomain (www., old., m., vm., vt.),
-    và domain có path riêng (clips.twitch.tv).
-
-    Trả về URL đã được viết lại, hoặc None nếu không xác định được domain gốc.
-    """
+    """Thay thế domain gốc trong URL bằng proxy domain."""
     original_domains = PLATFORM_ORIGINAL_DOMAINS.get(platform_key, [])
     if not original_domains:
         return None
 
-    # Thử thay thế lần lượt từng domain gốc (ưu tiên domain cụ thể hơn trước)
     for orig_domain in original_domains:
         if domain_in_url(original_url, orig_domain):
             return replace_domain(original_url, orig_domain, proxy_domain)
@@ -60,17 +59,8 @@ def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> 
     return None
 
 
-# ---------------------------------------------------------------------------
-# Bước 1: Xác thực qua JSON API (nếu proxy có API)
-# ---------------------------------------------------------------------------
-
 def _resolve_api_url(proxy_domain: str, original_url: str) -> str | None:
-    """Tạo URL API từ template, thay thế placeholder bằng dữ liệu từ URL gốc.
-
-    Hỗ trợ hai loại placeholder:
-      - {url}: URL gốc đã được URL-encode
-      - {path}: phần path của URL gốc (bỏ dấu / đầu)
-    """
+    """Tạo URL API từ template, thay thế placeholder bằng dữ liệu từ URL gốc."""
     api_config = PROXY_API_ENDPOINTS.get(proxy_domain)
     if not api_config:
         return None
@@ -85,11 +75,7 @@ def _resolve_api_url(proxy_domain: str, original_url: str) -> str | None:
 
 
 def _check_media_in_json(data: dict, dotpath: str) -> bool:
-    """Kiểm tra sự tồn tại của media trong JSON response theo dot notation path.
-
-    Ví dụ: dotpath="tweet.media" sẽ kiểm tra data["tweet"]["media"].
-    Trả về True nếu giá trị tồn tại và không rỗng.
-    """
+    """Kiểm tra sự tồn tại của media trong JSON response theo dot notation path."""
     current = data
     for key in dotpath.split("."):
         if isinstance(current, dict):
@@ -99,7 +85,6 @@ def _check_media_in_json(data: dict, dotpath: str) -> bool:
         if current is None:
             return False
 
-    # Giá trị tồn tại: kiểm tra không rỗng
     if isinstance(current, (dict, list, str)):
         return bool(current)
     return current is not None
@@ -109,16 +94,11 @@ async def validate_via_api(
     session: aiohttp.ClientSession,
     original_url: str,
     proxy_domain: str,
-) -> bool:
-    """Xác thực proxy bằng JSON API (nếu có).
-
-    Gửi GET request tới API endpoint, kiểm tra response JSON có chứa
-    media objects theo đường dẫn đã cấu hình.
-    Trả về True nếu có media, False nếu không hoặc lỗi.
-    """
+) -> tuple[bool, bool]:
+    """Xác thực proxy bằng JSON API (nếu có). Trả về (is_valid, is_nsfw)."""
     api_url = _resolve_api_url(proxy_domain, original_url)
     if not api_url:
-        return False
+        return False, False
 
     api_config = PROXY_API_ENDPOINTS[proxy_domain]
     media_path = api_config["media_check"]
@@ -134,45 +114,45 @@ async def validate_via_api(
                     f"[ProxyValidator] API trả về HTTP {resp.status}: {api_url}",
                     flush=True,
                 )
-                return False
+                return False, False
 
             data = await resp.json(content_type=None)
             if _check_media_in_json(data, media_path):
-                return True
+                is_nsfw = False
+                if "fxtwitter" in proxy_domain:
+                    tweet = data.get("tweet", {})
+                    is_nsfw = bool(tweet.get("possibly_sensitive") or tweet.get("nsfw"))
+                elif "vxtiktok" in proxy_domain:
+                    video_data = data.get("data", {})
+                    is_nsfw = bool(video_data.get("is_nsfw"))
+
+                return True, is_nsfw
 
             print(
                 f"[ProxyValidator] API không chứa media ({media_path}): {api_url}",
                 flush=True,
             )
-            return False
+            return False, False
 
     except asyncio.TimeoutError:
         print(
             f"[ProxyValidator] API hết thời gian chờ: {api_url}",
             flush=True,
         )
-        return False
+        return False, False
     except (aiohttp.ClientError, ValueError) as e:
         print(
             f"[ProxyValidator] API lỗi kết nối: {api_url} - {e}",
             flush=True,
         )
-        return False
+        return False, False
 
-
-# ---------------------------------------------------------------------------
-# Bước 2: Xác thực qua OG metadata (fallback khi không có API)
-# ---------------------------------------------------------------------------
 
 async def validate_via_og_metadata(
     session: aiohttp.ClientSession,
     proxy_url: str,
-) -> bool:
-    """Xác thực proxy URL bằng cách kiểm tra OpenGraph/Twitter Card metadata.
-
-    Gửi GET request với giới hạn đọc 16KB, phân tích HTML tìm meta tags.
-    Trả về True nếu tìm thấy og:image, og:video, hoặc twitter:card/image/player.
-    """
+) -> tuple[bool, bool]:
+    """Xác thực proxy URL bằng cách kiểm tra OpenGraph/Twitter Card metadata. Trả về (is_valid, is_nsfw)."""
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)",
@@ -189,65 +169,48 @@ async def validate_via_og_metadata(
                     f"[ProxyValidator] Proxy trả về HTTP {resp.status}: {proxy_url}",
                     flush=True,
                 )
-                return False
+                return False, False
 
             content = await resp.content.read(_MAX_READ_BYTES)
             html_text = content.decode("utf-8", errors="ignore")
 
             if _OG_META_PATTERN.search(html_text):
-                return True
+                is_nsfw = bool(_NSFW_PATTERN.search(html_text))
+                return True, is_nsfw
 
             print(
                 f"[ProxyValidator] Không tìm thấy OG metadata: {proxy_url}",
                 flush=True,
             )
-            return False
+            return False, False
 
     except asyncio.TimeoutError:
         print(
             f"[ProxyValidator] Hết thời gian chờ: {proxy_url}",
             flush=True,
         )
-        return False
+        return False, False
     except aiohttp.ClientError as e:
         print(
             f"[ProxyValidator] Lỗi kết nối: {proxy_url} - {e}",
             flush=True,
         )
-        return False
+        return False, False
     except Exception as e:
         print(
             f"[ProxyValidator] Lỗi không xác định: {proxy_url} - {e}",
             flush=True,
         )
-        return False
+        return False, False
 
-
-# ---------------------------------------------------------------------------
-# Chain of Responsibility: duyệt danh sách proxy theo thứ tự ưu tiên
-# ---------------------------------------------------------------------------
 
 async def find_valid_proxy(
     session: aiohttp.ClientSession,
     original_url: str,
     platform_key: str,
     guild_proxy_domains: list[str] | None = None,
-) -> str | None:
-    """Thực hiện Chain of Responsibility: thử từng proxy domain theo thứ tự ưu tiên.
-
-    Nếu guild_proxy_domains được cung cấp (không phải None), sử dụng danh sách đó
-    thay vì danh sách mặc định toàn cục. Điều này cho phép mỗi máy chủ tuỳ chỉnh
-    thứ tự ưu tiên proxy riêng.
-
-    Với mỗi proxy domain:
-      1. Bỏ qua nếu domain đang trong danh sách tạm ngừng do lỗi kết nối/502 gần đây
-      2. Viết lại URL gốc sang proxy URL
-      3. Nếu proxy có JSON API: xác thực qua API trước
-      4. Nếu API thất bại hoặc không có API: xác thực qua OG metadata
-      5. Proxy đầu tiên hợp lệ được trả về ngay lập tức
-
-    Trả về proxy URL đầu tiên hợp lệ, hoặc None nếu tất cả đều thất bại.
-    """
+) -> tuple[str | None, bool]:
+    """Thực hiện Chain of Responsibility: thử từng proxy domain theo thứ tự ưu tiên. Trả về (proxy_url, is_nsfw)."""
     if guild_proxy_domains is not None:
         proxy_domains = guild_proxy_domains
     else:
@@ -258,11 +221,10 @@ async def find_valid_proxy(
             f"[ProxyValidator] Không có proxy nào được cấu hình cho nền tảng '{platform_key}'",
             flush=True,
         )
-        return None
+        return None, False
 
     now = time.monotonic()
     for i, domain in enumerate(proxy_domains, start=1):
-        # Bỏ qua domain nếu đang trong thời gian cooldown sau lỗi
         if domain in _FAILED_DOMAINS_CACHE:
             if now < _FAILED_DOMAINS_CACHE[domain]:
                 print(
@@ -290,30 +252,28 @@ async def find_valid_proxy(
 
         async with _VALIDATION_SEMAPHORE:
             is_valid = False
+            is_nsfw = False
 
-            # Bước 1: Thử xác thực qua JSON API (nếu có)
             if domain in PROXY_API_ENDPOINTS:
-                is_valid = await validate_via_api(session, original_url, domain)
+                is_valid, is_nsfw = await validate_via_api(session, original_url, domain)
                 if is_valid:
                     print(
                         f"[ProxyValidator] Xác thực API thành công: {domain} "
-                        f"(nền tảng: {platform_key})",
+                        f"(nền tảng: {platform_key}, NSFW={is_nsfw})",
                         flush=True,
                     )
-                    return proxy_url
+                    return proxy_url, is_nsfw
 
-            # Bước 2: Fallback sang OG metadata
-            is_valid = await validate_via_og_metadata(session, proxy_url)
+            is_valid, is_nsfw = await validate_via_og_metadata(session, proxy_url)
 
         if is_valid:
             print(
                 f"[ProxyValidator] Proxy hợp lệ (OG metadata): {domain} "
-                f"(nền tảng: {platform_key})",
+                f"(nền tảng: {platform_key}, NSFW={is_nsfw})",
                 flush=True,
             )
-            return proxy_url
+            return proxy_url, is_nsfw
 
-        # Đánh dấu domain thất bại tạm thời vào cache
         _FAILED_DOMAINS_CACHE[domain] = time.monotonic() + _FAILED_DOMAIN_TTL
         print(
             f"[ProxyValidator] Proxy thất bại: {domain} (nền tảng: {platform_key})",
@@ -325,5 +285,4 @@ async def find_valid_proxy(
         f"{original_url}",
         flush=True,
     )
-    return None
-
+    return None, False

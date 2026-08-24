@@ -1,9 +1,28 @@
+from dataclasses import dataclass, field
 import discord
-from services.platform_fetchers import PostData
-from utils.constants import PLATFORMS, format_count
+from features.embed.constants import PLATFORMS, format_count
 
 MAX_TEXT_LENGTH = 1000
 MAX_GALLERY_DISPLAY = 4
+
+
+@dataclass
+class PostData:
+    platform: str
+    author: str = "Unknown"
+    author_url: str | None = None
+    author_avatar: str | None = None
+    text: str | None = None
+    media_urls: list[str] = field(default_factory=list)
+    media_type: str = "text"
+    is_nsfw: bool = False
+    is_spoiler: bool = False
+    likes: int | None = None
+    comments: int | None = None
+    retweets: int | None = None
+    url: str = ""
+    timestamp: str | None = None
+    thumbnail_url: str | None = None
 
 
 class NSFWFilterResult:
@@ -87,7 +106,7 @@ def build_embed(post: PostData, filter_result: NSFWFilterResult) -> discord.Embe
     if description_parts:
         embed.description = "\n".join(description_parts)
 
-    # Đặt ảnh xem trước (ưu tiên thumbnail_url cho video vì Discord embed không nhận link video MP4 trong set_image)
+    # Đặt ảnh xem trước (ưu tiên thumbnail_url cho video)
     image_url_to_set = post.thumbnail_url if post.media_type == "video" else (post.media_urls[0] if post.media_urls else None)
     if not image_url_to_set and post.media_urls and not post.media_urls[0].lower().endswith((".mp4", ".mov", ".mkv", ".webm")):
         image_url_to_set = post.media_urls[0]

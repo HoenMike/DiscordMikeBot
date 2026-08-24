@@ -13,7 +13,7 @@ from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
 from features.tarot.manager import TarotManager
 from features.tarot.tarot_view import TarotFlipView, WIDE_DIVIDER
-from services.ai_service import split_text
+from core.ai import split_text
 
 
 class TarotCog(commands.Cog):

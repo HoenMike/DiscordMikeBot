@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Optional
 from google.genai import types
 import config
-from services.ai_service import get_ai_client
+from core.ai import get_ai_client
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict, READER_STYLES
 
 # Cấu hình AI Tarot: Nhiệt độ 0.65 để câu trả lời sinh động, giàu cá tính

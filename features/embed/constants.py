@@ -1,11 +1,9 @@
 import re
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-
 # ---------------------------------------------------------------------------
 # Trích xuất URL từ tin nhắn Discord
 # Xử lý URL trong spoiler (||url||) và URL bị suppress (<url>).
-# Trích dẫn từ seriaati/embed-fixer utils/misc.py
 # ---------------------------------------------------------------------------
 _SPOILER_URL_PATTERN = re.compile(r"\|\|(https?://[^\s|]+)\|\|")
 _REGULAR_URL_PATTERN = re.compile(r"(?<!\$)(?<!<)(https?://[^\s>]+)(?!>)")
@@ -13,8 +11,6 @@ _REGULAR_URL_PATTERN = re.compile(r"(?<!\$)(?<!<)(https?://[^\s>]+)(?!>)")
 
 # ---------------------------------------------------------------------------
 # Regex nhận diện URL theo nền tảng
-# Trích xuất từ seriaati/embed-fixer fixes.py (Website patterns).
-# Mỗi nền tảng có một hoặc nhiều pattern để bắt chính xác URL hợp lệ.
 # ---------------------------------------------------------------------------
 PLATFORMS = {
     "twitter": {
@@ -140,8 +136,6 @@ PLATFORMS = {
 
 # ---------------------------------------------------------------------------
 # Proxy Fallback Registry
-# Danh sách proxy domain theo thứ tự ưu tiên giảm dần cho mỗi nền tảng.
-# Chuỗi fallback được duyệt tuần tự: proxy đầu tiên hợp lệ sẽ được sử dụng.
 # ---------------------------------------------------------------------------
 PROXY_DOMAINS = {
     "twitter": ["fxtwitter.com", "vxtwitter.com", "fixupx.com"],
@@ -158,7 +152,6 @@ PROXY_DOMAINS = {
 
 # ---------------------------------------------------------------------------
 # Domain gốc theo nền tảng
-# Dùng để xác định domain nào cần được thay thế khi viết lại URL sang proxy.
 # ---------------------------------------------------------------------------
 PLATFORM_ORIGINAL_DOMAINS = {
     "twitter": ["twitter.com", "x.com"],
@@ -175,9 +168,6 @@ PLATFORM_ORIGINAL_DOMAINS = {
 
 # ---------------------------------------------------------------------------
 # JSON API endpoints cho các proxy hỗ trợ xác thực qua API
-# Key = proxy domain, value = dict chứa thông tin API.
-#   "template": URL template. Hỗ trợ placeholder {url} (URL gốc đã encode).
-#   "media_check": đường dẫn JSON để kiểm tra media (dùng dot notation).
 # ---------------------------------------------------------------------------
 PROXY_API_ENDPOINTS = {
     "fxtwitter.com": {
@@ -190,12 +180,7 @@ PROXY_API_ENDPOINTS = {
     },
 }
 
-
-# ---------------------------------------------------------------------------
-# Query params cần giữ lại khi làm sạch URL
-# ---------------------------------------------------------------------------
 KEEP_QUERY_PARAMS = {}
-
 
 # ---------------------------------------------------------------------------
 # Cấu hình mặc định cho server
@@ -250,17 +235,10 @@ def format_count(n: int | None) -> str:
 
 
 def extract_urls(text: str) -> list[tuple[str, bool]]:
-    """Trích xuất URL từ nội dung tin nhắn Discord.
-
-    Xử lý cả URL trong spoiler (||url||) và URL thường.
-    Bỏ qua URL bị suppress (<url>) và URL sau ký tự tiền tệ ($).
-    Trả về danh sách các tuple (url, is_spoiler).
-    """
+    """Trích xuất URL từ nội dung tin nhắn Discord."""
     spoiler_urls = [(match, True) for match in _SPOILER_URL_PATTERN.findall(text)]
-
     text_without_spoilers = _SPOILER_URL_PATTERN.sub("", text)
     regular_urls = [(match, False) for match in _REGULAR_URL_PATTERN.findall(text_without_spoilers)]
-
     return spoiler_urls + regular_urls
 
 
@@ -273,7 +251,6 @@ def domain_in_url(url: str, domain: str) -> bool:
 def remove_query_params(url: str) -> str:
     """Loại bỏ tracking query params, giữ lại các params cần thiết."""
     parsed = urlparse(url)
-
     query = ""
     for domain, keep in KEEP_QUERY_PARAMS.items():
         if domain_in_url(url, domain):
@@ -291,28 +268,9 @@ def remove_query_params(url: str) -> str:
 
 
 def replace_domain(url: str, old_domain: str, new_domain: str) -> str:
-    """Thay thế domain trong URL bằng domain mới, sử dụng urlparse.
-
-    Trả về URL đã viết lại nếu domain khớp, ngược lại trả về URL gốc.
-    """
+    """Thay thế domain trong URL bằng domain mới, sử dụng urlparse."""
     parsed = urlparse(url)
     if domain_in_url(url, old_domain):
         new_parsed = parsed._replace(netloc=new_domain)
         return urlunparse(new_parsed)
     return url
-
-
-def sanitize_username(display_name: str) -> str:
-    """Thay thế 'discord' trong tên hiển thị để tránh API từ chối webhook.
-
-    Discord API từ chối webhook message khi username chứa từ 'discord'
-    (không phân biệt hoa thường). Thay thế bằng ký tự tương tự về hình thức
-    (U+0257, Latin small letter d with hook) để giữ nguyên giao diện.
-    """
-    if not display_name:
-        return "User"
-    sanitized = re.sub(r"(?i)discord", "discor\u0257", display_name)
-    sanitized = sanitized.strip()
-    if not sanitized:
-        return "User"
-    return sanitized[:80]

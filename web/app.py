@@ -11,7 +11,10 @@ from flask import Flask, jsonify, render_template
 
 import config
 from bot_instance import bot
-from services import ai_service
+try:
+    from features.summary import ai_summary
+except ImportError:
+    ai_summary = None
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 
@@ -83,6 +86,9 @@ def api_clear_logs():
 
 @app.route('/api/test/run', methods=['POST'])
 def api_run_test():
+    if ai_summary is None:
+        return jsonify({"success": False, "error": "Tính năng Summary (ai_summary) chưa được cài đặt hoặc đã bị tắt."}), 400
+
     async def run_test_logic():
         raw_messages = []
         source_info = "Mock Chat Data (Giả lập)"
@@ -114,18 +120,18 @@ def api_run_test():
 
         if not raw_messages:
             print(f"🔬 [Test API] Không có kênh online hoặc bot offline, sử dụng {source_info}...", flush=True)
-            raw_messages = ai_service.MOCK_CHAT_HISTORY
+            raw_messages = ai_summary.MOCK_CHAT_HISTORY
 
         scan_info = "150 tin nhắn thử nghiệm"
         summary_type = "long"
         clean_focus = "bot tóm tắt"
 
         print("🔬 [Test API] Đang chạy tóm tắt...", flush=True)
-        summary_result = await ai_service.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
+        summary_result = await ai_summary.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
 
         print("🔬 [Test API] Đang gửi kết quả cho AI QA tự động chấm điểm...", flush=True)
         raw_history_text = "\n".join(raw_messages)
-        evaluation_report = await ai_service.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
+        evaluation_report = await ai_summary.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
 
         score_val = "N/A"
         score_match = re.search(r"-\s*\*\*Điểm số\*\*:\s*([\d\.\/\s]+)", evaluation_report, re.IGNORECASE)

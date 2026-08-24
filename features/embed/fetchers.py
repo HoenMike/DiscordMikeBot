@@ -1,25 +1,6 @@
 import aiohttp
-from dataclasses import dataclass, field
 from urllib.parse import quote
-
-
-@dataclass
-class PostData:
-    platform: str
-    author: str = "Unknown"
-    author_url: str | None = None
-    author_avatar: str | None = None
-    text: str | None = None
-    media_urls: list[str] = field(default_factory=list)
-    media_type: str = "text"
-    is_nsfw: bool = False
-    is_spoiler: bool = False
-    likes: int | None = None
-    comments: int | None = None
-    retweets: int | None = None
-    url: str = ""
-    timestamp: str | None = None
-    thumbnail_url: str | None = None
+from features.embed.builder import PostData
 
 
 async def fetch_twitter(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
@@ -191,9 +172,6 @@ async def fetch_tiktok(session: aiohttp.ClientSession, url: str, match) -> PostD
 
 
 async def fetch_instagram(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    # Instagram không còn cung cấp oEmbed công khai không cần auth.
-    # Trả về None để chuỗi xử lý tự động chuyển sang Tier 1 (Proxy URL như vxinstagram/fxig),
-    # giúp Discord nhúng trình phát video trực tiếp kèm âm thanh và điều khiển phát mượt mà.
     return None
 
 
@@ -422,5 +400,3 @@ FETCHER_MAP = {
     "pixiv": fetch_pixiv,
     "threads": fetch_threads,
 }
-
-

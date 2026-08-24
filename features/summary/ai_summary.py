@@ -1,18 +1,7 @@
 import asyncio
-from google import genai
 from google.genai import types
 import config
-
-ai_client = None
-
-def get_ai_client():
-    global ai_client
-    if ai_client is None:
-        if config.GEMINI_API_KEY:
-            ai_client = genai.Client(api_key=config.GEMINI_API_KEY)
-        else:
-            raise ValueError("Chưa cấu hình GEMINI_API_KEY trong file .env!")
-    return ai_client
+from core.ai import get_ai_client
 
 # Cấu hình generation mặc định cho tất cả các lệnh gọi AI tóm tắt
 # temperature thấp để giảm thiểu hallucination, buộc AI bám sát dữ liệu
@@ -24,55 +13,6 @@ QA_CONFIG = types.GenerateContentConfig(
     temperature=config.QA_TEMPERATURE,
 )
 
-def split_text(text, limit=None):
-    """
-    Chia nhỏ văn bản thành các phần không vượt quá `limit` ký tự.
-    Ưu tiên ngắt tại các ranh giới tự nhiên (khối ngày `---`, dòng kẻ, đoạn văn `\n\n`)
-    để tránh cắt ngang giữa một mốc timeline hoặc một câu chuyện.
-    """
-    if limit is None:
-        limit = config.DISCORD_EMBED_CHAR_LIMIT
-    if not text:
-        return []
-    if len(text) <= limit:
-        return [text]
-
-    paragraphs = text.split('\n\n')
-    chunks = []
-    current_chunk = []
-    current_length = 0
-
-    for para in paragraphs:
-        para_len = len(para)
-        # Nếu một đoạn vượt quá giới hạn, phân chia nhỏ hơn theo từng dòng
-        if para_len > limit:
-            lines = para.split('\n')
-            for line in lines:
-                line_len = len(line)
-                if current_length + line_len + 1 > limit:
-                    if current_chunk:
-                        chunks.append('\n\n'.join(current_chunk).strip())
-                        current_chunk = []
-                        current_length = 0
-                if line_len > limit:
-                    # Cắt thô nếu 1 dòng đơn lẻ vượt quá limit
-                    chunks.append(line[:limit])
-                    line = line[limit:]
-                current_chunk.append(line)
-                current_length += len(line) + 1
-        else:
-            if current_length + para_len + 2 > limit:
-                if current_chunk:
-                    chunks.append('\n\n'.join(current_chunk).strip())
-                    current_chunk = []
-                    current_length = 0
-            current_chunk.append(para)
-            current_length += para_len + 2
-
-    if current_chunk:
-        chunks.append('\n\n'.join(current_chunk).strip())
-
-    return [c for c in chunks if c.strip()]
 
 async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instruction):
     chunk_text = "\n".join(chunk_messages)
@@ -124,6 +64,7 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     except Exception as e:
         print(f"❌ [MapReduce] Lỗi ở phân đoạn {chunk_index + 1}: {e}", flush=True)
         return f"[Lỗi: Không thể phân tích phân đoạn {chunk_index + 1} do lỗi hệ thống API]"
+
 
 async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
     focus_instruction = ""
@@ -339,6 +280,7 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
         print("✅ [MapReduce] Pha Reduce hoàn tất thành công.", flush=True)
         return response.text
 
+
 MOCK_CHAT_HISTORY = [
     "[T6 13/06 09:15] Miraei: Chào mọi người, hôm nay chúng ta bàn về dự án bot nhé.",
     "[T6 13/06 09:17] Tuan🐤: Ok, bot hiện tại đang chạy tốt nhưng tôi thấy hình như nếu quét dài quá nó chỉ lấy được ngày cũ nhất thôi.",
@@ -353,23 +295,8 @@ MOCK_CHAT_HISTORY = [
     "[T6 13/06 15:35] Poop: Ok vào game thôi."
 ]
 
-async def evaluate_summary(raw_history_text, generated_summary, summary_type, clean_focus):
-    raw_lines = raw_history_text.strip().split('\n')
-    total_msg_count = len(raw_lines)
-    head_sample = raw_lines[:15]
-    mid_start = max(0, total_msg_count // 2 - 7)
-    mid_sample = raw_lines[mid_start:mid_start + 15]
-    tail_sample = raw_lines[max(0, total_msg_count - 15):]
-    raw_sample = (
-        "--- 15 TIN NHẮN ĐẦU ---\n" + '\n'.join(head_sample) +
-        "\n\n--- 15 TIN NHẮN GIỮA ---\n" + '\n'.join(mid_sample) +
-        "\n\n--- 15 TIN NHẮN CUỐI ---\n" + '\n'.join(tail_sample)
-    )
-    import re as _re
-    date_pattern = _re.compile(r'\[(\d{2}/\d{2})')
-    dates_in_raw = sorted(set(date_pattern.findall(raw_history_text)))
-    dates_str = ', '.join(dates_in_raw) if dates_in_raw else 'Không xác định được'
 
+async def evaluate_summary(raw_history_text, generated_summary, summary_type, clean_focus):
     eval_prompt = f"""
     Bạn là một kỹ sư đảm bảo chất lượng AI (AI QA Engineer) khó tính.
     Nhiệm vụ của bạn là đánh giá và chấm điểm một bản tóm tắt được tạo bởi một AI Summary Bot từ lịch sử trò chuyện Discord.
