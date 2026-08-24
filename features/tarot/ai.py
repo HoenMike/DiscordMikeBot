@@ -196,6 +196,6 @@ async def generate_tarot_reading(
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Lỗi cuối: {last_error}", flush=True)
     return (
-        "⚠️ **Lỗi kết nối AI:** Không thể nhận bài luận giải chi tiết từ AI lúc này do lưu lượng máy chủ tăng cao.\n"
-        "Tuy nhiên bạn vẫn có thể dựa vào các từ khóa và hình ảnh lá bài phía trên để tự chiêm nghiệm!"
+        "🌌 **Tín hiệu vũ trụ bị gián đoạn:** Nguồn năng lượng từ vũ trụ hiện đang bị nhiễu động tạm thời.\n"
+        "Tuy nhiên bạn vẫn có thể dựa vào hình ảnh và các lá bài phía trên để tự chiêm nghiệm câu trả lời cho riêng mình!"
     )
