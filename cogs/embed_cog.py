@@ -21,6 +21,8 @@ MAX_LINKS_PER_MESSAGE = 3
 _PIPELINE_TIMEOUT = 45
 
 
+import re
+
 class EmbedCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -36,6 +38,18 @@ class EmbedCog(commands.Cog):
     async def cog_unload(self):
         if self.session and not self.session.closed:
             await self.session.close()
+
+    def _extract_user_comment(self, content: str, urls: list[str]) -> str | None:
+        """Trích xuất phần nội dung chữ/lời bình của người dùng, loại bỏ các link đã xử lý."""
+        if not content:
+            return None
+        cleaned = content
+        for u in urls:
+            escaped_u = re.escape(u)
+            pattern = re.compile(rf"(\|\|{escaped_u}\|\||<{escaped_u}>|{escaped_u})")
+            cleaned = pattern.sub("", cleaned)
+        cleaned = cleaned.strip()
+        return cleaned if cleaned else None
 
     def _detect_urls(self, content: str) -> list[tuple[str, str, object]]:
         """Phát hiện URL của các nền tảng được hỗ trợ trong nội dung tin nhắn.
@@ -83,16 +97,24 @@ class EmbedCog(commands.Cog):
 
         any_success = False
         platforms_enabled = config.get("platforms_enabled", {})
+        processed_urls = [u for _, u, _ in detected[:MAX_LINKS_PER_MESSAGE]]
+        user_comment = self._extract_user_comment(message.content, processed_urls)
+
+        # Gửi kèm comment của người dùng ở liên kết đầu tiên được xử lý thành công
+        comment_sent = False
 
         for platform_key, url, match in detected[:MAX_LINKS_PER_MESSAGE]:
             if not platforms_enabled.get(platform_key, True):
                 continue
 
+            current_comment = user_comment if not comment_sent else None
+
             success = await self._process_url_with_fallback(
-                message, platform_key, url, match, config
+                message, platform_key, url, match, config, user_comment=current_comment
             )
             if success:
                 any_success = True
+                comment_sent = True
             else:
                 # Thông báo cho người dùng khi liên kết bị khoá/riêng tư/lỗi
                 platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
@@ -129,6 +151,7 @@ class EmbedCog(commands.Cog):
         url: str,
         match: object,
         config: dict,
+        user_comment: str | None = None,
     ) -> bool:
         """Xử lý URL với chuỗi fallback 3 tầng, bọc trong timeout tổng thể.
 
@@ -142,7 +165,7 @@ class EmbedCog(commands.Cog):
 
         try:
             result = await asyncio.wait_for(
-                self._run_fallback_chain(message, platform_key, url, match, config),
+                self._run_fallback_chain(message, platform_key, url, match, config, user_comment=user_comment),
                 timeout=_PIPELINE_TIMEOUT,
             )
             elapsed = time.monotonic() - t_start
@@ -169,21 +192,22 @@ class EmbedCog(commands.Cog):
         url: str,
         match: object,
         config: dict,
+        user_comment: str | None = None,
     ) -> bool:
         """Thực thi chuỗi fallback 3 tầng tuần tự."""
 
         # === TIER 0: API Fetcher ===
-        result = await self._try_api_fetcher(message, platform_key, url, match, config)
+        result = await self._try_api_fetcher(message, platform_key, url, match, config, user_comment=user_comment)
         if result:
             return True
 
         # === TIER 1: Proxy URL Chain ===
-        result = await self._try_proxy_chain(message, platform_key, url)
+        result = await self._try_proxy_chain(message, platform_key, url, user_comment=user_comment)
         if result:
             return True
 
         # === TIER 2: yt-dlp Fallback ===
-        result = await self._try_ytdlp_fallback(message, platform_key, url, config)
+        result = await self._try_ytdlp_fallback(message, platform_key, url, config, user_comment=user_comment)
         if result:
             return True
 
@@ -200,6 +224,7 @@ class EmbedCog(commands.Cog):
         url: str,
         match: object,
         config: dict,
+        user_comment: str | None = None,
     ) -> bool:
         """Tier 0: Sử dụng API fetcher để lấy dữ liệu có cấu trúc và tạo embed."""
         fetcher = FETCHER_MAP.get(platform_key)
@@ -239,6 +264,7 @@ class EmbedCog(commands.Cog):
             success = await send_via_webhook(
                 channel=message.channel,
                 user=message.author,
+                content=user_comment,
                 embeds=embeds,
                 file=file,
                 view=view,
@@ -264,6 +290,7 @@ class EmbedCog(commands.Cog):
         message: discord.Message,
         platform_key: str,
         url: str,
+        user_comment: str | None = None,
     ) -> bool:
         """Tier 1: Tìm proxy hợp lệ và gửi URL đã viết lại qua webhook.
 
@@ -288,10 +315,12 @@ class EmbedCog(commands.Cog):
             # Tạo View với nút liên kết tới bài viết gốc
             view = create_platform_view(platform_key, url)
 
+            full_content = f"{user_comment}\n{proxy_url}" if user_comment else proxy_url
+
             success = await send_via_webhook(
                 channel=message.channel,
                 user=message.author,
-                content=proxy_url,
+                content=full_content,
                 view=view,
                 original_message=message,
             )
@@ -316,6 +345,7 @@ class EmbedCog(commands.Cog):
         platform_key: str,
         url: str,
         config: dict,
+        user_comment: str | None = None,
     ) -> bool:
         """Tier 2: Sử dụng yt-dlp để trích xuất media và tạo embed.
 
@@ -352,6 +382,7 @@ class EmbedCog(commands.Cog):
             success = await send_via_webhook(
                 channel=message.channel,
                 user=message.author,
+                content=user_comment,
                 embeds=[single_embed],
                 file=file,
                 view=view,
