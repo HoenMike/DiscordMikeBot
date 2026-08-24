@@ -141,6 +141,8 @@ class TarotFlipView(discord.ui.View):
             self.revealed_indices.add(idx)
 
         # 3. Kiểm tra xem đã lật hết chưa
+        is_completed = len(self.revealed_indices) == len(self.drawn_cards)
+
         # 4. Cập nhật nút bấm
         self._build_buttons()
 
