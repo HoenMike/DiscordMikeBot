@@ -8,7 +8,7 @@ from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.manager import TarotManager
 from services.ai_service import split_text
 
-WIDE_DIVIDER = "──────────────────────────────────────────"
+WIDE_DIVIDER = "───────────────────────────────────────────────────────────────"
 
 
 class TarotFlipView(discord.ui.View):
@@ -219,20 +219,17 @@ class TarotFlipView(discord.ui.View):
 
             embeds[0].set_image(url="attachment://tarot_spread.png")
 
-            # Khi đã lật xong, disable hoặc dọn dẹp các nút bấm
-            for item in self.children:
-                item.disabled = True
-
+            # Khi đã lật xong, xóa bỏ hoàn toàn View (nút bấm) để giao diện sạch đẹp
             try:
                 await interaction.edit_original_response(
                     embeds=embeds,
                     attachments=[file],
-                    view=self
+                    view=None
                 )
             except Exception:
                 if self.message:
                     try:
-                        await self.message.edit(embeds=embeds, attachments=[file], view=self)
+                        await self.message.edit(embeds=embeds, attachments=[file], view=None)
                     except Exception as ex:
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
             self.stop()
