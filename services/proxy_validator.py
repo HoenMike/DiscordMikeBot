@@ -1,4 +1,5 @@
 import re
+import time
 import asyncio
 import aiohttp
 from urllib.parse import quote, urlparse
@@ -28,6 +29,10 @@ _MAX_READ_BYTES = 16384
 
 # Timeout cho mỗi request xác thực đơn lẻ
 _VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=8)
+
+# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 3 phút)
+_FAILED_DOMAINS_CACHE: dict[str, float] = {}
+_FAILED_DOMAIN_TTL = 180.0  # 3 phút
 
 
 # ---------------------------------------------------------------------------
@@ -236,10 +241,11 @@ async def find_valid_proxy(
     thứ tự ưu tiên proxy riêng.
 
     Với mỗi proxy domain:
-      1. Viết lại URL gốc sang proxy URL
-      2. Nếu proxy có JSON API: xác thực qua API trước
-      3. Nếu API thất bại hoặc không có API: xác thực qua OG metadata
-      4. Proxy đầu tiên hợp lệ được trả về ngay lập tức
+      1. Bỏ qua nếu domain đang trong danh sách tạm ngừng do lỗi kết nối/502 gần đây
+      2. Viết lại URL gốc sang proxy URL
+      3. Nếu proxy có JSON API: xác thực qua API trước
+      4. Nếu API thất bại hoặc không có API: xác thực qua OG metadata
+      5. Proxy đầu tiên hợp lệ được trả về ngay lập tức
 
     Trả về proxy URL đầu tiên hợp lệ, hoặc None nếu tất cả đều thất bại.
     """
@@ -255,7 +261,19 @@ async def find_valid_proxy(
         )
         return None
 
+    now = time.monotonic()
     for i, domain in enumerate(proxy_domains, start=1):
+        # Bỏ qua domain nếu đang trong thời gian cooldown sau lỗi
+        if domain in _FAILED_DOMAINS_CACHE:
+            if now < _FAILED_DOMAINS_CACHE[domain]:
+                print(
+                    f"[ProxyValidator] Bỏ qua proxy {domain} (đang tạm nghỉ cooldown sau lỗi)",
+                    flush=True,
+                )
+                continue
+            else:
+                _FAILED_DOMAINS_CACHE.pop(domain, None)
+
         proxy_url = build_proxy_url(original_url, platform_key, domain)
         if not proxy_url:
             print(
@@ -296,6 +314,8 @@ async def find_valid_proxy(
             )
             return proxy_url
 
+        # Đánh dấu domain thất bại tạm thời vào cache
+        _FAILED_DOMAINS_CACHE[domain] = time.monotonic() + _FAILED_DOMAIN_TTL
         print(
             f"[ProxyValidator] Proxy thất bại: {domain} (nền tảng: {platform_key})",
             flush=True,
@@ -307,3 +327,4 @@ async def find_valid_proxy(
         flush=True,
     )
     return None
+

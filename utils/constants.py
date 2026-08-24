@@ -148,11 +148,11 @@ PROXY_DOMAINS = {
     "pixiv": ["phixiv.net"],
     "tiktok": ["vxtiktok.com", "tnktok.com", "kktiktok.com"],
     "reddit": ["rxddit.com", "fxreddit.seria.moe", "vxreddit.com"],
-    "instagram": ["eeinstagram.com", "oginstagram.com", "ddinstagram.com"],
-    "facebook": ["facebed.seria.moe", "fxfb.seria.moe"],
-    "bluesky": ["bskx.app", "fxbsky.app"],
+    "instagram": ["vxinstagram.com", "eeinstagram.com", "oginstagram.com"],
+    "facebook": ["facebed.seria.moe", "fxfb.seria.moe", "facebed.com"],
+    "bluesky": ["fxbsky.app", "bskx.app"],
     "twitch": ["fxtwitch.seria.moe"],
-    "threads": ["fixthreads.seria.moe", "vxthreads.net"],
+    "threads": ["vxthreads.net", "fixthreads.seria.moe"],
 }
 
 
