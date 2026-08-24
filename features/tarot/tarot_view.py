@@ -126,6 +126,13 @@ class TarotFlipView(discord.ui.View):
             )
             return
 
+        # 2. Defer interaction an toàn để tránh lỗi 3 giây timeout
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except Exception as e:
+            print(f"⚠️ [TarotFlipView] Lỗi defer interaction: {e}", flush=True)
+
         custom_id = interaction.data.get("custom_id", "")
         if custom_id == "flip_all":
             self.revealed_indices = set(range(len(self.drawn_cards)))
@@ -133,13 +140,13 @@ class TarotFlipView(discord.ui.View):
             idx = int(custom_id.split("_")[1])
             self.revealed_indices.add(idx)
 
-        # 2. Kiểm tra xem đã lật hết chưa
+        # 3. Kiểm tra xem đã lật hết chưa
         is_completed = len(self.revealed_indices) == len(self.drawn_cards)
 
-        # 3. Cập nhật nút bấm
+        # 4. Cập nhật nút bấm
         self._build_buttons()
 
-        # 4. Render lại ảnh Canvas với trạng thái lật hiện tại
+        # 5. Render lại ảnh Canvas với trạng thái lật hiện tại
         image_buffer = await asyncio.to_thread(
             render_spread_to_bytes,
             self.spread_key,
@@ -148,7 +155,7 @@ class TarotFlipView(discord.ui.View):
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
-        # 5. Xây dựng Embed tương ứng
+        # 6. Xây dựng Embed tương ứng
         if is_completed:
             self._has_completed = True
             # Await bài luận giải AI chạy ngầm
@@ -216,11 +223,18 @@ class TarotFlipView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
 
-            await interaction.response.edit_message(
-                embeds=embeds,
-                attachments=[file],
-                view=self
-            )
+            try:
+                await interaction.edit_original_response(
+                    embeds=embeds,
+                    attachments=[file],
+                    view=self
+                )
+            except Exception:
+                if self.message:
+                    try:
+                        await self.message.edit(embeds=embeds, attachments=[file], view=self)
+                    except Exception as ex:
+                        print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
             self.stop()
 
         else:
@@ -257,11 +271,18 @@ class TarotFlipView(discord.ui.View):
                 icon_url=self.author_avatar_url
             )
 
-            await interaction.response.edit_message(
-                embed=emb,
-                attachments=[file],
-                view=self
-            )
+            try:
+                await interaction.edit_original_response(
+                    embed=emb,
+                    attachments=[file],
+                    view=self
+                )
+            except Exception:
+                if self.message:
+                    try:
+                        await self.message.edit(embed=emb, attachments=[file], view=self)
+                    except Exception as ex:
+                        print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
 
     async def on_timeout(self):
         """Nếu sau 5 phút người dùng không lật hết, tự động lật toàn bộ."""

@@ -483,8 +483,14 @@ def render_celtic_cross_spread(drawn_cards: List[DrawnCard], revealed_indices: O
     cx_cross = 410
     cy_cross = 500
 
-    # 1. Lá 1: Hiện tại (Trung tâm Cross)
-    _draw_card_with_meta(canvas, drawn_cards[0], cx_cross, cy_cross, card_w, card_h, "1. HIỆN TẠI", font_size_scale=0.72, wrap_name=True, is_revealed=(0 in revealed_indices))
+    # 1. Lá 1: Hiện tại (Dọc ở trung tâm)
+    if 0 in revealed_indices:
+        card1_img = _load_and_prepare_card_image(drawn_cards[0], card_w, card_h)
+    else:
+        card1_img = _generate_card_back(card_w, card_h)
+    shadow1 = Image.new("RGBA", (card_w + 10, card_h + 10), (0, 0, 0, 180))
+    canvas.paste(shadow1, (cx_cross - card_w // 2 - 5, cy_cross - card_h // 2 - 2), shadow1)
+    canvas.paste(card1_img, (cx_cross - card_w // 2, cy_cross - card_h // 2), card1_img)
 
     # 2. Lá 2: Thử thách (Đè ngang qua lá 1)
     if 1 in revealed_indices:
@@ -493,25 +499,83 @@ def render_celtic_cross_spread(drawn_cards: List[DrawnCard], revealed_indices: O
         card2_img = _generate_card_back(card_w, card_h)
     card2_img = card2_img.rotate(90, expand=True)
     w_rot, h_rot = card2_img.size
-    shadow2 = Image.new("RGBA", (w_rot + 10, h_rot + 10), (0, 0, 0, 180))
+    shadow2 = Image.new("RGBA", (w_rot + 10, h_rot + 10), (0, 0, 0, 200))
     canvas.paste(shadow2, (cx_cross - w_rot // 2 - 5, cy_cross - h_rot // 2 - 2), shadow2)
     canvas.paste(card2_img, (cx_cross - w_rot // 2, cy_cross - h_rot // 2), card2_img)
 
+    # 3. Header cho Cụm Trung Tâm (1. HIỆN TẠI • 2. THỬ THÁCH)
+    draw = ImageDraw.Draw(canvas)
+    header_title = "1. HIỆN TẠI • 2. THỬ THÁCH"
+    font_pos = _get_font(10, bold=True)
+    bbox_pos = draw.textbbox((0, 0), header_title, font=font_pos)
+    pos_w = bbox_pos[2] - bbox_pos[0]
+    pos_y = cy_cross - card_h // 2 - 20
+    draw.rectangle(
+        [(cx_cross - pos_w // 2 - 6, pos_y - 2), (cx_cross + pos_w // 2 + 6, pos_y + 14)],
+        fill=(32, 24, 52, 240),
+        outline=COLOR_GOLD_PRIMARY,
+        width=1
+    )
+    draw.text((cx_cross - pos_w // 2, pos_y), header_title, fill=COLOR_GOLD_LIGHT, font=font_pos)
+
+    # 4. Footer chi tiết cho cả Lá 1 và Lá 2
+    footer_y1 = cy_cross + card_h // 2 + 5
+    footer_y2 = footer_y1 + 16
+    font_name = _get_font(10, bold=True)
+    font_orient = _get_font(9, bold=True)
+
+    # Dòng Lá 1
+    if 0 in revealed_indices:
+        c1 = drawn_cards[0]
+        c1_orient = "[NGƯỢC]" if c1.is_reversed else "[XUÔI]"
+        c1_color = COLOR_REVERSED if c1.is_reversed else COLOR_UPRIGHT
+        c1_prefix = f"Lá 1: {c1.card.name_vi}"
+        bbox_p1 = draw.textbbox((0, 0), c1_prefix, font=font_name)
+        wp1 = bbox_p1[2] - bbox_p1[0]
+        bbox_o1 = draw.textbbox((0, 0), f" {c1_orient}", font=font_orient)
+        wo1 = bbox_o1[2] - bbox_o1[0]
+        total_w1 = wp1 + wo1
+        draw.text((cx_cross - total_w1 // 2, footer_y1), c1_prefix, fill=(255, 255, 255), font=font_name)
+        draw.text((cx_cross - total_w1 // 2 + wp1, footer_y1), f" {c1_orient}", fill=c1_color, font=font_orient)
+    else:
+        s1_text = "Lá 1: • ĐANG CHỜ LẬT •"
+        bbox_s1 = draw.textbbox((0, 0), s1_text, font=font_orient)
+        draw.text((cx_cross - (bbox_s1[2] - bbox_s1[0]) // 2, footer_y1), s1_text, fill=COLOR_GOLD_LIGHT, font=font_orient)
+
+    # Dòng Lá 2
+    if 1 in revealed_indices:
+        c2 = drawn_cards[1]
+        c2_orient = "[NGƯỢC]" if c2.is_reversed else "[XUÔI]"
+        c2_color = COLOR_REVERSED if c2.is_reversed else COLOR_UPRIGHT
+        c2_prefix = f"Lá 2: {c2.card.name_vi}"
+        bbox_p2 = draw.textbbox((0, 0), c2_prefix, font=font_name)
+        wp2 = bbox_p2[2] - bbox_p2[0]
+        bbox_o2 = draw.textbbox((0, 0), f" {c2_orient}", font=font_orient)
+        wo2 = bbox_o2[2] - bbox_o2[0]
+        total_w2 = wp2 + wo2
+        draw.text((cx_cross - total_w2 // 2, footer_y2), c2_prefix, fill=(255, 255, 255), font=font_name)
+        draw.text((cx_cross - total_w2 // 2 + wp2, footer_y2), f" {c2_orient}", fill=c2_color, font=font_orient)
+    else:
+        s2_text = "Lá 2: • ĐANG CHỜ LẬT •"
+        bbox_s2 = draw.textbbox((0, 0), s2_text, font=font_orient)
+        draw.text((cx_cross - (bbox_s2[2] - bbox_s2[0]) // 2, footer_y2), s2_text, fill=COLOR_GOLD_LIGHT, font=font_orient)
+
     # 3. Lá 3: Tiềm thức / Gốc rễ (Bên DƯỚI)
-    _draw_card_with_meta(canvas, drawn_cards[2], cx_cross, cy_cross + 250, card_w, card_h, "3. GỐC RỄ", font_size_scale=0.72, wrap_name=True, is_revealed=(2 in revealed_indices))
+    _draw_card_with_meta(canvas, drawn_cards[2], cx_cross, cy_cross + 265, card_w, card_h, "3. GỐC RỄ", font_size_scale=0.72, wrap_name=True, is_revealed=(2 in revealed_indices))
 
     # 4. Lá 4: Quá khứ gần (Bên TRÁI)
     _draw_card_with_meta(canvas, drawn_cards[3], cx_cross - 240, cy_cross, card_w, card_h, "4. QUÁ KHỨ", font_size_scale=0.72, wrap_name=True, is_revealed=(3 in revealed_indices))
 
     # 5. Lá 5: Nhận thức / Mục tiêu (Bên TRÊN)
-    _draw_card_with_meta(canvas, drawn_cards[4], cx_cross, cy_cross - 250, card_w, card_h, "5. NHẬN THỨC", font_size_scale=0.72, wrap_name=True, is_revealed=(4 in revealed_indices))
+    _draw_card_with_meta(canvas, drawn_cards[4], cx_cross, cy_cross - 265, card_w, card_h, "5. NHẬN THỨC", font_size_scale=0.72, wrap_name=True, is_revealed=(4 in revealed_indices))
 
     # 6. Lá 6: Tương lai gần (Bên PHẢI)
     _draw_card_with_meta(canvas, drawn_cards[5], cx_cross + 240, cy_cross, card_w, card_h, "6. TƯƠNG LAI GẦN", font_size_scale=0.72, wrap_name=True, is_revealed=(5 in revealed_indices))
 
     # Cột Quyền Trượng (Staff Column - Bên phải): cx = 950
+    # Phân bố đều với khoảng cách 230px đảm bảo không bao giờ dính chữ giữa header và footer
     cx_staff = 950
-    staff_ys = [800, 600, 400, 200]
+    staff_ys = [850, 620, 390, 160]
     staff_cards = [
         (6, drawn_cards[6], "7. BẢN THÂN"),
         (7, drawn_cards[7], "8. MÔI TRƯỜNG"),

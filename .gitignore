@@ -10,3 +10,4 @@ data/
 *.db
 scratch/test_outputs/
 scratch/
+features/tarot/assets/cards/
