@@ -12,6 +12,7 @@ from features.tarot.deck import (
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
 from features.tarot.manager import TarotManager
+from services.ai_service import split_text
 
 
 class TarotCog(commands.Cog):
@@ -38,15 +39,42 @@ class TarotCog(commands.Cog):
         question="Câu hỏi hoặc chủ đề muốn xem (Bắt buộc cho mọi kiểu trải bài trừ Daily Card)"
     )
     @app_commands.choices(spread=[
-        app_commands.Choice(name="🌟 Daily Card (Năng lượng ngày - 1 lần/ngày)", value="daily"),
-        app_commands.Choice(name="⚡ Yes / No (Hỏi nhanh dứt khoát - 1 lá)", value="yes_no"),
-        app_commands.Choice(name="🎯 Single Card (Góc nhìn sâu / Lời khuyên - 1 lá)", value="single"),
-        app_commands.Choice(name="⚖️ Two Choices (So sánh nhanh 2 Hướng - 3 lá)", value="choices"),
-        app_commands.Choice(name="🌿 Two Paths (So sánh chuyên sâu 2 Hướng - 5 lá)", value="two_paths"),
-        app_commands.Choice(name="🧲 Horseshoe (Trải bài Móng ngựa - 5 lá)", value="horseshoe"),
-        app_commands.Choice(name="⏳ Past - Present - Future (Tiến trình thời gian - 3 lá)", value="ppf"),
-        app_commands.Choice(name="🧘 Mind - Body - Spirit (Định vị bản thân - 3 lá)", value="mbs"),
-        app_commands.Choice(name="👑 Celtic Cross (Trải bài chữ thập chuyên sâu - 10 lá)", value="celtic"),
+        app_commands.Choice(
+            name="🌟 Daily Card (Năng lượng & thông điệp ngày - 1 lá)",
+            value="daily",
+        ),
+        app_commands.Choice(
+            name="⚡ Yes / No (Trả lời dứt khoát câu hỏi Có/Không - 1 lá)",
+            value="yes_no",
+        ),
+        app_commands.Choice(
+            name="🎯 Single Card (Lời khuyên & góc nhìn trọng tâm - 1 lá)",
+            value="single",
+        ),
+        app_commands.Choice(
+            name="⏳ Past - Present - Future (Tiến trình sự việc - 3 lá)",
+            value="ppf",
+        ),
+        app_commands.Choice(
+            name="⚖️ Two Choices (So sánh nhanh 2 ngả đường A & B - 3 lá)",
+            value="choices",
+        ),
+        app_commands.Choice(
+            name="🧘 Mind - Body - Spirit (Định vị bản thân & năng lượng - 3 lá)",
+            value="mbs",
+        ),
+        app_commands.Choice(
+            name="🧲 Horseshoe (Toàn cảnh vấn đề & chướng ngại vật - 5 lá)",
+            value="horseshoe",
+        ),
+        app_commands.Choice(
+            name="🌿 Two Paths (Phân tích chi tiết rủi ro/lợi ích 2 hướng - 5 lá)",
+            value="two_paths",
+        ),
+        app_commands.Choice(
+            name="👑 Celtic Cross (Trải bài chuyên sâu toàn diện 10 góc nhìn - 10 lá)",
+            value="celtic",
+        ),
     ])
     async def tarot(
         self,
@@ -121,61 +149,59 @@ class TarotCog(commands.Cog):
                 ai_reading=ai_reading
             )
 
-            # Xây dựng Discord Embed
+            # Xây dựng Discord Embed (Sử dụng description để chiếm trọn chiều rộng của Discord)
             embed_color = 0x7851A9  # Tím hoàng gia mặc định
             if spread_key == "yes_no":
                 _, _, verdict_color = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
                 embed_color = verdict_color
 
-            embed = discord.Embed(
-                title=f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}",
-                color=embed_color
-            )
-
+            desc_lines = []
             if clean_question:
-                embed.add_field(name="❓ Câu hỏi / Chủ đề", value=f"*{clean_question}*", inline=False)
+                desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{clean_question}*\n")
 
             if spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
-                embed.add_field(
-                    name="⚡ Phán Quyết Yes / No",
-                    value=f"### {badge}\n> *{verdict_desc}*",
-                    inline=False
-                )
+                desc_lines.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
 
             # Liệt kê tóm tắt các lá bài
             cards_summary_lines = []
             for drawn in drawn_cards:
-                orient = "🔴 [NGƯỢC]" if drawn.is_reversed else "🟢 [XUÔI]"
+                orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
                 cards_summary_lines.append(
                     f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
                 )
 
-            embed.add_field(
-                name="🃏 Các Lá Bài Rút Được",
-                value="\n".join(cards_summary_lines),
-                inline=False
-            )
+            desc_lines.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines) + "\n")
+            desc_lines.append(f"**📖 Luận Giải Từ Vũ Trụ:**\n{ai_reading}")
 
-            # Thêm nội dung luận giải từ AI (chia nhỏ nếu quá dài)
-            if len(ai_reading) <= 1024:
-                embed.add_field(name="📖 Luận Giải Từ Vũ Trụ", value=ai_reading, inline=False)
-            else:
-                # Cắt gọn theo từng phần
-                reading_chunks = [ai_reading[i:i+1020] for i in range(0, len(ai_reading), 1020)]
-                for idx, chunk in enumerate(reading_chunks):
-                    field_title = "📖 Luận Giải Từ Vũ Trụ" if idx == 0 else f"📖 Luận Giải (Tiếp theo - Phần {idx+1})"
-                    embed.add_field(name=field_title, value=chunk, inline=False)
+            full_description = "\n".join(desc_lines)
 
-            # Đính kèm ảnh trải bài
+            # Chia nhỏ theo đoạn văn an toàn (không bao giờ cắt ngang chữ) nếu vượt quá 4000 ký tự
+            chunks = split_text(full_description, limit=4000)
+            if not chunks:
+                chunks = [full_description]
+
+            embeds = []
+            for idx, chunk in enumerate(chunks):
+                title = f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}" if idx == 0 else f"🔮 Luận Giải (Tiếp theo - Phần {idx+1})"
+                emb = discord.Embed(
+                    title=title,
+                    description=chunk,
+                    color=embed_color
+                )
+                if idx == len(chunks) - 1:
+                    # Gắn footer gọn gàng theo yêu cầu
+                    emb.set_footer(
+                        text=f"Quẻ bài của {interaction.user.display_name}",
+                        icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None
+                    )
+                embeds.append(emb)
+
+            # Đính kèm ảnh trải bài vào embed đầu tiên
             file = discord.File(fp=image_buffer, filename="tarot_spread.png")
-            embed.set_image(url="attachment://tarot_spread.png")
-            embed.set_footer(
-                text=f"Quẻ bài của {interaction.user.display_name} • DiscordMikeBot Tarot",
-                icon_url=interaction.user.display_avatar.url if interaction.user.display_avatar else None
-            )
+            embeds[0].set_image(url="attachment://tarot_spread.png")
 
-            await interaction.followup.send(embed=embed, file=file)
+            await interaction.followup.send(embeds=embeds, file=file)
 
         except Exception as e:
             print(f"❌ [TarotCog] Lỗi trong quá trình bốc bài: {e}", flush=True)

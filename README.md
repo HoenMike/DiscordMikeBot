@@ -147,16 +147,16 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 | `spread`   | Chọn 1 trong 7 kiểu trải bài (`daily`, `yes_no`, `single`, `choices`, `ppf`, `mbs`, `celtic`)     | —        | **Có**   |
 | `question` | Câu hỏi hoặc chủ đề muốn xem (Bắt buộc cho mọi kiểu trải bài ngoại trừ `daily`)                    | Không    | Tuỳ kiểu |
 
-- **9 kiểu trải bài phong phú**:
-  - `daily`: Daily Card (1 lá, Cooldown 1 lần/ngày theo giờ VN) - Lấy năng lượng và thông điệp ngày mới.
-  - `yes_no`: Yes / No (1 lá) - Phán quyết trực diện Có/Không kèm Badge 🟢 CÓ / 🔴 KHÔNG / 🟡 TÙY THUỘC.
-  - `single`: Single Card (1 lá) - Lời khuyên trọng tâm cho câu hỏi cụ thể.
-  - `choices`: Two Choices (3 lá) - So sánh nhanh Bối cảnh, Hướng đi A vs Hướng đi B.
-  - `two_paths`: Two Paths (5 lá) - So sánh chuyên sâu 2 lựa chọn (Bối cảnh, A-Thuận lợi, A-Rủi ro, B-Thuận lợi, B-Rủi ro) theo mô hình cây phân nhánh.
-  - `horseshoe`: Horseshoe Spread (5 lá) - Trải bài móng ngựa (Quá khứ, Hiện tại, Tác động ẩn, Trở ngại, Kết quả).
-  - `ppf`: Past - Present - Future (3 lá) - Quá khứ, Hiện tại, Tương lai.
-  - `mbs`: Mind - Body - Spirit (3 lá) - Tâm trí, Thể chất, Trực giác.
-  - `celtic`: Celtic Cross (10 lá) - Trải bài chữ thập chuyên sâu toàn diện.
+- **9 kiểu trải bài phong phú & giải thích mục đích rõ ràng**:
+  - `daily`: **Daily Card** (1 lá - Cooldown 1 lần/ngày) - Năng lượng & thông điệp ngày mới.
+  - `yes_no`: **Yes / No** (1 lá) - Trả lời dứt khoát câu hỏi Có/Không kèm Badge 🟢 CÓ / 🔴 KHÔNG / 🟡 TÙY THUỘC.
+  - `single`: **Single Card** (1 lá) - Lời khuyên & góc nhìn trọng tâm cho câu hỏi cụ thể.
+  - `ppf`: **Past - Present - Future** (3 lá) - Tiến trình sự việc theo dòng thời gian.
+  - `choices`: **Two Choices** (3 lá) - So sánh nhanh 2 ngả đường A & B.
+  - `mbs`: **Mind - Body - Spirit** (3 lá) - Định vị bản thân & năng lượng Thân - Tâm - Trí.
+  - `horseshoe`: **Horseshoe** (5 lá) - Toàn cảnh vấn đề & chướng ngại vật (Quá khứ ➔ Hiện trạng ➔ Trở ngại ẩn ➔ Lời khuyên ➔ Kết quả).
+  - `two_paths`: **Two Paths** (5 lá) - Phân tích chi tiết rủi ro/lợi ích 2 hướng (Bối cảnh chung, Thuận lợi A, Rủi ro A, Thuận lợi B, Rủi ro B).
+  - `celtic`: **Celtic Cross** (10 lá) - Trải bài chuyên sâu toàn diện 10 góc nhìn.
 - **Engine Canvas Pillow**: Tự động ghép các lá bài thành ảnh trải bài (`tarot_spread.png`), tự động xoay $180^\circ$ cho lá bài Ngược (Reversed) và vẽ ngôi sao vàng kim vector sắc nét.
 
 ### `/tarot_history`

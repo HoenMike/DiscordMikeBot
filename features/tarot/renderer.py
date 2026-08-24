@@ -26,17 +26,51 @@ COLOR_BRANCH_A = (52, 152, 219)     # #3498DB - Xanh biển cho Nhánh A
 COLOR_BRANCH_B = (155, 89, 182)     # #9B59B6 - Tím pastel cho Nhánh B
 
 
-def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
-    """Tải font hỗ trợ Tiếng Việt an toàn trên mọi hệ điều hành."""
-    font_names = ["segoeui.ttf", "arial.ttf", "calibri.ttf"]
-    if bold:
-        font_names = ["segouib.ttf", "arialbd.ttf", "calibrib.ttf"] + font_names
+FONTS_DIR = pathlib.Path(__file__).parent / "assets" / "fonts"
 
-    for name in font_names:
+
+def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    """Tải font hỗ trợ Tiếng Việt an toàn tuyệt đối trên mọi hệ điều hành."""
+    font_candidates = []
+
+    # 1. Ưu tiên font bundle sẵn trong thư mục assets/fonts
+    if bold:
+        font_candidates.extend([
+            FONTS_DIR / "segoeuib.ttf",
+            FONTS_DIR / "arialbd.ttf",
+        ])
+    else:
+        font_candidates.extend([
+            FONTS_DIR / "segoeui.ttf",
+            FONTS_DIR / "arial.ttf",
+        ])
+
+    # 2. Font hệ thống Windows / Linux
+    if bold:
+        font_candidates.extend([
+            "C:/Windows/Fonts/segoeuib.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "C:/Windows/Fonts/calibrib.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "segouib.ttf",
+            "arialbd.ttf",
+        ])
+    else:
+        font_candidates.extend([
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/calibri.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "segoeui.ttf",
+            "arial.ttf",
+        ])
+
+    for font_path in font_candidates:
         try:
-            return ImageFont.truetype(name, size)
+            return ImageFont.truetype(str(font_path), size)
         except Exception:
             continue
+
     return ImageFont.load_default()
 
 
@@ -297,8 +331,8 @@ def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
         card_w = 150
         card_h = 258
 
-        # 1. Lá 1: Bối cảnh (Ở đỉnh chính giữa)
-        _draw_card_with_meta(canvas, drawn_cards[0], width // 2, 235, card_w, card_h, "LÁ 1: BỐI CẢNH", font_size_scale=1.0)
+        # 1. Lá 1: Bối cảnh chung (Ở đỉnh chính giữa)
+        _draw_card_with_meta(canvas, drawn_cards[0], width // 2, 235, card_w, card_h, "LÁ 1: BỐI CẢNH CHUNG", font_size_scale=0.9, wrap_name=True)
 
         # Hàm vẽ Banner nhánh cân đối tuyệt đối theo tọa độ tâm
         def _draw_branch_header(center_x: int, top_y: int, text: str, border_color, text_color):
@@ -326,14 +360,14 @@ def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
         # Nhánh A (Trái): Tâm giữa 2 lá là cx = 295
         center_a = 295
         _draw_branch_header(center_a, 405, "HƯỚNG ĐI A", COLOR_BRANCH_A, (130, 200, 255))
-        _draw_card_with_meta(canvas, drawn_cards[1], 200, 580, card_w, card_h, "LÁ 2: THUẬN LỢI", font_size_scale=0.9, wrap_name=True)
-        _draw_card_with_meta(canvas, drawn_cards[2], 390, 580, card_w, card_h, "LÁ 3: RỦI RO", font_size_scale=0.9, wrap_name=True)
+        _draw_card_with_meta(canvas, drawn_cards[1], 200, 580, card_w, card_h, "LÁ 2: THUẬN LỢI A", font_size_scale=0.85, wrap_name=True)
+        _draw_card_with_meta(canvas, drawn_cards[2], 390, 580, card_w, card_h, "LÁ 3: RỦI RO A", font_size_scale=0.85, wrap_name=True)
 
         # Nhánh B (Phải): Tâm giữa 2 lá là cx = 845
         center_b = 845
         _draw_branch_header(center_b, 405, "HƯỚNG ĐI B", COLOR_BRANCH_B, (225, 160, 255))
-        _draw_card_with_meta(canvas, drawn_cards[3], 750, 580, card_w, card_h, "LÁ 4: THUẬN LỢI", font_size_scale=0.9, wrap_name=True)
-        _draw_card_with_meta(canvas, drawn_cards[4], 940, 580, card_w, card_h, "LÁ 5: RỦI RO", font_size_scale=0.9, wrap_name=True)
+        _draw_card_with_meta(canvas, drawn_cards[3], 750, 580, card_w, card_h, "LÁ 4: THUẬN LỢI B", font_size_scale=0.85, wrap_name=True)
+        _draw_card_with_meta(canvas, drawn_cards[4], 940, 580, card_w, card_h, "LÁ 5: RỦI RO B", font_size_scale=0.85, wrap_name=True)
 
         return canvas
 
@@ -347,15 +381,15 @@ def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard]) -> Image
         card_h = 275
 
         positions = [
-            (drawn_cards[0], 160, 290, "LÁ 1: QUÁ KHỨ"),
-            (drawn_cards[1], 380, 385, "LÁ 2: HIỆN TẠI"),
-            (drawn_cards[2], 600, 445, "LÁ 3: TÁC ĐỘNG ẨN"),
-            (drawn_cards[3], 820, 385, "LÁ 4: TRỞ NGẠI"),
-            (drawn_cards[4], 1040, 290, "LÁ 5: KẾT QUẢ"),
+            (drawn_cards[0], 160, 290, "LÁ 1: QUÁ KHỨ ẢNH HƯỞNG"),
+            (drawn_cards[1], 380, 385, "LÁ 2: HIỆN TRẠNG VẤN ĐỀ"),
+            (drawn_cards[2], 600, 445, "LÁ 3: TRỞ NGẠI / YẾU TỐ ẨN"),
+            (drawn_cards[3], 820, 385, "LÁ 4: LỜI KHUYÊN HÀNH ĐỘNG"),
+            (drawn_cards[4], 1040, 290, "LÁ 5: KẾT QUẢ TIỀM NĂNG"),
         ]
 
         for card, cx, cy, pos_title in positions:
-            _draw_card_with_meta(canvas, card, cx, cy, card_w, card_h, pos_title, font_size_scale=0.95, wrap_name=True)
+            _draw_card_with_meta(canvas, card, cx, cy, card_w, card_h, pos_title, font_size_scale=0.85, wrap_name=True)
 
         return canvas
 

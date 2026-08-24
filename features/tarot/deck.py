@@ -785,11 +785,11 @@ SPREAD_DEFINITIONS: Dict[str, dict] = {
         "is_daily": False,
         "requires_question": True,
         "positions": [
-            ("LÁ 1: BỐI CẢNH", "Bản chất tình huống & tâm thế hiện tại của bạn."),
-            ("LÁ 2: HƯỚNG A - THUẬN LỢI", "Tiềm năng, cơ hội và điểm mạnh nếu chọn Hướng A."),
-            ("LÁ 3: HƯỚNG A - RỦI RO", "Thách thức, trở ngại và điểm yếu cần lưu ý ở Hướng A."),
-            ("LÁ 4: HƯỚNG B - THUẬN LỢI", "Tiềm năng, cơ hội và điểm mạnh nếu chọn Hướng B."),
-            ("LÁ 5: HƯỚNG B - RỦI RO", "Thách thức, trở ngại và điểm yếu cần lưu ý ở Hướng B.")
+            ("LÁ 1: BỐI CẢNH CHUNG", "Gốc rễ và nguyên nhân dẫn đến sự phân vân hiện tại."),
+            ("LÁ 2: THUẬN LỢI CỦA HƯỚNG A", "Điểm mạnh, cơ hội và kết quả tốt nếu chọn Hướng A."),
+            ("LÁ 3: RỦI RO CỦA HƯỚNG A", "Thách thức, bất lợi hoặc cái giá phải trả của Hướng A."),
+            ("LÁ 4: THUẬN LỢI CỦA HƯỚNG B", "Điểm mạnh, cơ hội và kết quả tốt nếu chọn Hướng B."),
+            ("LÁ 5: RỦI RO CỦA HƯỚNG B", "Thách thức, bất lợi hoặc cái giá phải trả của Hướng B.")
         ]
     },
     "horseshoe": {
@@ -799,11 +799,11 @@ SPREAD_DEFINITIONS: Dict[str, dict] = {
         "is_daily": False,
         "requires_question": True,
         "positions": [
-            ("LÁ 1: QUÁ KHỨ", "Cội nguồn và các sự kiện đã qua dẫn đến hiện tại."),
-            ("LÁ 2: HIỆN TẠI", "Thực trạng và những gì đang diễn ra xung quanh bạn."),
-            ("LÁ 3: TÁC ĐỘNG ẨN", "Các yếu tố ngầm, tiềm thức hoặc điều bạn chưa thấy rõ."),
-            ("LÁ 4: TRỞ NGẠI", "Thử thách chính cần đối mặt và vượt qua."),
-            ("LÁ 5: KẾT QUẢ TIỀM NĂNG", "Xu hướng phát triển và cái kết có khả năng xảy ra nhất.")
+            ("LÁ 1: QUÁ KHỨ ẢNH HƯỞNG", "Sự việc trong quá khứ dẫn đến tình trạng hiện tại."),
+            ("LÁ 2: HIỆN TRẠNG VẤN ĐỀ", "Tình hình thực tế và những gì đang diễn ra."),
+            ("LÁ 3: TRỞ NGẠI / YẾU TỐ ẨN", "Thách thức bất ngờ hoặc điều bạn chưa nhìn thấy."),
+            ("LÁ 4: LỜI KHUYÊN HÀNH ĐỘNG", "Giải pháp và hướng xử lý tối ưu nhất lúc này."),
+            ("LÁ 5: KẾT QUẢ TIỀM NĂNG", "Kết cục nếu bạn làm theo định hướng và lời khuyên.")
         ]
     },
     "ppf": {
