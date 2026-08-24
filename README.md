@@ -138,6 +138,31 @@ Thiết lập danh sách proxy domain ưu tiên cho một nền tảng trên má
 
 Khôi phục danh sách proxy domain của nền tảng về mặc định toàn cục. Yêu cầu quyền `Manage Server`.
 
+### `/tarot`
+
+Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài trực quan.
+
+| Tham số    | Mô tả                                                                                              | Mặc định | Bắt buộc |
+|------------|----------------------------------------------------------------------------------------------------|----------|----------|
+| `spread`   | Chọn 1 trong 7 kiểu trải bài (`daily`, `yes_no`, `single`, `choices`, `ppf`, `mbs`, `celtic`)     | —        | **Có**   |
+| `question` | Câu hỏi hoặc chủ đề muốn xem (Bắt buộc cho mọi kiểu trải bài ngoại trừ `daily`)                    | Không    | Tuỳ kiểu |
+
+- **9 kiểu trải bài phong phú**:
+  - `daily`: Daily Card (1 lá, Cooldown 1 lần/ngày theo giờ VN) - Lấy năng lượng và thông điệp ngày mới.
+  - `yes_no`: Yes / No (1 lá) - Phán quyết trực diện Có/Không kèm Badge 🟢 CÓ / 🔴 KHÔNG / 🟡 TÙY THUỘC.
+  - `single`: Single Card (1 lá) - Lời khuyên trọng tâm cho câu hỏi cụ thể.
+  - `choices`: Two Choices (3 lá) - So sánh nhanh Bối cảnh, Hướng đi A vs Hướng đi B.
+  - `two_paths`: Two Paths (5 lá) - So sánh chuyên sâu 2 lựa chọn (Bối cảnh, A-Thuận lợi, A-Rủi ro, B-Thuận lợi, B-Rủi ro) theo mô hình cây phân nhánh.
+  - `horseshoe`: Horseshoe Spread (5 lá) - Trải bài móng ngựa (Quá khứ, Hiện tại, Tác động ẩn, Trở ngại, Kết quả).
+  - `ppf`: Past - Present - Future (3 lá) - Quá khứ, Hiện tại, Tương lai.
+  - `mbs`: Mind - Body - Spirit (3 lá) - Tâm trí, Thể chất, Trực giác.
+  - `celtic`: Celtic Cross (10 lá) - Trải bài chữ thập chuyên sâu toàn diện.
+- **Engine Canvas Pillow**: Tự động ghép các lá bài thành ảnh trải bài (`tarot_spread.png`), tự động xoay $180^\circ$ cho lá bài Ngược (Reversed) và vẽ ngôi sao vàng kim vector sắc nét.
+
+### `/tarot_history`
+
+Xem lại danh sách tối đa 5 lượt bốc bài gần nhất của bản thân (gửi dưới dạng tin nhắn riêng ephemeral).
+
 ---
 
 ## Cấu trúc dự án
@@ -156,6 +181,14 @@ DiscordMikeBot/
     embed_cog.py          # Listener on_message, pipeline 3 tầng xử lý link mạng xã hội
     proxy_cog.py          # Nhóm lệnh /proxy (view, set, reset) quản lý proxy per-guild
     summary_cog.py        # Lệnh /tomtat và /test_tomtat tóm tắt AI
+  features/
+    tarot/                # Module trọn gói tính năng Tarot AI
+      tarot_cog.py        # Slash Commands /tarot & /tarot_history
+      deck.py             # Dữ liệu 78 lá Rider-Waite, metadata, keywords & Yes/No logic
+      renderer.py         # Engine Canvas Pillow ghép ảnh trải bài (1 lá, 3 lá, 10 lá)
+      ai.py               # Module gọi Gemini AI luận giải trải bài
+      manager.py          # Quản lý SQLite history & Daily Cooldown
+      assets/cards/       # Lưu trữ hình ảnh 78 lá bài
   services/
     ai_service.py         # Xử lý AI: Single-Pass, MapReduce, QA Evaluator
     config_manager.py     # Quản lý cấu hình SQLite, cache bộ nhớ, proxy domains

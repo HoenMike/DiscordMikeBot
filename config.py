@@ -71,9 +71,13 @@ GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 # Model dùng cho AI QA Evaluator tự động đánh giá và chấm điểm
 GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", "gemini-3.5-flash-lite")
 
+# Model dùng cho bốc và luận giải Tarot AI
+GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", GEMINI_SUMMARY_MODEL)
+
 # Tham số Generation
 SUMMARY_TEMPERATURE = float(os.getenv("SUMMARY_TEMPERATURE", "0.1"))
 QA_TEMPERATURE = float(os.getenv("QA_TEMPERATURE", "0.3"))
+TAROT_TEMPERATURE = float(os.getenv("TAROT_TEMPERATURE", "0.7"))
 
 # ==========================================
 # 3. THAM SỐ XỬ LÝ DỮ LIỆU & GIỚI HẠN (LIMITS)
