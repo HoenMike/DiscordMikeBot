@@ -184,9 +184,10 @@ async def generate_tarot_reading(
                 if response and response.text:
                     import re
                     # Loại bỏ bất kỳ dòng xưng hô/chào hỏi mở đầu nào trước tiêu đề mục 1
-                    text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", text, flags=re.IGNORECASE).strip()
+                    raw_text = response.text
+                    clean_text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", raw_text, flags=re.IGNORECASE).strip()
                     print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}'.", flush=True)
-                    return text
+                    return clean_text
             except Exception as e:
                 last_error = e
                 is_server_busy = "503" in str(e) or "high demand" in str(e).lower() or "unavailable" in str(e).lower()

@@ -8,6 +8,8 @@ from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.manager import TarotManager
 from services.ai_service import split_text
 
+WIDE_DIVIDER = "──────────────────────────────────────────"
+
 
 class TarotFlipView(discord.ui.View):
     """
@@ -44,7 +46,7 @@ class TarotFlipView(discord.ui.View):
         self.channel_id = channel_id
 
         self.revealed_indices: Set[int] = set()
-        self.is_finished: bool = False
+        self._has_completed: bool = False
         self.message: Optional[discord.Message] = None
 
         # Màu embed
@@ -148,7 +150,7 @@ class TarotFlipView(discord.ui.View):
 
         # 5. Xây dựng Embed tương ứng
         if is_completed:
-            self.is_finished = True
+            self._has_completed = True
             # Await bài luận giải AI chạy ngầm
             ai_reading = await self.ai_task
 
@@ -175,6 +177,8 @@ class TarotFlipView(discord.ui.View):
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_lines.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
 
+            desc_lines.append(WIDE_DIVIDER)
+
             cards_summary_lines = []
             for drawn in self.drawn_cards:
                 orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
@@ -183,6 +187,7 @@ class TarotFlipView(discord.ui.View):
                 )
 
             desc_lines.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines) + "\n")
+            desc_lines.append(WIDE_DIVIDER)
             desc_lines.append(ai_reading)
 
             full_description = "\n".join(desc_lines)
@@ -224,6 +229,8 @@ class TarotFlipView(discord.ui.View):
             if self.question:
                 desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
 
+            desc_lines.append(WIDE_DIVIDER)
+
             cards_summary_lines = []
             for idx, drawn in enumerate(self.drawn_cards):
                 if idx in self.revealed_indices:
@@ -233,7 +240,7 @@ class TarotFlipView(discord.ui.View):
                     )
                 else:
                     cards_summary_lines.append(
-                        f"• **{drawn.position_title}**: *✦ Đang chờ lật mở... ✦*"
+                        f"• **{drawn.position_title}**: ⏳ *(Chờ lật)*"
                     )
 
             desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
@@ -258,7 +265,7 @@ class TarotFlipView(discord.ui.View):
 
     async def on_timeout(self):
         """Nếu sau 5 phút người dùng không lật hết, tự động lật toàn bộ."""
-        if self.is_finished:
+        if self._has_completed:
             return
 
         try:

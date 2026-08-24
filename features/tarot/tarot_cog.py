@@ -165,9 +165,11 @@ class TarotCog(commands.Cog):
             if clean_question:
                 desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{clean_question}*\n")
 
+            desc_lines.append("──────────────────────────────────────────")
+
             cards_summary_lines = []
             for drawn in drawn_cards:
-                cards_summary_lines.append(f"• **{drawn.position_title}**: *✦ Đang chờ lật mở... ✦*")
+                cards_summary_lines.append(f"• **{drawn.position_title}**: ⏳ *(Chờ lật)*")
 
             desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
             desc_lines.append("⏳ *Hãy bấm vào các nút bên dưới để lật mở từng lá bài...*")

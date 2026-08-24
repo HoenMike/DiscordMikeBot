@@ -8,3 +8,5 @@ venv/
 .vscode/
 data/
 *.db
+scratch/test_outputs/
+scratch/
