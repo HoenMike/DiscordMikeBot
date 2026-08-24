@@ -401,6 +401,75 @@ async def fetch_pixiv(session: aiohttp.ClientSession, url: str, match) -> PostDa
         return None
 
 
+async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
+    try:
+        username = match.group(1) if len(match.groups()) >= 1 else "threads_user"
+        post_id = match.group(2) if len(match.groups()) >= 2 else ""
+        original_url = f"https://www.threads.net/@{username}/post/{post_id}" if post_id else url
+
+        oembed_url = f"https://www.threads.net/oembed/?url={quote(original_url, safe='')}"
+
+        async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+
+        media_urls = []
+        if data.get("thumbnail_url"):
+            media_urls.append(data["thumbnail_url"])
+
+        media_type = "video" if data.get("type") == "video" else "image" if media_urls else "text"
+
+        return PostData(
+            platform="threads",
+            author=data.get("author_name", f"@{username}"),
+            author_url=f"https://www.threads.net/@{username}",
+            text=data.get("title"),
+            media_urls=media_urls,
+            media_type=media_type,
+            is_nsfw=False,
+            url=original_url,
+            timestamp=None,
+        )
+    except Exception as e:
+        print(f"[Fetcher/Threads] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
+        return None
+
+
+async def fetch_youtube(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
+    try:
+        video_id = match.group(1)
+        canonical_url = f"https://www.youtube.com/watch?v={video_id}"
+        oembed_url = f"https://www.youtube.com/oembed?url={quote(canonical_url, safe='')}&format=json"
+
+        async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+
+        media_urls = []
+        if data.get("thumbnail_url"):
+            media_urls.append(data["thumbnail_url"])
+        else:
+            # Fallback: sử dụng thumbnail mặc định của YouTube
+            media_urls.append(f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg")
+
+        return PostData(
+            platform="youtube",
+            author=data.get("author_name", "Unknown"),
+            author_url=data.get("author_url"),
+            text=data.get("title", "YouTube Video"),
+            media_urls=media_urls,
+            media_type="video",
+            is_nsfw=False,
+            url=canonical_url,
+            timestamp=None,
+        )
+    except Exception as e:
+        print(f"[Fetcher/YouTube] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
+        return None
+
+
 FETCHER_MAP = {
     "twitter": fetch_twitter,
     "reddit": fetch_reddit,
@@ -410,4 +479,7 @@ FETCHER_MAP = {
     "bluesky": fetch_bluesky,
     "twitch": fetch_twitch,
     "pixiv": fetch_pixiv,
+    "threads": fetch_threads,
+    "youtube": fetch_youtube,
 }
+

@@ -22,18 +22,24 @@ Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và t�
 
 **Các nền tảng được hỗ trợ:**
 
-| Nền tảng       | Dịch vụ proxy sử dụng          | Dữ liệu hiển thị                     |
-|----------------|--------------------------------|---------------------------------------|
-| Twitter / X    | `api.fxtwitter.com`            | Nội dung, ảnh, video, lượt tương tác  |
-| Reddit         | Reddit JSON API                | Tiêu đề, nội dung, ảnh, gallery       |
-| TikTok         | `api.vxtiktok.com`             | Mô tả, thumbnail, lượt tương tác     |
-| Instagram      | `api.ddinstagram.com`          | Nội dung, ảnh/video                   |
-| Facebook       | Facebook oEmbed                | Tiêu đề, tác giả                     |
-| Bluesky        | `public.api.bsky.app`          | Nội dung, ảnh, lượt tương tác         |
-| Twitch         | Twitch oEmbed                  | Tiêu đề clip, thumbnail              |
-| Pixiv          | `phixiv.net`                   | Tiêu đề, ảnh, gallery, tag NSFW      |
+| Nền tảng       | Cơ chế chính (Tier 0 API)      | Fallback Proxies (Tier 1)             | Dữ liệu hiển thị                     |
+|----------------|--------------------------------|---------------------------------------|---------------------------------------|
+| Twitter / X    | `api.fxtwitter.com`            | `fxtwitter`, `vxtwitter`, `fixupx`    | Nội dung, ảnh, video, tương tác      |
+| Reddit         | Reddit JSON API                | `rxddit`, `fxreddit`, `vxreddit`      | Tiêu đề, nội dung, ảnh, gallery       |
+| TikTok         | `api.vxtiktok.com`             | `vxtiktok`, `tnktok`, `kktiktok`      | Mô tả, thumbnail, lượt tương tác     |
+| Instagram      | `api.ddinstagram.com`          | `ddinstagram`, `eeinstagram`, `oginstagram` | Nội dung, ảnh/video             |
+| Facebook       | Facebook oEmbed                | `facebed`, `fxfb`                     | Tiêu đề, tác giả                     |
+| Bluesky        | `public.api.bsky.app`          | `bskx.app`, `fxbsky.app`              | Nội dung, ảnh, tương tác              |
+| Twitch         | Twitch oEmbed                  | `fxtwitch`                            | Tiêu đề clip, thumbnail              |
+| Pixiv          | `phixiv.net`                   | `phixiv.net`                          | Tiêu đề, ảnh, gallery, tag NSFW      |
+| Threads        | Threads oEmbed                 | `fixthreads`, `vxthreads`             | Nội dung, ảnh/video, tác giả          |
+| YouTube        | YouTube oEmbed                 | `koutube.com`                         | Tiêu đề, thumbnail video / Shorts    |
 
-Tất cả đều sử dụng các dịch vụ proxy nhẹ, không phụ thuộc vào `yt-dlp` hay API key riêng của từng nền tảng.
+#### Pipeline xử lý URL 3 tầng (Multi-tier Pipeline):
+1. **Tier 0 (API Fetchers)**: Gọi API JSON/oEmbed để trích xuất dữ liệu có cấu trúc và dựng Discord Embed giàu thông tin.
+2. **Tier 1 (Proxy URL Chain)**: Nếu API thất bại, tự động duyệt chuỗi Proxy domain theo thứ tự ưu tiên (xác thực trước qua API / OpenGraph metadata).
+3. **Tier 2 (yt-dlp Fallback)**: Nếu tất cả API và Proxy đều không khả dụng, sử dụng `yt-dlp` bóc tách media trực tiếp trong background thread.
+4. **Webhook Emulation**: Tự động gửi bài viết qua Discord Webhook giả lập đúng avatar và tên người gửi gốc, đồng thời xoá tin nhắn thô ban đầu.
 
 ### Bộ lọc NSFW / Spoiler
 
@@ -121,6 +127,18 @@ Reset toàn bộ cấu hình máy chủ về giá trị mặc định. Yêu cầ
 
 Mở giao diện chọn (dropdown) để bật hoặc tắt từng nền tảng mạng xã hội. Có thể áp dụng cho toàn máy chủ hoặc kênh hiện tại. Yêu cầu quyền `Manage Server`.
 
+### `/proxy view`
+
+Xem danh sách proxy domain đang áp dụng cho từng nền tảng (tuỳ chỉnh của server hoặc mặc định toàn cục). Yêu cầu quyền `Manage Server`.
+
+### `/proxy set`
+
+Thiết lập danh sách proxy domain ưu tiên cho một nền tảng trên máy chủ (phân cách bằng dấu phẩy, VD: `fxtwitter.com,vxtwitter.com`). Yêu cầu quyền `Manage Server`.
+
+### `/proxy reset`
+
+Khôi phục danh sách proxy domain của nền tảng về mặc định toàn cục. Yêu cầu quyền `Manage Server`.
+
 ---
 
 ## Cấu trúc dự án
@@ -136,19 +154,24 @@ DiscordMikeBot/
   .env.example            # Mẫu file biến môi trường
   cogs/
     config_cog.py         # Nhóm lệnh /config (view, set, channel_set, reset, platforms)
-    embed_cog.py          # Listener on_message, phát hiện URL mạng xã hội, tạo embed
+    embed_cog.py          # Listener on_message, pipeline 3 tầng xử lý link mạng xã hội
+    proxy_cog.py          # Nhóm lệnh /proxy (view, set, reset) quản lý proxy per-guild
     summary_cog.py        # Lệnh /tomtat và /test_tomtat tóm tắt AI
   services/
     ai_service.py         # Xử lý AI: Single-Pass, MapReduce, QA Evaluator
-    config_manager.py     # Quản lý cấu hình SQLite, in-memory cache, deep merge
+    config_manager.py     # Quản lý cấu hình SQLite, cache bộ nhớ, proxy domains
     embed_builder.py      # Xây dựng Discord Embed & Bộ lọc NSFW/Spoiler
-    platform_fetchers.py  # Fetcher dữ liệu mạng xã hội (Twitter, Reddit, TikTok, Pixiv...)
+    platform_fetchers.py  # Fetcher API trực tiếp (Twitter, Reddit, TikTok, Pixiv, Threads, YouTube...)
+    platform_ui.py        # Nút liên kết "Xem trên [Nền tảng]"
+    proxy_validator.py    # Xác thực proxy URL qua API & OG metadata (Chain of Responsibility)
+    webhook_sender.py     # Giả lập người dùng gửi tin nhắn qua Discord Webhook
+    ytdlp_fallback.py     # Fallback bóc tách media qua yt-dlp
   web/
     app.py                # Backend Flask Server & REST API endpoints
     templates/
       dashboard.html      # Giao diện Web Dashboard (HTML/CSS/JS tách riêng)
   utils/
-    constants.py          # Registry nền tảng, regex patterns, cấu hình mặc định
+    constants.py          # Registry nền tảng, regex patterns, proxy registry, helper functions
   data/
     bot_config.db         # SQLite database (tự động tạo, nằm trong .gitignore)
 ```
@@ -229,7 +252,8 @@ Bot cần các quyền sau trong máy chủ Discord:
 - `Embed Links`
 - `Attach Files`
 - `Read Message History`
-- `Manage Messages` (để ẩn embed mặc định)
+- `Manage Messages` (để ẩn/xoá tin nhắn thô ban đầu)
+- `Manage Webhooks` (để gửi tin nhắn giả lập avatar/nickname người dùng)
 - `Use Slash Commands`
 
 **Intent bắt buộc**: `Message Content Intent` (bật trong Discord Developer Portal).
