@@ -5,8 +5,7 @@ import io
 
 from utils.constants import PLATFORMS
 from services.platform_fetchers import FETCHER_MAP
-from services.nsfw_filter import NSFWFilter
-from services.embed_builder import build_embed, build_gallery_embeds
+from services.embed_builder import NSFWFilter, build_embed, build_gallery_embeds
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
 MAX_LINKS_PER_MESSAGE = 3

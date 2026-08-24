@@ -1,14 +1,3 @@
-from flask import Flask, jsonify, render_template_string
-from datetime import datetime, timezone, timedelta
-import psutil
-import platform
-import math
-import config
-from bot_instance import bot
-
-app = Flask('')
-
-HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -46,7 +35,7 @@ HTML_TEMPLATE = r"""
             height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Khóa cuộn trang chính */
+            overflow: hidden;
             background-image: 
                 radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 40%),
                 radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.12) 0%, transparent 40%);
@@ -137,14 +126,14 @@ HTML_TEMPLATE = r"""
             grid-template-columns: 320px 1fr;
             gap: 1.5rem;
             height: calc(100vh - 70px);
-            overflow: hidden; /* Khóa cuộn container chính */
+            overflow: hidden;
         }
 
         @media (max-width: 1024px) {
             main {
                 grid-template-columns: 1fr;
                 height: calc(100vh - 70px);
-                overflow-y: auto; /* Cho phép cuộn trên mobile */
+                overflow-y: auto;
             }
             body {
                 overflow: auto;
@@ -258,7 +247,6 @@ HTML_TEMPLATE = r"""
             border-top: 1px solid rgba(255, 255, 255, 0.04);
         }
 
-        /* TABS NAVIGATION */
         .tabs-header {
             display: flex;
             gap: 0.75rem;
@@ -398,7 +386,6 @@ HTML_TEMPLATE = r"""
             border-color: var(--status-offline);
         }
 
-        /* AUDIT PANEL CSS */
         .audit-split-panel {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -568,7 +555,7 @@ HTML_TEMPLATE = r"""
             <div class="bot-avatar">🤖</div>
             <div>
                 <h1 id="header-bot-name">MikeDaBot</h1>
-                <p style="font-size: 0.7rem; color: var(--text-secondary);">Gemma 4 Summary Agent</p>
+                <p style="font-size: 0.7rem; color: var(--text-secondary);">Discord AI Agent & Dashboard</p>
             </div>
         </div>
         <div class="status-badge">
@@ -614,15 +601,15 @@ HTML_TEMPLATE = r"""
                 <div class="info-row-container">
                     <div class="info-row">
                         <span class="info-label">Trí tuệ nhân tạo</span>
-                        <span class="info-value">Gemma 4</span>
+                        <span class="info-value">Google Gemini</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Model ID</span>
-                        <span class="info-value">gemma-4-31b-it</span>
+                        <span class="info-label">Model AI</span>
+                        <span id="info-model-id" class="info-value">Loading...</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Lệnh Slash</span>
-                        <span class="info-value">/tomtat</span>
+                        <span class="info-value">/tomtat, /config</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Nền tảng / OS</span>
@@ -630,7 +617,7 @@ HTML_TEMPLATE = r"""
                     </div>
                     <div class="info-row">
                         <span class="info-label">Python Version</span>
-                        <span class="info-value">3.14.3</span>
+                        <span class="info-value">3.14+</span>
                     </div>
                 </div>
                 <div class="sidebar-footer">
@@ -698,14 +685,12 @@ HTML_TEMPLATE = r"""
         let selectedTestIndex = null;
         const consoleBody = document.getElementById('console-body');
 
-        // Phát hiện cuộn chuột để khóa auto scroll
         consoleBody.addEventListener('scroll', () => {
             const threshold = 40; 
             const isAtBottom = consoleBody.scrollHeight - consoleBody.clientHeight - consoleBody.scrollTop < threshold;
             autoScroll = isAtBottom;
         });
 
-        // Tab switcher
         function switchTab(tabName) {
             activeTab = tabName;
             document.getElementById('tab-logs-btn').className = tabName === 'logs' ? 'tab-btn active' : 'tab-btn';
@@ -782,7 +767,6 @@ HTML_TEMPLATE = r"""
             }
         }
 
-        // Render danh sách các lượt test runs
         function renderTestRuns() {
             const listContainer = document.getElementById('test-runs-list');
             if (testRunsData.length === 0) {
@@ -814,7 +798,6 @@ HTML_TEMPLATE = r"""
             }).join('');
         }
 
-        // Chọn xem chi tiết một lượt test
         function selectTestRun(index) {
             selectedTestIndex = index;
             renderTestRuns();
@@ -828,16 +811,13 @@ HTML_TEMPLATE = r"""
             if (scoreNum < 5) scoreColor = 'var(--status-offline)';
             else if (scoreNum < 8) scoreColor = '#f59e0b';
             
-            // Format report Markdown to simple HTML elements
             let htmlReport = escapeHtml(run.evaluation)
                 .replace(/^### (.*$)/gim, '<h3>$1</h3>')
                 .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
                 .replace(/^\s*-\s*\*\*(.*?)\*\*:\s*(.*$)/gim, '<li><strong>$1</strong>: $2</li>')
                 .replace(/^\s*-\s*(.*$)/gim, '<li>$1</li>');
                 
-            // Wrap <li> into <ul>
             htmlReport = htmlReport.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
-            // Clean consecutive <ul> tags
             htmlReport = htmlReport.replace(/<\/ul>\s*<ul>/g, '');
 
             detailPane.innerHTML = `
@@ -874,7 +854,6 @@ HTML_TEMPLATE = r"""
             `;
         }
 
-        // Kích hoạt API chạy test từ dashboard
         async function runSelfAuditTest() {
             const btn = document.getElementById('run-test-btn');
             const loading = document.getElementById('test-loading');
@@ -887,9 +866,7 @@ HTML_TEMPLATE = r"""
                 const response = await fetch('/api/test/run', { method: 'POST' });
                 const result = await response.json();
                 if (result.success) {
-                    // Cập nhật dữ liệu dashboard lập tức
                     await updateDashboard();
-                    // Chọn phần tử test đầu tiên (vừa mới tạo)
                     selectedTestIndex = 0;
                     renderTestRuns();
                     selectTestRun(0);
@@ -915,7 +892,6 @@ HTML_TEMPLATE = r"""
                 }
                 const data = await response.json();
 
-                // Cập nhật trạng thái
                 const isOnline = data.bot_status === "Online";
                 const statusDot = document.getElementById('header-status-dot');
                 const statusText = document.getElementById('header-status-text');
@@ -932,7 +908,6 @@ HTML_TEMPLATE = r"""
                     document.getElementById('header-bot-name').textContent = data.bot_name;
                 }
 
-                // Cập nhật giá trị
                 document.getElementById('stat-latency').textContent = data.latency;
                 document.getElementById('stat-guilds').textContent = data.guilds;
                 document.getElementById('stat-users').textContent = data.total_users;
@@ -940,8 +915,10 @@ HTML_TEMPLATE = r"""
                 document.getElementById('stat-uptime').textContent = data.uptime;
                 document.getElementById('stat-ram').textContent = data.ram_usage;
                 document.getElementById('info-os').textContent = data.os_info;
+                if (document.getElementById('info-model-id')) {
+                    document.getElementById('info-model-id').textContent = data.model || 'Gemini Flash';
+                }
 
-                // Cập nhật logs
                 if (data.logs && data.logs.length > 0) {
                     consoleBody.innerHTML = data.logs.map(formatLogLine).join('');
                     if (autoScroll) {
@@ -951,12 +928,10 @@ HTML_TEMPLATE = r"""
                     consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
                 }
 
-                // Cập nhật lịch sử test runs
                 if (data.test_runs) {
                     testRunsData = data.test_runs;
                     if (activeTab === 'audit') {
                         renderTestRuns();
-                        // Giữ nguyên hiển thị chi tiết test nếu đang chọn
                         if (selectedTestIndex !== null && selectedTestIndex < testRunsData.length) {
                             selectTestRun(selectedTestIndex);
                         }
@@ -970,169 +945,8 @@ HTML_TEMPLATE = r"""
             }
         }
 
-        // Chạy ngay lập tức và thăm dò mỗi 3 giây
         updateDashboard();
         setInterval(updateDashboard, 3000);
     </script>
 </body>
 </html>
-"""
-
-@app.route('/')
-def home():
-    print("ℹ️ Web server nhận được ping từ UptimeRobot hoặc trình duyệt.", flush=True)
-    return render_template_string(HTML_TEMPLATE)
-
-@app.route('/api/stats')
-def api_stats():
-    now = datetime.now(timezone.utc)
-    uptime_delta = now - config.start_time
-    
-    # Định dạng uptime
-    hours_up, remainder = divmod(int(uptime_delta.total_seconds()), 3600)
-    minutes_up, seconds_up = divmod(remainder, 60)
-    uptime_str = f"{hours_up:02d}h {minutes_up:02d}m {seconds_up:02d}s"
-    
-    bot_latency = "N/A"
-    bot_status = "Offline"
-    guild_count = 0
-    total_users = 0
-    bot_name = "N/A"
-    
-    # Đo RAM sử dụng
-    try:
-        ram_usage = psutil.Process().memory_info().rss / (1024 * 1024) # MB
-        ram_str = f"{ram_usage:.1f} MB"
-    except Exception:
-        ram_str = "N/A"
-        
-    if bot.is_ready():
-        bot_status = "Online"
-        try:
-            latency = bot.latency
-            if latency is not None and not math.isnan(latency):
-                bot_latency = f"{round(latency * 1000)}ms"
-            else:
-                bot_latency = "N/A"
-        except Exception:
-            bot_latency = "N/A"
-            
-        guild_count = len(bot.guilds)
-        total_users = sum(g.member_count for g in bot.guilds if g.member_count)
-        bot_name = bot.user.name if bot.user else "N/A"
-
-    return jsonify({
-        "bot_status": bot_status,
-        "bot_name": bot_name,
-        "uptime": uptime_str,
-        "latency": bot_latency,
-        "guilds": guild_count,
-        "total_users": total_users,
-        "ram_usage": ram_str,
-        "os_info": f"{platform.system()} ({platform.release()})",
-        "summaries": config.summary_count,
-        "model": "Gemma 4 (gemma-4-31b-it)",
-        "logs": list(config.log_buffer),
-        "test_runs": config.test_runs
-    })
-
-@app.route('/api/logs/clear', methods=['POST'])
-def api_clear_logs():
-    config.log_buffer.clear()
-    print("🧹 Đã xóa toàn bộ logs hệ thống theo yêu cầu từ Dashboard.", flush=True)
-    return jsonify({"success": True})
-
-@app.route('/api/test/run', methods=['POST'])
-def api_run_test():
-    import asyncio
-    import ai_helper
-    import config as cfg
-    from bot_instance import bot
-    from datetime import datetime, timezone, timedelta
-    import re
-
-    async def run_test_logic():
-        """Thu thập tin nhắn, tóm tắt và đánh giá - trả về plain dict (không dùng Flask context)."""
-        raw_messages = []
-        source_info = "Mock Chat Data (Giả lập)"
-
-        if bot.is_ready() and len(bot.guilds) > 0:
-            target_channel = None
-            for guild in bot.guilds:
-                for channel in guild.text_channels:
-                    permissions = channel.permissions_for(guild.me)
-                    if permissions.read_messages and permissions.read_message_history:
-                        target_channel = channel
-                        break
-                if target_channel:
-                    break
-
-            if target_channel:
-                source_info = f"Kênh thực tế: #{target_channel.name} ({target_channel.guild.name})"
-                vn_tz = timezone(timedelta(hours=7))
-                print(f"🔬 [Test API] Đang lấy tin nhắn test từ kênh Discord {source_info}...", flush=True)
-                async for msg in target_channel.history(limit=150):
-                    if msg.author.bot:
-                        continue
-                    local_time = msg.created_at.astimezone(vn_tz).strftime('%d/%m %H:%M')
-                    raw_messages.append(f"[{local_time}] {msg.author.display_name}: {msg.content}")
-                raw_messages.reverse()
-
-        if not raw_messages:
-            print(f"🔬 [Test API] Không có kênh online hoặc bot offline, sử dụng {source_info}...", flush=True)
-            raw_messages = ai_helper.MOCK_CHAT_HISTORY
-
-        scan_info = "150 tin nhắn thử nghiệm"
-        summary_type = "long"
-        clean_focus = "bot tóm tắt"
-
-        print("🔬 [Test API] Đang chạy tóm tắt...", flush=True)
-        summary_result = await ai_helper.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
-
-        print("🔬 [Test API] Đang gửi kết quả cho AI QA tự động chấm điểm...", flush=True)
-        raw_history_text = "\n".join(raw_messages)
-        evaluation_report = await ai_helper.evaluate_summary(raw_history_text, summary_result, summary_type, clean_focus)
-
-        score_val = "N/A"
-        score_match = re.search(r"-\s*\*\*Điểm số\*\*:\s*([\d\.\/\s]+)", evaluation_report, re.IGNORECASE)
-        if score_match:
-            score_val = score_match.group(1).strip()
-
-        test_run = {
-            "timestamp": datetime.now(timezone(timedelta(hours=7))).strftime('%d/%m %H:%M:%S'),
-            "source": source_info,
-            "scan_info": scan_info,
-            "mode": summary_type,
-            "focus": clean_focus,
-            "raw_count": len(raw_messages),
-            "summary": summary_result,
-            "evaluation": evaluation_report,
-            "score": score_val
-        }
-
-        cfg.test_runs.insert(0, test_run)
-        if len(cfg.test_runs) > 20:
-            cfg.test_runs = cfg.test_runs[:20]
-
-        print(f"🎉 [Test API] Đã chạy xong lượt test. AI QA chấm điểm: {score_val}.", flush=True)
-        # Trả về plain dict — KHÔNG gọi jsonify() ở đây vì không có Flask context
-        return test_run
-
-    try:
-        if bot.is_ready() and bot.loop and bot.loop.is_running():
-            print("🔬 [Test API] Chạy test bằng loop của Discord Bot (threadsafe)...", flush=True)
-            future = asyncio.run_coroutine_threadsafe(run_test_logic(), bot.loop)
-            test_run = future.result(timeout=120)
-        else:
-            print("🔬 [Test API] Chạy test bằng loop mới (bot offline)...", flush=True)
-            test_run = asyncio.run(run_test_logic())
-
-        return jsonify({"success": True, "test_run": test_run})
-
-    except Exception as e:
-        import traceback
-        import sys
-        print(f"❌ [Test API] Gặp lỗi khi chạy vòng lặp kiểm thử: {e}", flush=True)
-        traceback.print_exc(file=sys.stdout)
-        return jsonify({"success": False, "error": str(e)}), 500
-
