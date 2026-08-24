@@ -61,13 +61,20 @@ async def fetch_twitter(session: aiohttp.ClientSession, url: str, match) -> Post
 async def fetch_reddit(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
     try:
         clean_path = match.group(1).rstrip("/")
+        if not clean_path.startswith("/"):
+            clean_path = "/" + clean_path
+
+        # Link rút gọn /s/ không có .json trực tiếp, chuyển sang Tier 1 Proxy (rxddit/fxreddit)
+        if "/s/" in clean_path:
+            return None
+
         api_url = f"https://www.reddit.com{clean_path}.json"
 
-        headers = {"User-Agent": "MikeDaBot/1.0"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         async with session.get(api_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            data = await resp.json(content_type=None)
 
         if not data or not isinstance(data, list):
             return None

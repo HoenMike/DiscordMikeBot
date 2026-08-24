@@ -21,8 +21,6 @@ PLATFORMS = {
         "button_label": "Xem bản gốc trên X",
         "api_base": "https://api.fxtwitter.com",
         "patterns": [
-            re.compile(r"https://(www\.)?twitter\.com/[a-zA-Z0-9_]+/status/\d+(/photo|video/\d+)?/?"),
-            re.compile(r"https://(www\.)?x\.com/[a-zA-Z0-9_]+/status/\d+(/photo|video/\d+)?/?"),
             re.compile(r"https?://(?:www\.)?(?:twitter\.com|x\.com)/(\w+)/status/(\d+)\S*"),
         ],
     },
@@ -34,7 +32,6 @@ PLATFORMS = {
         "button_label": "Xem trên Pixiv",
         "api_base": "https://phixiv.net",
         "patterns": [
-            re.compile(r"https://(www\.)?pixiv\.net(/[a-zA-Z]+)?/artworks/(\d+)/?"),
             re.compile(r"https?://(?:www\.)?pixiv\.net/(?:\w+/)?artworks/(\d+)"),
         ],
     },
@@ -46,9 +43,6 @@ PLATFORMS = {
         "button_label": "Xem trên TikTok",
         "api_base": "https://api.vxtiktok.com",
         "patterns": [
-            re.compile(r"https://(www\.)?tiktok\.com/(t/\w+|@[\w.]+/video/(\d+))/?"),
-            re.compile(r"https://vm\.tiktok\.com/([\w]+)/?"),
-            re.compile(r"https://vt\.tiktok\.com/([\w]+)/?"),
             re.compile(r"https?://(?:www\.)?tiktok\.com/@[\w.]+/video/(\d+)\S*"),
             re.compile(r"https?://(?:vm|vt)\.tiktok\.com/([\w]+)\S*"),
         ],
@@ -61,10 +55,10 @@ PLATFORMS = {
         "button_label": "Xem trên Reddit",
         "api_base": None,
         "patterns": [
-            re.compile(r"https://(www\.|old\.)?reddit\.com(/r/[\w]+/comments/[\w]+/[\w]+)/?"),
-            re.compile(r"https://(www\.|old\.)?reddit\.com(/r/[\w]+/s/[\w]+)/?"),
-            re.compile(r"https://(www\.|old\.)?reddit\.com(/user/[\w]+/comments/[\w]+/[\w]+)/?"),
-            re.compile(r"https?://(?:www\.)?reddit\.com(/r/\w+/comments/\w+\S*)"),
+            re.compile(r"https?://(?:www\.|old\.)?reddit\.com(/r/[\w]+/comments/[\w]+/[\w]+)/?"),
+            re.compile(r"https?://(?:www\.|old\.)?reddit\.com(/r/[\w]+/s/[\w]+)/?"),
+            re.compile(r"https?://(?:www\.|old\.)?reddit\.com(/user/[\w]+/comments/[\w]+/[\w]+)/?"),
+            re.compile(r"https?://(?:www\.|old\.)?reddit\.com(/r/\w+/comments/\w+\S*)"),
         ],
     },
     "instagram": {
@@ -102,8 +96,8 @@ PLATFORMS = {
         "button_label": "Xem trên Bluesky",
         "api_base": "https://public.api.bsky.app",
         "patterns": [
-            re.compile(r"https://(www\.)?bsky\.app/profile/([\w.\-]+)/post/([\w]+)/?"),
-            re.compile(r"https?://bsky\.app/profile/([\w.:]+)/post/([\w]+)"),
+            re.compile(r"https?://(?:www\.)?bsky\.app/profile/([\w.\-]+)/post/([\w]+)/?"),
+            re.compile(r"https?://(?:www\.)?bsky\.app/profile/([\w.:]+)/post/([\w]+)"),
         ],
     },
     "twitch": {
@@ -114,9 +108,9 @@ PLATFORMS = {
         "button_label": "Xem trên Twitch",
         "api_base": None,
         "patterns": [
-            re.compile(r"https://m\.twitch\.tv/clip/([\w-]+)/?"),
-            re.compile(r"https://clips\.twitch\.tv/([\w-]+)/?"),
-            re.compile(r"https://(www\.)?twitch\.tv/\w+/clip/([\w-]+)/?"),
+            re.compile(r"https?://(?:www\.)?(?:m\.)?twitch\.tv/clip/([\w-]+)/?"),
+            re.compile(r"https?://clips\.twitch\.tv/([\w-]+)/?"),
+            re.compile(r"https?://(?:www\.)?twitch\.tv/\w+/clip/([\w-]+)/?"),
         ],
     },
     "threads": {
@@ -127,8 +121,8 @@ PLATFORMS = {
         "button_label": "Xem trên Threads",
         "api_base": None,
         "patterns": [
-            re.compile(r"https://(www\.)?threads\.(?:net|com)/@([\w.]+)/post/([\w]+)/?"),
-            re.compile(r"https://(www\.)?threads\.(?:net|com)/share/([\w]+)/?"),
+            re.compile(r"https?://(?:www\.)?threads\.(?:net|com)/@([\w.]+)/post/([\w]+)/?"),
+            re.compile(r"https?://(?:www\.)?threads\.(?:net|com)/share/([\w]+)/?"),
         ],
     },
 }
