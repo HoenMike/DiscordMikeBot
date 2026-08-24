@@ -243,23 +243,75 @@ Dự án được cấu hình sẵn để chạy trên Render hoặc các nền 
 
 ---
 
-## Quyền Discord (Bot Permissions)
+## Quyền Discord & Hướng dẫn Cấp quyền (Bot Permissions & Setup)
 
-Bot cần các quyền sau trong máy chủ Discord:
+Để bot hoạt động đầy đủ tất cả các tính năng (đặc biệt là tính năng giả lập Webhook và tự động xoá link thô), bot cần các quyền sau:
 
-- `Read Messages` / `View Channels`
-- `Send Messages`
-- `Embed Links`
-- `Attach Files`
-- `Read Message History`
-- `Manage Messages` (để ẩn/xoá tin nhắn thô ban đầu)
-- `Manage Webhooks` (để gửi tin nhắn giả lập avatar/nickname người dùng)
-- `Use Slash Commands`
+### 1. Danh sách quyền bắt buộc:
+* **`Manage Webhooks` (Quản lý Webhook)**: Để tạo Webhook gửi bài viết giả lập Avatar & Tên của người dùng.
+* **`Manage Messages` (Quản lý Tin nhắn)**: Để tự động xoá tin nhắn chứa link thô ban đầu sau khi gửi embed.
+* **`View Channels` (Xem Kênh)** & **`Send Messages` (Gửi Tin nhắn)**: Để tương tác trong các kênh chat.
+* **`Embed Links` (Nhúng Liên kết)**: Để gửi embed tóm tắt AI và bài viết mạng xã hội.
+* **`Attach Files` (Đính kèm Tệp)**: Để gửi file spoiler hình ảnh khi gặp nội dung NSFW.
+* **`Read Message History` (Đọc Lịch sử Tin nhắn)**: Để bot quét tin nhắn và tạo bản tóm tắt AI (`/tomtat`).
+* **`Use Application Commands` (Sử dụng Lệnh Ứng dụng)**: Để chạy các Slash Commands (`/tomtat`, `/config`, `/proxy`).
 
-**Intent bắt buộc**: `Message Content Intent` (bật trong Discord Developer Portal).
+---
+
+### 2. Cách 1: Cấp quyền trực tiếp trong Server Discord (Nhanh nhất - Không cần mời lại bot)
+
+Nếu bot đã ở trong server của bạn, bạn chỉ cần cấp quyền cho **Role của Bot**:
+
+1. Mở **Server Settings (Cài đặt máy chủ)** $\rightarrow$ Chọn mục **Roles (Vai trò)**.
+2. Tìm và bấm vào Role có tên của bot (ví dụ: `MikeDaBot`).
+3. Chuyển sang tab **Permissions (Quyền hạn)**.
+4. Bật các quyền sau:
+   - ✅ **Manage Webhooks** (*Quản lý Webhook*)
+   - ✅ **Manage Messages** (*Quản lý Tin nhắn*)
+   - ✅ **Attach Files** (*Đính kèm Tệp*)
+   - ✅ **Read Message History** (*Đọc Lịch sử Tin nhắn*)
+   - ✅ **Embed Links** (*Nhúng Liên kết*)
+   - *(Hoặc có thể bật quyền **Administrator** nếu là server cá nhân/nội bộ để bot có đầy đủ toàn quyền).*
+5. Bấm **Save Changes (Lưu thay đổi)**.
+
+> 💡 **Lưu ý về Channel Permissions**: Nếu một kênh cụ thể (ví dụ kênh `#💬chém-gió`) có cài đặt phân quyền riêng (Channel Overrides), hãy kiểm tra phần **Edit Channel (Chỉnh sửa kênh)** $\rightarrow$ **Permissions** để đảm bảo Role của Bot không bị dấu ❌ (gạch chéo đỏ) ở quyền **Manage Webhooks** hoặc **Manage Messages**.
+
+---
+
+### 3. Cách 2: Tạo Link Mời Bot mới có sẵn đầy đủ Quyền (Invite Link Generator)
+
+Nếu bạn muốn tạo một đường link mời bot sang các máy chủ khác với đầy đủ quyền được chọn sẵn:
+
+1. Truy cập [Discord Developer Portal](https://discord.com/developers/applications).
+2. Chọn ứng dụng Bot của bạn (`MikeDaBot`).
+3. **Bật Gateway Intents** (Bắt buộc):
+   - Vào menu **Bot** ở thanh bên trái.
+   - Cuộn xuống phần **Privileged Gateway Intents**.
+   - Bật tích xanh: ✅ **MESSAGE CONTENT INTENT** và ✅ **SERVER MEMBERS INTENT**.
+   - Bấm **Save Changes**.
+4. **Tạo Link Mời (OAuth2 URL Generator)**:
+   - Vào menu **OAuth2** $\rightarrow$ chọn **URL Generator**.
+   - Trong mục **Scopes**, tích chọn:
+     - ✅ `bot`
+     - ✅ `applications.commands`
+   - Trong mục **Bot Permissions** xuất hiện bên dưới, tích chọn:
+     - ✅ *Manage Webhooks*
+     - ✅ *Manage Messages*
+     - ✅ *Read Messages/View Channels*
+     - ✅ *Send Messages*
+     - ✅ *Embed Links*
+     - ✅ *Attach Files*
+     - ✅ *Read Message History*
+   - Copy đường dẫn ở ô **Generated URL** ở cuối trang và mở trên trình duyệt để thêm Bot vào Server.
+
+*(Mẫu link mời nhanh - thay `CLIENT_ID_CUA_BAN` bằng Application ID của bạn):*
+```
+https://discord.com/oauth2/authorize?client_id=CLIENT_ID_CUA_BAN&permissions=2684423104&integration_type=0&scope=bot+applications.commands
+```
 
 ---
 
 ## Giấy phép
 
 Liên hệ tác giả để biết thêm thông tin về giấy phép sử dụng.
+
