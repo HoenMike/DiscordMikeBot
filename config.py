@@ -32,9 +32,17 @@ class LogStreamRedirector:
         if hasattr(self.original_stream, 'reconfigure'):
             self.original_stream.reconfigure(*args, **kwargs)
 
-# Ép đầu ra của python flush ngay lập tức
-sys.stdout.reconfigure(line_buffering=True)
-sys.stderr.reconfigure(line_buffering=True)
+# Ép đầu ra của python flush ngay lập tức và hỗ trợ UTF-8 an toàn trên Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+    except Exception:
+        pass
+if hasattr(sys.stderr, 'reconfigure'):
+    try:
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace', line_buffering=True)
+    except Exception:
+        pass
 
 # Chuyển hướng stdout và stderr sang redirector để hứng log
 sys.stdout = LogStreamRedirector(sys.stdout)
@@ -47,8 +55,36 @@ import pathlib
 from dotenv import load_dotenv
 load_dotenv()
 
+# ==========================================
+# 1. BIẾN MÔI TRƯỜNG & KHÓA XÁC THỰC
+# ==========================================
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# ==========================================
+# 2. CẤU HÌNH AI & MÔ HÌNH (CENTRALIZED AI CONFIG)
+# ==========================================
+# Model chính dùng cho tóm tắt nội dung (Single-Pass & MapReduce)
+# Có thể đổi nhanh tại file .env (GEMINI_MODEL=...) hoặc chỉnh trực tiếp tại đây
+GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+
+# Model dùng cho AI QA Evaluator tự động đánh giá và chấm điểm
+GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", "gemini-3.5-flash-lite")
+
+# Tham số Generation
+SUMMARY_TEMPERATURE = float(os.getenv("SUMMARY_TEMPERATURE", "0.1"))
+QA_TEMPERATURE = float(os.getenv("QA_TEMPERATURE", "0.3"))
+
+# ==========================================
+# 3. THAM SỐ XỬ LÝ DỮ LIỆU & GIỚI HẠN (LIMITS)
+# ==========================================
+SINGLE_PASS_MSG_LIMIT = int(os.getenv("SINGLE_PASS_MSG_LIMIT", "300"))       # <= 300 msg: Single-Pass; > 300 msg: MapReduce
+MAPREDUCE_CHUNK_SIZE = int(os.getenv("MAPREDUCE_CHUNK_SIZE", "200"))         # Kích thước chunk phân đoạn MapReduce
+DISCORD_EMBED_CHAR_LIMIT = int(os.getenv("DISCORD_EMBED_CHAR_LIMIT", "3500")) # Giới hạn ký tự mỗi embed Discord
+MAX_FETCH_MESSAGES_LIMIT = 2500   # Giới hạn trần quét tin nhắn tối đa
+COMMAND_COOLDOWN_SECONDS = 30.0   # Cooldown lệnh Discord Slash Command
+DEFAULT_SCAN_HOURS = 2.0
+DEFAULT_SCAN_LIMIT = 150
 
 DATA_DIR = pathlib.Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
