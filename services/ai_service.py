@@ -115,7 +115,7 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     try:
         response = await asyncio.to_thread(
             get_ai_client().models.generate_content,
-            model=config.GEMINI_SUMMARY_MODEL,
+            model=config.GEMINI_DATA_MODEL,
             contents=prompt,
             config=SUMMARY_CONFIG,
         )

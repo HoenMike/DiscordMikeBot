@@ -64,15 +64,28 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # ==========================================
 # 2. CẤU HÌNH AI & MÔ HÌNH (CENTRALIZED AI CONFIG)
 # ==========================================
-# Model chính dùng cho tóm tắt nội dung (Single-Pass & MapReduce)
-# Có thể đổi nhanh tại file .env (GEMINI_MODEL=...) hoặc chỉnh trực tiếp tại đây
+# Model chính dùng cho xử lý dữ liệu nền, trích xuất dữ liệu thô (nhẹ, nhanh, tiết kiệm token)
+GEMINI_DATA_MODEL = os.getenv("GEMINI_DATA_MODEL", "gemini-3.1-flash-lite")
+
+# Model dùng cho tóm tắt nội dung tin nhắn (Single-Pass & MapReduce Reduce)
 GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 # Model dùng cho AI QA Evaluator tự động đánh giá và chấm điểm
 GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", "gemini-3.5-flash-lite")
 
-# Model dùng cho bốc và luận giải Tarot AI
-GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", GEMINI_SUMMARY_MODEL)
+# Model chuyên sâu dùng cho bốc và luận giải Tarot AI (Thinking / Deep Reasoning)
+# Mặc định ưu tiên gemini-3.7-flash -> fallback gemini-3.6-flash -> gemini-3.5-flash-lite -> gemma-4-31b-it
+GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", "gemini-3.7-flash")
+
+# Danh sách chuỗi Fallback mô hình dự phòng khi gặp quá tải (503 / 429 Quota Exceeded)
+TAROT_FALLBACK_MODELS = [
+    GEMINI_TAROT_MODEL,
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemma-4-31b-it"
+]
 
 # Tham số Generation
 SUMMARY_TEMPERATURE = float(os.getenv("SUMMARY_TEMPERATURE", "0.1"))
