@@ -162,27 +162,22 @@ class SummaryCog(commands.Cog):
 
             chunks = ai_service.split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
 
+            # Dòng cấu hình ngắn gọn 1 hàng ngang nằm ngay trên cùng của phần 1
+            focus_part = f" • Focus: `{clean_focus}`" if clean_focus else ""
+            config_header = f"⚙️ `{len(raw_messages)} tin nhắn` ({time_range_str}) • `{scan_info}` • **{mode_info}**{focus_part}\n\n"
+
             for i, chunk in enumerate(chunks):
                 part_title = title_str
                 if len(chunks) > 1:
                     part_title += f" (Phần {i+1}/{len(chunks)})"
 
+                description_text = (config_header + chunk) if i == 0 else chunk
+
                 embed = discord.Embed(
                     title=part_title,
-                    description=chunk,
+                    description=description_text,
                     color=embed_color
                 )
-
-                if i == 0:
-                    embed.add_field(
-                        name="⚙️ Thông tin & Cấu hình quét",
-                        value=(
-                            f"📊 **Dữ liệu quét**: `{len(raw_messages)} tin nhắn` ({time_range_str})\n"
-                            f"🎯 **Cài đặt**: `{scan_info}` | Chế độ: **{mode_info}**{f' | Focus: **`{clean_focus}`**' if clean_focus else ''}\n"
-                            f"📍 **Kênh**: {target_channel.mention}"
-                        ),
-                        inline=False
-                    )
 
                 embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
 

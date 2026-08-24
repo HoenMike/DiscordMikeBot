@@ -8,7 +8,7 @@ from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.manager import TarotManager
 from services.ai_service import split_text
 
-WIDE_DIVIDER = "───────────────────────────────────────────────────────────────"
+WIDE_DIVIDER = "---"
 
 
 class TarotFlipView(discord.ui.View):

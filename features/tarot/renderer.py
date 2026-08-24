@@ -1,7 +1,7 @@
 import io
 import math
 import pathlib
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Set
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from features.tarot.deck import (
