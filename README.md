@@ -33,7 +33,6 @@ Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và t�
 | Twitch         | Twitch oEmbed                  | `fxtwitch`                            | Tiêu đề clip, thumbnail              |
 | Pixiv          | `phixiv.net`                   | `phixiv.net`                          | Tiêu đề, ảnh, gallery, tag NSFW      |
 | Threads        | Threads oEmbed                 | `fixthreads`, `vxthreads`             | Nội dung, ảnh/video, tác giả          |
-| YouTube        | YouTube oEmbed                 | `koutube.com`                         | Tiêu đề, thumbnail video / Shorts    |
 
 #### Pipeline xử lý URL 3 tầng (Multi-tier Pipeline):
 1. **Tier 0 (API Fetchers)**: Gọi API JSON/oEmbed để trích xuất dữ liệu có cấu trúc và dựng Discord Embed giàu thông tin.

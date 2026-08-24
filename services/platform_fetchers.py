@@ -436,40 +436,6 @@ async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> Post
         return None
 
 
-async def fetch_youtube(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    try:
-        video_id = match.group(1)
-        canonical_url = f"https://www.youtube.com/watch?v={video_id}"
-        oembed_url = f"https://www.youtube.com/oembed?url={quote(canonical_url, safe='')}&format=json"
-
-        async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-
-        media_urls = []
-        if data.get("thumbnail_url"):
-            media_urls.append(data["thumbnail_url"])
-        else:
-            # Fallback: sử dụng thumbnail mặc định của YouTube
-            media_urls.append(f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg")
-
-        return PostData(
-            platform="youtube",
-            author=data.get("author_name", "Unknown"),
-            author_url=data.get("author_url"),
-            text=data.get("title", "YouTube Video"),
-            media_urls=media_urls,
-            media_type="video",
-            is_nsfw=False,
-            url=canonical_url,
-            timestamp=None,
-        )
-    except Exception as e:
-        print(f"[Fetcher/YouTube] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
-        return None
-
-
 FETCHER_MAP = {
     "twitter": fetch_twitter,
     "reddit": fetch_reddit,
@@ -480,6 +446,6 @@ FETCHER_MAP = {
     "twitch": fetch_twitch,
     "pixiv": fetch_pixiv,
     "threads": fetch_threads,
-    "youtube": fetch_youtube,
 }
+
 

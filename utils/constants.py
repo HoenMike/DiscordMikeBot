@@ -139,19 +139,6 @@ PLATFORMS = {
             re.compile(r"https://(www\.)?threads\.(?:net|com)/share/([\w]+)/?"),
         ],
     },
-    "youtube": {
-        "name": "YouTube",
-        "color": 0xFF0000,
-        "icon_url": "https://www.youtube.com/s/desktop/acce624e/img/favicon_144x144.png",
-        "footer_text": "YouTube",
-        "button_label": "Xem trên YouTube",
-        "api_base": "https://www.youtube.com/oembed",
-        "patterns": [
-            re.compile(r"https://(?:www\.)?youtube\.com/watch\?v=([\w\-]+)"),
-            re.compile(r"https://youtu\.be/([\w\-]+)"),
-            re.compile(r"https://(?:www\.)?youtube\.com/shorts/([\w\-]+)"),
-        ],
-    },
 }
 
 
@@ -170,7 +157,6 @@ PROXY_DOMAINS = {
     "bluesky": ["bskx.app", "fxbsky.app"],
     "twitch": ["fxtwitch.seria.moe"],
     "threads": ["fixthreads.seria.moe", "vxthreads.net"],
-    "youtube": ["koutube.com"],
 }
 
 
@@ -188,7 +174,6 @@ PLATFORM_ORIGINAL_DOMAINS = {
     "bluesky": ["bsky.app"],
     "twitch": ["clips.twitch.tv", "m.twitch.tv", "twitch.tv"],
     "threads": ["threads.net", "threads.com"],
-    "youtube": ["youtube.com", "youtu.be"],
 }
 
 
@@ -212,11 +197,8 @@ PROXY_API_ENDPOINTS = {
 
 # ---------------------------------------------------------------------------
 # Query params cần giữ lại khi làm sạch URL
-# Ví dụ: ?v= cho YouTube là tham số xác định nội dung, không phải tracking.
 # ---------------------------------------------------------------------------
-KEEP_QUERY_PARAMS = {
-    "youtube.com": {"v"},
-}
+KEEP_QUERY_PARAMS = {}
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +215,6 @@ DEFAULT_CONFIG = {
         "twitch": True,
         "pixiv": True,
         "threads": True,
-        "youtube": True,
     },
     "nsfw_mode": "spoiler",
     "auto_embed_enabled": True,
