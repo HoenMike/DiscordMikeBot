@@ -30,6 +30,7 @@ class TarotFlipView(discord.ui.View):
         tarot_manager: TarotManager,
         guild_id: Optional[int] = None,
         channel_id: Optional[int] = None,
+        context: Optional[str] = None,
         timeout: float = 300.0,
     ):
         super().__init__(timeout=timeout)
@@ -40,6 +41,7 @@ class TarotFlipView(discord.ui.View):
         self.spread_info = spread_info
         self.drawn_cards = drawn_cards
         self.question = question
+        self.context = context
         self.ai_task = ai_task
         self.tarot_manager = tarot_manager
         self.guild_id = guild_id
@@ -171,6 +173,8 @@ class TarotFlipView(discord.ui.View):
             desc_cards = []
             if self.question:
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
+            if self.context:
+                desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
@@ -219,12 +223,13 @@ class TarotFlipView(discord.ui.View):
             if self.spread_key == "daily":
                 await self.tarot_manager.record_daily_draw(self.author_id, self.drawn_cards[0])
 
+            saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
             await self.tarot_manager.save_tarot_history(
                 user_id=self.author_id,
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
                 spread_type=self.spread_key,
-                question=self.question,
+                question=saved_q,
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading
             )
@@ -282,6 +287,8 @@ class TarotFlipView(discord.ui.View):
             desc_lines = []
             if self.question:
                 desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
+            if self.context:
+                desc_lines.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
 
             desc_lines.append(WIDE_DIVIDER)
 
@@ -356,6 +363,8 @@ class TarotFlipView(discord.ui.View):
             desc_cards = []
             if self.question:
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
+            if self.context:
+                desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")

@@ -28,7 +28,8 @@ def _build_tarot_prompt(
     spread_name: str,
     drawn_cards: List[DrawnCard],
     question: Optional[str],
-    user_name: str
+    user_name: str,
+    context: Optional[str] = None
 ) -> str:
     """Xây dựng prompt ngắn gọn, kết luận ngay trên đầu, súc tích, trực diện và tràn đầy năng lượng xây dựng tích cực."""
     cards_context = _format_cards_context(drawn_cards)
@@ -44,6 +45,10 @@ def _build_tarot_prompt(
        - Giữ giọng văn điềm tĩnh, thông tuệ, sắc sảo, khách quan và đưa ra góc nhìn khai sáng, thực tế.
     """.strip()
 
+    # Xử lý thông tin bối cảnh
+    ctx_str = f'\n- Bối cảnh / Hoàn cảnh thực tế của `{user_name}`: "{context}"\n(Hãy kết hợp chặt chẽ bối cảnh này với các lá bài để đưa ra lời khuyên cá nhân hóa, sắc bén và chính xác nhất).' if context else ""
+    q_str = f'"{question}"' if question else "Tổng quan năng lượng"
+
     # 1. Prompt cho kiểu Yes/No (1 lá)
     if spread_key == "yes_no":
         card = drawn_cards[0].card
@@ -52,7 +57,7 @@ def _build_tarot_prompt(
 
         return f"""
         Bạn là Tarot reader chuyên nghiệp và giàu lòng thấu cảm. Hãy trả lời cực kỳ ngắn gọn, súc tích (dưới 600 ký tự).
-        Người hỏi: `{user_name}` | Câu hỏi: "{question}"
+        Người hỏi: `{user_name}` | Câu hỏi: "{question}"{ctx_str}
         Phán quyết: {badge} - {verdict_title}
         Lá bài: {cards_context}
 
@@ -66,24 +71,39 @@ def _build_tarot_prompt(
 
     # 2. Prompt cho kiểu Daily Card (1 lá)
     elif spread_key == "daily":
-        return f"""
-        Bạn là Tarot reader truyền cảm hứng. Hãy đưa ra thông điệp ngày mới ngắn gọn, tích cực (dưới 700 ký tự).
-        Người nhận: `{user_name}` | Lá bài:
-        {cards_context}
+        if question:
+            return f"""
+            Bạn là Tarot reader truyền cảm hứng và tinh tế. Hãy giải mã lá bài để trả lời trực tiếp cho câu hỏi trong ngày của người hỏi (dưới 700 ký tự).
+            Người nhận: `{user_name}` | Câu hỏi / Định hướng: "{question}"{ctx_str}
+            Lá bài:
+            {cards_context}
 
-        {common_rules}
+            {common_rules}
 
-        Cấu trúc trả lời:
-        1. 🎯 **TỔNG QUAN NGÀY MỚI**: Năng lượng cốt lõi và kết luận thông điệp hôm nay trong 1-2 câu.
-        2. 🃏 **Ý NGHĨA LÁ BÀI**: Cơ hội hoặc điểm lưu ý cần chuyển hóa trong ngày.
-        3. 💡 **KIM CHỈ NAM**: 1 điều nên phát huy và 1 điều nên lưu ý.
-        """.strip()
+            Cấu trúc trả lời:
+            1. 🎯 **TRẢ LỜI & ĐỊNH HƯỚNG**: Dựa vào năng lượng của lá bài, trả lời trực diện câu hỏi "{question}" trong 1-2 câu súc tích.
+            2. 🃏 **Ý NGHĨA LÁ BÀI**: Tại sao lá bài lại đưa ra gợi ý/lựa chọn này dưới góc nhìn năng lượng ngày.
+            3. 💡 **GỢI Ý HÀNH ĐỘNG**: Lời khuyên cụ thể và điểm lưu ý thực tế để đạt kết quả tốt nhất.
+            """.strip()
+        else:
+            return f"""
+            Bạn là Tarot reader truyền cảm hứng. Hãy đưa ra thông điệp ngày mới ngắn gọn, tích cực (dưới 700 ký tự).
+            Người nhận: `{user_name}`{ctx_str} | Lá bài:
+            {cards_context}
+
+            {common_rules}
+
+            Cấu trúc trả lời:
+            1. 🎯 **TỔNG QUAN NGÀY MỚI**: Năng lượng cốt lõi và kết luận thông điệp hôm nay trong 1-2 câu.
+            2. 🃏 **Ý NGHĨA LÁ BÀI**: Cơ hội hoặc điểm lưu ý cần chuyển hóa trong ngày.
+            3. 💡 **KIM CHỈ NAM**: 1 điều nên phát huy và 1 điều nên lưu ý.
+            """.strip()
 
     # 3. Prompt cho kiểu Two Choices (3 lá)
     elif spread_key == "choices":
         return f"""
         Bạn là Tarot reader định hướng. Hãy so sánh 2 lựa chọn cực kỳ súc tích, trực diện, khích lệ (dưới 1200 ký tự).
-        Người hỏi: `{user_name}` | Vấn đề phân vân: "{question}"
+        Người hỏi: `{user_name}` | Vấn đề phân vân: "{question}"{ctx_str}
         Lá bài:
         {cards_context}
 
@@ -102,7 +122,7 @@ def _build_tarot_prompt(
     elif spread_key == "two_paths":
         return f"""
         Bạn là Tarot reader chuyên sâu. Hãy phân tích 2 lựa chọn rõ ràng, công tâm, mang tính định hướng phát triển (dưới 1600 ký tự).
-        Người hỏi: `{user_name}` | Vấn đề phân vân: "{question}"
+        Người hỏi: `{user_name}` | Vấn đề phân vân: "{question}"{ctx_str}
         Lá bài:
         {cards_context}
 
@@ -121,7 +141,7 @@ def _build_tarot_prompt(
     else:
         return f"""
         Bạn là Tarot reader chuyên nghiệp, thấu cảm và mang lại năng lượng tích cực. Hãy luận giải súc tích, cô đọng, đi thẳng vào trọng tâm (dưới 1800 ký tự).
-        Người hỏi: `{user_name}` | Câu hỏi: {q_str}
+        Người hỏi: `{user_name}` | Câu hỏi: {q_str}{ctx_str}
         Kiểu trải bài: {spread_name} ({len(drawn_cards)} lá)
         Lá bài rút được:
         {cards_context}
@@ -139,6 +159,7 @@ async def generate_tarot_reading(
     spread_key: str,
     drawn_cards: List[DrawnCard],
     question: Optional[str] = None,
+    context: Optional[str] = None,
     user_name: str = "Bạn"
 ) -> str:
     """
@@ -147,7 +168,7 @@ async def generate_tarot_reading(
     """
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
     spread_name = spread_info["name"]
-    prompt = _build_tarot_prompt(spread_key, spread_name, drawn_cards, question, user_name)
+    prompt = _build_tarot_prompt(spread_key, spread_name, drawn_cards, question, user_name, context)
 
     client = get_ai_client()
 

@@ -77,11 +77,17 @@ class TarotCog(commands.Cog):
             value="celtic",
         ),
     ])
+    @app_commands.describe(
+        spread="Kiểu trải bài Tarot bạn muốn thực hiện",
+        question="Câu hỏi hoặc chủ đề bạn muốn hỏi bài (Bắt buộc với hầu hết các trải bài)",
+        context="Bối cảnh/hoàn cảnh hiện tại (Ví dụ: đang có crush, sắp chuyển việc...) để bài giải chuẩn xác hơn"
+    )
     async def tarot(
         self,
         interaction: discord.Interaction,
         spread: app_commands.Choice[str],
-        question: str | None = None
+        question: str | None = None,
+        context: str | None = None
     ):
         spread_key = spread.value
         spread_info = SPREAD_DEFINITIONS.get(spread_key)
@@ -94,6 +100,7 @@ class TarotCog(commands.Cog):
 
         # 1. Kiểm tra điều kiện bắt buộc nhập câu hỏi
         clean_question = question.strip() if question else ""
+        clean_context = context.strip() if context else ""
         if spread_info.get("requires_question", True) and not clean_question:
             await interaction.response.send_message(
                 f"❌ Với kiểu trải bài **{spread_info['name']}**, bạn **bắt buộc** phải nhập câu hỏi hoặc chủ đề cần xem vào ô `question`!\n"
@@ -131,6 +138,7 @@ class TarotCog(commands.Cog):
                     spread_key=spread_key,
                     drawn_cards=drawn_cards,
                     question=clean_question if clean_question else None,
+                    context=clean_context if clean_context else None,
                     user_name=interaction.user.display_name
                 )
             )
@@ -145,6 +153,7 @@ class TarotCog(commands.Cog):
                 spread_info=spread_info,
                 drawn_cards=drawn_cards,
                 question=clean_question if clean_question else None,
+                context=clean_context if clean_context else None,
                 ai_task=ai_task,
                 tarot_manager=self.tarot_manager,
                 guild_id=interaction.guild.id if interaction.guild else None,
@@ -164,8 +173,10 @@ class TarotCog(commands.Cog):
             desc_lines = []
             if clean_question:
                 desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{clean_question}*\n")
+            if clean_context:
+                desc_lines.append(f"**📝 Bối cảnh:**\n*{clean_context}*\n")
 
-            desc_lines.append("──────────────────────────────────────────")
+            desc_lines.append(WIDE_DIVIDER)
 
             cards_summary_lines = []
             for drawn in drawn_cards:
