@@ -186,8 +186,8 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
 
     else:
         # Bắt đầu MapReduce
-        print(f"🧠 [MapReduce] Nhận thấy có {len(raw_messages)} tin nhắn (>{config.SINGLE_PASS_MSG_LIMIT}). Chia làm nhiều phần để phân tích song song (Model: {config.GEMINI_SUMMARY_MODEL})...", flush=True)
-        chunk_size = config.MAPREDUCE_CHUNK_SIZE
+        print(f"🧠 [MapReduce] Nhận thấy có {len(raw_messages)} tin nhắn (>{config.SINGLE_PASS_MSG_LIMIT}). Chia làm nhiều phần để phân tích song song (Model: {getattr(config, 'GEMINI_DATA_MODEL', config.GEMINI_SUMMARY_MODEL)} & {config.GEMINI_SUMMARY_MODEL})...", flush=True)
+        chunk_size = getattr(config, "MAPREDUCE_CHUNK_SIZE", 200)
         chunks = [raw_messages[i:i + chunk_size] for i in range(0, len(raw_messages), chunk_size)]
         total_chunks = len(chunks)
 
