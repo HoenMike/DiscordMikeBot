@@ -77,6 +77,9 @@ GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", "gemini-3.5-flash-lite")
 # Mặc định ưu tiên gemini-3.7-flash -> fallback gemini-3.6-flash -> gemini-3.5-flash-lite -> gemma-4-31b-it
 GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", "gemini-3.7-flash")
 
+# Model dùng cho Meme Reasoning & Vision Multimodal
+GEMINI_MEME_MODEL = os.getenv("GEMINI_MEME_MODEL", "gemini-3.6-flash")
+
 # Danh sách chuỗi Fallback mô hình dự phòng khi gặp quá tải (503 / 429 Quota Exceeded)
 TAROT_FALLBACK_MODELS = [
     GEMINI_TAROT_MODEL,
@@ -102,13 +105,22 @@ COMMAND_COOLDOWN_SECONDS = float(os.getenv("COMMAND_COOLDOWN_SECONDS", "30.0")) 
 DEFAULT_SCAN_HOURS = 2.0
 DEFAULT_SCAN_LIMIT = 150
 
+# Meme Engine Configuration
+TENOR_API_KEY = os.getenv("TENOR_API_KEY", "")
+GIPHY_API_KEY = os.getenv("GIPHY_API_KEY", "")
+GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY", "")
+GOOGLE_CSE_CX = os.getenv("GOOGLE_CSE_CX", "")
+
 DATA_DIR = pathlib.Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "bot_config.db"
+MEME_DB_PATH = DATA_DIR / "meme_vault.db"
 
 # Stats variables
 start_time = datetime.now(timezone.utc)
 summary_count = 0
+meme_count = 0
 active_interactions = set()
 is_shutting_down = False
 test_runs = []
+
