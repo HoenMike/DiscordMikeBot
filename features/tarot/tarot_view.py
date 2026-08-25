@@ -1,5 +1,6 @@
 import asyncio
 import io
+import os
 import random
 from typing import List, Optional, Set, Any
 import discord
@@ -14,7 +15,7 @@ from features.tarot.deck import (
 )
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
-from features.tarot.voice_reader import play_tarot_voice
+from features.tarot.voice_reader import play_tarot_voice, generate_tarot_speech
 from features.tarot.manager import TarotManager
 from core.ai import split_text
 
@@ -517,7 +518,7 @@ class TarotLauncherView(discord.ui.View):
 class TarotResultView(discord.ui.View):
     """
     View tương tác sau khi đã luận giải xong quẻ bài:
-    Hỗ trợ nút bấm phát giọng đọc Gemini 2.0 Audio trực tiếp trong Voice Channel.
+    Hỗ trợ nút bấm phát giọng đọc Neural TTS tiếng Việt trực tiếp trong Voice Channel (Preloaded).
     """
 
     def __init__(
@@ -527,6 +528,7 @@ class TarotResultView(discord.ui.View):
         author_id: int,
         author_name: str,
         spread_name: str = "",
+        preload_task: Optional[asyncio.Task] = None,
         timeout: float = 600.0,
     ):
         super().__init__(timeout=timeout)
@@ -535,6 +537,8 @@ class TarotResultView(discord.ui.View):
         self.author_id = author_id
         self.author_name = author_name
         self.spread_name = spread_name
+        self.preload_task = preload_task
+        self.preloaded_audio_path: Optional[str] = None
         self.is_speaking = False
         self.message: Optional[discord.Message] = None
 
@@ -573,13 +577,28 @@ class TarotResultView(discord.ui.View):
         except Exception:
             pass
 
+        # Lấy đường dẫn file âm thanh đã preload sẵn nếu có
+        preloaded_path = None
+        if self.preloaded_audio_path and os.path.exists(self.preloaded_audio_path):
+            preloaded_path = self.preloaded_audio_path
+        elif self.preload_task:
+            try:
+                preloaded_path = await asyncio.wait_for(asyncio.shield(self.preload_task), timeout=3.0)
+                self.preloaded_audio_path = preloaded_path
+            except Exception:
+                pass
+
         try:
             await play_tarot_voice(
                 interaction=interaction,
                 reading_text=self.ai_reading,
                 reader_style=self.reader_style,
                 spread_name=self.spread_name,
+                preloaded_audio_path=preloaded_path,
             )
+            # Sau khi phát xong, file đã được dọn dẹp trong play_tarot_voice
+            self.preloaded_audio_path = None
+            self.preload_task = None
         finally:
             self.is_speaking = False
             style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
@@ -602,6 +621,17 @@ class TarotResultView(discord.ui.View):
                 await self.message.edit(view=self)
             except Exception:
                 pass
+
+        # Dọn dẹp file preload nếu người dùng không bấm nghe bài
+        try:
+            path_to_clean = self.preloaded_audio_path
+            if not path_to_clean and self.preload_task and self.preload_task.done():
+                path_to_clean = self.preload_task.result()
+            if path_to_clean and os.path.exists(path_to_clean):
+                os.remove(path_to_clean)
+                print(f"🧹 [TarotResultView] Đã dọn dẹp file preload không dùng: {path_to_clean}", flush=True)
+        except Exception:
+            pass
 
 
 class TarotFlipView(discord.ui.View):
@@ -650,6 +680,10 @@ class TarotFlipView(discord.ui.View):
         self._has_completed: bool = False
         self.message: Optional[discord.Message] = None
 
+        # Tác vụ Preload âm thanh nền để khi lật xong là có sẵn audio ngay
+        self.preload_voice_task: Optional[asyncio.Task] = None
+        self._start_voice_preload()
+
         # Màu embed theo phong cách hoặc Yes/No phán quyết
         self.embed_color = self.style_info.get("color", 0x7851A9)
         if self.spread_key == "yes_no":
@@ -657,6 +691,25 @@ class TarotFlipView(discord.ui.View):
             self.embed_color = verdict_color
 
         self._build_buttons()
+
+    def _start_voice_preload(self):
+        """Khởi chạy preload audio ngay khi AI vừa hoàn tất giải bài (chạy ngầm lúc user lật bài)."""
+        async def _worker():
+            try:
+                ai_reading = await self.ai_task
+                if ai_reading and not self._has_completed:
+                    self.preload_voice_task = asyncio.create_task(
+                        generate_tarot_speech(
+                            reading_text=ai_reading,
+                            reader_style=self.reader_style,
+                            user_name=self.author_name,
+                            spread_name=self.spread_info.get("name", "")
+                        )
+                    )
+            except Exception:
+                pass
+
+        asyncio.create_task(_worker())
 
     def _build_buttons(self):
         """Khởi tạo và cập nhật trạng thái các nút bấm lật bài."""
@@ -859,13 +912,14 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
-            # Tạo view kết quả có nút Voice Reader
+            # Tạo view kết quả có nút Voice Reader (kèm Preloaded Audio Task)
             result_view = TarotResultView(
                 ai_reading=ai_reading,
                 reader_style=self.reader_style,
                 author_id=self.author_id,
                 author_name=self.author_name,
-                spread_name=self.spread_info.get("name", "")
+                spread_name=self.spread_info.get("name", ""),
+                preload_task=self.preload_voice_task
             )
             result_view.message = self.message
 
@@ -1020,7 +1074,8 @@ class TarotFlipView(discord.ui.View):
                 reader_style=self.reader_style,
                 author_id=self.author_id,
                 author_name=self.author_name,
-                spread_name=self.spread_info.get("name", "")
+                spread_name=self.spread_info.get("name", ""),
+                preload_task=self.preload_voice_task
             )
             result_view.message = self.message
 

@@ -20,30 +20,74 @@ VOICE_MAP = {
     "chaos": "Puck",      # 🃏 Jester: Tinh nghịch, hóm hỉnh, năng động
 }
 
+# Ánh xạ phong cách Reader sang cấu hình giọng Edge Neural TTS tiếng Việt (Tối ưu ngữ điệu & tốc độ)
+EDGE_VOICE_CONFIG = {
+    # ⚖️ Orion: Nam trầm ấm, điềm đạm, suy tư -> Giảm nhẹ tốc độ (-8%), hạ pitch (-2Hz)
+    "neutral": {"voice": "vi-VN-NamMinhNeural", "pitch": "-2Hz", "rate": "-8%"},
+    # 🌸 Celeste: Nữ dịu dàng, ân cần, ấm áp -> Nhịp chậm rãi vỗ về (-6%), pitch tự nhiên
+    "healer": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate": "-6%"},
+    # 🃏 Jester: Hóm hỉnh, tưng tửng -> Pitch cao hơn (+8Hz), nhịp nhanh vừa phải (+4%)
+    "chaos": {"voice": "vi-VN-NamMinhNeural", "pitch": "+8Hz", "rate": "+4%"},
+}
+
 # Tập hợp theo dõi các server đang có luồng đọc bài Voice (tránh xung đột)
 _active_voice_guilds: Set[int] = set()
 
 
-def _clean_markdown_for_tts(text: str) -> str:
-    """Loại bỏ các ký tự Markdown, link, tiêu đề để AI đọc trôi chảy, tự nhiên."""
+def _clean_and_format_for_tts(text: str, reader_style: str = "neutral") -> str:
+    """
+    Chuyển đổi văn bản luận giải Tarot thành kịch bản đọc thoại tự nhiên:
+    - Loại bỏ các ký tự định dạng Markdown cứng nhắc.
+    - Biến các tiêu đề thành câu dẫn tự nhiên kèm ngắt nghỉ (...).
+    - Thêm dấu phẩy và nhịp nghỉ hợp lý để AI đọc truyền cảm.
+    """
     if not text:
         return ""
 
     cleaned = text
-    # Xóa các định dạng bold, italic, code
+    # Xóa các định dạng Markdown
     cleaned = re.sub(r"\*\*([^*]+)\*\*", r"\1", cleaned)
     cleaned = re.sub(r"\*([^*]+)\*", r"\1", cleaned)
     cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
     cleaned = re.sub(r"#{1,6}\s*", "", cleaned)
     cleaned = re.sub(r"[-=]{3,}", " ", cleaned)
-    # Thay thế gạch đầu dòng bằng dấu chấm để tạo nhịp ngắt
-    cleaned = re.sub(r"^[•\-\*]\s+", "", cleaned, flags=re.MULTILINE)
-    # Loại bỏ các emoji rườm rà nhưng giữ lại nội dung chính
-    cleaned = re.sub(r"[🎯🃏💡✨🔮🌸⚖️👑🌿⏳🧲⚡]", "", cleaned)
+
+    # Chuyển đổi các tiêu đề mục thành câu dẫn thoại tự nhiên
+    cleaned = re.sub(
+        r"(?i)\b\d+[\.\)]\s*(🎯|🃏|💡|✨|🔮)?\s*(tổng quan ngày mới|tổng quan & định hướng|kết luận & tổng quan|kết luận & định hướng chính|kết luận|trả lời & định hướng|tổng quan)\s*:\s*",
+        "Về tổng quan thông điệp... ",
+        cleaned
+    )
+    cleaned = re.sub(
+        r"(?i)\b\d+[\.\)]\s*(🎯|🃏|💡|✨|🔮)?\s*(ý nghĩa lá bài|ý nghĩa các lá trong ngữ cảnh|phân tích nhanh các lá bài|ý nghĩa các lá bài)\s*:\s*",
+        "\n\nVề ý nghĩa các lá bài... ",
+        cleaned
+    )
+    cleaned = re.sub(
+        r"(?i)\b\d+[\.\)]\s*(🎯|🃏|💡|✨|🔮)?\s*(kim chỉ nam|lời khuyên|gợi ý hành động|đúc kết tại sao & hành động|tại sao & lời khuyên)\s*:\s*",
+        "\n\nLời khuyên và định hướng dành cho bạn... ",
+        cleaned
+    )
+
+    # Chuyển đổi các gạch đầu dòng chi tiết thành câu nói mượt mà
+    cleaned = re.sub(r"(?i)[•\-\*]?\s*nên phát huy\s*:\s*", "\nĐiều bạn nên phát huy là: ", cleaned)
+    cleaned = re.sub(r"(?i)[•\-\*]?\s*nên lưu ý\s*:\s*", "\nVà điều bạn cần lưu ý là: ", cleaned)
+    cleaned = re.sub(r"(?i)[•\-\*]?\s*hướng a\s*(\([^)]*\))?\s*:\s*", "\nĐối với hướng thứ nhất... ", cleaned)
+    cleaned = re.sub(r"(?i)[•\-\*]?\s*hướng b\s*(\([^)]*\))?\s*:\s*", "\nĐối với hướng thứ hai... ", cleaned)
+    cleaned = re.sub(r"(?i)[•\-\*]?\s*bối cảnh\s*(\([^)]*\))?\s*:\s*", "\nVề bối cảnh hiện tại... ", cleaned)
+
+    # Xóa các emoji rườm rà
+    cleaned = re.sub(r"[🎯🃏💡✨🔮🌸⚖️👑🌿⏳🧲⚡💖🌀🎭]", "", cleaned)
+
+    # Xử lý các gạch đầu dòng còn lại tạo nhịp ngắt
+    cleaned = re.sub(r"^[•\-\*]\s+", "... ", cleaned, flags=re.MULTILINE)
+
+    # Chuyển dấu chấm phẩy thành dấu phẩy để tạo nhịp thở nhẹ
+    cleaned = re.sub(r";\s*", ", ", cleaned)
+
     # Chuẩn hóa khoảng trắng và dòng
-    cleaned = re.sub(r"\n{2,}", ". ", cleaned)
-    cleaned = re.sub(r"\n", " ", cleaned)
-    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
     return cleaned
 
@@ -60,15 +104,8 @@ def pcm_to_wav_bytes(pcm_data: bytes, sample_rate: int = 24000, num_channels: in
     return wav_io.read()
 
 
-EDGE_VOICE_CONFIG = {
-    "neutral": {"voice": "vi-VN-NamMinhNeural", "pitch": "+0Hz", "rate": "+0%"},
-    "healer": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate": "-4%"},
-    "chaos": {"voice": "vi-VN-NamMinhNeural", "pitch": "+12Hz", "rate": "+15%"},
-}
-
-
 async def generate_speech_edge_tts(clean_text: str, reader_style: str) -> Optional[str]:
-    """Tạo file audio siêu tốc (<1.5s) bằng Edge Neural TTS tiếng Việt chuyên dụng."""
+    """Tạo file audio siêu tốc (<1.0s) bằng Edge Neural TTS tiếng Việt chuyên dụng."""
     try:
         import edge_tts
         cfg = EDGE_VOICE_CONFIG.get(reader_style, EDGE_VOICE_CONFIG["neutral"])
@@ -84,7 +121,7 @@ async def generate_speech_edge_tts(clean_text: str, reader_style: str) -> Option
         )
         await communicate.save(temp_path)
         if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
-            print(f"✅ [Edge-TTS] Đã tạo file audio giọng '{cfg['voice']}' ({reader_style}) thành công: {temp_path}", flush=True)
+            print(f"✅ [Edge-TTS] Đã tạo file audio giọng '{cfg['voice']}' ({reader_style}, rate={cfg['rate']}) thành công: {temp_path}", flush=True)
             return temp_path
     except Exception as e:
         print(f"⚠️ [Edge-TTS] Gặp lỗi khi tạo audio: {e}", flush=True)
@@ -102,14 +139,14 @@ async def generate_tarot_speech(
     Ưu tiên Edge Neural TTS tiếng Việt cực nhanh và tự nhiên,
     tự động fallback sang Gemini TTS nếu cần.
     """
-    clean_text = _clean_markdown_for_tts(reading_text)
+    clean_text = _clean_and_format_for_tts(reading_text, reader_style)
     if not clean_text:
         return None
 
     style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
     reader_name = style_info.get("name", "Reader")
 
-    # 1. Thử tạo âm thanh bằng Edge-TTS (Cực nhanh, mượt mà tiếng Việt, không tốn quota)
+    # 1. Thử tạo âm thanh bằng Edge-TTS (Cực nhanh <1s, mượt mà tiếng Việt, không tốn quota)
     edge_audio_path = await generate_speech_edge_tts(clean_text, reader_style)
     if edge_audio_path:
         return edge_audio_path
@@ -198,13 +235,14 @@ async def play_tarot_voice(
     interaction: discord.Interaction,
     reading_text: str,
     reader_style: str,
-    spread_name: str = ""
+    spread_name: str = "",
+    preloaded_audio_path: Optional[str] = None
 ):
     """
     Xử lý toàn bộ quy trình:
     1. Kiểm tra trạng thái Voice của người dùng.
     2. Kết nối vào Voice Channel.
-    3. Tạo file Audio và phát qua FFmpeg.
+    3. Phát file Audio (ưu tiên file đã preload sẵn).
     4. Tự động ngắt kết nối và dọn dẹp file tạm.
     """
     # 1. Kiểm tra xem user có đang ở trong Voice Channel không
@@ -236,7 +274,7 @@ async def play_tarot_voice(
 
     # Thông báo bắt đầu kết nối
     await interaction.followup.send(
-        f"🎙️ **{reader_name}** đang chuẩn bị giọng đọc và kết nối vào kênh **🔊 {voice_channel.name}**...",
+        f"🎙️ **{reader_name}** đang kết nối vào kênh **🔊 {voice_channel.name}** để đọc bài...",
         ephemeral=True
     )
 
@@ -245,13 +283,17 @@ async def play_tarot_voice(
     temp_audio_path: Optional[str] = None
 
     try:
-        # 3. Sinh file âm thanh từ Gemini 2.5 Audio TRƯỚC khi join vào voice channel
-        temp_audio_path = await generate_tarot_speech(
-            reading_text=reading_text,
-            reader_style=reader_style,
-            user_name=interaction.user.display_name,
-            spread_name=spread_name
-        )
+        # 3. Sử dụng file âm thanh đã Preload sẵn hoặc tạo mới
+        if preloaded_audio_path and os.path.exists(preloaded_audio_path) and os.path.getsize(preloaded_audio_path) > 0:
+            temp_audio_path = preloaded_audio_path
+            print(f"⚡ [Tarot Voice] Sử dụng file âm thanh đã Preload sẵn: {temp_audio_path}", flush=True)
+        else:
+            temp_audio_path = await generate_tarot_speech(
+                reading_text=reading_text,
+                reader_style=reader_style,
+                user_name=interaction.user.display_name,
+                spread_name=spread_name
+            )
 
         if not temp_audio_path or not os.path.exists(temp_audio_path):
             await interaction.followup.send(
