@@ -503,6 +503,8 @@ class TarotCog(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """Tự động ngắt kết nối Voice khi tất cả người dùng đã rời khỏi phòng."""
+        if member.bot:
+            return
         if before.channel and before.channel != after.channel:
             voice_client = member.guild.voice_client
             if voice_client and voice_client.channel == before.channel:
@@ -512,7 +514,7 @@ class TarotCog(commands.Cog):
                     if voice_client.is_playing():
                         voice_client.stop()
                     try:
-                        await voice_client.disconnect()
+                        await voice_client.disconnect(force=True)
                     except Exception:
                         pass
 

@@ -212,15 +212,7 @@ async def play_tarot_voice(
     temp_audio_path: Optional[str] = None
 
     try:
-        # 3. Kết nối hoặc tái sử dụng VoiceClient
-        voice_client = guild.voice_client
-        if voice_client and voice_client.is_connected():
-            if voice_client.channel.id != voice_channel.id:
-                await voice_client.move_to(voice_channel)
-        else:
-            voice_client = await voice_channel.connect(timeout=20.0, reconnect=True)
-
-        # 4. Sinh file âm thanh từ Gemini 2.0 Audio
+        # 3. Sinh file âm thanh từ Gemini 2.5 Audio TRƯỚC khi join vào voice channel
         temp_audio_path = await generate_tarot_speech(
             reading_text=reading_text,
             reader_style=reader_style,
@@ -234,6 +226,23 @@ async def play_tarot_voice(
                 ephemeral=True
             )
             return
+
+        # 4. Kiểm tra và dọn dẹp các session voice cũ (nếu có) trước khi kết nối
+        existing_vc = guild.voice_client
+        if existing_vc:
+            if existing_vc.is_connected():
+                if existing_vc.channel.id != voice_channel.id:
+                    await existing_vc.move_to(voice_channel)
+                voice_client = existing_vc
+            else:
+                try:
+                    await existing_vc.disconnect(force=True)
+                except Exception:
+                    pass
+                await asyncio.sleep(0.5)
+                voice_client = await voice_channel.connect(timeout=15.0, reconnect=False, self_deaf=True)
+        else:
+            voice_client = await voice_channel.connect(timeout=15.0, reconnect=False, self_deaf=True)
 
         # 5. Phát âm thanh qua FFmpeg
         finished_event = asyncio.Event()
@@ -259,7 +268,7 @@ async def play_tarot_voice(
                 if voice_client.is_playing():
                     voice_client.stop()
                 break
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(0.5)
 
     except Exception as e:
         print(f"❌ [Tarot Voice] Lỗi trong quá trình phát Voice: {e}", flush=True)
@@ -276,7 +285,7 @@ async def play_tarot_voice(
         _active_voice_guilds.discard(guild.id)
         if voice_client and voice_client.is_connected():
             try:
-                await voice_client.disconnect()
+                await voice_client.disconnect(force=True)
                 print(f"👋 [Tarot Voice] Đã rời kênh thoại '{voice_channel.name}'.", flush=True)
             except Exception as dc_err:
                 print(f"⚠️ [Tarot Voice] Lỗi khi ngắt kết nối voice: {dc_err}", flush=True)
