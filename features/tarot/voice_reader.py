@@ -60,6 +60,37 @@ def pcm_to_wav_bytes(pcm_data: bytes, sample_rate: int = 24000, num_channels: in
     return wav_io.read()
 
 
+EDGE_VOICE_CONFIG = {
+    "neutral": {"voice": "vi-VN-NamMinhNeural", "pitch": "+0Hz", "rate": "+0%"},
+    "healer": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate": "-4%"},
+    "chaos": {"voice": "vi-VN-NamMinhNeural", "pitch": "+12Hz", "rate": "+15%"},
+}
+
+
+async def generate_speech_edge_tts(clean_text: str, reader_style: str) -> Optional[str]:
+    """Tạo file audio siêu tốc (<1.5s) bằng Edge Neural TTS tiếng Việt chuyên dụng."""
+    try:
+        import edge_tts
+        cfg = EDGE_VOICE_CONFIG.get(reader_style, EDGE_VOICE_CONFIG["neutral"])
+        temp_dir = tempfile.gettempdir()
+        temp_filename = f"tarot_voice_{uuid.uuid4().hex}.mp3"
+        temp_path = os.path.join(temp_dir, temp_filename)
+
+        communicate = edge_tts.Communicate(
+            text=clean_text,
+            voice=cfg["voice"],
+            pitch=cfg["pitch"],
+            rate=cfg["rate"]
+        )
+        await communicate.save(temp_path)
+        if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+            print(f"✅ [Edge-TTS] Đã tạo file audio giọng '{cfg['voice']}' ({reader_style}) thành công: {temp_path}", flush=True)
+            return temp_path
+    except Exception as e:
+        print(f"⚠️ [Edge-TTS] Gặp lỗi khi tạo audio: {e}", flush=True)
+    return None
+
+
 async def generate_tarot_speech(
     reading_text: str,
     reader_style: str,
@@ -67,18 +98,24 @@ async def generate_tarot_speech(
     spread_name: str = ""
 ) -> Optional[str]:
     """
-    Sử dụng Gemini 2.0 Native Audio để tạo file âm thanh WAV chất lượng cao
-    theo đúng cá tính và tone giọng của Reader.
-    Trả về đường dẫn file .wav tạm thời.
+    Tạo file âm thanh giọng đọc theo cá tính từng Reader.
+    Ưu tiên Edge Neural TTS tiếng Việt cực nhanh và tự nhiên,
+    tự động fallback sang Gemini TTS nếu cần.
     """
     clean_text = _clean_markdown_for_tts(reading_text)
     if not clean_text:
         return None
 
     style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
-    voice_name = VOICE_MAP.get(reader_style, "Charon")
     reader_name = style_info.get("name", "Reader")
 
+    # 1. Thử tạo âm thanh bằng Edge-TTS (Cực nhanh, mượt mà tiếng Việt, không tốn quota)
+    edge_audio_path = await generate_speech_edge_tts(clean_text, reader_style)
+    if edge_audio_path:
+        return edge_audio_path
+
+    # 2. Fallback: Gemini TTS Multimodal Audio
+    voice_name = VOICE_MAP.get(reader_style, "Charon")
     prompt = f"""
 Bạn là {reader_name}.
 Hãy đọc bài Tarot sau cho {user_name} một cách thật tự nhiên, liền mạch, biểu cảm và đúng tính cách của bạn.
@@ -108,7 +145,6 @@ Không thêm các lời chào hỏi ngoài lề, không đọc các ký tự đ�
         ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview", "gemini-2.5-pro-preview-tts"]
     )
 
-    # Lọc bỏ trùng lặp
     ordered_models = []
     for m in models_to_try:
         if m and m not in ordered_models:
@@ -125,16 +161,14 @@ Không thêm các lời chào hỏi ngoài lề, không đọc các ký tự đ�
                     contents=prompt,
                     config=gen_config
                 ),
-                timeout=25.0
+                timeout=35.0
             )
 
-            # Trích xuất dữ liệu âm thanh từ response parts
             for part in response.candidates[0].content.parts:
                 if part.inline_data and part.inline_data.data:
                     raw_audio_data = part.inline_data.data
                     mime_type = getattr(part.inline_data, "mime_type", "")
 
-                    # Tạo file tạm
                     temp_dir = tempfile.gettempdir()
                     temp_filename = f"tarot_voice_{uuid.uuid4().hex}.wav"
                     temp_path = os.path.join(temp_dir, temp_filename)
@@ -143,7 +177,6 @@ Không thêm các lời chào hỏi ngoài lề, không đọc các ký tự đ�
                         with open(temp_path, "wb") as f:
                             f.write(raw_audio_data)
                     else:
-                        # Mặc định Gemini Audio trả về PCM 24000Hz 1 channel 16-bit
                         wav_bytes = pcm_to_wav_bytes(raw_audio_data, sample_rate=24000)
                         with open(temp_path, "wb") as f:
                             f.write(wav_bytes)
@@ -152,7 +185,7 @@ Không thêm các lời chào hỏi ngoài lề, không đọc các ký tự đ�
                     return temp_path
 
         except asyncio.TimeoutError:
-            print(f"⏱️ [Tarot Voice] Model '{model_name}' timeout (>25s), thử model tiếp theo...", flush=True)
+            print(f"⏱️ [Tarot Voice] Model '{model_name}' timeout (>35s), thử model tiếp theo...", flush=True)
         except Exception as e:
             last_error = e
             print(f"⚠️ [Tarot Voice] Model '{model_name}' gặp lỗi: {e}", flush=True)
