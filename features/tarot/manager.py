@@ -15,9 +15,9 @@ class TarotManager:
         self._db: Optional[aiosqlite.Connection] = None
         self._user_last_action: dict[int, float] = {}
 
-    def check_user_cooldown(self, user_id: int, cooldown_seconds: float = 60.0) -> Tuple[bool, float]:
+    def check_user_cooldown(self, user_id: int, cooldown_seconds: float = 30.0) -> Tuple[bool, float]:
         """
-        Kiểm tra cooldown 1 phút giữa 2 lần bốc bài / gọi lệnh của 1 user.
+        Kiểm tra cooldown 30s giữa 2 lần bốc bài / gọi lệnh của 1 user.
         Trả về (can_proceed, remaining_seconds).
         """
         import time
