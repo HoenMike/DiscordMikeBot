@@ -6,6 +6,69 @@ from typing import List, Dict, Optional, Any
 import config
 
 
+MEME_TRUSTED_DOMAINS = [
+    "tenor.com",
+    "giphy.com",
+    "imgflip.com",
+    "knowyourmeme.com",
+    "kym-cdn.com",
+    "redd.it",
+    "reddit.com",
+    "hoyolab.com",
+    "zerochan.net",
+    "gamebanana.com",
+    "fptshop.com.vn",
+    "sforum.vn",
+    "bom.edu.vn",
+    "khoanhdep.com",
+    "genk.mediacdn.vn",
+    "media.makeameme.org",
+    "danbooru",
+    "safebooru",
+]
+
+BAD_KEYWORDS = [
+    "shopee",
+    "lazada",
+    "tiki",
+    "amazon",
+    "aliexpress",
+    "product",
+    "catalog",
+    "san-pham",
+    "mua-ban",
+    "cadbury",
+    "almonds",
+    "chocolate",
+    "pricing",
+    "store",
+    "shop",
+]
+
+
+def score_meme_candidate(url: str, query: str = "") -> int:
+    """Chấm điểm ứng cử viên meme: Ưu tiên nguồn uy tín và ảnh động GIF, trừ điểm trang bán hàng."""
+    score = 0
+    u_lower = url.lower()
+
+    # 1. Điểm cộng cho các website chuyên về Meme / GIF / Gaming / Anime
+    for d in MEME_TRUSTED_DOMAINS:
+        if d in u_lower:
+            score += 50
+            break
+
+    # 2. Điểm cộng rất lớn cho ảnh GIF động (chuẩn reaction meme)
+    if ".gif" in u_lower or "tenor.com" in u_lower or "giphy.com" in u_lower:
+        score += 30
+
+    # 3. Trừ điểm nặng các trang bán hàng, thương mại điện tử, danh mục sản phẩm
+    for bad in BAD_KEYWORDS:
+        if bad in u_lower:
+            score -= 100
+
+    return score
+
+
 class MemeFetcher:
     """Thu thập hình ảnh & GIF Meme từ nhiều nguồn: Web Scraper, Google CSE, Tenor, Giphy và Imgflip."""
 
@@ -38,7 +101,6 @@ class MemeFetcher:
 
                         for u in murls:
                             clean_u = u.strip()
-                            # Kiểm tra định dạng ảnh / gif hoặc liên kết media phổ biến
                             is_valid_media = any(ext in clean_u.lower() for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]) or "tenor.com" in clean_u.lower() or "giphy.com" in clean_u.lower()
                             if is_valid_media:
                                 is_gif = ".gif" in clean_u.lower() or "tenor.com" in clean_u.lower() or "giphy.com" in clean_u.lower()
@@ -168,11 +230,10 @@ class MemeFetcher:
         raw_prompt: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Hợp nhất tìm kiếm meme từ tất cả các nguồn theo chuỗi biến thể tối ưu:
+        Hợp nhất tìm kiếm meme từ tất cả các nguồn theo chuỗi biến thể tối ưu kèm thuật toán xếp hạng:
         1. Google CSE / Tenor / Giphy (nếu có key)
-        2. Web Search theo từ khóa gốc chính xác (raw_prompt)
-        3. Web Search theo biến thể tách từ (ví dụ: 'nono' -> 'no no') & đuôi gif
-        4. Web Search theo từ khóa quốc tế (en_keywords) & tiếng Việt (vi_keywords)
+        2. Quét các biến thể từ khóa trên Web: f"{raw_prompt} gif", f"{raw_prompt} meme", spaced words
+        3. Thuật toán Smart Scoring: Ưu tiên Tenor/Giphy/Reddit/Meme Hubs và loại bỏ ảnh rác/bán hàng
         """
         all_candidates = []
         seen_urls = set()
@@ -191,28 +252,32 @@ class MemeFetcher:
         if config.GIPHY_API_KEY:
             add_items(await cls.fetch_giphy_gifs(raw_prompt or en_keywords))
 
-        # 2. Quét Web theo từ khóa gốc của user (cực kỳ nhạy và chuẩn xác với từ lóng/tên nhân vật)
+        # 2. Quét Web theo các biến thể thông minh
         if raw_prompt:
             clean_raw = raw_prompt.strip()
-            # Tìm trực tiếp raw prompt (VD: 'miyabi nono', 'kek')
-            add_items(await cls.fetch_web_images(clean_raw, limit=6))
+            # Ưu tiên tìm GIF động trước (chuẩn reaction meme)
+            add_items(await cls.fetch_web_images(f"{clean_raw} gif", limit=8))
+            add_items(await cls.fetch_web_images(f"{clean_raw} meme", limit=8))
 
-            # Biến thể tách từ lóng (VD: 'nono' -> 'no no')
+            # Biến thể tách từ (VD: 'nono' -> 'no no')
             if "nono" in clean_raw.lower():
                 spaced = re.sub(r'nono', 'no no', clean_raw, flags=re.IGNORECASE)
+                add_items(await cls.fetch_web_images(f"{spaced} gif", limit=6))
                 add_items(await cls.fetch_web_images(spaced, limit=6))
 
-            # Biến thể kèm đuôi gif / meme nếu chưa có
-            if "gif" not in clean_raw.lower() and "meme" not in clean_raw.lower():
-                add_items(await cls.fetch_web_images(f"{clean_raw} gif", limit=6))
-                add_items(await cls.fetch_web_images(f"{clean_raw} meme", limit=6))
+            add_items(await cls.fetch_web_images(clean_raw, limit=6))
 
-        # 3. Quét Web theo từ khóa tiếng Anh AI đề xuất
+        # 3. Quét Web theo từ khóa tiếng Anh & tiếng Việt AI đề xuất
         if en_keywords and en_keywords != raw_prompt:
             add_items(await cls.fetch_web_images(en_keywords, limit=6))
-
-        # 4. Quét Web theo từ khóa tiếng Việt AI đề xuất
         if vi_keywords and vi_keywords != raw_prompt:
             add_items(await cls.fetch_web_images(vi_keywords, limit=6))
 
-        return all_candidates
+        # 4. Sắp xếp thứ hạng (Smart Ranking)
+        sorted_candidates = sorted(
+            all_candidates,
+            key=lambda x: score_meme_candidate(x["url"], raw_prompt or ""),
+            reverse=True
+        )
+
+        return sorted_candidates
