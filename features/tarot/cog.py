@@ -19,7 +19,6 @@ from features.tarot.manager import TarotManager
 from features.tarot.tarot_view import (
     TarotFlipView,
     TarotLauncherView,
-    TarotTriggerView,
     WIDE_DIVIDER
 )
 from core.ai import split_text
@@ -415,7 +414,7 @@ class TarotCog(commands.Cog):
         # 1. Trường hợp không truyền tham số hoặc yêu cầu mở menu tương tác (UI)
         if spread_arg is None or spread_arg.lower() in ["ui", "menu", "panel", "chon", "open", "launcher"]:
             user_avatar = ctx.author.display_avatar.url if ctx.author.display_avatar else None
-            trigger_view = TarotTriggerView(
+            launcher = TarotLauncherView(
                 author_id=ctx.author.id,
                 author_name=ctx.author.display_name,
                 author_avatar_url=user_avatar,
@@ -424,12 +423,13 @@ class TarotCog(commands.Cog):
                 selected_reader="random",
                 question=None
             )
+            embed = launcher.build_launcher_embed()
             sent_msg = await ctx.reply(
-                "🔮 **Điện Bốc Bài Tarot** — Nhấn nút bên dưới để mở Bảng thiết lập (Chỉ mình bạn thấy):",
-                view=trigger_view,
+                embed=embed,
+                view=launcher,
                 mention_author=False
             )
-            trigger_view.message = sent_msg
+            launcher.message = sent_msg
             return
 
         # 2. Xem lịch sử
@@ -464,7 +464,7 @@ class TarotCog(commands.Cog):
         # 5. Nếu spread_arg không khớp kiểu trải bài nào -> Người dùng có thể đã nhập thẳng câu hỏi
         full_query = f"{spread_arg} {rest or ''}".strip()
         user_avatar = ctx.author.display_avatar.url if ctx.author.display_avatar else None
-        trigger_view = TarotTriggerView(
+        launcher = TarotLauncherView(
             author_id=ctx.author.id,
             author_name=ctx.author.display_name,
             author_avatar_url=user_avatar,
@@ -473,12 +473,13 @@ class TarotCog(commands.Cog):
             selected_reader="random",
             question=full_query
         )
+        embed = launcher.build_launcher_embed()
         sent_msg = await ctx.reply(
-            f"💡 Đã ghi nhận câu hỏi: **{full_query}**\n🔮 Nhấn nút bên dưới để mở Bảng thiết lập (Chỉ mình bạn thấy):",
-            view=trigger_view,
+            embed=embed,
+            view=launcher,
             mention_author=False
         )
-        trigger_view.message = sent_msg
+        launcher.message = sent_msg
 
     @commands.command(
         name="tarot_history",
