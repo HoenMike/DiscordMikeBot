@@ -13,7 +13,6 @@ FEATURE_EXTENSIONS = [
     "features.embed.cog",
     "features.summary.cog",
     "features.tarot.cog",
-    "features.meme.cog",
 ]
 
 
@@ -132,16 +131,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         inline=False
     )
     embed.add_field(
-        name="🎭 3. MEME ENGINE THÔNG MINH (VECTOR & AI)",
-        value=(
-            "• Gửi meme chuẩn 'vibe' cảm xúc hoặc ngữ cảnh bằng AI & Web Search.\n"
-            "• Kho Vector tự học (Self-expanding) và Context Menu chuột phải.\n"
-            "👉 **Lệnh:** `/meme`, `$m meme` | **Xem chi tiết:** Chọn mục `🎭 Meme` bên dưới."
-        ),
-        inline=False
-    )
-    embed.add_field(
-        name="👑 4. TỰ ĐỘNG FIX EMBED LIÊN KẾT",
+        name="👑 3. TỰ ĐỘNG FIX EMBED LIÊN KẾT",
         value=(
             "• Tự động hiển thị video/ảnh cho TikTok, Instagram, Twitter/X, Reddit, Threads.\n"
             "👉 **Lệnh quản trị:** `/autoembed`, `/embedconfig`"
@@ -299,57 +289,6 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
     return embed
 
 
-def build_meme_help_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
-    embed = discord.Embed(
-        title="🎭 HƯỚNG DẪN TÍNH NĂNG MEME ENGINE THÔNG MINH",
-        description=(
-            "Hệ thống tìm kiếm và phản hồi Meme đa phương thức theo mô hình **Hybrid "
-            "(Local Vector Search + AI Context Reasoning + Web Discovery + Self-Expanding Vault)**."
-        ),
-        color=0xF1C40F
-    )
-    embed.add_field(
-        name="💡 CÚ PHÁP SỬ DỤNG LỆNH",
-        value=(
-            "• **Tìm Meme theo cảm xúc / ngữ cảnh:**\n"
-            "  `/meme [prompt]` hoặc `$m meme [prompt]`\n"
-            "  *(Ví dụ: `/meme bất lực nhưng phải cười`, `$m meme độ mixi cay`, `$m meme sếp bảo ot`)*\n\n"
-            "• **Bốc Meme ngẫu nhiên từ kho:**\n"
-            "  `/meme_random` hoặc `$m meme random`\n\n"
-            "• **Xem bảng xếp hạng & thống kê kho:**\n"
-            "  `/meme_stats` hoặc `$m meme stats`\n\n"
-            "• **Thêm meme mới vào kho kèm AI phân tích:**\n"
-            "  `/meme_add [url] [title]` hoặc `$m meme add [url]`"
-        ),
-        inline=False
-    )
-    embed.add_field(
-        name="🖱️ TÍNH NĂNG CHUỘT PHẢI (CONTEXT MENU)",
-        value=(
-            "• **Thả Meme Hợp Cảnh**: Chuột phải vào bất kỳ tin nhắn $\rightarrow$ `Apps` $\rightarrow$ `Thả Meme Hợp Cảnh`.\n"
-            "  *Bot sẽ đọc tin nhắn đó và gửi một meme phản hồi đối đáp cực chuẩn!*\n\n"
-            "• **Lưu Vào Kho Meme**: Chuột phải vào tin nhắn có ảnh/GIF $\rightarrow$ `Apps` $\rightarrow$ `Lưu Vào Kho Meme`.\n"
-            "  *Vision AI sẽ tự động nhìn ảnh, gán tags và nạp vector vào DB.*"
-        ),
-        inline=False
-    )
-    embed.add_field(
-        name="⚡ NÚT BẤM TƯƠNG TÁC DƯỚI MỖI MEME",
-        value=(
-            "• `🎲 Đổi Meme`: Chuyển sang ảnh/GIF tiếp theo trong danh sách kết quả.\n"
-            "• `⭐ Lưu Vào Kho`: Đưa meme từ Web Search vào kho Vector vĩnh viễn.\n"
-            "• `😆 Haha`: Thả Haha cho meme để tăng thứ hạng bảng xếp hạng.\n"
-            "• `❌ Đóng`: Xóa tin nhắn sạch sẽ khỏi kênh chat."
-        ),
-        inline=False
-    )
-    embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Meme Engine",
-        icon_url=user.display_avatar.url if user.display_avatar else None
-    )
-    return embed
-
-
 class HelpView(discord.ui.View):
     """View điều hướng tương tác giữa các trang hướng dẫn của MikeBot."""
 
@@ -384,12 +323,6 @@ class HelpView(discord.ui.View):
                     default=(self.current_tab == "summary")
                 ),
                 discord.SelectOption(
-                    label="🎭 Meme Engine (AI & Web)",
-                    value="meme",
-                    description="Hướng dẫn gửi meme theo cảm xúc và Context Menu",
-                    default=(self.current_tab == "meme")
-                ),
-                discord.SelectOption(
                     label="👑 Tự Động Embed Liên Kết",
                     value="embed",
                     description="Hướng dẫn và cấu hình tự động sửa link MXH",
@@ -416,8 +349,6 @@ class HelpView(discord.ui.View):
             return build_tarot_help_embed(user)
         elif self.current_tab == "summary":
             return build_summary_help_embed(user)
-        elif self.current_tab == "meme":
-            return build_meme_help_embed(user)
         elif self.current_tab == "embed":
             return build_embed_help_embed(user)
         else:
@@ -482,7 +413,6 @@ async def send_bot_help(
 @app_commands.choices(feature=[
     app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
     app_commands.Choice(name="📝 Tóm Tắt Tin Nhắn (AI)", value="summary"),
-    app_commands.Choice(name="🎭 Meme Engine (AI & Web)", value="meme"),
     app_commands.Choice(name="👑 Tự Động Fix Embed Link", value="embed"),
     app_commands.Choice(name="🌐 Tổng Quan Tất Cả Tính Năng", value="overview"),
 ])
@@ -494,12 +424,11 @@ async def help_slash(
     await send_bot_help(interaction, feature=chosen, ephemeral=True)
 
 
-@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng MikeBot (Tarot, Tóm tắt, Meme, Embed)")
+@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng MikeBot (Tarot, Tóm tắt, Embed)")
 @app_commands.describe(feature="Chọn tính năng bạn muốn xem hướng dẫn chi tiết")
 @app_commands.choices(feature=[
     app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
     app_commands.Choice(name="📝 Tóm Tắt Tin Nhắn (AI)", value="summary"),
-    app_commands.Choice(name="🎭 Meme Engine (AI & Web)", value="meme"),
     app_commands.Choice(name="👑 Tự Động Fix Embed Link", value="embed"),
     app_commands.Choice(name="🌐 Tổng Quan Tất Cả Tính Năng", value="overview"),
 ])
@@ -520,8 +449,6 @@ async def help_cmd(ctx: commands.Context, *, feature_arg: Optional[str] = None):
             chosen = "tarot"
         elif arg_lower in ["tomtat", "summary", "sum", "chat"]:
             chosen = "summary"
-        elif arg_lower in ["meme", "m", "anhche", "haihuoc"]:
-            chosen = "meme"
         elif arg_lower in ["embed", "fixembed", "link"]:
             chosen = "embed"
     await send_bot_help(ctx, feature=chosen)
