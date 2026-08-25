@@ -156,13 +156,19 @@ class MemeFetcher:
         return results
 
     @classmethod
-    async def discover_meme(cls, vi_keywords: str, en_keywords: str) -> List[Dict[str, Any]]:
+    async def discover_meme(
+        cls,
+        vi_keywords: str,
+        en_keywords: str,
+        raw_prompt: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """
         Hợp nhất tìm kiếm meme từ tất cả các nguồn theo thứ tự ưu tiên:
         1. Google CSE (nếu có key)
         2. Tenor / Giphy (nếu có key)
-        3. Web Image Scraper (tiếng Việt)
-        4. Web Image Scraper (tiếng Anh)
+        3. Web Image Scraper theo raw_prompt (ví dụ: 'kek meme')
+        4. Web Image Scraper theo en_keywords (quốc tế)
+        5. Web Image Scraper theo vi_keywords (tiếng Việt)
         """
         all_candidates = []
 
@@ -180,15 +186,25 @@ class MemeFetcher:
         if giphy_res:
             all_candidates.extend(giphy_res)
 
-        # 3. Quét Web theo từ khóa tiếng Việt (rất tốt cho meme Việt Nam)
-        web_vi_res = await cls.fetch_web_images(vi_keywords, limit=8)
-        if web_vi_res:
-            all_candidates.extend(web_vi_res)
+        # 3. Quét Web theo từ khóa gốc của user (cực kỳ chuẩn xác cho tên meme cụ thể như 'kek', 'pepe'...)
+        if raw_prompt:
+            clean_raw = raw_prompt.strip()
+            query_raw = f"{clean_raw} meme" if "meme" not in clean_raw.lower() else clean_raw
+            web_raw_res = await cls.fetch_web_images(query_raw, limit=8)
+            if web_raw_res:
+                all_candidates.extend(web_raw_res)
 
-        # 4. Quét Web theo từ khóa tiếng Anh (bổ sung ảnh quốc tế)
-        web_en_res = await cls.fetch_web_images(en_keywords, limit=8)
-        if web_en_res:
-            all_candidates.extend(web_en_res)
+        # 4. Quét Web theo từ khóa tiếng Anh (bổ sung ảnh/GIF quốc tế)
+        if en_keywords:
+            web_en_res = await cls.fetch_web_images(en_keywords, limit=8)
+            if web_en_res:
+                all_candidates.extend(web_en_res)
+
+        # 5. Quét Web theo từ khóa tiếng Việt
+        if vi_keywords:
+            web_vi_res = await cls.fetch_web_images(vi_keywords, limit=8)
+            if web_vi_res:
+                all_candidates.extend(web_vi_res)
 
         # Khử trùng lặp URL
         unique_results = []

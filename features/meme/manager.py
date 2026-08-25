@@ -142,6 +142,33 @@ INITIAL_SEEDS = [
         "tags": ["omedetou", "shinji", "evangelion", "vỗ tay", "chúc mừng", "congratulations", "anime", "mỉa mai"],
         "vibe": "Vỗ tay chúc mừng một cách trịnh trọng hoặc mỉa mai một màn thể hiện khó đỡ",
         "source": "seed"
+    },
+    {
+        "title": "KEKW / Pepe Laugh (Cười Bể Bụng El Risitas)",
+        "url": "https://media.tenor.com/T0b4_qG3i_wAAAAC/kekw-kek.gif",
+        "media_type": "gif",
+        "caption": "KEKW! Cười không nhặt được mồm luôn á!",
+        "tags": ["kek", "kekw", "pepelaugh", "cười", "el risitas", "twitch", "emote", "lmao", "lol", "cười lăn lộn"],
+        "vibe": "Cười lăn lộn, cười nghiêng ngả, cười vỡ bụng trước một tình huống quá buồn cười",
+        "source": "seed"
+    },
+    {
+        "title": "GigaChad (Người Đàn Ông Hoàn Hảo Alpha Male)",
+        "url": "https://media.tenor.com/F3bOQfU0a-wAAAAC/gigachad-chad.gif",
+        "media_type": "gif",
+        "caption": "Vâng, tôi làm vậy đấy, thì sao nào?",
+        "tags": ["gigachad", "chad", "alpha", "nam tính", "tự tin", "đẳng cấp", "bản lĩnh", "bá đạo"],
+        "vibe": "Tự tin ngút trời, điềm tĩnh chấp nhận mọi ý kiến với phong thái đỉnh cao",
+        "source": "seed"
+    },
+    {
+        "title": "Wojak Crying Behind Mask (Khóc Thầm Sau Mặt Nạ Cười)",
+        "url": "https://i.imgflip.com/4acc2v.jpg",
+        "media_type": "image",
+        "caption": "Bên ngoài cười ha ha, bên trong khóc ròng rã!",
+        "tags": ["wojak", "khóc sau mặt nạ", "crying mask", "đau lòng", "bất lực", "giả vờ ổn", "doomer", "sad"],
+        "vibe": "Giả vờ vui vẻ đắc ý trước mặt mọi người nhưng thực ra bên trong đang cay cú tổn thương",
+        "source": "seed"
     }
 ]
 
@@ -218,21 +245,19 @@ class MemeManager:
         print("[MemeManager] Đã khởi tạo cơ sở dữ liệu Meme Vault thành công.", flush=True)
 
     async def seed_vault_if_empty(self, embed_fn) -> int:
-        """Nạp các meme kinh điển ban đầu và vector hóa chúng nếu DB còn trống."""
+        """Nạp các meme kinh điển ban đầu và vector hóa chúng nếu chưa có trong DB."""
         db = await self.get_db()
-        cursor = await db.execute("SELECT COUNT(*) as cnt FROM memes")
-        row = await cursor.fetchone()
-        count = row["cnt"] if row else 0
-
-        if count > 0:
-            return count
-
-        print("[MemeManager] Đang vector hóa và nạp Seed Vault ban đầu...", flush=True)
         added = 0
         now_str = datetime.now(timezone.utc).isoformat()
 
         for item in INITIAL_SEEDS:
             try:
+                # Kiểm tra xem meme đã có trong DB chưa
+                cursor = await db.execute("SELECT 1 FROM memes WHERE url = ?", (item["url"],))
+                exists = await cursor.fetchone()
+                if exists:
+                    continue
+
                 # Ghép chuỗi ngữ nghĩa để tạo vector chất lượng cao
                 text_to_embed = f"Title: {item['title']}. Vibe: {item['vibe']}. Tags: {', '.join(item['tags'])}. Caption: {item['caption']}"
                 vector = await embed_fn(text_to_embed)
@@ -262,9 +287,13 @@ class MemeManager:
             except Exception as e:
                 print(f"[MemeManager] Lỗi seed meme '{item['title']}': {e}", flush=True)
 
-        await db.commit()
-        print(f"[MemeManager] Đã nạp thành công {added} meme kinh điển vào Vector Vault.", flush=True)
-        return added
+        if added > 0:
+            await db.commit()
+            print(f"[MemeManager] Đã nạp thành công {added} meme kinh điển mới vào Vector Vault.", flush=True)
+
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM memes")
+        row = await cursor.fetchone()
+        return row["cnt"] if row else 0
 
     async def add_meme(
         self,

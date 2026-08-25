@@ -67,16 +67,24 @@ class MemeCog(commands.Cog):
 
         try:
             # 2. Bước 1: Vector Search trong kho nội bộ
-            query_vector = await MemeAI.get_embedding(prompt_clean)
+            # 2. Bước 1: Tra cứu Vector Search & Keyword Search trong kho nội bộ
             local_matches = []
+            keyword_matches = await self.meme_manager.search_keywords(prompt_clean, limit=3)
+            query_vector = await MemeAI.get_embedding(prompt_clean)
             if query_vector:
-                local_matches = await self.meme_manager.search_vector(query_vector, top_k=3, threshold=0.75)
+                vector_matches = await self.meme_manager.search_vector(query_vector, top_k=3, threshold=0.75)
+                # Gộp kết quả keyword và vector (ưu tiên keyword nếu khớp chính xác tên meme)
+                seen_ids = set()
+                for m in keyword_matches + vector_matches:
+                    if m["id"] not in seen_ids:
+                        seen_ids.add(m["id"])
+                        local_matches.append(m)
 
             candidates = []
             ai_data = {}
 
-            # Nếu có kết quả Vector HIT (độ tương đồng >= 75%)
-            if local_matches and local_matches[0]["similarity"] >= 0.75:
+            # Nếu có kết quả Vector/Keyword HIT
+            if local_matches and (keyword_matches or local_matches[0]["similarity"] >= 0.75):
                 candidates = local_matches
                 best_hit = local_matches[0]
                 await self.meme_manager.use_meme(best_hit["id"])
@@ -90,7 +98,8 @@ class MemeCog(commands.Cog):
                 ai_data = await MemeAI.reason_meme_context(prompt_clean, chat_context)
                 web_results = await MemeFetcher.discover_meme(
                     vi_keywords=ai_data.get("vi_keywords", prompt_clean),
-                    en_keywords=ai_data.get("en_keywords", prompt_clean)
+                    en_keywords=ai_data.get("en_keywords", prompt_clean),
+                    raw_prompt=prompt_clean
                 )
 
                 # Ghép kết quả nội bộ (nếu có) và kết quả Web

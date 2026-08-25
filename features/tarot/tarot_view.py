@@ -672,7 +672,7 @@ class TarotFlipView(discord.ui.View):
             # Xây dựng danh sách lá bài rút được
             cards_summary_lines = []
             for drawn in self.drawn_cards:
-                orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
+                orient = "`[NGƯỢC]`" if drawn.is_reversed else "`[XUÔI]`"
                 cards_summary_lines.append(
                     f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
                 )
@@ -805,7 +805,7 @@ class TarotFlipView(discord.ui.View):
             cards_summary_lines = []
             for idx, drawn in enumerate(self.drawn_cards):
                 if idx in self.revealed_indices:
-                    orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
+                    orient = "`[NGƯỢC]`" if drawn.is_reversed else "`[XUÔI]`"
                     cards_summary_lines.append(
                         f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
                     )
@@ -864,7 +864,7 @@ class TarotFlipView(discord.ui.View):
             # Xây dựng danh sách lá bài rút được
             cards_summary_lines = []
             for drawn in self.drawn_cards:
-                orient = "🔴 `[NGƯỢC]`" if drawn.is_reversed else "🟢 `[XUÔI]`"
+                orient = "`[NGƯỢC]`" if drawn.is_reversed else "`[XUÔI]`"
                 cards_summary_lines.append(
                     f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
                 )
