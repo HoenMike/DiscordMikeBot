@@ -124,10 +124,68 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
         await interaction.response.edit_message(embed=embed, view=self.launcher_view)
 
 
+class TarotTriggerView(discord.ui.View):
+    """View rút gọn chứa nút bấm mở Bảng Điều Khiển Tarot Riêng Tư (Ephemeral)."""
+
+    def __init__(
+        self,
+        author_id: int,
+        author_name: str,
+        author_avatar_url: Optional[str],
+        tarot_manager: TarotManager,
+        selected_spread: str = "daily",
+        selected_reader: str = "random",
+        question: Optional[str] = None,
+        timeout: float = 300.0,
+    ):
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.author_name = author_name
+        self.author_avatar_url = author_avatar_url
+        self.tarot_manager = tarot_manager
+        self.selected_spread = selected_spread
+        self.selected_reader = selected_reader
+        self.question = question
+        self.message: Optional[discord.Message] = None
+
+    @discord.ui.button(
+        label="🔮 Mở Bảng Chọn Trải Bài (Riêng Tư)",
+        style=discord.ButtonStyle.primary,
+        custom_id="trigger_open_tarot_launcher"
+    )
+    async def open_launcher(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Nút này dành riêng cho người đã gọi lệnh!", ephemeral=True)
+            return
+
+        launcher = TarotLauncherView(
+            author_id=self.author_id,
+            author_name=self.author_name,
+            author_avatar_url=self.author_avatar_url,
+            tarot_manager=self.tarot_manager,
+            selected_spread=self.selected_spread,
+            selected_reader=self.selected_reader,
+            question=self.question,
+            trigger_message=self.message
+        )
+        embed = launcher.build_launcher_embed()
+        await interaction.response.send_message(embed=embed, view=launcher, ephemeral=True)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except Exception:
+                pass
+
+
 class TarotLauncherView(discord.ui.View):
     """
-    View Bảng Điều Khiển Tương Tác (Launcher UI):
-    Cho phép chọn Kiểu trải bài, Người giải bài, Nhập câu hỏi qua Modal và Bốc bài trực tiếp.
+    View Bảng Điều Khiển Tương Tác (Launcher UI - Private / Ephemeral):
+    Cho phép chọn Kiểu trải bài, Người giải bài, Nhập câu hỏi qua Modal riêng tư,
+    và sau đó bung quẻ bài công khai (Public) ra kênh chat.
     """
 
     def __init__(
@@ -140,6 +198,7 @@ class TarotLauncherView(discord.ui.View):
         selected_reader: str = "random",
         question: Optional[str] = None,
         context: Optional[str] = None,
+        trigger_message: Optional[discord.Message] = None,
         timeout: float = 300.0,
     ):
         super().__init__(timeout=timeout)
@@ -151,6 +210,7 @@ class TarotLauncherView(discord.ui.View):
         self.selected_reader = selected_reader
         self.question = question
         self.context = context
+        self.trigger_message = trigger_message
         self.message: Optional[discord.Message] = None
 
         self._build_components()
@@ -174,6 +234,7 @@ class TarotLauncherView(discord.ui.View):
 
         lines = [
             f"Chào mừng **{self.author_name}** đến với không gian chiêm tinh học Tarot huyền bí!\n",
+            f"🔒 *(Bảng điều khiển này là riêng tư, chỉ mình bạn nhìn thấy)*\n",
             f"**🔮 THIẾT LẬP QUẺ BÀI:**",
             f"• 🃏 **Kiểu trải bài:** **{spread_info['name']}**",
             f"• 🎭 **Người giải bài:** {reader_display}",
@@ -183,11 +244,11 @@ class TarotLauncherView(discord.ui.View):
             "💡 **Hướng dẫn thao tác:**",
             "1. Chọn kiểu trải bài & người giải bài từ **2 Menu thả xuống** bên dưới.",
             "2. Nhấn nút **✏️ Đặt Câu Hỏi** để nhập câu hỏi / bối cảnh cụ thể.",
-            "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để bước vào giao diện lật mở quẻ bài trực quan!"
+            "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để bung quẻ bài công khai ra kênh chat!"
         ]
 
         embed = discord.Embed(
-            title="🔮 ĐIỆN BÓC BÀI TAROT HUYỀN BÍ",
+            title="🔮 ĐIỆN BỐC BÀI TAROT HUYỀN BÍ (RIÊNG TƯ)",
             description="\n".join(lines),
             color=embed_color
         )
@@ -330,8 +391,8 @@ class TarotLauncherView(discord.ui.View):
         await self.start_reading(interaction)
 
     async def start_reading(self, interaction: discord.Interaction):
-        """Chuyển đổi giao diện sang TarotFlipView để người dùng lật mở bài trực tiếp."""
-        await interaction.response.defer()
+        """Tạo quẻ bài công khai trong kênh chat và đóng bảng điều khiển riêng tư."""
+        await interaction.response.defer(ephemeral=True)
 
         drawn_cards = draw_spread(self.selected_spread)
         spread_info = SPREAD_DEFINITIONS[self.selected_spread]
@@ -403,13 +464,26 @@ class TarotLauncherView(discord.ui.View):
             icon_url=self.author_avatar_url
         )
 
+        # 1. Gửi quẻ bài CÔNG KHAI vào kênh chat
+        if interaction.channel:
+            sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
+            flip_view.message = sent_msg
+
+        # 2. Phản hồi xác nhận trong bảng riêng tư (Ephemeral)
         try:
-            await interaction.edit_original_response(embed=embed, attachments=[file], view=flip_view)
-            flip_view.message = self.message or interaction.message
+            await interaction.followup.send(
+                "✨ **Quẻ bài của bạn đã được trải công khai tại kênh chat!** Hãy theo dõi và lật bài bên dưới nhé.",
+                ephemeral=True
+            )
         except Exception:
-            if self.message:
-                await self.message.edit(embed=embed, attachments=[file], view=flip_view)
-                flip_view.message = self.message
+            pass
+
+        # 3. Dọn dẹp trigger message nếu có
+        if self.trigger_message:
+            try:
+                await self.trigger_message.delete()
+            except Exception:
+                pass
 
         self.stop()
 
@@ -455,7 +529,7 @@ class TarotLauncherView(discord.ui.View):
 
         self.clear_items()
         embed = discord.Embed(
-            title="🔮 ĐIỆN BÓC BÀI TAROT",
+            title="🔮 ĐIỆN BỐC BÀI TAROT",
             description="❌ *Bảng điều khiển bốc bài Tarot đã được đóng lại.*",
             color=0x7F8C8D
         )
@@ -471,7 +545,7 @@ class TarotLauncherView(discord.ui.View):
         if self.message:
             try:
                 embed = discord.Embed(
-                    title="🔮 ĐIỆN BÓC BÀI TAROT",
+                    title="🔮 ĐIỆN BỐC BÀI TAROT",
                     description="⏳ *Bảng điều khiển đã hết thời gian tương tác (5 phút).* Hãy gõ `$m tarot` để mở lại!",
                     color=0x7F8C8D
                 )

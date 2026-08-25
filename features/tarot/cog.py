@@ -15,7 +15,12 @@ from features.tarot.deck import (
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
 from features.tarot.manager import TarotManager
-from features.tarot.tarot_view import TarotFlipView, TarotLauncherView, WIDE_DIVIDER
+from features.tarot.tarot_view import (
+    TarotFlipView,
+    TarotLauncherView,
+    TarotTriggerView,
+    WIDE_DIVIDER
+)
 from core.ai import split_text
 
 
@@ -370,19 +375,29 @@ class TarotCog(commands.Cog):
         # 1. Trường hợp không truyền tham số hoặc yêu cầu mở menu tương tác (UI)
         if spread_arg is None or spread_arg.lower() in ["ui", "menu", "panel", "chon", "open", "launcher"]:
             user_avatar = ctx.author.display_avatar.url if ctx.author.display_avatar else None
-            launcher_view = TarotLauncherView(
+            trigger_view = TarotTriggerView(
                 author_id=ctx.author.id,
                 author_name=ctx.author.display_name,
                 author_avatar_url=user_avatar,
                 tarot_manager=self.tarot_manager,
                 selected_spread="daily",
                 selected_reader="random",
-                question=None,
-                context=None
+                question=None
             )
-            embed = launcher_view.build_launcher_embed()
-            sent_msg = await ctx.reply(embed=embed, view=launcher_view, mention_author=False)
-            launcher_view.message = sent_msg
+            embed = discord.Embed(
+                title="🔮 ĐIỆN BÓC BÀI TAROT HUYỀN BÍ",
+                description=(
+                    f"Chào **{ctx.author.display_name}**! Hãy nhấn nút **Mở Bảng Chọn Trải Bài** bên dưới để thiết lập quẻ bài riêng tư (chỉ một mình bạn nhìn thấy).\n\n"
+                    f"✨ *Sau khi thiết lập xong, bài Tarot sẽ được **trải và lật mở công khai** tại kênh chat!*"
+                ),
+                color=0x7851A9
+            )
+            embed.set_footer(
+                text=f"Yêu cầu bởi {ctx.author.display_name} • MikeBot Tarot",
+                icon_url=user_avatar
+            )
+            sent_msg = await ctx.reply(embed=embed, view=trigger_view, mention_author=False)
+            trigger_view.message = sent_msg
             return
 
         # 2. Xem lịch sử
@@ -417,24 +432,29 @@ class TarotCog(commands.Cog):
         # 5. Nếu spread_arg không khớp kiểu trải bài nào -> Người dùng có thể đã nhập thẳng câu hỏi
         full_query = f"{spread_arg} {rest or ''}".strip()
         user_avatar = ctx.author.display_avatar.url if ctx.author.display_avatar else None
-        launcher_view = TarotLauncherView(
+        trigger_view = TarotTriggerView(
             author_id=ctx.author.id,
             author_name=ctx.author.display_name,
             author_avatar_url=user_avatar,
             tarot_manager=self.tarot_manager,
             selected_spread="single",  # Mặc định Single Card nếu có câu hỏi
             selected_reader="random",
-            question=full_query,
-            context=None
+            question=full_query
         )
-        embed = launcher_view.build_launcher_embed()
-        sent_msg = await ctx.reply(
-            content=f"💡 Đã ghi nhận câu hỏi: **{full_query}**. Bạn có thể tùy chỉnh kiểu trải bài hoặc bấm **🎴 Bắt Đầu Bốc Bài** bên dưới:",
-            embed=embed,
-            view=launcher_view,
-            mention_author=False
+        embed = discord.Embed(
+            title="🔮 ĐIỆN BÓC BÀI TAROT HUYỀN BÍ",
+            description=(
+                f"💡 Đã ghi nhận câu hỏi: **{full_query}**\n\n"
+                f"Hãy nhấn nút bên dưới để mở Bảng chọn quẻ bài riêng tư của bạn:"
+            ),
+            color=0x7851A9
         )
-        launcher_view.message = sent_msg
+        embed.set_footer(
+            text=f"Yêu cầu bởi {ctx.author.display_name} • MikeBot Tarot",
+            icon_url=user_avatar
+        )
+        sent_msg = await ctx.reply(embed=embed, view=trigger_view, mention_author=False)
+        trigger_view.message = sent_msg
 
     @commands.command(
         name="tarot_history",
