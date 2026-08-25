@@ -1,7 +1,9 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import sys
 import traceback
+from typing import Optional, Union, List, Dict
 from core.config_manager import ConfigManager
 
 intents = discord.Intents.default()
