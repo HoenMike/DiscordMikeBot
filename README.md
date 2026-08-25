@@ -83,13 +83,23 @@ Khi nhận tín hiệu tắt (SIGTERM/SIGINT), bot hoãn tối đa 15 giây đ�
 
 Tóm tắt lịch sử trò chuyện của một kênh chat.
 
-| Tham số        | Mô tả                                                      | Mặc định           |
-|----------------|-------------------------------------------------------------|---------------------|
-| `channel`      | Kênh cần tóm tắt                                           | Kênh hiện tại       |
-| `hours`        | Quét tin nhắn trong X giờ qua (tối đa 168 giờ / 7 ngày)    | 2.0                 |
-| `limit`        | Số lượng tin nhắn quét tối đa (tối đa 2500)                 | 150                 |
-| `summary_type` | `short` (ngắn gọn) hoặc `long` (chi tiết kèm timeline)     | `short`             |
-| `focus`        | Chủ đề hoặc từ khóa cần phân tích sâu                       | Không               |
+| Tham số        | Mô tả                                                                 | Mặc định           |
+|----------------|------------------------------------------------------------------------|---------------------|
+| `channel`      | Kênh cần tóm tắt                                                      | Kênh hiện tại       |
+| `hours`        | Quét tin nhắn trong X giờ qua (tối đa 168 giờ / 7 ngày)               | 2.0                 |
+| `date`         | Quét theo ngày cụ thể (VD: `19/05/2024` hoặc `19/05/24`)               | Không               |
+| `from_time`    | Giờ bắt đầu quét theo GMT+7 (VD: `00:00` hoặc `0h`)                    | `00:00`             |
+| `to_time`      | Giờ kết thúc quét theo GMT+7 (VD: `04:00` hoặc `4h`)                   | `23:59`             |
+| `message_link` | Link tin nhắn Discord hoặc Message ID để làm điểm neo bắt đầu quét     | Không               |
+| `limit`        | Số lượng tin nhắn quét tối đa (tối đa 2500)                            | 150 (hoặc 1000/300) |
+| `summary_type` | `short` (ngắn gọn) hoặc `long` (chi tiết kèm timeline)                | `short`             |
+| `focus`        | Chủ đề hoặc từ khóa cần phân tích sâu                                  | Không               |
+| `send_to_dm`   | Gửi kết quả riêng vào DM của bạn thay vì đăng lên kênh chung           | `False`             |
+
+**Ví dụ sử dụng:**
+- Quét khung giờ chính xác và gửi về DM riêng tư: `/tomtat date:19/05/2024 from_time:00:00 to_time:04:00 summary_type:long send_to_dm:True`
+- Quét từ link tin nhắn: `/tomtat message_link:https://discord.com/channels/.../.../124144... limit:300`
+- Prefix command tương đương: `$m tt 19/05/2024 00:00 04:00 long dm` hoặc `$m tt <message_link> 300 dm`
 
 Cooldown: 30 giây mỗi người dùng.
 
