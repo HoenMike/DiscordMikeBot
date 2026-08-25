@@ -134,7 +134,13 @@ class MemeCog(commands.Cog):
                 sent_msg = await interaction.followup.send(embed=embed, view=view)
                 view.message = sent_msg
             elif ctx:
-                sent_msg = await ctx.reply(embed=embed, view=view, mention_author=False)
+                # Tự động xóa tin nhắn lệnh $m meme của người dùng nếu ở server
+                if ctx.guild:
+                    try:
+                        await ctx.message.delete()
+                    except Exception:
+                        pass
+                sent_msg = await ctx.send(embed=embed, view=view)
                 view.message = sent_msg
 
             config.meme_count += 1
@@ -292,7 +298,12 @@ class MemeCog(commands.Cog):
                 prompt="Meme ngẫu nhiên"
             )
             embed = view.build_embed(ctx.author)
-            sent_msg = await ctx.reply(embed=embed, view=view, mention_author=False)
+            if ctx.guild:
+                try:
+                    await ctx.message.delete()
+                except Exception:
+                    pass
+            sent_msg = await ctx.send(embed=embed, view=view)
             view.message = sent_msg
             return
 

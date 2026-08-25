@@ -88,29 +88,9 @@ class MemeInteractiveView(discord.ui.View):
         if not meme:
             return discord.Embed(title="❌ Không tìm thấy meme phù hợp!", color=discord.Color.red())
 
-        caption = meme.get("caption") or self.ai_data.get("caption") or f"Tâm trạng: {self.prompt}"
-        vibe = meme.get("vibe") or self.ai_data.get("vibe", "Hài hước")
-        matched = meme.get("title") or self.ai_data.get("matched_meme", "Meme")
-
-        embed = discord.Embed(
-            title=f"🎭 {matched}",
-            description=f"💬 *\"{caption}\"*\n\n✨ **Vibe:** `{vibe}`",
-            color=0xF1C40F
-        )
+        # Giao diện tối giản: Chỉ hiển thị hình ảnh/GIF sạch sẽ cùng các nút tương tác
+        embed = discord.Embed(color=0x2B2D31)
         embed.set_image(url=meme["url"])
-
-        similarity = meme.get("similarity")
-        source = meme.get("source", "web")
-        source_label = "⚡ Kho Vector Vault (Hit)" if source in ["seed", "vault"] else "🌐 Khám phá từ Web Search"
-
-        footer_text = f"Yêu cầu bởi {user.display_name} • {source_label}"
-        if similarity and similarity < 1.0:
-            footer_text += f" (Khớp {int(similarity * 100)}%)"
-
-        embed.set_footer(
-            text=footer_text,
-            icon_url=user.display_avatar.url if user.display_avatar else None
-        )
         return embed
 
     async def _handle_reroll(self, interaction: discord.Interaction):
