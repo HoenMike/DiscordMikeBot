@@ -22,12 +22,12 @@ VOICE_MAP = {
 
 # Ánh xạ phong cách Reader sang cấu hình giọng Edge Neural TTS tiếng Việt (Tối ưu ngữ điệu & tốc độ)
 EDGE_VOICE_CONFIG = {
-    # ⚖️ Orion: Nam trầm ấm, điềm đạm, suy tư -> Giảm nhẹ tốc độ (-8%), hạ pitch (-2Hz)
-    "neutral": {"voice": "vi-VN-NamMinhNeural", "pitch": "-2Hz", "rate": "-8%"},
-    # 🌸 Celeste: Nữ dịu dàng, ân cần, ấm áp -> Nhịp chậm rãi vỗ về (-6%), pitch tự nhiên
-    "healer": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate": "-6%"},
-    # 🃏 Jester: Hóm hỉnh, tưng tửng -> Pitch cao hơn (+8Hz), nhịp nhanh vừa phải (+4%)
-    "chaos": {"voice": "vi-VN-NamMinhNeural", "pitch": "+8Hz", "rate": "+4%"},
+    # ⚖️ Orion: Nam trầm ấm, điềm đạm, suy tư -> Giảm nhẹ tốc độ (-5%), hạ pitch (-4Hz)
+    "neutral": {"voice": "vi-VN-NamMinhNeural", "pitch": "-4Hz", "rate": "-5%"},
+    # 🌸 Celeste: Nữ dịu dàng, ân cần, ấm áp -> Nhịp chậm rãi vỗ về (-5%), pitch tự nhiên
+    "healer": {"voice": "vi-VN-HoaiMyNeural", "pitch": "+0Hz", "rate": "-5%"},
+    # 🃏 Jester: Hóm hỉnh, tưng tửng -> Pitch cao hơn (+6Hz), nhịp lanh lợi (+5%)
+    "chaos": {"voice": "vi-VN-NamMinhNeural", "pitch": "+6Hz", "rate": "+5%"},
 }
 
 # Tập hợp theo dõi các server đang có luồng đọc bài Voice (tránh xung đột)
@@ -231,6 +231,134 @@ Không thêm các lời chào hỏi ngoài lề, không đọc các ký tự đ�
     return None
 
 
+async def _execute_voice_playback(
+    guild: discord.Guild,
+    voice_channel: discord.VoiceChannel,
+    temp_audio_path: str,
+    reader_name: str
+):
+    """Thực thi kết nối vào voice channel, phát file audio và ngắt kết nối khi hoàn tất."""
+    _active_voice_guilds.add(guild.id)
+    voice_client: Optional[discord.VoiceClient] = None
+
+    try:
+        # 1. Kiểm tra và dọn dẹp các session voice cũ (nếu có) trước khi kết nối
+        existing_vc = guild.voice_client
+        if existing_vc:
+            if existing_vc.is_connected():
+                if existing_vc.channel.id != voice_channel.id:
+                    await existing_vc.move_to(voice_channel)
+                voice_client = existing_vc
+            else:
+                try:
+                    await existing_vc.disconnect(force=True)
+                except Exception:
+                    pass
+                await asyncio.sleep(0.5)
+                voice_client = await voice_channel.connect(timeout=15.0, reconnect=False, self_deaf=True)
+        else:
+            voice_client = await voice_channel.connect(timeout=15.0, reconnect=False, self_deaf=True)
+
+        # 2. Phát âm thanh qua FFmpeg
+        finished_event = asyncio.Event()
+
+        def _after_play(error):
+            if error:
+                print(f"⚠️ [Tarot Voice] Lỗi khi phát audio: {error}", flush=True)
+            finished_event.set()
+
+        # Dùng FFmpegPCMAudio
+        audio_source = discord.FFmpegPCMAudio(temp_audio_path)
+        voice_client.play(audio_source, after=_after_play)
+        print(f"🔊 [Tarot Voice] Đang phát bài đọc của {reader_name} trong kênh '{voice_channel.name}'...", flush=True)
+
+        # 3. Chờ phát xong hoặc kiểm tra nếu phòng trống
+        while not finished_event.is_set():
+            if not voice_client.is_connected():
+                break
+            human_members = [m for m in voice_channel.members if not m.bot]
+            if not human_members:
+                print(f"🏃 [Tarot Voice] Kênh '{voice_channel.name}' không còn ai nghe, dừng phát...", flush=True)
+                if voice_client.is_playing():
+                    voice_client.stop()
+                break
+            await asyncio.sleep(0.5)
+
+    except Exception as e:
+        print(f"❌ [Tarot Voice] Lỗi trong quá trình phát Voice: {e}", flush=True)
+        raise e
+
+    finally:
+        _active_voice_guilds.discard(guild.id)
+        if voice_client and voice_client.is_connected():
+            try:
+                await voice_client.disconnect(force=True)
+                print(f"👋 [Tarot Voice] Đã rời kênh thoại '{voice_channel.name}'.", flush=True)
+            except Exception as dc_err:
+                print(f"⚠️ [Tarot Voice] Lỗi khi ngắt kết nối voice: {dc_err}", flush=True)
+
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.remove(temp_audio_path)
+                print(f"🧹 [Tarot Voice] Đã xóa file tạm: {temp_audio_path}", flush=True)
+            except Exception as del_err:
+                print(f"⚠️ [Tarot Voice] Lỗi xóa file tạm: {del_err}", flush=True)
+
+
+async def auto_play_tarot_voice(
+    guild: discord.Guild,
+    voice_channel: discord.VoiceChannel,
+    reading_text: str,
+    reader_style: str,
+    user_name: str,
+    spread_name: str = "",
+    preload_task: Optional[asyncio.Task] = None,
+    result_view: Optional[Any] = None
+):
+    """
+    Tự động kết nối vào Voice Channel và đọc bài khi người bốc bài đang ở sẵn trong kênh thoại.
+    """
+    if guild.id in _active_voice_guilds:
+        print(f"⏳ [Tarot Voice Auto] Bot đang bận đọc ở kênh khác trong server {guild.name}.", flush=True)
+        if result_view:
+            await result_view.on_auto_play_finished(is_busy=True)
+        return
+
+    style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
+    reader_name = style_info.get("name", "Reader")
+
+    # 1. Lấy file audio từ preload hoặc sinh mới
+    temp_audio_path = None
+    if preload_task:
+        try:
+            temp_audio_path = await asyncio.wait_for(asyncio.shield(preload_task), timeout=5.0)
+        except Exception:
+            pass
+
+    if not temp_audio_path or not os.path.exists(temp_audio_path):
+        temp_audio_path = await generate_tarot_speech(
+            reading_text=reading_text,
+            reader_style=reader_style,
+            user_name=user_name,
+            spread_name=spread_name
+        )
+
+    if not temp_audio_path or not os.path.exists(temp_audio_path):
+        print(f"❌ [Tarot Voice Auto] Không tạo được file âm thanh cho {reader_name}.", flush=True)
+        if result_view:
+            await result_view.on_auto_play_finished(failed=True)
+        return
+
+    # 2. Phát âm thanh
+    try:
+        await _execute_voice_playback(guild, voice_channel, temp_audio_path, reader_name)
+    except Exception as e:
+        print(f"❌ [Tarot Voice Auto] Lỗi phát voice: {e}", flush=True)
+    finally:
+        if result_view:
+            await result_view.on_auto_play_finished()
+
+
 async def play_tarot_voice(
     interaction: discord.Interaction,
     reading_text: str,
@@ -239,7 +367,7 @@ async def play_tarot_voice(
     preloaded_audio_path: Optional[str] = None
 ):
     """
-    Xử lý toàn bộ quy trình:
+    Xử lý khi người dùng bấm nút thủ công:
     1. Kiểm tra trạng thái Voice của người dùng.
     2. Kết nối vào Voice Channel.
     3. Phát file Audio (ưu tiên file đã preload sẵn).
@@ -278,75 +406,28 @@ async def play_tarot_voice(
         ephemeral=True
     )
 
-    _active_voice_guilds.add(guild.id)
-    voice_client: Optional[discord.VoiceClient] = None
-    temp_audio_path: Optional[str] = None
+    temp_audio_path = None
+    if preloaded_audio_path and os.path.exists(preloaded_audio_path) and os.path.getsize(preloaded_audio_path) > 0:
+        temp_audio_path = preloaded_audio_path
+        print(f"⚡ [Tarot Voice] Sử dụng file âm thanh đã Preload sẵn: {temp_audio_path}", flush=True)
+    else:
+        temp_audio_path = await generate_tarot_speech(
+            reading_text=reading_text,
+            reader_style=reader_style,
+            user_name=interaction.user.display_name,
+            spread_name=spread_name
+        )
+
+    if not temp_audio_path or not os.path.exists(temp_audio_path):
+        await interaction.followup.send(
+            f"🌌 **{reader_name} không thể truyền tải giọng đọc lúc này** do tín hiệu âm thanh bị gián đoạn. Bạn hãy thử lại sau nhé!",
+            ephemeral=True
+        )
+        return
 
     try:
-        # 3. Sử dụng file âm thanh đã Preload sẵn hoặc tạo mới
-        if preloaded_audio_path and os.path.exists(preloaded_audio_path) and os.path.getsize(preloaded_audio_path) > 0:
-            temp_audio_path = preloaded_audio_path
-            print(f"⚡ [Tarot Voice] Sử dụng file âm thanh đã Preload sẵn: {temp_audio_path}", flush=True)
-        else:
-            temp_audio_path = await generate_tarot_speech(
-                reading_text=reading_text,
-                reader_style=reader_style,
-                user_name=interaction.user.display_name,
-                spread_name=spread_name
-            )
-
-        if not temp_audio_path or not os.path.exists(temp_audio_path):
-            await interaction.followup.send(
-                f"🌌 **{reader_name} không thể truyền tải giọng đọc lúc này** do tín hiệu âm thanh bị gián đoạn. Bạn hãy thử lại sau nhé!",
-                ephemeral=True
-            )
-            return
-
-        # 4. Kiểm tra và dọn dẹp các session voice cũ (nếu có) trước khi kết nối
-        existing_vc = guild.voice_client
-        if existing_vc:
-            if existing_vc.is_connected():
-                if existing_vc.channel.id != voice_channel.id:
-                    await existing_vc.move_to(voice_channel)
-                voice_client = existing_vc
-            else:
-                try:
-                    await existing_vc.disconnect(force=True)
-                except Exception:
-                    pass
-                await asyncio.sleep(0.5)
-                voice_client = await voice_channel.connect(timeout=15.0, reconnect=False, self_deaf=True)
-        else:
-            voice_client = await voice_channel.connect(timeout=15.0, reconnect=False, self_deaf=True)
-
-        # 5. Phát âm thanh qua FFmpeg
-        finished_event = asyncio.Event()
-
-        def _after_play(error):
-            if error:
-                print(f"⚠️ [Tarot Voice] Lỗi khi phát audio: {error}", flush=True)
-            finished_event.set()
-
-        # Dùng FFmpegPCMAudio
-        audio_source = discord.FFmpegPCMAudio(temp_audio_path)
-        voice_client.play(audio_source, after=_after_play)
-        print(f"🔊 [Tarot Voice] Đang phát bài đọc của {reader_name} trong kênh '{voice_channel.name}'...", flush=True)
-
-        # 6. Chờ phát xong hoặc kiểm tra nếu phòng trống
-        while not finished_event.is_set():
-            if not voice_client.is_connected():
-                break
-            # Kiểm tra nếu chỉ còn bot trong phòng (trừ các bot khác)
-            human_members = [m for m in voice_channel.members if not m.bot]
-            if not human_members:
-                print(f"🏃 [Tarot Voice] Kênh '{voice_channel.name}' không còn ai nghe, dừng phát...", flush=True)
-                if voice_client.is_playing():
-                    voice_client.stop()
-                break
-            await asyncio.sleep(0.5)
-
+        await _execute_voice_playback(guild, voice_channel, temp_audio_path, reader_name)
     except Exception as e:
-        print(f"❌ [Tarot Voice] Lỗi trong quá trình phát Voice: {e}", flush=True)
         try:
             await interaction.followup.send(
                 f"⚠️ Đã có sự cố xảy ra khi kết nối kênh thoại: `{e}`",
@@ -354,20 +435,3 @@ async def play_tarot_voice(
             )
         except Exception:
             pass
-
-    finally:
-        # 7. Dọn dẹp tài nguyên và ngắt kết nối
-        _active_voice_guilds.discard(guild.id)
-        if voice_client and voice_client.is_connected():
-            try:
-                await voice_client.disconnect(force=True)
-                print(f"👋 [Tarot Voice] Đã rời kênh thoại '{voice_channel.name}'.", flush=True)
-            except Exception as dc_err:
-                print(f"⚠️ [Tarot Voice] Lỗi khi ngắt kết nối voice: {dc_err}", flush=True)
-
-        if temp_audio_path and os.path.exists(temp_audio_path):
-            try:
-                os.remove(temp_audio_path)
-                print(f"🧹 [Tarot Voice] Đã xóa file tạm: {temp_audio_path}", flush=True)
-            except Exception as del_err:
-                print(f"⚠️ [Tarot Voice] Lỗi xóa file tạm: {del_err}", flush=True)

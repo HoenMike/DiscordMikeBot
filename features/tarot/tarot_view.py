@@ -15,7 +15,7 @@ from features.tarot.deck import (
 )
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
-from features.tarot.voice_reader import play_tarot_voice, generate_tarot_speech
+from features.tarot.voice_reader import play_tarot_voice, auto_play_tarot_voice, generate_tarot_speech
 from features.tarot.manager import TarotManager
 from core.ai import split_text
 
@@ -518,7 +518,8 @@ class TarotLauncherView(discord.ui.View):
 class TarotResultView(discord.ui.View):
     """
     View tương tác sau khi đã luận giải xong quẻ bài:
-    Hỗ trợ nút bấm phát giọng đọc Neural TTS tiếng Việt trực tiếp trong Voice Channel (Preloaded).
+    - Nếu người bốc bài đang trong Voice: Tự động phát âm thanh, nút hiển thị '🔊 Đang Đọc Trong Voice...'.
+    - Nếu người bốc bài KHÔNG trong Voice: Hiển thị nút '🔊 Nghe Đọc Bài' để bấm khi cần.
     """
 
     def __init__(
@@ -529,6 +530,7 @@ class TarotResultView(discord.ui.View):
         author_name: str,
         spread_name: str = "",
         preload_task: Optional[asyncio.Task] = None,
+        is_auto_playing: bool = False,
         timeout: float = 600.0,
     ):
         super().__init__(timeout=timeout)
@@ -539,23 +541,48 @@ class TarotResultView(discord.ui.View):
         self.spread_name = spread_name
         self.preload_task = preload_task
         self.preloaded_audio_path: Optional[str] = None
-        self.is_speaking = False
+        self.is_speaking = is_auto_playing
         self.message: Optional[discord.Message] = None
 
         style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
-        reader_name = style_info.get("name", "Reader")
+        self.reader_name = style_info.get("name", "Reader")
 
         # Nút nghe đọc bài qua Voice
+        btn_label = "🔊 Đang Đọc Trong Voice..." if is_auto_playing else f"🔊 Nghe {self.reader_name} Đọc Bài"
         self.voice_button = discord.ui.Button(
-            label=f"🔊 Nghe {reader_name} Đọc Bài",
+            label=btn_label,
             style=discord.ButtonStyle.primary,
             custom_id="tarot_listen_voice",
+            disabled=is_auto_playing,
             row=0,
         )
         self.voice_button.callback = self._handle_voice_click
         self.add_item(self.voice_button)
 
+    async def on_auto_play_finished(self, failed: bool = False, is_busy: bool = False):
+        """Callback khi luồng tự động đọc bài hoàn tất hoặc kết thúc."""
+        self.is_speaking = False
+        if failed or is_busy:
+            self.voice_button.label = f"🔊 Nghe {self.reader_name} Đọc Bài"
+        else:
+            self.voice_button.label = f"🔊 Nghe {self.reader_name} Đọc Lại"
+        self.voice_button.disabled = False
+        try:
+            if self.message:
+                await self.message.edit(view=self)
+        except Exception:
+            pass
+
     async def _handle_voice_click(self, interaction: discord.Interaction):
+        # Chỉ cho phép người bốc bài (author) bấm nút
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                f"🔒 **Chỉ người bốc quẻ bài này ({self.author_name}) mới có thể yêu cầu Bot đọc bài!**\n"
+                f"💡 Hãy dùng lệnh `/tarot` để tự bốc và nghe trải bài của riêng bạn nhé!",
+                ephemeral=True
+            )
+            return
+
         if self.is_speaking:
             await interaction.response.send_message(
                 "⏳ Reader đang thực hiện đọc bài trong Voice Channel, vui lòng đợi đọc xong nhé!",
@@ -601,9 +628,7 @@ class TarotResultView(discord.ui.View):
             self.preload_task = None
         finally:
             self.is_speaking = False
-            style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
-            reader_name = style_info.get("name", "Reader")
-            self.voice_button.label = f"🔊 Nghe {reader_name} Đọc Lại"
+            self.voice_button.label = f"🔊 Nghe {self.reader_name} Đọc Lại"
             self.voice_button.disabled = False
             try:
                 if self.message:
@@ -912,6 +937,12 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
+            # Kiểm tra xem người bốc bài (author) có đang ở trong Voice Channel không
+            author_member = interaction.guild.get_member(self.author_id) if interaction.guild else None
+            author_voice = author_member.voice if author_member else getattr(interaction.user, "voice", None)
+            voice_channel = author_voice.channel if author_voice else None
+            is_in_voice = bool(voice_channel and interaction.guild)
+
             # Tạo view kết quả có nút Voice Reader (kèm Preloaded Audio Task)
             result_view = TarotResultView(
                 ai_reading=ai_reading,
@@ -919,9 +950,25 @@ class TarotFlipView(discord.ui.View):
                 author_id=self.author_id,
                 author_name=self.author_name,
                 spread_name=self.spread_info.get("name", ""),
-                preload_task=self.preload_voice_task
+                preload_task=self.preload_voice_task,
+                is_auto_playing=is_in_voice
             )
             result_view.message = self.message
+
+            # Nếu người bốc bài đang trong Voice -> Tự động kích hoạt flow đọc bài
+            if is_in_voice and voice_channel and interaction.guild:
+                asyncio.create_task(
+                    auto_play_tarot_voice(
+                        guild=interaction.guild,
+                        voice_channel=voice_channel,
+                        reading_text=ai_reading,
+                        reader_style=self.reader_style,
+                        user_name=self.author_name,
+                        spread_name=self.spread_info.get("name", ""),
+                        preload_task=self.preload_voice_task,
+                        result_view=result_view
+                    )
+                )
 
             # Cập nhật kết quả bài giải đầy đủ lên Discord
             try:
@@ -1069,15 +1116,36 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
+            guild = self.message.guild if self.message else None
+            author_member = guild.get_member(self.author_id) if guild else None
+            author_voice = author_member.voice if author_member else None
+            voice_channel = author_voice.channel if author_voice else None
+            is_in_voice = bool(voice_channel and guild)
+
             result_view = TarotResultView(
                 ai_reading=ai_reading,
                 reader_style=self.reader_style,
                 author_id=self.author_id,
                 author_name=self.author_name,
                 spread_name=self.spread_info.get("name", ""),
-                preload_task=self.preload_voice_task
+                preload_task=self.preload_voice_task,
+                is_auto_playing=is_in_voice
             )
             result_view.message = self.message
+
+            if is_in_voice and voice_channel and guild:
+                asyncio.create_task(
+                    auto_play_tarot_voice(
+                        guild=guild,
+                        voice_channel=voice_channel,
+                        reading_text=ai_reading,
+                        reader_style=self.reader_style,
+                        user_name=self.author_name,
+                        spread_name=self.spread_info.get("name", ""),
+                        preload_task=self.preload_voice_task,
+                        result_view=result_view
+                    )
+                )
 
             if self.message:
                 await self.message.edit(embeds=final_embeds, attachments=[file], view=result_view)
