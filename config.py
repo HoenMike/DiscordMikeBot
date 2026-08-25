@@ -98,7 +98,7 @@ TAROT_TEMPERATURE = float(os.getenv("TAROT_TEMPERATURE", "0.7"))
 SINGLE_PASS_MSG_LIMIT = int(os.getenv("SINGLE_PASS_MSG_LIMIT", "300"))       # <= 300 msg: Single-Pass; > 300 msg: MapReduce
 MAPREDUCE_CHUNK_SIZE = int(os.getenv("MAPREDUCE_CHUNK_SIZE", "200"))         # Kích thước chunk phân đoạn MapReduce
 DISCORD_EMBED_CHAR_LIMIT = int(os.getenv("DISCORD_EMBED_CHAR_LIMIT", "3500")) # Giới hạn ký tự mỗi embed Discord
-MAX_FETCH_MESSAGES_LIMIT = 2500   # Giới hạn trần quét tin nhắn tối đa
+MAX_FETCH_MESSAGES_LIMIT = 4000   # Giới hạn trần quét tin nhắn tối đa
 COMMAND_COOLDOWN_SECONDS = float(os.getenv("COMMAND_COOLDOWN_SECONDS", "30.0"))   # Cooldown 30s per user
 DEFAULT_SCAN_HOURS = 2.0
 DEFAULT_SCAN_LIMIT = 150

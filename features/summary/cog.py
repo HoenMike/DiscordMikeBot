@@ -242,17 +242,14 @@ class SummaryCog(commands.Cog):
         """Quyết định số lượng tin quét và chuỗi thông tin quét (scan_info) cho AI."""
         # Trường hợp 1: Quét theo Ngày & Giờ cụ thể
         if time_scan_info is not None:
-            lim = limit if limit is not None else 1000
-            lim = min(lim, config.MAX_FETCH_MESSAGES_LIMIT)
             info = f"{time_scan_info}"
             if limit is not None:
-                info += f" | tối đa {lim} tin"
-            return None, lim, info
+                info += f" | tối đa {limit} tin"
+            return None, limit, info
 
         # Trường hợp 2: Quét theo Link Tin Nhắn / Message ID
         if after_message_id is not None:
-            lim = limit if limit is not None else 300
-            lim = min(lim, config.MAX_FETCH_MESSAGES_LIMIT)
+            lim = limit if limit is not None else 1000
             info = f"từ tin nhắn ID `{after_message_id}` (tối đa {lim} tin)"
             return None, lim, info
 
@@ -282,20 +279,20 @@ class SummaryCog(commands.Cog):
     ) -> tuple[list[str], str]:
         """
         Thu thập tin nhắn từ kênh Discord:
-        - Nếu có start_time_utc / end_time_utc: Discord API nhảy thẳng đến timestamp đó (Snowflake index).
+        - Nếu có start_time_utc / end_time_utc: Discord API nhảy thẳng đến timestamp đó (Snowflake index) và lấy trọn vẹn toàn bộ khung giờ (nếu limit=None).
         - Nếu có after_message_id: Bắt đầu lấy từ tin nhắn đó trở đi theo thứ tự xuôi.
         - Nếu có hours: Quét lùi từ hiện tại về quá khứ.
         """
         weekday_map = {0: "T2", 1: "T3", 2: "T4", 3: "T5", 4: "T6", 5: "T7", 6: "CN"}
         vn_tz = timezone(timedelta(hours=7))
         raw_items = []
-        max_limit = min(limit, config.MAX_FETCH_MESSAGES_LIMIT) if limit is not None else 1000
 
         # Trường hợp 1: Quét theo khoảng thời gian cụ thể (after/before UTC)
+        # Nếu limit=None, Discord API sẽ stream lấy toàn bộ 100% tin nhắn trong khung giờ đó không giới hạn
         if start_time_utc is not None or end_time_utc is not None:
             fetch_after = start_time_utc - timedelta(seconds=1) if start_time_utc else None
             fetch_before = end_time_utc + timedelta(seconds=1) if end_time_utc else None
-            async for msg in target_channel.history(limit=max_limit, after=fetch_after, before=fetch_before, oldest_first=True):
+            async for msg in target_channel.history(limit=limit, after=fetch_after, before=fetch_before, oldest_first=True):
                 if msg.author.bot:
                     continue
                 local_dt = msg.created_at.astimezone(vn_tz)
