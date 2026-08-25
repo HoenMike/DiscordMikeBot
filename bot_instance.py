@@ -296,6 +296,7 @@ class HelpView(discord.ui.View):
         super().__init__(timeout=timeout)
         self.author_id = author_id
         self.current_tab = current_tab
+        self.message: Optional[discord.Message] = None
         self._build_components()
 
     def _build_components(self):
@@ -333,6 +334,16 @@ class HelpView(discord.ui.View):
         select.callback = self._handle_select
         self.add_item(select)
 
+        # Nút Đóng / Xóa tin nhắn hướng dẫn
+        btn_close = discord.ui.Button(
+            label="❌ Đóng",
+            style=discord.ButtonStyle.danger,
+            custom_id="help_btn_close",
+            row=1
+        )
+        btn_close.callback = self._handle_close
+        self.add_item(btn_close)
+
     def get_embed(self, user: Union[discord.User, discord.Member]) -> discord.Embed:
         if self.current_tab == "tarot":
             return build_tarot_help_embed(user)
@@ -344,16 +355,43 @@ class HelpView(discord.ui.View):
             return build_overview_embed(user)
 
     async def _handle_select(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Chỉ người gọi lệnh mới có thể tương tác!", ephemeral=True)
+            return
+
         self.current_tab = interaction.data["values"][0]
         self._build_components()
         embed = self.get_embed(interaction.user)
         await interaction.response.edit_message(embed=embed, view=self)
 
+    async def _handle_close(self, interaction: discord.Interaction):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Chỉ người gọi lệnh mới có thể đóng hướng dẫn!", ephemeral=True)
+            return
+
+        self.clear_items()
+        try:
+            if self.message:
+                await self.message.delete()
+            else:
+                await interaction.delete_original_response()
+        except Exception:
+            pass
+        self.stop()
+
+    async def on_timeout(self):
+        self.clear_items()
+        if self.message:
+            try:
+                await self.message.delete()
+            except Exception:
+                pass
+
 
 async def send_bot_help(
     target: Union[commands.Context, discord.Interaction],
     feature: str = "overview",
-    ephemeral: bool = False
+    ephemeral: bool = True
 ):
     """Hàm dùng chung gửi giao diện hướng dẫn cho cả Slash và Prefix."""
     user = target.author if isinstance(target, commands.Context) else target.user
@@ -361,7 +399,8 @@ async def send_bot_help(
     embed = view.get_embed(user)
 
     if isinstance(target, commands.Context):
-        await target.reply(embed=embed, view=view, mention_author=False)
+        sent_msg = await target.reply(embed=embed, view=view, mention_author=False)
+        view.message = sent_msg
     else:
         if target.response.is_done():
             await target.followup.send(embed=embed, view=view, ephemeral=ephemeral)
@@ -382,7 +421,7 @@ async def help_slash(
     feature: Optional[app_commands.Choice[str]] = None
 ):
     chosen = feature.value if feature else "overview"
-    await send_bot_help(interaction, feature=chosen, ephemeral=False)
+    await send_bot_help(interaction, feature=chosen, ephemeral=True)
 
 
 @bot.command(name="help", aliases=["huongdan", "h"])
