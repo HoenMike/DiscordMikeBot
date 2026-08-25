@@ -395,6 +395,14 @@ class TarotCog(commands.Cog):
             await interaction.response.send_message(*args, **kwargs)
         await self._show_history(interaction.user, send_response, is_ephemeral=True)
 
+    @app_commands.command(
+        name="tarot_help",
+        description="Xem hướng dẫn chi tiết về 9 kiểu trải bài, 3 Reader và cách bốc bài Tarot"
+    )
+    async def tarot_help_slash(self, interaction: discord.Interaction):
+        from bot_instance import send_bot_help
+        await send_bot_help(interaction, feature="tarot", ephemeral=True)
+
     # =========================================================================
     # 2. PREFIX COMMANDS ($m tarot ...)
     # =========================================================================

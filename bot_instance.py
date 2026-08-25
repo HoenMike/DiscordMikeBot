@@ -424,6 +424,22 @@ async def help_slash(
     await send_bot_help(interaction, feature=chosen, ephemeral=True)
 
 
+@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng MikeBot (Tarot, Tóm tắt, Embed)")
+@app_commands.describe(feature="Chọn tính năng bạn muốn xem hướng dẫn chi tiết")
+@app_commands.choices(feature=[
+    app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
+    app_commands.Choice(name="📝 Tóm Tắt Tin Nhắn (AI)", value="summary"),
+    app_commands.Choice(name="👑 Tự Động Fix Embed Link", value="embed"),
+    app_commands.Choice(name="🌐 Tổng Quan Tất Cả Tính Năng", value="overview"),
+])
+async def mhelp_slash(
+    interaction: discord.Interaction,
+    feature: Optional[app_commands.Choice[str]] = None
+):
+    chosen = feature.value if feature else "overview"
+    await send_bot_help(interaction, feature=chosen, ephemeral=True)
+
+
 @bot.command(name="help", aliases=["huongdan", "h"])
 async def help_cmd(ctx: commands.Context, *, feature_arg: Optional[str] = None):
     chosen = "overview"
