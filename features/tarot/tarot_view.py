@@ -14,6 +14,7 @@ from features.tarot.deck import (
 )
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
+from features.tarot.voice_reader import play_tarot_voice
 from features.tarot.manager import TarotManager
 from core.ai import split_text
 
@@ -513,6 +514,96 @@ class TarotLauncherView(discord.ui.View):
                 pass
 
 
+class TarotResultView(discord.ui.View):
+    """
+    View tương tác sau khi đã luận giải xong quẻ bài:
+    Hỗ trợ nút bấm phát giọng đọc Gemini 2.0 Audio trực tiếp trong Voice Channel.
+    """
+
+    def __init__(
+        self,
+        ai_reading: str,
+        reader_style: str,
+        author_id: int,
+        author_name: str,
+        spread_name: str = "",
+        timeout: float = 600.0,
+    ):
+        super().__init__(timeout=timeout)
+        self.ai_reading = ai_reading
+        self.reader_style = reader_style
+        self.author_id = author_id
+        self.author_name = author_name
+        self.spread_name = spread_name
+        self.is_speaking = False
+        self.message: Optional[discord.Message] = None
+
+        style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
+        reader_name = style_info.get("name", "Reader")
+
+        # Nút nghe đọc bài qua Voice
+        self.voice_button = discord.ui.Button(
+            label=f"🔊 Nghe {reader_name} Đọc Bài",
+            style=discord.ButtonStyle.primary,
+            custom_id="tarot_listen_voice",
+            row=0,
+        )
+        self.voice_button.callback = self._handle_voice_click
+        self.add_item(self.voice_button)
+
+    async def _handle_voice_click(self, interaction: discord.Interaction):
+        if self.is_speaking:
+            await interaction.response.send_message(
+                "⏳ Reader đang thực hiện đọc bài trong Voice Channel, vui lòng đợi đọc xong nhé!",
+                ephemeral=True,
+            )
+            return
+
+        # Defer ephemeral response để chuẩn bị xử lý
+        await interaction.response.defer(ephemeral=True)
+
+        self.is_speaking = True
+        self.voice_button.label = "⏳ Đang kết nối & đọc bài..."
+        self.voice_button.disabled = True
+        try:
+            if self.message:
+                await self.message.edit(view=self)
+            else:
+                await interaction.edit_original_response(view=self)
+        except Exception:
+            pass
+
+        try:
+            await play_tarot_voice(
+                interaction=interaction,
+                reading_text=self.ai_reading,
+                reader_style=self.reader_style,
+                spread_name=self.spread_name,
+            )
+        finally:
+            self.is_speaking = False
+            style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
+            reader_name = style_info.get("name", "Reader")
+            self.voice_button.label = f"🔊 Nghe {reader_name} Đọc Lại"
+            self.voice_button.disabled = False
+            try:
+                if self.message:
+                    await self.message.edit(view=self)
+                else:
+                    await interaction.edit_original_response(view=self)
+            except Exception:
+                pass
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except Exception:
+                pass
+
+
 class TarotFlipView(discord.ui.View):
     """
     View tương tác Gamification: Cho phép người dùng bấm từng nút để lật mở từng lá bài,
@@ -768,26 +859,36 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
+            # Tạo view kết quả có nút Voice Reader
+            result_view = TarotResultView(
+                ai_reading=ai_reading,
+                reader_style=self.reader_style,
+                author_id=self.author_id,
+                author_name=self.author_name,
+                spread_name=self.spread_info.get("name", "")
+            )
+            result_view.message = self.message
+
             # Cập nhật kết quả bài giải đầy đủ lên Discord
             try:
                 if not sent_image_already:
                     await interaction.edit_original_response(
                         embeds=final_embeds,
                         attachments=[file],
-                        view=None
+                        view=result_view
                     )
                 else:
                     await interaction.edit_original_response(
                         embeds=final_embeds,
-                        view=None
+                        view=result_view
                     )
             except Exception:
                 if self.message:
                     try:
                         if not sent_image_already:
-                            await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
+                            await self.message.edit(embeds=final_embeds, attachments=[file], view=result_view)
                         else:
-                            await self.message.edit(embeds=final_embeds, view=None)
+                            await self.message.edit(embeds=final_embeds, view=result_view)
                     except Exception as ex:
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
             self.stop()
@@ -914,7 +1015,16 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
+            result_view = TarotResultView(
+                ai_reading=ai_reading,
+                reader_style=self.reader_style,
+                author_id=self.author_id,
+                author_name=self.author_name,
+                spread_name=self.spread_info.get("name", "")
+            )
+            result_view.message = self.message
+
             if self.message:
-                await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
+                await self.message.edit(embeds=final_embeds, attachments=[file], view=result_view)
         except Exception as e:
             print(f"[TarotFlipView] Lỗi on_timeout: {e}", flush=True)
