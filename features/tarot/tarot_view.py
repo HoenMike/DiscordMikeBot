@@ -1,14 +1,483 @@
 import asyncio
 import io
-from typing import List, Optional, Set
+import random
+from typing import List, Optional, Set, Any
 import discord
 
-from features.tarot.deck import DrawnCard, get_yes_no_verdict, READER_STYLES
+from features.tarot.deck import (
+    DrawnCard,
+    get_yes_no_verdict,
+    READER_STYLES,
+    SPREAD_DEFINITIONS,
+    draw_spread
+)
 from features.tarot.renderer import render_spread_to_bytes
+from features.tarot.ai import generate_tarot_reading
 from features.tarot.manager import TarotManager
 from core.ai import split_text
 
 WIDE_DIVIDER = "---"
+
+SPREAD_SELECT_OPTIONS = [
+    discord.SelectOption(
+        label="🌟 Daily Card (Năng lượng ngày - 1 lá)",
+        value="daily",
+        description="Thông điệp & năng lượng bao quát trong ngày"
+    ),
+    discord.SelectOption(
+        label="⚡ Yes / No (Hỏi nhanh - 1 lá)",
+        value="yes_no",
+        description="Phán quyết Có/Không kèm phân tích năng lượng"
+    ),
+    discord.SelectOption(
+        label="🎯 Single Card (Lời khuyên - 1 lá)",
+        value="single",
+        description="Góc nhìn cốt lõi và bài học quan trọng nhất"
+    ),
+    discord.SelectOption(
+        label="⏳ Past - Present - Future (3 lá)",
+        value="ppf",
+        description="Tiến trình Quá khứ - Hiện tại - Tương lai"
+    ),
+    discord.SelectOption(
+        label="⚖️ Two Choices (2 ngả đường - 3 lá)",
+        value="choices",
+        description="So sánh nhanh Phương án A & Phương án B"
+    ),
+    discord.SelectOption(
+        label="🧘 Mind - Body - Spirit (3 lá)",
+        value="mbs",
+        description="Tâm trí - Thể chất - Trực giác nội tâm"
+    ),
+    discord.SelectOption(
+        label="🧲 Horseshoe Spread (5 lá)",
+        value="horseshoe",
+        description="Toàn cảnh vấn đề & chướng ngại vật"
+    ),
+    discord.SelectOption(
+        label="🌿 Two Paths (So sánh sâu 2 hướng - 5 lá)",
+        value="two_paths",
+        description="Phân tích chi tiết rủi ro & cơ hội của 2 hướng"
+    ),
+    discord.SelectOption(
+        label="👑 Celtic Cross (Chữ thập - 10 lá)",
+        value="celtic",
+        description="Trải bài chuyên sâu toàn diện 10 góc nhìn"
+    ),
+]
+
+READER_SELECT_OPTIONS = [
+    discord.SelectOption(
+        label="🎲 Ngẫu Nhiên",
+        value="random"
+    ),
+    discord.SelectOption(
+        label="⚖️ Orion",
+        value="neutral"
+    ),
+    discord.SelectOption(
+        label="🌸 Celeste",
+        value="healer"
+    ),
+    discord.SelectOption(
+        label="🃏 Jester",
+        value="chaos"
+    ),
+]
+
+
+class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối Cảnh Tarot"):
+    """Modal popup cho phép người dùng nhập câu hỏi và bối cảnh trước khi bốc bài."""
+
+    def __init__(self, launcher_view: "TarotLauncherView"):
+        super().__init__()
+        self.launcher_view = launcher_view
+
+        self.question_input = discord.ui.TextInput(
+            label="Câu hỏi / Chủ đề muốn xem",
+            style=discord.TextStyle.paragraph,
+            placeholder="Ví dụ: Công việc tháng tới của tôi sẽ tiến triển thế nào?",
+            default=launcher_view.question or "",
+            required=False,
+            max_length=500
+        )
+        self.add_item(self.question_input)
+
+        self.context_input = discord.ui.TextInput(
+            label="Bối cảnh thực tế (Không bắt buộc)",
+            style=discord.TextStyle.paragraph,
+            placeholder="Ví dụ: Đang chuẩn bị chuyển việc hoặc sắp có đợt đánh giá...",
+            default=launcher_view.context or "",
+            required=False,
+            max_length=500
+        )
+        self.add_item(self.context_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        clean_q = self.question_input.value.strip() if self.question_input.value else None
+        clean_ctx = self.context_input.value.strip() if self.context_input.value else None
+
+        self.launcher_view.question = clean_q if clean_q else None
+        self.launcher_view.context = clean_ctx if clean_ctx else None
+
+        embed = self.launcher_view.build_launcher_embed()
+        await interaction.response.edit_message(embed=embed, view=self.launcher_view)
+
+
+class TarotLauncherView(discord.ui.View):
+    """
+    View Bảng Điều Khiển Tương Tác (Launcher UI):
+    Cho phép chọn Kiểu trải bài, Người giải bài, Nhập câu hỏi qua Modal và Bốc bài trực tiếp.
+    """
+
+    def __init__(
+        self,
+        author_id: int,
+        author_name: str,
+        author_avatar_url: Optional[str],
+        tarot_manager: TarotManager,
+        selected_spread: str = "daily",
+        selected_reader: str = "random",
+        question: Optional[str] = None,
+        context: Optional[str] = None,
+        timeout: float = 300.0,
+    ):
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.author_name = author_name
+        self.author_avatar_url = author_avatar_url
+        self.tarot_manager = tarot_manager
+        self.selected_spread = selected_spread
+        self.selected_reader = selected_reader
+        self.question = question
+        self.context = context
+        self.message: Optional[discord.Message] = None
+
+        self._build_components()
+
+    def _check_author(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.author_id
+
+    def build_launcher_embed(self) -> discord.Embed:
+        """Xây dựng Embed hiển thị thông tin và trạng thái lựa chọn hiện tại."""
+        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        if self.selected_reader == "random" or self.selected_reader not in READER_STYLES:
+            reader_display = "🎲 **Ngẫu Nhiên**"
+            embed_color = 0x7851A9
+        else:
+            reader_info = READER_STYLES[self.selected_reader]
+            reader_display = f"**{reader_info['name']}**"
+            embed_color = reader_info.get("color", 0x7851A9)
+
+        q_status = f"*{self.question}*" if self.question else ("⚠️ *Chưa nhập (Bắt buộc)*" if spread_info.get("requires_question", True) else "*(Không bắt buộc)*")
+        ctx_status = f"*{self.context}*" if self.context else "*(Không có)*"
+
+        lines = [
+            f"Chào mừng **{self.author_name}** đến với không gian chiêm tinh học Tarot huyền bí!\n",
+            f"**🔮 THIẾT LẬP QUẺ BÀI:**",
+            f"• 🃏 **Kiểu trải bài:** **{spread_info['name']}**",
+            f"• 🎭 **Người giải bài:** {reader_display}",
+            f"• ❓ **Câu hỏi / Chủ đề:** {q_status}",
+            f"• 📝 **Bối cảnh:** {ctx_status}",
+            WIDE_DIVIDER,
+            "💡 **Hướng dẫn thao tác:**",
+            "1. Chọn kiểu trải bài & người giải bài từ **2 Menu thả xuống** bên dưới.",
+            "2. Nhấn nút **✏️ Đặt Câu Hỏi** để nhập câu hỏi / bối cảnh cụ thể.",
+            "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để bước vào giao diện lật mở quẻ bài trực quan!"
+        ]
+
+        embed = discord.Embed(
+            title="🔮 ĐIỆN BÓC BÀI TAROT HUYỀN BÍ",
+            description="\n".join(lines),
+            color=embed_color
+        )
+        embed.set_footer(
+            text=f"Quẻ bài của {self.author_name} • MikeBot Tarot",
+            icon_url=self.author_avatar_url
+        )
+        return embed
+
+    def _build_components(self):
+        self.clear_items()
+
+        # 1. Select Menu: Chọn kiểu trải bài (Row 0)
+        spread_select = discord.ui.Select(
+            placeholder="🔮 Chọn kiểu trải bài Tarot...",
+            options=[
+                discord.SelectOption(
+                    label=opt.label,
+                    value=opt.value,
+                    description=opt.description,
+                    default=(opt.value == self.selected_spread)
+                )
+                for opt in SPREAD_SELECT_OPTIONS
+            ],
+            row=0,
+            custom_id="launcher_spread_select"
+        )
+        spread_select.callback = self._handle_spread_select
+        self.add_item(spread_select)
+
+        # 2. Select Menu: Chọn người giải bài (Row 1)
+        reader_select = discord.ui.Select(
+            placeholder="🎭 Chọn người giải bài...",
+            options=[
+                discord.SelectOption(
+                    label=opt.label,
+                    value=opt.value,
+                    description=opt.description,
+                    default=(opt.value == self.selected_reader)
+                )
+                for opt in READER_SELECT_OPTIONS
+            ],
+            row=1,
+            custom_id="launcher_reader_select"
+        )
+        reader_select.callback = self._handle_reader_select
+        self.add_item(reader_select)
+
+        # 3. Action Buttons (Row 2)
+        btn_question = discord.ui.Button(
+            label="✏️ Đặt Câu Hỏi",
+            style=discord.ButtonStyle.primary,
+            custom_id="launcher_btn_question",
+            row=2
+        )
+        btn_question.callback = self._handle_question_button
+        self.add_item(btn_question)
+
+        btn_start = discord.ui.Button(
+            label="🎴 Bắt Đầu Bốc Bài",
+            style=discord.ButtonStyle.success,
+            custom_id="launcher_btn_start",
+            row=2
+        )
+        btn_start.callback = self._handle_start_button
+        self.add_item(btn_start)
+
+        btn_history = discord.ui.Button(
+            label="📜 Lịch Sử",
+            style=discord.ButtonStyle.secondary,
+            custom_id="launcher_btn_history",
+            row=2
+        )
+        btn_history.callback = self._handle_history_button
+        self.add_item(btn_history)
+
+        btn_cancel = discord.ui.Button(
+            label="❌ Đóng",
+            style=discord.ButtonStyle.danger,
+            custom_id="launcher_btn_cancel",
+            row=2
+        )
+        btn_cancel.callback = self._handle_cancel_button
+        self.add_item(btn_cancel)
+
+    async def _handle_spread_select(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        self.selected_spread = interaction.data["values"][0]
+        self._build_components()
+        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_reader_select(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        self.selected_reader = interaction.data["values"][0]
+        self._build_components()
+        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_question_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        await interaction.response.send_modal(TarotQuestionModal(self))
+
+    async def _handle_start_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+
+        # Kiểm tra câu hỏi nếu trải bài yêu cầu
+        if spread_info.get("requires_question", True) and not self.question:
+            await interaction.response.send_modal(TarotQuestionModal(self))
+            return
+
+        # Kiểm tra Daily Cooldown
+        if self.selected_spread == "daily":
+            can_draw, last_draw = await self.tarot_manager.check_daily_cooldown(interaction.user.id)
+            if not can_draw and last_draw:
+                last_card_str = f"**{last_draw.get('name_vi', 'Bài')}** ({last_draw.get('name_en', '')})"
+                orient_str = "[NGƯỢC]" if last_draw.get("is_reversed") else "[XUÔI]"
+                drawn_time = last_draw.get("drawn_at", "hôm nay")
+                await interaction.response.send_message(
+                    f"☀️ **Bạn đã rút Daily Card của ngày hôm nay rồi!**\n\n"
+                    f"🃏 Lá bài hôm nay của bạn: {last_card_str} - `{orient_str}` *(Rút lúc {drawn_time})*\n"
+                    f"⏰ *Lượt bốc bài sẽ được làm mới vào lúc 00:00 (Giờ VN)!*\n\n"
+                    f"💡 *Nếu bạn có câu hỏi khác, hãy chọn `Single Card` hoặc `Yes / No` trong menu nhé!*",
+                    ephemeral=True
+                )
+                return
+
+        # Khởi chạy phiên bốc bài
+        await self.start_reading(interaction)
+
+    async def start_reading(self, interaction: discord.Interaction):
+        """Chuyển đổi giao diện sang TarotFlipView để người dùng lật mở bài trực tiếp."""
+        await interaction.response.defer()
+
+        drawn_cards = draw_spread(self.selected_spread)
+        spread_info = SPREAD_DEFINITIONS[self.selected_spread]
+
+        # Nếu không chọn hoặc chọn Ngẫu nhiên, tự động random 1 trong 3 Reader
+        actual_reader = self.selected_reader
+        if actual_reader == "random" or not actual_reader or actual_reader not in READER_STYLES:
+            actual_reader = random.choice(["neutral", "healer", "chaos"])
+
+        ai_task = asyncio.create_task(
+            generate_tarot_reading(
+                spread_key=self.selected_spread,
+                drawn_cards=drawn_cards,
+                question=self.question,
+                context=self.context,
+                reader_style=actual_reader,
+                user_name=self.author_name
+            )
+        )
+
+        flip_view = TarotFlipView(
+            author_id=self.author_id,
+            author_name=self.author_name,
+            author_avatar_url=self.author_avatar_url,
+            spread_key=self.selected_spread,
+            spread_info=spread_info,
+            drawn_cards=drawn_cards,
+            question=self.question,
+            context=self.context,
+            reader_style=actual_reader,
+            ai_task=ai_task,
+            tarot_manager=self.tarot_manager,
+            guild_id=interaction.guild.id if interaction.guild else None,
+            channel_id=interaction.channel.id if interaction.channel else None
+        )
+
+        image_buffer = await asyncio.to_thread(
+            render_spread_to_bytes,
+            self.selected_spread,
+            drawn_cards,
+            set()
+        )
+        file = discord.File(fp=image_buffer, filename="tarot_spread.png")
+
+        desc_lines = []
+        if self.question:
+            desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
+        if self.context:
+            desc_lines.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
+        desc_lines.append(f"**🎭 Người trải bài:** {flip_view.style_info['name']}\n")
+
+        desc_lines.append(WIDE_DIVIDER)
+
+        cards_summary_lines = []
+        for drawn in drawn_cards:
+            cards_summary_lines.append(f"• **{drawn.position_title}**: ⏳ *(Chờ lật)*")
+
+        desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
+        desc_lines.append("⏳ *Hãy bấm vào các nút bên dưới để lật mở từng lá bài...*")
+
+        embed = discord.Embed(
+            title=f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}",
+            description="\n".join(desc_lines),
+            color=flip_view.embed_color
+        )
+        embed.set_image(url="attachment://tarot_spread.png")
+        embed.set_footer(
+            text=f"Quẻ bài của {self.author_name} (Đang bốc bài...)",
+            icon_url=self.author_avatar_url
+        )
+
+        try:
+            await interaction.edit_original_response(embed=embed, attachments=[file], view=flip_view)
+            flip_view.message = self.message or interaction.message
+        except Exception:
+            if self.message:
+                await self.message.edit(embed=embed, attachments=[file], view=flip_view)
+                flip_view.message = self.message
+
+        self.stop()
+
+    async def _handle_history_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        history = await self.tarot_manager.get_user_history(interaction.user.id, limit=5)
+        if not history:
+            await interaction.response.send_message(
+                "📜 Bạn chưa có lượt bốc bài Tarot nào được lưu lại.",
+                ephemeral=True
+            )
+            return
+
+        embed = discord.Embed(
+            title=f"📜 LỊCH SỬ BỐC BÀI TAROT - {self.author_name.upper()}",
+            description="Dưới đây là tối đa 5 lượt bốc bài gần nhất của bạn:",
+            color=0xDAA520
+        )
+        for item in history:
+            spread_k = item["spread_type"]
+            s_name = SPREAD_DEFINITIONS.get(spread_k, {}).get("name", spread_k)
+            q_str = f"**Câu hỏi:** *{item['question']}*\n" if item["question"] else ""
+            cards = item["cards"]
+            cards_summary = ", ".join([
+                f"{c['name_vi']} ({'[NGƯỢC]' if c['is_reversed'] else '[XUÔI]'})"
+                for c in cards
+            ])
+            embed.add_field(
+                name=f"🔮 {s_name} • ({item['created_at']})",
+                value=f"{q_str}🃏 **Các lá bài:** {cards_summary}",
+                inline=False
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    async def _handle_cancel_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        self.clear_items()
+        embed = discord.Embed(
+            title="🔮 ĐIỆN BÓC BÀI TAROT",
+            description="❌ *Bảng điều khiển bốc bài Tarot đã được đóng lại.*",
+            color=0x7F8C8D
+        )
+        try:
+            await interaction.response.edit_message(embed=embed, view=None)
+        except Exception:
+            if self.message:
+                await self.message.edit(embed=embed, view=None)
+        self.stop()
+
+    async def on_timeout(self):
+        self.clear_items()
+        if self.message:
+            try:
+                embed = discord.Embed(
+                    title="🔮 ĐIỆN BÓC BÀI TAROT",
+                    description="⏳ *Bảng điều khiển đã hết thời gian tương tác (5 phút).* Hãy gõ `$m tarot` để mở lại!",
+                    color=0x7F8C8D
+                )
+                await self.message.edit(embed=embed, view=None)
+            except Exception:
+                pass
 
 
 class TarotFlipView(discord.ui.View):
@@ -43,8 +512,11 @@ class TarotFlipView(discord.ui.View):
         self.drawn_cards = drawn_cards
         self.question = question
         self.context = context
-        self.reader_style = reader_style
-        self.style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
+        if reader_style == "random" or not reader_style or reader_style not in READER_STYLES:
+            self.reader_style = random.choice(["neutral", "healer", "chaos"])
+        else:
+            self.reader_style = reader_style
+        self.style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
         self.ai_task = ai_task
         self.tarot_manager = tarot_manager
         self.guild_id = guild_id

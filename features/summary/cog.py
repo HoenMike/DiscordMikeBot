@@ -1,6 +1,7 @@
 import sys
 import re
 import traceback
+from typing import Optional, Union
 from datetime import datetime, timezone, timedelta
 
 import discord
@@ -93,6 +94,150 @@ class SummaryCog(commands.Cog):
         messages = [item[2] for item in raw_items]
         return messages, time_range_str
 
+    async def _execute_summary_flow(
+        self,
+        user: Union[discord.User, discord.Member],
+        target_channel: discord.TextChannel,
+        hours: Optional[float] = None,
+        limit: Optional[int] = None,
+        summary_type: str = "short",
+        focus: Optional[str] = None,
+        interaction: Optional[discord.Interaction] = None,
+        ctx: Optional[commands.Context] = None
+    ):
+        """Quy trình thực thi tóm tắt tin nhắn bằng AI dùng chung cho Slash và Prefix Command."""
+        if config.is_shutting_down:
+            msg = "❌ Bot đang được cập nhật hoặc tái khởi động hệ thống. Vui lòng thực hiện lại sau 15-30 giây!"
+            if interaction:
+                await interaction.response.send_message(msg, ephemeral=True)
+            elif ctx:
+                await ctx.reply(msg, mention_author=False)
+            return
+
+        if hours is not None and (hours <= 0 or hours > 168.0):
+            msg = "❌ Số giờ quét phải lớn hơn 0 và không được vượt quá 168.0 giờ (7 ngày)!"
+            if interaction:
+                await interaction.response.send_message(msg, ephemeral=True)
+            elif ctx:
+                await ctx.reply(msg, mention_author=False)
+            return
+
+        if limit is not None and (limit <= 0 or limit > config.MAX_FETCH_MESSAGES_LIMIT):
+            msg = f"❌ Số lượng tin nhắn quét phải lớn hơn 0 và không được vượt quá {config.MAX_FETCH_MESSAGES_LIMIT} tin nhắn!"
+            if interaction:
+                await interaction.response.send_message(msg, ephemeral=True)
+            elif ctx:
+                await ctx.reply(msg, mention_author=False)
+            return
+
+        followup_msg = None
+        if interaction:
+            await interaction.response.defer(ephemeral=False)
+            config.active_interactions.add(interaction)
+
+        resolved_hours, resolved_limit, scan_info = self._resolve_scan_parameters(hours, limit)
+
+        clean_focus = None
+        if focus and focus.strip() and focus.strip().lower() not in ["none", "null", "undefined"]:
+            clean_focus = focus.strip()
+
+        print(f"📥 [Lệnh nhận] tomtat được gọi bởi @{user.display_name} tại kênh #{target_channel.name}", flush=True)
+        print(f"   ↳ Tham số quét: hours={resolved_hours}, limit={resolved_limit}, kiểu='{summary_type}', focus='{clean_focus}'", flush=True)
+
+        mode_info = "Tóm tắt ngắn gọn" if summary_type == "short" else "Tóm tắt dài & Timeline chi tiết"
+        focus_info = f" | Tập trung: `{clean_focus}`" if clean_focus else ""
+        loading_text = f"⏳ Đang thu thập và phân tích dữ liệu tại {target_channel.mention} ({scan_info} | chế độ: *{mode_info}*{focus_info}). Vui lòng đợi một lát..."
+
+        if interaction:
+            followup_msg = await interaction.followup.send(loading_text)
+        elif ctx:
+            followup_msg = await ctx.reply(loading_text, mention_author=False)
+
+        try:
+            print(f"⏳ Đang tải lịch sử kênh #{target_channel.name}...", flush=True)
+            raw_messages, time_range_str = await self._fetch_messages(target_channel, resolved_hours, resolved_limit)
+        except Exception as fetch_error:
+            print(f"❌ Lỗi khi tải lịch sử chat: {fetch_error}", flush=True)
+            traceback.print_exc(file=sys.stdout)
+            err_msg = "❌ Không thể tải lịch sử kênh chat. Hãy kiểm tra quyền hạn của bot!"
+            if interaction:
+                await interaction.followup.send(err_msg)
+                config.active_interactions.discard(interaction)
+            elif ctx and followup_msg:
+                await followup_msg.edit(content=err_msg)
+            return
+
+        print(f"✅ Đã tải xong: Đọc được {len(raw_messages)} tin nhắn ({time_range_str}).", flush=True)
+
+        if not raw_messages:
+            print(f"⚠️ Hủy bỏ: Không tìm thấy tin nhắn nào trong kênh #{target_channel.name} để tóm tắt.", flush=True)
+            err_msg = f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}."
+            if interaction:
+                await interaction.followup.send(err_msg)
+                config.active_interactions.discard(interaction)
+            elif ctx and followup_msg:
+                await followup_msg.edit(content=err_msg)
+            return
+
+        try:
+            summary_result = await ai_summary.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
+
+            title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
+            embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
+
+            chunks = split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
+
+            focus_part = f" • Focus: `{clean_focus}`" if clean_focus else ""
+            config_header = f"⚙️ `{len(raw_messages)} tin nhắn` ({time_range_str}) • `{scan_info}` • **{mode_info}**{focus_part}\n\n"
+
+            for i, chunk in enumerate(chunks):
+                part_title = title_str
+                if len(chunks) > 1:
+                    part_title += f" (Phần {i+1}/{len(chunks)})"
+
+                description_text = (config_header + chunk) if i == 0 else chunk
+
+                embed = discord.Embed(
+                    title=part_title,
+                    description=description_text,
+                    color=embed_color
+                )
+                embed.set_footer(text=f"Yêu cầu bởi {user.display_name}")
+
+                content = f"🔔 {user.mention} Đã tóm tắt xong cuộc trò chuyện!" if i == 0 else None
+                if interaction:
+                    await interaction.followup.send(content=content, embed=embed)
+                elif ctx:
+                    await ctx.channel.send(content=content, embed=embed)
+
+            print(f"🎉 Tóm tắt thành công! Đã gửi {len(chunks)} Embed tới kênh #{target_channel.name}.", flush=True)
+            config.summary_count += 1
+
+            if followup_msg:
+                try:
+                    await followup_msg.delete()
+                except Exception:
+                    pass
+
+        except Exception as e:
+            print(f"❌ Lỗi trong quá trình xử lý AI của tomtat: {e}", flush=True)
+            traceback.print_exc(file=sys.stdout)
+            err_msg = "❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!"
+            if interaction:
+                try:
+                    await interaction.followup.send(err_msg)
+                except Exception:
+                    pass
+            elif ctx and followup_msg:
+                try:
+                    await followup_msg.edit(content=err_msg)
+                except Exception:
+                    pass
+
+        finally:
+            if interaction:
+                config.active_interactions.discard(interaction)
+
     @app_commands.command(name="tomtat", description="Tóm tắt nội dung cuộc trò chuyện trong kênh chat bằng AI")
     @app_commands.describe(
         channel="Kênh chat cần tóm tắt (Mặc định là kênh hiện tại)",
@@ -115,94 +260,62 @@ class SummaryCog(commands.Cog):
         summary_type: str = "short",
         focus: str = None
     ):
-        if not await self._validate_inputs(interaction, hours, limit):
-            return
-
-        await interaction.response.defer(ephemeral=False)
-        config.active_interactions.add(interaction)
-
         target_channel = channel or interaction.channel
-        resolved_hours, resolved_limit, scan_info = self._resolve_scan_parameters(hours, limit)
-
-        clean_focus = None
-        if focus and focus.strip() and focus.strip().lower() not in ["none", "null", "undefined"]:
-            clean_focus = focus.strip()
-
-        print(f"📥 [Lệnh nhận] /tomtat được gọi bởi @{interaction.user.display_name} tại kênh #{target_channel.name}", flush=True)
-        print(f"   ↳ Tham số quét: hours={resolved_hours}, limit={resolved_limit}, kiểu='{summary_type}', focus='{clean_focus}'", flush=True)
-
-        mode_info = "Tóm tắt ngắn gọn" if summary_type == "short" else "Tóm tắt dài & Timeline chi tiết"
-        focus_info = f" | Tập trung: `{clean_focus}`" if clean_focus else ""
-        followup_msg = await interaction.followup.send(
-            f"⏳ Đang thu thập và phân tích dữ liệu tại {target_channel.mention} ({scan_info} | chế độ: *{mode_info}*{focus_info}). Vui lòng đợi một lát..."
+        await self._execute_summary_flow(
+            user=interaction.user,
+            target_channel=target_channel,
+            hours=hours,
+            limit=limit,
+            summary_type=summary_type,
+            focus=focus,
+            interaction=interaction
         )
 
-        try:
-            print(f"⏳ Đang tải lịch sử kênh #{target_channel.name}...", flush=True)
-            raw_messages, time_range_str = await self._fetch_messages(target_channel, resolved_hours, resolved_limit)
-        except Exception as fetch_error:
-            print(f"❌ Lỗi khi tải lịch sử chat: {fetch_error}", flush=True)
-            traceback.print_exc(file=sys.stdout)
-            await interaction.followup.send("❌ Không thể tải lịch sử kênh chat. Hãy kiểm tra quyền hạn của bot!")
-            config.active_interactions.discard(interaction)
-            return
+    @commands.command(
+        name="tomtat",
+        aliases=["summary", "tt"],
+        help="Tóm tắt nội dung cuộc trò chuyện trong kênh chat bằng AI"
+    )
+    async def tomtat_prefix(self, ctx: commands.Context, *args):
+        hours = None
+        limit = None
+        summary_type = "short"
+        focus = None
 
-        print(f"✅ Đã tải xong: Đọc được {len(raw_messages)} tin nhắn ({time_range_str}).", flush=True)
+        unprocessed = []
+        for arg in args:
+            arg_clean = arg.strip().lower()
+            if arg_clean in ["short", "ngan", "ngan-gon", "s"]:
+                summary_type = "short"
+            elif arg_clean in ["long", "dai", "chi-tiet", "detail", "l"]:
+                summary_type = "long"
+            elif arg_clean.endswith("h") and arg_clean[:-1].replace(".", "", 1).isdigit():
+                hours = float(arg_clean[:-1])
+            elif arg_clean.isdigit() and limit is None and hours is not None:
+                limit = int(arg_clean)
+            elif arg_clean.replace(".", "", 1).isdigit() and hours is None:
+                val = float(arg_clean)
+                if val.is_integer() and val > 24 and limit is None:
+                    limit = int(val)
+                else:
+                    hours = val
+            elif arg_clean.isdigit() and limit is None:
+                limit = int(arg_clean)
+            else:
+                unprocessed.append(arg)
 
-        if not raw_messages:
-            print(f"⚠️ Hủy bỏ: Không tìm thấy tin nhắn nào trong kênh #{target_channel.name} để tóm tắt.", flush=True)
-            await interaction.followup.send(f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}.")
-            config.active_interactions.discard(interaction)
-            return
+        if unprocessed:
+            focus = " ".join(unprocessed)
 
-        try:
-            summary_result = await ai_summary.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
-
-            title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
-            embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
-
-            chunks = split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
-
-            # Dòng cấu hình ngắn gọn 1 hàng ngang nằm ngay trên cùng của phần 1
-            focus_part = f" • Focus: `{clean_focus}`" if clean_focus else ""
-            config_header = f"⚙️ `{len(raw_messages)} tin nhắn` ({time_range_str}) • `{scan_info}` • **{mode_info}**{focus_part}\n\n"
-
-            for i, chunk in enumerate(chunks):
-                part_title = title_str
-                if len(chunks) > 1:
-                    part_title += f" (Phần {i+1}/{len(chunks)})"
-
-                description_text = (config_header + chunk) if i == 0 else chunk
-
-                embed = discord.Embed(
-                    title=part_title,
-                    description=description_text,
-                    color=embed_color
-                )
-
-                embed.set_footer(text=f"Yêu cầu bởi {interaction.user.display_name}")
-
-                content = f"🔔 {interaction.user.mention} Đã tóm tắt xong cuộc trò chuyện!" if i == 0 else None
-                await interaction.followup.send(content=content, embed=embed)
-
-            print(f"🎉 Tóm tắt thành công! Đã gửi {len(chunks)} Embed tới kênh #{target_channel.name}.", flush=True)
-            config.summary_count += 1
-
-            try:
-                await followup_msg.delete()
-            except Exception:
-                pass
-
-        except Exception as e:
-            print(f"❌ Lỗi trong quá trình xử lý AI của /tomtat: {e}", flush=True)
-            traceback.print_exc(file=sys.stdout)
-            try:
-                await interaction.followup.send("❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!")
-            except Exception:
-                pass
-
-        finally:
-            config.active_interactions.discard(interaction)
+        await self._execute_summary_flow(
+            user=ctx.author,
+            target_channel=ctx.channel,
+            hours=hours,
+            limit=limit,
+            summary_type=summary_type,
+            focus=focus,
+            ctx=ctx
+        )
 
     @app_commands.command(name="test_tomtat", description="Chạy tóm tắt thử nghiệm kèm AI tự động đánh giá và chấm điểm chất lượng")
     @app_commands.describe(
