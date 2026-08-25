@@ -125,6 +125,69 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
         await interaction.response.edit_message(embed=embed, view=self.launcher_view)
 
 
+class TarotTriggerView(discord.ui.View):
+    """View nút bấm rút gọn để mở Bảng Thiết Lập Tarot dạng Private / Ephemeral."""
+
+    def __init__(
+        self,
+        author_id: int,
+        author_name: str,
+        author_avatar_url: Optional[str],
+        tarot_manager: TarotManager,
+        selected_spread: str = "daily",
+        selected_reader: str = "random",
+        question: Optional[str] = None,
+        timeout: float = 120.0,
+    ):
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.author_name = author_name
+        self.author_avatar_url = author_avatar_url
+        self.tarot_manager = tarot_manager
+        self.selected_spread = selected_spread
+        self.selected_reader = selected_reader
+        self.question = question
+        self.message: Optional[discord.Message] = None
+
+    @discord.ui.button(
+        label="🔮 Mở Bảng Thiết Lập (Chỉ Mình Bạn Thấy)",
+        style=discord.ButtonStyle.primary,
+        custom_id="trigger_open_tarot_launcher"
+    )
+    async def open_launcher(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Nút này dành riêng cho người đã gọi lệnh!", ephemeral=True)
+            return
+
+        launcher = TarotLauncherView(
+            author_id=self.author_id,
+            author_name=self.author_name,
+            author_avatar_url=self.author_avatar_url,
+            tarot_manager=self.tarot_manager,
+            selected_spread=self.selected_spread,
+            selected_reader=self.selected_reader,
+            question=self.question,
+            trigger_message=self.message
+        )
+        embed = launcher.build_launcher_embed()
+        # Mở Bảng Thiết Lập Private (Ephemeral)
+        await interaction.response.send_message(embed=embed, view=launcher, ephemeral=True)
+
+        # Xóa tin nhắn trigger trên kênh chat để giữ kênh sạch sẽ
+        if self.message:
+            try:
+                await self.message.delete()
+            except Exception:
+                pass
+
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.delete()
+            except Exception:
+                pass
+
+
 class TarotLauncherView(discord.ui.View):
     """
     View Bảng Điều Khiển Tương Tác (Launcher UI):
@@ -426,26 +489,20 @@ class TarotLauncherView(discord.ui.View):
             icon_url=self.author_avatar_url
         )
 
-        # 1. Nếu mở từ Prefix ($m tarot -> self.message tồn tại): Edit trực tiếp vào tin nhắn đó (mượt mà, 0 tin nhắn thừa)
-        if self.message:
-            try:
-                await self.message.edit(embed=embed, attachments=[file], view=flip_view)
-                flip_view.message = self.message
-            except Exception:
-                if interaction.channel:
-                    sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
-                    flip_view.message = sent_msg
-        else:
-            # 2. Nếu mở từ Slash Command (/tarot -> ephemeral): Gửi quẻ bài ra kênh và xóa sạch bảng ephemeral
-            if interaction.channel:
-                sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
-                flip_view.message = sent_msg
-            try:
-                await interaction.delete_original_response()
-            except Exception:
-                pass
+        # 1. Gửi quẻ bài CÔNG KHAI (Public) ra kênh chat
+        if interaction.channel:
+            sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
+            flip_view.message = sent_msg
 
-        # 3. Dọn dẹp trigger message nếu có
+        # 2. Xóa bảng thiết lập Private (Ephemeral)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            await interaction.delete_original_response()
+        except Exception:
+            pass
+
+        # 3. Dọn dẹp trigger message nếu còn tồn tại
         if self.trigger_message:
             try:
                 await self.trigger_message.delete()
