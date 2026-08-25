@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+import config
 from features.tarot.deck import (
     SPREAD_DEFINITIONS,
     draw_spread,
@@ -199,7 +200,22 @@ class TarotCog(commands.Cog):
                     await ctx.reply(cooldown_msg, mention_author=False)
                 return
 
-        # 3. Phản hồi ban đầu
+        # 3. Kiểm tra Cooldown 1 phút chống spam giữa 2 lần bốc bài liên tiếp của 1 người
+        can_proceed, wait_sec = self.tarot_manager.check_user_cooldown(
+            user.id,
+            cooldown_seconds=config.COMMAND_COOLDOWN_SECONDS
+        )
+        if not can_proceed:
+            cd_msg = f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng tĩnh tâm và chờ thêm `{int(wait_sec) + 1}s` nữa trước khi bốc quẻ tiếp theo nhé."
+            if interaction:
+                await interaction.response.send_message(cd_msg, ephemeral=True)
+            elif ctx:
+                await ctx.reply(cd_msg, mention_author=False)
+            return
+
+        self.tarot_manager.record_user_action(user.id)
+
+        # 4. Phản hồi ban đầu
         initial_msg = None
         if interaction:
             await interaction.response.defer(thinking=True)
@@ -207,8 +223,12 @@ class TarotCog(commands.Cog):
             initial_msg = await ctx.reply("🔮 Đang kết nối năng lượng và trải bài Tarot...", mention_author=False)
 
         try:
-            # 1. Rút bài ngẫu nhiên
-            drawn_cards = draw_spread(spread_key)
+            # 1. Rút bài theo seed năng lượng vũ trụ theo khung giờ
+            drawn_cards = draw_spread(
+                spread_key=spread_key,
+                user_id=user.id,
+                question=clean_question if clean_question else None
+            )
 
             # 2. Zero-Latency Pre-fetch
             ai_task = asyncio.create_task(
@@ -329,16 +349,34 @@ class TarotCog(commands.Cog):
         app_commands.Choice(name="🌸 Celeste", value="healer"),
         app_commands.Choice(name="🃏 Jester", value="chaos"),
     ])
+    @app_commands.checks.cooldown(1, 60.0, key=lambda i: i.user.id)
     async def tarot_slash(
         self,
         interaction: discord.Interaction,
-        spread: app_commands.Choice[str],
+        spread: app_commands.Choice[str] | None = None,
         question: str | None = None,
         context: str | None = None,
         reader: app_commands.Choice[str] | None = None
     ):
-        spread_key = spread.value
         reader_key = reader.value if reader else "random"
+        if not spread:
+            # Mở launcher riêng tư (Ephemeral) trực tiếp 100%
+            user_avatar = interaction.user.display_avatar.url if interaction.user.display_avatar else None
+            launcher = TarotLauncherView(
+                author_id=interaction.user.id,
+                author_name=interaction.user.display_name,
+                author_avatar_url=user_avatar,
+                tarot_manager=self.tarot_manager,
+                selected_spread="daily",
+                selected_reader=reader_key,
+                question=question,
+                context=context
+            )
+            embed = launcher.build_launcher_embed()
+            await interaction.response.send_message(embed=embed, view=launcher, ephemeral=True)
+            return
+
+        spread_key = spread.value
         await self._execute_tarot_flow(
             user=interaction.user,
             spread_key=spread_key,
@@ -352,6 +390,7 @@ class TarotCog(commands.Cog):
         name="tarot_history",
         description="Xem lại các lượt bốc bài Tarot gần nhất của bạn"
     )
+    @app_commands.checks.cooldown(1, 60.0, key=lambda i: i.user.id)
     async def tarot_history_slash(self, interaction: discord.Interaction):
         async def send_response(*args, **kwargs):
             await interaction.response.send_message(*args, **kwargs)
@@ -365,6 +404,7 @@ class TarotCog(commands.Cog):
         aliases=["tr", "bocbai", "tarotcard"],
         help="Bốc bài Tarot với menu tương tác trực quan hoặc bốc nhanh qua cú pháp"
     )
+    @commands.cooldown(1, 60.0, commands.BucketType.user)
     async def tarot_prefix(
         self,
         ctx: commands.Context,
@@ -384,19 +424,11 @@ class TarotCog(commands.Cog):
                 selected_reader="random",
                 question=None
             )
-            embed = discord.Embed(
-                title="🔮 ĐIỆN BÓC BÀI TAROT HUYỀN BÍ",
-                description=(
-                    f"Chào **{ctx.author.display_name}**! Hãy nhấn nút **Mở Bảng Chọn Trải Bài** bên dưới để thiết lập quẻ bài riêng tư (chỉ một mình bạn nhìn thấy).\n\n"
-                    f"✨ *Sau khi thiết lập xong, bài Tarot sẽ được **trải và lật mở công khai** tại kênh chat!*"
-                ),
-                color=0x7851A9
+            sent_msg = await ctx.reply(
+                "🔮 **Điện Bốc Bài Tarot** — Nhấn nút bên dưới để mở Bảng thiết lập trải bài:",
+                view=trigger_view,
+                mention_author=False
             )
-            embed.set_footer(
-                text=f"Yêu cầu bởi {ctx.author.display_name} • MikeBot Tarot",
-                icon_url=user_avatar
-            )
-            sent_msg = await ctx.reply(embed=embed, view=trigger_view, mention_author=False)
             trigger_view.message = sent_msg
             return
 
@@ -441,25 +473,18 @@ class TarotCog(commands.Cog):
             selected_reader="random",
             question=full_query
         )
-        embed = discord.Embed(
-            title="🔮 ĐIỆN BÓC BÀI TAROT HUYỀN BÍ",
-            description=(
-                f"💡 Đã ghi nhận câu hỏi: **{full_query}**\n\n"
-                f"Hãy nhấn nút bên dưới để mở Bảng chọn quẻ bài riêng tư của bạn:"
-            ),
-            color=0x7851A9
+        sent_msg = await ctx.reply(
+            f"💡 Đã ghi nhận câu hỏi: **{full_query}**\n🔮 Nhấn nút bên dưới để mở Bảng thiết lập trải bài:",
+            view=trigger_view,
+            mention_author=False
         )
-        embed.set_footer(
-            text=f"Yêu cầu bởi {ctx.author.display_name} • MikeBot Tarot",
-            icon_url=user_avatar
-        )
-        sent_msg = await ctx.reply(embed=embed, view=trigger_view, mention_author=False)
         trigger_view.message = sent_msg
 
     @commands.command(
         name="tarot_history",
         aliases=["thistory", "t_history", "lichsutarot"]
     )
+    @commands.cooldown(1, 60.0, commands.BucketType.user)
     async def tarot_history_prefix(self, ctx: commands.Context):
         async def send_reply(*args, **kwargs):
             kwargs.pop("ephemeral", None)

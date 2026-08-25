@@ -51,6 +51,32 @@ class SummaryBot(commands.Bot):
             print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
             traceback.print_exc(file=sys.stdout)
 
+        # Xử lý lỗi toàn cục cho Slash Commands (bao gồm Cooldown)
+        @self.tree.error
+        async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+            if isinstance(error, discord.app_commands.CommandOnCooldown):
+                msg = f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(error.retry_after) + 1}s` nữa trước khi dùng lại lệnh."
+                if interaction.response.is_done():
+                    await interaction.followup.send(msg, ephemeral=True)
+                else:
+                    await interaction.response.send_message(msg, ephemeral=True)
+            else:
+                print(f"❌ [Slash Command Error] {error}", flush=True)
+                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stdout)
+
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        """Xử lý lỗi toàn cục cho các lệnh Prefix ($m ...)."""
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.reply(
+                f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(error.retry_after) + 1}s` nữa trước khi dùng lại lệnh.",
+                mention_author=False
+            )
+            return
+        elif isinstance(error, commands.CommandNotFound):
+            return
+        else:
+            print(f"⚠️ [Prefix Command Error] {error}", flush=True)
+
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return

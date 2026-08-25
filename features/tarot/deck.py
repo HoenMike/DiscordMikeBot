@@ -1,7 +1,10 @@
-import random
+import hashlib
 import pathlib
-import urllib.request
+import random
+import re
 import urllib.parse
+import urllib.request
+from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 
@@ -852,8 +855,51 @@ SPREAD_DEFINITIONS: Dict[str, dict] = {
 }
 
 
-def draw_spread(spread_key: str) -> List[DrawnCard]:
-    """Rút ngẫu nhiên N lá không trùng lặp từ bộ 78 lá bài kèm xác suất 50% đảo chiều."""
+def compute_tarot_seed(
+    user_id: Optional[int] = None,
+    spread_key: str = "daily",
+    question: Optional[str] = None,
+) -> Optional[int]:
+    """
+    Tạo seed năng lượng vũ trụ theo từng khung giờ (1 tiếng/khung) cho mỗi người dùng & câu hỏi.
+    - user_id: ID người dùng Discord
+    - spread_key: Kiểu trải bài
+    - question: Câu hỏi đã chuẩn hóa
+    """
+    if user_id is None:
+        return None
+
+    # Múi giờ Việt Nam (UTC+7)
+    vn_tz = timezone(timedelta(hours=7))
+    now = datetime.now(vn_tz)
+
+    if spread_key == "daily":
+        time_slot = now.strftime("%Y-%m-%d")
+    else:
+        # Mỗi tiếng 1 khung (Ví dụ: 2026-08-25_H09)
+        time_slot = now.strftime("%Y-%m-%d_H%H")
+
+    norm_q = ""
+    if question:
+        norm_q = re.sub(r"[^\w\s]", "", question.lower()).strip()
+        norm_q = re.sub(r"\s+", " ", norm_q)
+
+    raw_seed_str = f"tarot_{user_id}_{spread_key}_{time_slot}_{norm_q}"
+    # Dùng 16 ký tự hex đầu của SHA-256 để chuyển thành integer 64-bit an toàn
+    seed_int = int(hashlib.sha256(raw_seed_str.encode("utf-8")).hexdigest()[:16], 16)
+    return seed_int
+
+
+def draw_spread(
+    spread_key: str,
+    user_id: Optional[int] = None,
+    question: Optional[str] = None,
+    seed: Optional[int] = None
+) -> List[DrawnCard]:
+    """
+    Rút N lá không trùng lặp từ bộ 78 lá bài với seed năng lượng vũ trụ theo từng khung giờ (1 giờ/khung).
+    Nếu cùng user hỏi cùng câu hỏi trong cùng 1 tiếng, bài rút ra sẽ hoàn toàn nhất quán.
+    """
     if spread_key not in SPREAD_DEFINITIONS:
         raise ValueError(f"Kiểu trải bài không hợp lệ: {spread_key}")
 
@@ -861,12 +907,17 @@ def draw_spread(spread_key: str) -> List[DrawnCard]:
     count = spread_def["card_count"]
     positions = spread_def["positions"]
 
+    if seed is None and user_id is not None:
+        seed = compute_tarot_seed(user_id=user_id, spread_key=spread_key, question=question)
+
+    rng = random.Random(seed) if seed is not None else random.Random()
+
     all_cards = list(TAROT_DECK.values())
-    chosen_cards = random.sample(all_cards, count)
+    chosen_cards = rng.sample(all_cards, count)
 
     drawn: List[DrawnCard] = []
     for i, card in enumerate(chosen_cards):
-        is_reversed = random.choice([True, False])
+        is_reversed = rng.choice([True, False])
         pos_title, pos_desc = positions[i]
         drawn.append(DrawnCard(
             card=card,

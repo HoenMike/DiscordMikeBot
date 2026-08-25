@@ -276,6 +276,7 @@ class SummaryCog(commands.Cog):
         aliases=["summary", "tt"],
         help="Tóm tắt nội dung cuộc trò chuyện trong kênh chat bằng AI"
     )
+    @commands.cooldown(1, config.COMMAND_COOLDOWN_SECONDS, commands.BucketType.user)
     async def tomtat_prefix(self, ctx: commands.Context, *args):
         hours = None
         limit = None

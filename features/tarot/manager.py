@@ -13,6 +13,25 @@ class TarotManager:
     def __init__(self):
         self.db_path = str(config.DB_PATH)
         self._db: Optional[aiosqlite.Connection] = None
+        self._user_last_action: dict[int, float] = {}
+
+    def check_user_cooldown(self, user_id: int, cooldown_seconds: float = 60.0) -> Tuple[bool, float]:
+        """
+        Kiểm tra cooldown 1 phút giữa 2 lần bốc bài / gọi lệnh của 1 user.
+        Trả về (can_proceed, remaining_seconds).
+        """
+        import time
+        now = time.time()
+        last_time = self._user_last_action.get(user_id, 0.0)
+        elapsed = now - last_time
+        if elapsed < cooldown_seconds:
+            return False, cooldown_seconds - elapsed
+        return True, 0.0
+
+    def record_user_action(self, user_id: int) -> None:
+        """Ghi nhận mốc thời gian vừa thực hiện hành động của user."""
+        import time
+        self._user_last_action[user_id] = time.time()
 
     async def _get_db(self) -> aiosqlite.Connection:
         if self._db is None:
