@@ -8,7 +8,6 @@ from core.config_manager import ConfigManager
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.voice_states = True
 
 FEATURE_EXTENSIONS = [
     "features.embed.cog",

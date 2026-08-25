@@ -1,6 +1,5 @@
 import asyncio
 import io
-import os
 import random
 from typing import List, Optional, Set, Any
 import discord
@@ -15,7 +14,6 @@ from features.tarot.deck import (
 )
 from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading
-from features.tarot.voice_reader import play_tarot_voice, auto_play_tarot_voice, generate_tarot_speech
 from features.tarot.manager import TarotManager
 from core.ai import split_text
 
@@ -515,150 +513,6 @@ class TarotLauncherView(discord.ui.View):
                 pass
 
 
-class TarotResultView(discord.ui.View):
-    """
-    View tương tác sau khi đã luận giải xong quẻ bài:
-    - Nếu người bốc bài đang trong Voice: Tự động phát âm thanh, nút hiển thị '🔊 Đang Đọc Trong Voice...'.
-    - Nếu người bốc bài KHÔNG trong Voice: Hiển thị nút '🔊 Nghe Đọc Bài' để bấm khi cần.
-    """
-
-    def __init__(
-        self,
-        ai_reading: str,
-        reader_style: str,
-        author_id: int,
-        author_name: str,
-        spread_name: str = "",
-        preload_task: Optional[asyncio.Task] = None,
-        is_auto_playing: bool = False,
-        timeout: float = 600.0,
-    ):
-        super().__init__(timeout=timeout)
-        self.ai_reading = ai_reading
-        self.reader_style = reader_style
-        self.author_id = author_id
-        self.author_name = author_name
-        self.spread_name = spread_name
-        self.preload_task = preload_task
-        self.preloaded_audio_path: Optional[str] = None
-        self.is_speaking = is_auto_playing
-        self.message: Optional[discord.Message] = None
-
-        style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
-        self.reader_name = style_info.get("name", "Reader")
-
-        # Nút nghe đọc bài qua Voice
-        btn_label = "🔊 Đang Đọc Trong Voice..." if is_auto_playing else f"🔊 Nghe {self.reader_name} Đọc Bài"
-        self.voice_button = discord.ui.Button(
-            label=btn_label,
-            style=discord.ButtonStyle.primary,
-            custom_id="tarot_listen_voice",
-            disabled=is_auto_playing,
-            row=0,
-        )
-        self.voice_button.callback = self._handle_voice_click
-        self.add_item(self.voice_button)
-
-    async def on_auto_play_finished(self, failed: bool = False, is_busy: bool = False):
-        """Callback khi luồng tự động đọc bài hoàn tất hoặc kết thúc."""
-        self.is_speaking = False
-        if failed or is_busy:
-            self.voice_button.label = f"🔊 Nghe {self.reader_name} Đọc Bài"
-        else:
-            self.voice_button.label = f"🔊 Nghe {self.reader_name} Đọc Lại"
-        self.voice_button.disabled = False
-        try:
-            if self.message:
-                await self.message.edit(view=self)
-        except Exception:
-            pass
-
-    async def _handle_voice_click(self, interaction: discord.Interaction):
-        # Chỉ cho phép người bốc bài (author) bấm nút
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                f"🔒 **Chỉ người bốc quẻ bài này ({self.author_name}) mới có thể yêu cầu Bot đọc bài!**\n"
-                f"💡 Hãy dùng lệnh `/tarot` để tự bốc và nghe trải bài của riêng bạn nhé!",
-                ephemeral=True
-            )
-            return
-
-        if self.is_speaking:
-            await interaction.response.send_message(
-                "⏳ Reader đang thực hiện đọc bài trong Voice Channel, vui lòng đợi đọc xong nhé!",
-                ephemeral=True,
-            )
-            return
-
-        # Defer ephemeral response để chuẩn bị xử lý
-        await interaction.response.defer(ephemeral=True)
-
-        self.is_speaking = True
-        self.voice_button.label = "⏳ Đang kết nối & đọc bài..."
-        self.voice_button.disabled = True
-        try:
-            if self.message:
-                await self.message.edit(view=self)
-            else:
-                await interaction.edit_original_response(view=self)
-        except Exception:
-            pass
-
-        # Lấy đường dẫn file âm thanh đã preload sẵn nếu có
-        preloaded_path = None
-        if self.preloaded_audio_path and os.path.exists(self.preloaded_audio_path):
-            preloaded_path = self.preloaded_audio_path
-        elif self.preload_task:
-            try:
-                preloaded_path = await asyncio.wait_for(asyncio.shield(self.preload_task), timeout=3.0)
-                self.preloaded_audio_path = preloaded_path
-            except Exception:
-                pass
-
-        try:
-            await play_tarot_voice(
-                interaction=interaction,
-                reading_text=self.ai_reading,
-                reader_style=self.reader_style,
-                spread_name=self.spread_name,
-                preloaded_audio_path=preloaded_path,
-            )
-            # Sau khi phát xong, file đã được dọn dẹp trong play_tarot_voice
-            self.preloaded_audio_path = None
-            self.preload_task = None
-        finally:
-            self.is_speaking = False
-            self.voice_button.label = f"🔊 Nghe {self.reader_name} Đọc Lại"
-            self.voice_button.disabled = False
-            try:
-                if self.message:
-                    await self.message.edit(view=self)
-                else:
-                    await interaction.edit_original_response(view=self)
-            except Exception:
-                pass
-
-    async def on_timeout(self):
-        for item in self.children:
-            item.disabled = True
-        if self.message:
-            try:
-                await self.message.edit(view=self)
-            except Exception:
-                pass
-
-        # Dọn dẹp file preload nếu người dùng không bấm nghe bài
-        try:
-            path_to_clean = self.preloaded_audio_path
-            if not path_to_clean and self.preload_task and self.preload_task.done():
-                path_to_clean = self.preload_task.result()
-            if path_to_clean and os.path.exists(path_to_clean):
-                os.remove(path_to_clean)
-                print(f"🧹 [TarotResultView] Đã dọn dẹp file preload không dùng: {path_to_clean}", flush=True)
-        except Exception:
-            pass
-
-
 class TarotFlipView(discord.ui.View):
     """
     View tương tác Gamification: Cho phép người dùng bấm từng nút để lật mở từng lá bài,
@@ -705,10 +559,6 @@ class TarotFlipView(discord.ui.View):
         self._has_completed: bool = False
         self.message: Optional[discord.Message] = None
 
-        # Tác vụ Preload âm thanh nền để khi lật xong là có sẵn audio ngay
-        self.preload_voice_task: Optional[asyncio.Task] = None
-        self._start_voice_preload()
-
         # Màu embed theo phong cách hoặc Yes/No phán quyết
         self.embed_color = self.style_info.get("color", 0x7851A9)
         if self.spread_key == "yes_no":
@@ -716,25 +566,6 @@ class TarotFlipView(discord.ui.View):
             self.embed_color = verdict_color
 
         self._build_buttons()
-
-    def _start_voice_preload(self):
-        """Khởi chạy preload audio ngay khi AI vừa hoàn tất giải bài (chạy ngầm lúc user lật bài)."""
-        async def _worker():
-            try:
-                ai_reading = await self.ai_task
-                if ai_reading and not self._has_completed:
-                    self.preload_voice_task = asyncio.create_task(
-                        generate_tarot_speech(
-                            reading_text=ai_reading,
-                            reader_style=self.reader_style,
-                            user_name=self.author_name,
-                            spread_name=self.spread_info.get("name", "")
-                        )
-                    )
-            except Exception:
-                pass
-
-        asyncio.create_task(_worker())
 
     def _build_buttons(self):
         """Khởi tạo và cập nhật trạng thái các nút bấm lật bài."""
@@ -937,59 +768,26 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
-            # Kiểm tra xem người bốc bài (author) có đang ở trong Voice Channel không
-            author_member = interaction.guild.get_member(self.author_id) if interaction.guild else None
-            author_voice = author_member.voice if author_member else getattr(interaction.user, "voice", None)
-            voice_channel = author_voice.channel if author_voice else None
-            is_in_voice = bool(voice_channel and interaction.guild)
-
-            # Tạo view kết quả có nút Voice Reader (kèm Preloaded Audio Task)
-            result_view = TarotResultView(
-                ai_reading=ai_reading,
-                reader_style=self.reader_style,
-                author_id=self.author_id,
-                author_name=self.author_name,
-                spread_name=self.spread_info.get("name", ""),
-                preload_task=self.preload_voice_task,
-                is_auto_playing=is_in_voice
-            )
-            result_view.message = self.message
-
-            # Nếu người bốc bài đang trong Voice -> Tự động kích hoạt flow đọc bài
-            if is_in_voice and voice_channel and interaction.guild:
-                asyncio.create_task(
-                    auto_play_tarot_voice(
-                        guild=interaction.guild,
-                        voice_channel=voice_channel,
-                        reading_text=ai_reading,
-                        reader_style=self.reader_style,
-                        user_name=self.author_name,
-                        spread_name=self.spread_info.get("name", ""),
-                        preload_task=self.preload_voice_task,
-                        result_view=result_view
-                    )
-                )
-
             # Cập nhật kết quả bài giải đầy đủ lên Discord
             try:
                 if not sent_image_already:
                     await interaction.edit_original_response(
                         embeds=final_embeds,
                         attachments=[file],
-                        view=result_view
+                        view=None
                     )
                 else:
                     await interaction.edit_original_response(
                         embeds=final_embeds,
-                        view=result_view
+                        view=None
                     )
             except Exception:
                 if self.message:
                     try:
                         if not sent_image_already:
-                            await self.message.edit(embeds=final_embeds, attachments=[file], view=result_view)
+                            await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
                         else:
-                            await self.message.edit(embeds=final_embeds, view=result_view)
+                            await self.message.edit(embeds=final_embeds, view=None)
                     except Exception as ex:
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
             self.stop()
@@ -1116,38 +914,7 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
-            guild = self.message.guild if self.message else None
-            author_member = guild.get_member(self.author_id) if guild else None
-            author_voice = author_member.voice if author_member else None
-            voice_channel = author_voice.channel if author_voice else None
-            is_in_voice = bool(voice_channel and guild)
-
-            result_view = TarotResultView(
-                ai_reading=ai_reading,
-                reader_style=self.reader_style,
-                author_id=self.author_id,
-                author_name=self.author_name,
-                spread_name=self.spread_info.get("name", ""),
-                preload_task=self.preload_voice_task,
-                is_auto_playing=is_in_voice
-            )
-            result_view.message = self.message
-
-            if is_in_voice and voice_channel and guild:
-                asyncio.create_task(
-                    auto_play_tarot_voice(
-                        guild=guild,
-                        voice_channel=voice_channel,
-                        reading_text=ai_reading,
-                        reader_style=self.reader_style,
-                        user_name=self.author_name,
-                        spread_name=self.spread_info.get("name", ""),
-                        preload_task=self.preload_voice_task,
-                        result_view=result_view
-                    )
-                )
-
             if self.message:
-                await self.message.edit(embeds=final_embeds, attachments=[file], view=result_view)
+                await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
         except Exception as e:
             print(f"[TarotFlipView] Lỗi on_timeout: {e}", flush=True)

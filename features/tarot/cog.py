@@ -500,24 +500,6 @@ class TarotCog(commands.Cog):
             await ctx.reply(*args, mention_author=False, **kwargs)
         await self._show_history(ctx.author, send_reply, is_ephemeral=False)
 
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-        """Tự động ngắt kết nối Voice khi tất cả người dùng đã rời khỏi phòng."""
-        if member.bot:
-            return
-        if before.channel and before.channel != after.channel:
-            voice_client = member.guild.voice_client
-            if voice_client and voice_client.channel == before.channel:
-                human_members = [m for m in before.channel.members if not m.bot]
-                if not human_members:
-                    print(f"👋 [Tarot Voice Listener] Phòng '{before.channel.name}' đã trống, tự động ngắt kết nối bot...", flush=True)
-                    if voice_client.is_playing():
-                        voice_client.stop()
-                    try:
-                        await voice_client.disconnect(force=True)
-                    except Exception:
-                        pass
-
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TarotCog(bot))

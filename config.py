@@ -77,15 +77,6 @@ GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", "gemini-3.5-flash-lite")
 # Mặc định ưu tiên gemini-3.7-flash -> fallback gemini-3.6-flash -> gemini-3.5-flash-lite -> gemma-4-31b-it
 GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", "gemini-3.7-flash")
 
-# Model AI hỗ trợ Multimodal Audio Output (TTS giọng đọc tự nhiên theo nhân vật)
-GEMINI_VOICE_MODEL = os.getenv("GEMINI_VOICE_MODEL", "gemini-2.5-flash-preview-tts")
-VOICE_FALLBACK_MODELS = [
-    GEMINI_VOICE_MODEL,
-    "gemini-3.1-flash-tts-preview",
-    "gemini-2.5-pro-preview-tts",
-    "gemini-2.5-flash-native-audio-latest"
-]
-
 # Danh sách chuỗi Fallback mô hình dự phòng khi gặp quá tải (503 / 429 Quota Exceeded)
 TAROT_FALLBACK_MODELS = [
     GEMINI_TAROT_MODEL,
