@@ -21,7 +21,6 @@ app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 't
 
 @app.route('/')
 def home():
-    print("ℹ️ Web server nhận được ping từ UptimeRobot hoặc trình duyệt.", flush=True)
     return render_template('dashboard.html')
 
 

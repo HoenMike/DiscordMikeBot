@@ -11,3 +11,5 @@ data/
 scratch/test_outputs/
 scratch/
 features/tarot/assets/cards/
+logs/
+*.log

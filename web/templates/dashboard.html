@@ -386,6 +386,66 @@
             border-color: var(--status-offline);
         }
 
+        .log-filter-group {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            gap: 2px;
+        }
+
+        .btn-filter {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.25rem 0.55rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-family: inherit;
+        }
+
+        .btn-filter:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .btn-filter.active {
+            background: rgba(139, 92, 246, 0.25);
+            color: #f8fafc;
+            font-weight: 600;
+        }
+
+        .btn-filter.active.btn-filter-error {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+        }
+
+        .btn-filter.active.btn-filter-warn {
+            background: rgba(245, 158, 11, 0.25);
+            color: #fde68a;
+        }
+
+        .filter-count-badge {
+            background: #ef4444;
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 10px;
+            line-height: 1.2;
+        }
+
+        .filter-count-badge.warn-badge {
+            background: #f59e0b;
+        }
+
         .audit-split-panel {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -638,10 +698,21 @@
                     <div class="console-title">
                         <span>💻 Console Logs</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <div class="log-filter-group">
+                            <button class="btn-filter active" id="filter-btn-all" onclick="setLogFilter('all')">Tất cả</button>
+                            <button class="btn-filter" id="filter-btn-error" onclick="setLogFilter('error')">
+                                <span>❌ Chỉ lỗi</span>
+                                <span id="error-badge" class="filter-count-badge" style="display:none;">0</span>
+                            </button>
+                            <button class="btn-filter" id="filter-btn-warn" onclick="setLogFilter('warn')">
+                                <span>⚠️ Cảnh báo</span>
+                                <span id="warn-badge" class="filter-count-badge" style="display:none;">0</span>
+                            </button>
+                        </div>
                         <button class="btn-action copy" onclick="copyConsoleLogs()">Sao chép log</button>
                         <button class="btn-action clear" onclick="clearConsoleLogs()">Xóa log</button>
-                        <div class="live-indicator" style="margin-left: 0.5rem;">
+                        <div class="live-indicator" style="margin-left: 0.25rem;">
                             <span class="live-dot"></span>
                             <span>Live</span>
                         </div>
@@ -681,6 +752,8 @@
     <script>
         let autoScroll = true;
         let activeTab = 'logs';
+        let currentLogFilter = 'all'; // 'all' | 'error' | 'warn'
+        let cachedRawLogs = [];
         let testRunsData = [];
         let selectedTestIndex = null;
         const consoleBody = document.getElementById('console-body');
@@ -704,6 +777,33 @@
             }
         }
 
+        function setLogFilter(filterType) {
+            currentLogFilter = filterType;
+            
+            const btnAll = document.getElementById('filter-btn-all');
+            const btnError = document.getElementById('filter-btn-error');
+            const btnWarn = document.getElementById('filter-btn-warn');
+
+            if (btnAll) btnAll.className = filterType === 'all' ? 'btn-filter active' : 'btn-filter';
+            if (btnError) btnError.className = filterType === 'error' ? 'btn-filter active btn-filter-error' : 'btn-filter';
+            if (btnWarn) btnWarn.className = filterType === 'warn' ? 'btn-filter active btn-filter-warn' : 'btn-filter';
+
+            renderLogs();
+        }
+
+        function getLogCategory(line) {
+            if (!line || typeof line !== 'string') return 'info';
+            const lower = line.toLowerCase();
+            if (line.includes("❌") || line.includes("Lỗi") || lower.includes("error") || lower.includes("exception") || lower.includes("[error]") || lower.includes("traceback") || lower.includes("failed")) {
+                return 'error';
+            } else if (line.includes("⚠️") || lower.includes("warning") || lower.includes("[warning]")) {
+                return 'warn';
+            } else if (line.includes("🎉") || line.includes("thành công") || lower.includes("success")) {
+                return 'success';
+            }
+            return 'info';
+        }
+
         function formatLogLine(line) {
             if (!line || typeof line !== 'string') return '';
             
@@ -716,17 +816,76 @@
                 content = line.substring(timestamp.length).trim();
             }
 
+            const cat = getLogCategory(content);
             let styleClass = "log-info";
-            
-            if (content.includes("❌") || content.includes("Lỗi") || content.includes("error") || content.includes("Exception") || content.includes("[ERROR]")) {
-                styleClass = "log-error";
-            } else if (content.includes("⚠️") || content.includes("warning") || content.includes("[WARNING]")) {
-                styleClass = "log-warn";
-            } else if (content.includes("🎉") || content.includes("thành công") || content.includes("success") || content.includes("success!")) {
-                styleClass = "log-success";
-            }
+            if (cat === 'error') styleClass = "log-error";
+            else if (cat === 'warn') styleClass = "log-warn";
+            else if (cat === 'success') styleClass = "log-success";
 
             return `<div class="log-line"><span class="log-timestamp">${timestamp}</span><span class="${styleClass}">${escapeHtml(content)}</span></div>`;
+        }
+
+        function renderLogs() {
+            if (!cachedRawLogs || cachedRawLogs.length === 0) {
+                consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
+                return;
+            }
+
+            // Update badge counts
+            let errorCount = 0;
+            let warnCount = 0;
+            cachedRawLogs.forEach(line => {
+                const cat = getLogCategory(line);
+                if (cat === 'error') errorCount++;
+                else if (cat === 'warn') warnCount++;
+            });
+
+            const errorBadge = document.getElementById('error-badge');
+            if (errorBadge) {
+                if (errorCount > 0) {
+                    errorBadge.textContent = errorCount;
+                    errorBadge.style.display = 'inline-block';
+                } else {
+                    errorBadge.style.display = 'none';
+                }
+            }
+
+            const warnBadge = document.getElementById('warn-badge');
+            if (warnBadge) {
+                if (warnCount > 0) {
+                    warnBadge.textContent = warnCount;
+                    warnBadge.style.display = 'inline-block';
+                    warnBadge.className = 'filter-count-badge warn-badge';
+                } else {
+                    warnBadge.style.display = 'none';
+                }
+            }
+
+            let filteredLogs = cachedRawLogs;
+            if (currentLogFilter === 'error') {
+                filteredLogs = cachedRawLogs.filter(line => getLogCategory(line) === 'error');
+            } else if (currentLogFilter === 'warn') {
+                filteredLogs = cachedRawLogs.filter(line => {
+                    const cat = getLogCategory(line);
+                    return cat === 'warn' || cat === 'error';
+                });
+            }
+
+            if (filteredLogs.length === 0) {
+                if (currentLogFilter === 'error') {
+                    consoleBody.innerHTML = '<div class="log-line" style="color: var(--text-secondary);"><span class="log-timestamp">[--:--:--]</span> ✨ Tuyệt vời! Không có lỗi (Error) nào trong hệ thống.</div>';
+                } else if (currentLogFilter === 'warn') {
+                    consoleBody.innerHTML = '<div class="log-line" style="color: var(--text-secondary);"><span class="log-timestamp">[--:--:--]</span> ✨ Không có cảnh báo hoặc lỗi nào được ghi nhận.</div>';
+                } else {
+                    consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
+                }
+            } else {
+                consoleBody.innerHTML = filteredLogs.map(formatLogLine).join('');
+            }
+
+            if (autoScroll) {
+                consoleBody.scrollTop = consoleBody.scrollHeight;
+            }
         }
 
         function escapeHtml(unsafe) {
@@ -744,7 +903,7 @@
                 .map(el => el.textContent)
                 .join('\n');
             navigator.clipboard.writeText(lines).then(() => {
-                alert("Đã sao chép toàn bộ logs vào Clipboard!");
+                alert("Đã sao chép logs hiển thị vào Clipboard!");
             }).catch(err => {
                 console.error("Không thể sao chép logs: ", err);
             });
@@ -757,7 +916,8 @@
             try {
                 const response = await fetch('/api/logs/clear', { method: 'POST' });
                 if (response.ok) {
-                    consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Logs đã được xóa sạch.</div>';
+                    cachedRawLogs = [];
+                    renderLogs();
                 } else {
                     alert("Không thể xóa logs trên máy chủ.");
                 }
@@ -919,14 +1079,8 @@
                     document.getElementById('info-model-id').textContent = data.model || 'Gemini Flash';
                 }
 
-                if (data.logs && data.logs.length > 0) {
-                    consoleBody.innerHTML = data.logs.map(formatLogLine).join('');
-                    if (autoScroll) {
-                        consoleBody.scrollTop = consoleBody.scrollHeight;
-                    }
-                } else {
-                    consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
-                }
+                cachedRawLogs = data.logs || [];
+                renderLogs();
 
                 if (data.test_runs) {
                     testRunsData = data.test_runs;

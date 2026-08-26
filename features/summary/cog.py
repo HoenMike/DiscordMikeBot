@@ -303,7 +303,7 @@ class SummaryCog(commands.Cog):
         # Trường hợp 2: Quét từ một Message ID / Link cụ thể
         elif after_message_id is not None:
             fetch_after = discord.Object(id=after_message_id - 1)
-            async for msg in target_channel.history(limit=max_limit, after=fetch_after, oldest_first=True):
+            async for msg in target_channel.history(limit=limit, after=fetch_after, oldest_first=True):
                 if msg.author.bot:
                     continue
                 local_dt = msg.created_at.astimezone(vn_tz)
@@ -318,7 +318,7 @@ class SummaryCog(commands.Cog):
                 now_utc = datetime.now(timezone.utc)
                 cutoff_time_utc = now_utc - timedelta(hours=hours)
 
-            async for msg in target_channel.history(limit=max_limit):
+            async for msg in target_channel.history(limit=limit):
                 if cutoff_time_utc and msg.created_at < cutoff_time_utc:
                     break
                 if msg.author.bot:

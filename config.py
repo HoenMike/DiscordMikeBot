@@ -4,13 +4,38 @@ from datetime import datetime, timezone, timedelta
 import sys
 
 # ==========================================
-# 0. KHỞI TẠO BỘ ĐỆM LOG & CHUYỂN HƯỚNG OUTPUT
+# 0. KHỞI TẠO BỘ ĐỆM LOG & FILE GHI ERROR
 # ==========================================
-log_buffer = collections.deque(maxlen=100)
+log_buffer = collections.deque(maxlen=500)
+
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+ERROR_LOG_PATH = os.path.join(LOG_DIR, "error.log")
+
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+except Exception:
+    pass
+
+
+def is_error_log(text: str, is_stderr: bool = False) -> bool:
+    if is_stderr:
+        return True
+    lower = text.lower()
+    return any(keyword in lower for keyword in ["❌", "lỗi", "error", "exception", "traceback", "failed", "[error]"])
+
+
+def append_to_error_file(timestamp_full: str, line: str):
+    try:
+        with open(ERROR_LOG_PATH, "a", encoding="utf-8", errors="replace") as f:
+            f.write(f"[{timestamp_full}] {line}\n")
+    except Exception:
+        pass
+
 
 class LogStreamRedirector:
-    def __init__(self, original_stream):
+    def __init__(self, original_stream, is_stderr: bool = False):
         self.original_stream = original_stream
+        self.is_stderr = is_stderr
 
     def write(self, data):
         self.original_stream.write(data)
@@ -21,9 +46,21 @@ class LogStreamRedirector:
             for line in clean_data.split('\n'):
                 stripped_line = line.strip()
                 if stripped_line:
+                    # Lọc bỏ thông báo ping UptimeRobot / Trình duyệt nếu có
+                    if "Web server nhận được ping từ UptimeRobot" in stripped_line:
+                        continue
+
                     vn_tz = timezone(timedelta(hours=7))
-                    timestamp = datetime.now(vn_tz).strftime('%H:%M:%S')
-                    log_buffer.append(f"[{timestamp}] {stripped_line}")
+                    now_vn = datetime.now(vn_tz)
+                    timestamp_short = now_vn.strftime('%H:%M:%S')
+                    timestamp_full = now_vn.strftime('%Y-%m-%d %H:%M:%S')
+
+                    # Lưu vào RAM buffer phục vụ live Dashboard
+                    log_buffer.append(f"[{timestamp_short}] {stripped_line}")
+
+                    # Nếu là Error Log, lưu bền vững vào file logs/error.log
+                    if is_error_log(stripped_line, self.is_stderr):
+                        append_to_error_file(timestamp_full, stripped_line)
 
     def flush(self):
         self.original_stream.flush()
@@ -45,10 +82,10 @@ if hasattr(sys.stderr, 'reconfigure'):
         pass
 
 # Chuyển hướng stdout và stderr sang redirector để hứng log
-sys.stdout = LogStreamRedirector(sys.stdout)
-sys.stderr = LogStreamRedirector(sys.stderr)
+sys.stdout = LogStreamRedirector(sys.stdout, is_stderr=False)
+sys.stderr = LogStreamRedirector(sys.stderr, is_stderr=True)
 
-print("ℹ️ Hệ thống Logging và Dashboard Buffer đã hoạt động từ config.py.", flush=True)
+print("ℹ️ Hệ thống Logging, Dashboard Buffer (500 dòng) và Error Persistence (logs/error.log) đã hoạt động từ config.py.", flush=True)
 
 # Config variables
 import pathlib
