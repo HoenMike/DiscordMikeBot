@@ -392,10 +392,68 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- TAB 4: TAROT DAILY COOLDOWNS -->
+        <!-- ========================================== -->
+        <!-- TAB 4: TAROT ANALYTICS & COOLDOWNS -->
         <!-- ========================================== -->
         <section id="tab-content-tarot" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
-            <!-- Toolbar -->
+            
+            <!-- Ratings & Dataset Export Card -->
+            <div class="flex-shrink-0 bg-dark-card border border-dark-border rounded-xl p-3 flex flex-col gap-2.5 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-dark-border/60 pb-2">
+                    <div class="flex items-center gap-2">
+                        <div class="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+                            <i data-lucide="thumbs-up" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-white">Thống Kê Đánh Giá Người Dùng (Like / Dislike)</span>
+                            <p class="text-[11px] text-slate-400">Dữ liệu đánh giá từ nút 👍/👎 trên Discord giúp tinh chỉnh và tối ưu hóa Persona AI Reader.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="/api/tarot/ratings/export?format=json" download="tarot_ratings_dataset.json" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 transition-all active:scale-95">
+                            <i data-lucide="file-json" class="w-3.5 h-3.5"></i>
+                            <span>Xuất Dataset JSON</span>
+                        </a>
+                        <a href="/api/tarot/ratings/export?format=csv" download="tarot_ratings_dataset.csv" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 transition-all active:scale-95">
+                            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                            <span>Xuất CSV (Excel)</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Rating Metric Chips -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div class="p-2 rounded-lg bg-dark-surface border border-dark-border flex items-center justify-between">
+                        <span class="text-[11px] text-slate-400 font-medium">Tổng Đánh Giá:</span>
+                        <span id="tarot-rating-total" class="font-bold text-xs text-white code-font">0 lượt</span>
+                    </div>
+                    <div class="p-2 rounded-lg bg-dark-surface border border-dark-border flex items-center justify-between">
+                        <span class="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                            <i data-lucide="thumbs-up" class="w-3 h-3"></i> Hài Lòng:
+                        </span>
+                        <span id="tarot-rating-likes" class="font-bold text-xs text-emerald-300 code-font">0</span>
+                    </div>
+                    <div class="p-2 rounded-lg bg-dark-surface border border-dark-border flex items-center justify-between">
+                        <span class="text-[11px] text-rose-400 font-medium flex items-center gap-1">
+                            <i data-lucide="thumbs-down" class="w-3 h-3"></i> Chưa Chuẩn:
+                        </span>
+                        <span id="tarot-rating-dislikes" class="font-bold text-xs text-rose-300 code-font">0</span>
+                    </div>
+                    <div class="p-2 rounded-lg bg-dark-surface border border-dark-border flex items-center justify-between">
+                        <span class="text-[11px] text-amber-400 font-medium flex items-center gap-1">
+                            <i data-lucide="percent" class="w-3 h-3"></i> Tỷ Lệ Tích Cực:
+                        </span>
+                        <span id="tarot-rating-rate" class="font-bold text-xs text-amber-300 code-font">100%</span>
+                    </div>
+                </div>
+
+                <!-- Breakdown by Reader Style -->
+                <div id="tarot-rating-styles-container" class="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span class="text-slate-500 italic text-[11px]">Đang tải thống kê theo phong cách Reader...</span>
+                </div>
+            </div>
+
+            <!-- Toolbar Cooldowns -->
             <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-dark-card border border-dark-border rounded-xl p-2.5">
                 <div class="flex items-center gap-2.5">
                     <div class="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
@@ -425,7 +483,7 @@
                         <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
                         <span>Gỡ tất cả hôm nay</span>
                     </button>
-                    <button onclick="fetchTarotCooldowns()" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-all">
+                    <button onclick="fetchTarotCooldowns(); fetchTarotRatingStats();" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-all">
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i>
                         <span>Làm mới</span>
                     </button>
@@ -820,6 +878,7 @@
                 fetchGuildsData();
             } else if (tab === 'tarot') {
                 fetchTarotCooldowns();
+                fetchTarotRatingStats();
             }
             lucide.createIcons();
         }
@@ -1409,17 +1468,71 @@
             input.value = "";
         }
 
+        async function fetchTarotRatingStats() {
+            try {
+                const res = await fetch('/api/tarot/ratings/stats');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                const totalEl = document.getElementById('tarot-rating-total');
+                const likesEl = document.getElementById('tarot-rating-likes');
+                const dislikesEl = document.getElementById('tarot-rating-dislikes');
+                const rateEl = document.getElementById('tarot-rating-rate');
+                
+                if (totalEl) totalEl.textContent = `${data.total || 0} lượt`;
+                if (likesEl) likesEl.textContent = data.likes || 0;
+                if (dislikesEl) dislikesEl.textContent = data.dislikes || 0;
+                if (rateEl) rateEl.textContent = `${data.satisfaction_rate || 100}%`;
+
+                const stylesContainer = document.getElementById('tarot-rating-styles-container');
+                if (stylesContainer) {
+                    if (!data.by_style || data.by_style.length === 0) {
+                        stylesContainer.innerHTML = `<span class="text-slate-500 italic text-[11px]">Chưa có lượt đánh giá nào được ghi nhận trên hệ thống.</span>`;
+                    } else {
+                        const styleNames = {
+                            "neutral": "🔮 Khách quan (Neutral)",
+                            "healer": "🧙‍♂️ Chữa lành (Healer)",
+                            "chaos": "⚡ Thẳng thắn (Chaos)"
+                        };
+                        stylesContainer.innerHTML = data.by_style.map(s => {
+                            const name = styleNames[s.style] || s.style;
+                            const badgeColor = s.rate >= 75 ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' : (s.rate >= 50 ? 'text-amber-300 border-amber-500/30 bg-amber-500/10' : 'text-rose-300 border-rose-500/30 bg-rose-500/10');
+                            return `
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${badgeColor}">
+                                    <span class="font-medium text-slate-200">${name}:</span>
+                                    <span class="font-bold code-font">${s.rate}%</span>
+                                    <span class="text-[10px] text-slate-400">(${s.likes}👍 / ${s.dislikes}👎)</span>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                }
+                lucide.createIcons();
+            } catch (err) {
+                console.error("Lỗi khi tải thống kê đánh giá Tarot:", err);
+            }
+        }
+
         // ==========================================
         // CONSOLE LOGS
         // ==========================================
+        function isWarningLog(line) {
+            return /⚠️|warn|timeout|503|429|unavailable|resource_exhausted|chuyển sang model|thử proxy|không tìm thấy og/i.test(line);
+        }
+
+        function isRealErrorLog(line) {
+            if (isWarningLog(line)) return false;
+            return /❌|\[error\]|traceback|syntaxerror|nameerror|typeerror|critical/i.test(line);
+        }
+
         function renderLogs() {
             const container = document.getElementById('logs-container');
             let lines = cachedLogs;
 
             if (logFilterType === 'error') {
-                lines = lines.filter(l => /❌|lỗi|error|exception|traceback|failed/i.test(l));
+                lines = lines.filter(l => isRealErrorLog(l));
             } else if (logFilterType === 'warn') {
-                lines = lines.filter(l => /⚠️|warn|timeout|503/i.test(l));
+                lines = lines.filter(l => isWarningLog(l));
             }
 
             if (logSearchQuery) {
@@ -1429,13 +1542,13 @@
 
             container.innerHTML = lines.map(line => {
                 let colorClass = "text-slate-300";
-                if (/❌|lỗi|error|exception|traceback|failed/i.test(line)) {
+                if (isRealErrorLog(line)) {
                     colorClass = "text-rose-400 font-medium bg-rose-500/5 px-1 py-0.5 rounded";
-                } else if (/⚠️|warn|timeout|503/i.test(line)) {
+                } else if (isWarningLog(line)) {
                     colorClass = "text-amber-300 font-medium bg-amber-500/5 px-1 py-0.5 rounded";
                 } else if (/✅|thành công|success/i.test(line)) {
                     colorClass = "text-emerald-400 font-medium";
-                } else if (/ℹ️|info|bắt đầu|kết nối/i.test(line)) {
+                } else if (/ℹ️|info|bắt đầu|kết nối|🚀|🤖/i.test(line)) {
                     colorClass = "text-sky-300";
                 } else if (/🔮|tarot/i.test(line)) {
                     colorClass = "text-purple-300";
@@ -1632,9 +1745,10 @@
                     }
                 }
 
-                // 3. Fetch Tarot Cooldowns nếu đang ở tab tarot hoặc định kỳ cập nhật badge
+                // 3. Fetch Tarot Cooldowns & Rating Stats nếu đang ở tab tarot
                 if (currentTab === 'tarot') {
                     fetchTarotCooldowns();
+                    fetchTarotRatingStats();
                 }
 
             } catch (err) {
@@ -1648,6 +1762,7 @@
             fetchDashboardData();
             fetchGuildsData();
             fetchTarotCooldowns();
+            fetchTarotRatingStats();
             setInterval(fetchDashboardData, 3000);
         });
     </script>

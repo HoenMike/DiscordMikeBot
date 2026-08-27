@@ -18,10 +18,23 @@ except Exception:
 
 
 def is_error_log(text: str, is_stderr: bool = False) -> bool:
+    stripped = text.strip()
+    # 1. Các cảnh báo bình thường, fallback của bot hoặc warning của Python/thư viện
+    if any(k in stripped for k in [
+        "⚠️", "Warning:", "SyntaxWarning", "RuntimeWarning", "UserWarning",
+        "503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "chuyển sang model",
+        "Thử proxy", "Không tìm thấy OG", "Direct use of automatic function calling"
+    ]):
+        return False
+
     if is_stderr:
+        if any(w in stripped for w in ["Warning:", "SyntaxWarning:", "RuntimeWarning:"]):
+            return False
         return True
-    lower = text.lower()
-    return any(keyword in lower for keyword in ["❌", "lỗi", "error", "exception", "traceback", "failed", "[error]"])
+
+    lower = stripped.lower()
+    # 2. Chỉ coi là lỗi thực sự nếu bắt đầu bằng ❌ hoặc có crash/traceback nghiêm trọng
+    return any(keyword in lower for keyword in ["❌", "[error]", "traceback (most recent call last)", "syntaxerror:", "nameerror:", "typeerror:"])
 
 
 def append_to_error_file(timestamp_full: str, line: str):

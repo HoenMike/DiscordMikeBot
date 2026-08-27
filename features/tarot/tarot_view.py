@@ -934,9 +934,15 @@ class TarotFlipView(discord.ui.View):
             # Await bài luận giải thông điệp
             ai_res = await self.ai_task
             if isinstance(ai_res, tuple):
-                ai_reading, topic_tag = ai_res
+                if len(ai_res) >= 4:
+                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], ai_res[1], ai_res[2], ai_res[3]
+                elif len(ai_res) == 2:
+                    ai_reading, topic_tag = ai_res[0], ai_res[1]
+                    mood_tag, summary_headline = "", ""
+                else:
+                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], "general", "", ""
             else:
-                ai_reading, topic_tag = ai_res, "general"
+                ai_reading, topic_tag, mood_tag, summary_headline = str(ai_res), "general", "", ""
 
             # Ghi nhận hoạt động vào Live Activity Logger
             try:
@@ -963,6 +969,8 @@ class TarotFlipView(discord.ui.View):
                         "spread": self.spread_key,
                         "reader": self.reader_style,
                         "topic_tag": topic_tag,
+                        "mood_tag": mood_tag,
+                        "summary_headline": summary_headline,
                         "cards": [c.card.name_vi for c in self.drawn_cards]
                     }
                 )
@@ -982,7 +990,8 @@ class TarotFlipView(discord.ui.View):
                 question=saved_q,
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading,
-                topic_tag=topic_tag
+                topic_tag=topic_tag,
+                mood_tag=mood_tag
             )
 
             # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
@@ -1111,9 +1120,15 @@ class TarotFlipView(discord.ui.View):
 
             ai_res = await self.ai_task
             if isinstance(ai_res, tuple):
-                ai_reading, topic_tag = ai_res
+                if len(ai_res) >= 4:
+                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], ai_res[1], ai_res[2], ai_res[3]
+                elif len(ai_res) == 2:
+                    ai_reading, topic_tag = ai_res[0], ai_res[1]
+                    mood_tag, summary_headline = "", ""
+                else:
+                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], "general", "", ""
             else:
-                ai_reading, topic_tag = ai_res, "general"
+                ai_reading, topic_tag, mood_tag, summary_headline = str(ai_res), "general", "", ""
 
             image_buffer = await asyncio.to_thread(
                 render_spread_to_bytes,
@@ -1172,7 +1187,8 @@ class TarotFlipView(discord.ui.View):
                 question=saved_q,
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading,
-                topic_tag=topic_tag
+                topic_tag=topic_tag,
+                mood_tag=mood_tag
             )
 
             # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---

@@ -51,6 +51,7 @@ class TarotManager:
                 cards_json   TEXT NOT NULL,
                 ai_reading   TEXT,
                 topic_tag    TEXT NOT NULL DEFAULT 'general',
+                mood_tag     TEXT NOT NULL DEFAULT '',
                 created_at   TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
@@ -88,9 +89,13 @@ class TarotManager:
                 updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
-        # Tự động cập nhật thêm cột topic_tag nếu bảng tarot_history đã tồn tại từ trước
+        # Tự động cập nhật thêm cột topic_tag và mood_tag nếu bảng tarot_history đã tồn tại từ trước
         try:
             await db.execute("ALTER TABLE tarot_history ADD COLUMN topic_tag TEXT NOT NULL DEFAULT 'general'")
+        except Exception:
+            pass
+        try:
+            await db.execute("ALTER TABLE tarot_history ADD COLUMN mood_tag TEXT NOT NULL DEFAULT ''")
         except Exception:
             pass
 
@@ -206,9 +211,10 @@ class TarotManager:
         question: Optional[str],
         drawn_cards: List[DrawnCard],
         ai_reading: str,
-        topic_tag: str = "general"
+        topic_tag: str = "general",
+        mood_tag: str = ""
     ) -> None:
-        """Lưu lịch sử bốc bài vào database kèm topic_tag."""
+        """Lưu lịch sử bốc bài vào database kèm topic_tag và mood_tag."""
         cards_list = [
             {
                 "position_index": c.position_index,
@@ -224,16 +230,16 @@ class TarotManager:
 
         db = await self._get_db()
         await db.execute("""
-            INSERT INTO tarot_history (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag or "general"))
+            INSERT INTO tarot_history (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag, mood_tag)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag or "general", mood_tag or ""))
         await db.commit()
 
     async def get_user_history(self, user_id: int, limit: int = 5) -> List[dict]:
         """Lấy lịch sử các lượt bốc bài gần nhất của user."""
         db = await self._get_db()
         async with db.execute("""
-            SELECT id, spread_type, question, cards_json, ai_reading, topic_tag, created_at
+            SELECT id, spread_type, question, cards_json, ai_reading, topic_tag, mood_tag, created_at
             FROM tarot_history
             WHERE user_id = ?
             ORDER BY id DESC
@@ -250,21 +256,22 @@ class TarotManager:
                 "cards": json.loads(r[3]),
                 "ai_reading": r[4],
                 "topic_tag": r[5] if len(r) > 5 else "general",
-                "created_at": r[6] if len(r) > 6 else r[5]
+                "mood_tag": r[6] if len(r) > 6 else "",
+                "created_at": r[7] if len(r) > 7 else (r[6] if len(r) > 6 else "")
             })
         return results
 
     async def get_user_recent_context(self, user_id: int) -> Optional[dict]:
         """
         Lấy ngữ cảnh lần đọc trước gần nhất trong vòng 10 ngày (trừ khi user đã tắt memory).
-        Trả về dict: {"topic_tag": ..., "last_card_name": ..., "days_ago": ...} hoặc None.
+        Trả về dict: {"topic_tag": ..., "mood_tag": ..., "last_card_name": ..., "days_ago": ...} hoặc None.
         """
         if not await self.is_user_memory_enabled(user_id):
             return None
 
         db = await self._get_db()
         async with db.execute("""
-            SELECT topic_tag, cards_json, created_at
+            SELECT topic_tag, mood_tag, cards_json, created_at
             FROM tarot_history
             WHERE user_id = ? AND created_at >= datetime('now', '-10 days')
             ORDER BY id DESC
@@ -275,7 +282,7 @@ class TarotManager:
         if not row:
             return None
 
-        topic_tag, cards_json, created_at = row
+        topic_tag, mood_tag, cards_json, created_at = row
         try:
             cards = json.loads(cards_json)
             lead_card = cards[0]["name_vi"] if cards else "Ẩn danh"
@@ -288,6 +295,7 @@ class TarotManager:
         days_str = "vài ngày trước"
         return {
             "topic_tag": topic_tag or "general",
+            "mood_tag": mood_tag or "",
             "last_card_name": lead_card_full,
             "approx_time": days_str
         }
@@ -376,4 +384,79 @@ class TarotManager:
         db = await self._get_db()
         await db.execute("UPDATE tarot_weekly_guild_config SET last_sent_week = ?, updated_at = datetime('now') WHERE guild_id = ?", (week_str, guild_id))
         await db.commit()
+
+    async def get_rating_stats(self) -> dict:
+        """Lấy thống kê đánh giá tổng thể và phân loại theo Reader Style & Spread Type."""
+        db = await self._get_db()
+        async with db.execute("SELECT is_positive, reader_style, spread_type FROM tarot_ratings") as cursor:
+            rows = await cursor.fetchall()
+
+        total = len(rows)
+        likes = sum(1 for r in rows if r[0] == 1)
+        dislikes = total - likes
+        rate = round((likes / total * 100), 1) if total > 0 else 100.0
+
+        # Phân tích theo style
+        by_style = {}
+        for r in rows:
+            st = r[1] or "neutral"
+            if st not in by_style:
+                by_style[st] = {"style": st, "total": 0, "likes": 0, "dislikes": 0}
+            by_style[st]["total"] += 1
+            if r[0] == 1:
+                by_style[st]["likes"] += 1
+            else:
+                by_style[st]["dislikes"] += 1
+
+        for st, data in by_style.items():
+            data["rate"] = round((data["likes"] / data["total"] * 100), 1) if data["total"] > 0 else 100.0
+
+        # Phân tích theo spread
+        by_spread = {}
+        for r in rows:
+            sp = r[2] or "daily"
+            if sp not in by_spread:
+                by_spread[sp] = {"spread": sp, "total": 0, "likes": 0, "dislikes": 0}
+            by_spread[sp]["total"] += 1
+            if r[0] == 1:
+                by_spread[sp]["likes"] += 1
+            else:
+                by_spread[sp]["dislikes"] += 1
+
+        for sp, data in by_spread.items():
+            data["rate"] = round((data["likes"] / data["total"] * 100), 1) if data["total"] > 0 else 100.0
+
+        return {
+            "total": total,
+            "likes": likes,
+            "dislikes": dislikes,
+            "satisfaction_rate": rate,
+            "by_style": list(by_style.values()),
+            "by_spread": list(by_spread.values())
+        }
+
+    async def get_all_ratings_detailed(self) -> List[dict]:
+        """Lấy toàn bộ danh sách đánh giá chi tiết để xuất Dataset (JSON/CSV)."""
+        db = await self._get_db()
+        async with db.execute("""
+            SELECT id, user_id, guild_id, spread_type, reader_style, is_positive, created_at
+            FROM tarot_ratings
+            ORDER BY id DESC
+        """) as cursor:
+            rows = await cursor.fetchall()
+
+        results = []
+        for r in rows:
+            rating_id, u_id, g_id, sp_type, r_style, is_pos, c_at = r
+            results.append({
+                "rating_id": rating_id,
+                "user_id": u_id,
+                "guild_id": g_id,
+                "spread_type": sp_type,
+                "reader_style": r_style,
+                "rating": "LIKE" if is_pos == 1 else "DISLIKE",
+                "is_positive": bool(is_pos),
+                "created_at": c_at
+            })
+        return results
 

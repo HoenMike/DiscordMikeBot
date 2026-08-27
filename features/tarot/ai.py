@@ -45,10 +45,13 @@ def _build_tarot_prompt(
 
     memory_prompt = ""
     if recent_context:
+        mem_topic = recent_context.get('topic_tag', 'chung')
+        mem_mood = recent_context.get('mood_tag', '')
+        mem_vibe = f"{mem_topic} ({mem_mood})" if mem_mood else mem_topic
         memory_prompt = f"""
         🧠 NGỮ CẢNH LẦN ĐỌC TRƯỚC (khoảng {recent_context.get('approx_time', 'vài ngày trước')}):
-        - Người này từng chiêm nghiệm về chủ đề: [{recent_context.get('topic_tag', 'chung')}], lá bài chủ đạo là [{recent_context.get('last_card_name', '')}].
-        🚨 QUY TẮC NHỚ MANG MÁNG: Nếu bạn muốn liên hệ với lần đọc trước, CHỈ ĐƯỢC nhắc lướt qua một cách tự nhiên như người quen nhớ mang máng (ví dụ: 'Lần trước khi nói về chuyện {recent_context.get('topic_tag', 'cũ')}, năng lượng có phần chông chênh...'). TUYỆT ĐỐI KHÔNG trích dẫn nguyên văn câu hỏi cũ, KHÔNG bịa đặt chi tiết riêng tư.
+        - Người này từng chiêm nghiệm về chủ đề: [{mem_vibe}], lá bài chủ đạo là [{recent_context.get('last_card_name', '')}].
+        🚨 QUY TẮC NHỚ MANG MÁNG: Nếu bạn muốn liên hệ với lần đọc trước, CHỈ ĐƯỢC nhắc lướt qua một cách tự nhiên như người quen nhớ mang máng (ví dụ: 'Lần trước khi nói về chuyện {mem_topic}, năng lượng có phần chông chênh...'). TUYỆT ĐỐI KHÔNG trích dẫn nguyên văn câu hỏi cũ, KHÔNG bịa đặt chi tiết riêng tư.
         """.strip()
 
     ctx_str = f'\n- Bối cảnh thực tế: "{context}"' if context else ""
@@ -67,12 +70,16 @@ def _build_tarot_prompt(
     {cards_context}
 
     🚨 YÊU CẦU ĐỊNH DẠNG:
-    Hãy phân loại chủ đề của quẻ bài vào 1 trong các tag: `career` (công việc/học tập), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học hành), hoặc `general` (chung).
+    1. Phân loại chủ đề (`topic_tag`): 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
+    2. Đặt tag tâm trạng / năng lượng (`mood_tag`): 1 cụm từ tiếng Việt ngắn gọn mô tả mood/vibe chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Khởi đầu mới bùng nổ', 'Rối bời & Do dự', 'Thăng hoa & Tự tin', 'Thận trọng & Phòng thủ'...).
+    3. Tiêu đề vibe ngắn (`summary_headline`): 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
     
     Hãy trả lời theo định dạng JSON có cấu trúc sau:
     ```json
     {{
       "topic_tag": "career",
+      "mood_tag": "Cày cuốc chăm chỉ",
+      "summary_headline": "Tập trung cao độ cho chuyên môn, mài giũa tay nghề và tích lũy thực lực.",
       "conclusion": "Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.",
       "cards_analysis": "Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi.",
       "advice": "Lời khuyên hành động thực tế và thông điệp khích lệ.",
@@ -91,11 +98,11 @@ async def generate_tarot_reading(
     reader_style: str = "neutral",
     user_name: str = "Bạn",
     recent_context: Optional[Dict] = None
-) -> Tuple[str, str]:
+) -> Tuple[str, str, str, str]:
     """
     Gọi AI phân tích quẻ bài với Concurrency Semaphore và Fallback Cascade:
     gemini-3.7-flash ➔ gemini-3.6-flash ➔ gemini-3.5-flash ➔ gemini-3.5-flash-lite ➔ gemini-3.1-flash-lite ➔ gemma-4-31b-it.
-    Trả về Tuple: (full_reading_markdown, topic_tag)
+    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline)
     """
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
     spread_name = spread_info["name"]
@@ -139,6 +146,8 @@ async def generate_tarot_reading(
                     
                     # Thử parse JSON có cấu trúc
                     topic_tag = "general"
+                    mood_tag = "Năng lượng tích cực"
+                    summary_headline = ""
                     full_reading = raw_text
 
                     # Trích xuất JSON từ markdown block nếu có
@@ -152,6 +161,8 @@ async def generate_tarot_reading(
                         try:
                             parsed = json.loads(raw_json_str)
                             topic_tag = parsed.get("topic_tag", "general")
+                            mood_tag = parsed.get("mood_tag", "Cân bằng & Tĩnh tại")
+                            summary_headline = parsed.get("summary_headline", "")
                             if "full_reading" in parsed and len(parsed["full_reading"]) > 50:
                                 full_reading = parsed["full_reading"]
                             else:
@@ -161,13 +172,19 @@ async def generate_tarot_reading(
 
                     # Dọn dẹp lời chào mở đầu nếu có
                     clean_text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", full_reading, flags=re.IGNORECASE).strip()
-                    print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag}).", flush=True)
-                    return clean_text, topic_tag
+                    print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag} | Mood: {mood_tag}).", flush=True)
+                    return clean_text, topic_tag, mood_tag, summary_headline
             except asyncio.TimeoutError:
                 print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>14s), chuyển sang model tiếp theo...", flush=True)
             except Exception as e:
                 last_error = e
-                print(f"⚠️ [Tarot AI] Model '{model_name}' gặp sự cố ({type(e).__name__}): {e}. Chuyển sang model tiếp theo...", flush=True)
+                err_str = str(e)
+                if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower():
+                    print(f"⚠️ [Tarot AI] Model '{model_name}' tạm thời quá tải (503 High Demand), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
+                elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                    print(f"⚠️ [Tarot AI] Model '{model_name}' chạm giới hạn quota (429 Rate Limit), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
+                else:
+                    print(f"⚠️ [Tarot AI] Model '{model_name}' không khả dụng ({type(e).__name__}), chuyển sang model tiếp theo...", flush=True)
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Sử dụng bộ luận giải chiêm tinh cổ điển từ điển Tarot...", flush=True)
     fallback_parts = [
@@ -185,7 +202,7 @@ async def generate_tarot_reading(
     fallback_parts.append(
         "💡 **Lời khuyên tổng kết:** Hãy nhìn nhận thông điệp từ góc độ khách quan, lắng nghe trực giác và đưa ra quyết định phù hợp nhất với hành trình của bạn!"
     )
-    return "\n".join(fallback_parts), "general"
+    return "\n".join(fallback_parts), "general", "Chiêm nghiệm cổ điển", "Thông điệp chiêm tinh cổ điển từ điển Tarot"
 
 
 async def generate_followup_answer(

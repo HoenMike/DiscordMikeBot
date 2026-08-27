@@ -383,9 +383,67 @@ def api_tarot_reset_all_cooldowns():
     tm = TarotManager()
     try:
         run_coroutine_safe(tm.reset_all_daily_cooldowns())
-        print("✨ [Admin Console] Đã gỡ toàn bộ Daily Cooldown hôm nay.", flush=True)
+        print("✨ [Admin Console] Đã xóa sạch toàn bộ Cooldown Tarot trong ngày!", flush=True)
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==========================================
+# 7. TAROT RATINGS & DATASET EXPORT APIS
+# ==========================================
+@app.route('/api/tarot/ratings/stats', methods=['GET'])
+@login_required
+def api_tarot_ratings_stats():
+    from features.tarot.manager import TarotManager
+    tm = TarotManager()
+    try:
+        stats = run_coroutine_safe(tm.get_rating_stats())
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/tarot/ratings/export', methods=['GET'])
+@login_required
+def api_tarot_ratings_export():
+    import io
+    import csv
+    import json
+    from flask import Response
+    from features.tarot.manager import TarotManager
+    tm = TarotManager()
+    export_format = request.args.get("format", "json").lower()
+
+    try:
+        ratings = run_coroutine_safe(tm.get_all_ratings_detailed())
+        stats = run_coroutine_safe(tm.get_rating_stats())
+
+        if export_format == "csv":
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Rating ID", "User ID", "Guild ID", "Spread Type", "Reader Style", "Rating", "Is Positive", "Created At"])
+            for r in ratings:
+                writer.writerow([
+                    r["rating_id"], r["user_id"], r["guild_id"] or "", r["spread_type"],
+                    r["reader_style"], r["rating"], r["is_positive"], r["created_at"]
+                ])
+            response = Response(output.getvalue(), mimetype="text/csv; charset=utf-8")
+            response.headers["Content-Disposition"] = "attachment; filename=tarot_ratings_dataset.csv"
+            return response
+        else:
+            export_payload = {
+                "exported_at": datetime.now(timezone.utc).isoformat(),
+                "summary": stats,
+                "dataset": ratings
+            }
+            response = Response(
+                json.dumps(export_payload, ensure_ascii=False, indent=2),
+                mimetype="application/json; charset=utf-8"
+            )
+            response.headers["Content-Disposition"] = "attachment; filename=tarot_ratings_dataset.json"
+            return response
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
