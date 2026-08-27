@@ -190,17 +190,25 @@ def api_activities():
 @app.route('/api/activities/clear', methods=['POST'])
 @login_required
 def api_clear_activities():
-    activity_logger.clear()
-    print("🧹 Đã xóa toàn bộ lịch sử tương tác từ Web Console.", flush=True)
-    return jsonify({"success": True})
+    try:
+        run_coroutine_safe(activity_logger.clear_db())
+        print("🧹 Đã xóa toàn bộ lịch sử tương tác từ Web Console.", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        activity_logger.clear()
+        return jsonify({"success": True})
 
 
 @app.route('/api/logs/clear', methods=['POST'])
 @login_required
 def api_clear_logs():
-    config.log_buffer.clear()
-    print("🧹 Đã xóa toàn bộ logs hệ thống theo yêu cầu từ Web Console.", flush=True)
-    return jsonify({"success": True})
+    try:
+        run_coroutine_safe(activity_logger.clear_console_logs_db())
+        print("🧹 Đã xóa toàn bộ logs hệ thống theo yêu cầu từ Web Console.", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        config.log_buffer.clear()
+        return jsonify({"success": True})
 
 
 # ==========================================

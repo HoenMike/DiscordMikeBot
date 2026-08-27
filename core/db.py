@@ -92,6 +92,9 @@ class DatabaseClient:
         # 1. Thử kết nối Turso Cloud nếu có token cấu hình
         if HAS_LIBSQL and config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL:
             try:
+                if self._turso_client is not None and self._loop != current_loop:
+                    self._turso_client = None
+
                 # Chuyển đổi giao thức libsql:// sang https:// nếu cần cho HTTP client
                 url = config.TURSO_DATABASE_URL
                 if url.startswith("libsql://"):
@@ -102,7 +105,8 @@ class DatabaseClient:
                     auth_token=config.TURSO_AUTH_TOKEN
                 )
                 # Thử ping nhẹ 1 query để xác thực token
-                await self._turso_client.execute("SELECT 1")
+                ping_task = asyncio.create_task(self._turso_client.execute("SELECT 1"))
+                await ping_task
                 self._is_cloud = True
                 self._loop = current_loop
                 print(f"☁️ [Database] Đã kết nối thành công tới Turso Cloud LibSQL ({config.TURSO_DATABASE_URL})!", flush=True)
@@ -130,7 +134,8 @@ class DatabaseClient:
         # Thực thi trên Turso Cloud
         if self._is_cloud and self._turso_client:
             args = list(params) if isinstance(params, (tuple, list)) else (params or [])
-            rs = await self._turso_client.execute(sql, args)
+            exec_task = asyncio.create_task(self._turso_client.execute(sql, args))
+            rs = await exec_task
             return CursorWrapper(
                 rows=rs.rows,
                 last_insert_id=getattr(rs, 'last_insert_rowid', None),

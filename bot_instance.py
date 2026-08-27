@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from core.config_manager import ConfigManager
+from core.activity_logger import activity_logger
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -37,6 +38,7 @@ class SummaryBot(commands.Bot):
 
     async def setup_hook(self):
         await self.config_manager.init_db()
+        await activity_logger.init_db()
 
         for ext in FEATURE_EXTENSIONS:
             try:

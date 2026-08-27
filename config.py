@@ -55,8 +55,16 @@ class LogStreamRedirector:
                     timestamp_short = now_vn.strftime('%H:%M:%S')
                     timestamp_full = now_vn.strftime('%Y-%m-%d %H:%M:%S')
 
+                    formatted_line = f"[{timestamp_short}] {stripped_line}"
                     # Lưu vào RAM buffer phục vụ live Dashboard
-                    log_buffer.append(f"[{timestamp_short}] {stripped_line}")
+                    log_buffer.append(formatted_line)
+
+                    # Lưu bền vững vào Database
+                    try:
+                        from core.activity_logger import activity_logger
+                        activity_logger.log_console(formatted_line)
+                    except Exception:
+                        pass
 
                     # Nếu là Error Log, lưu bền vững vào file logs/error.log
                     if is_error_log(stripped_line, self.is_stderr):
