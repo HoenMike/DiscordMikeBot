@@ -261,7 +261,7 @@ def api_suspend_guild():
 
     try:
         run_coroutine_safe(bot.config_manager.suspend_guild(guild_id, guild_name=guild_name, reason=reason))
-        print(f"⛔ [Admin Console] Đã tạm ngưng (Suspend) server: {guild_name} ({guild_id}). Lý do: {reason}", flush=True)
+        print(f"⛔ [Admin Console] Đã tạm ngừng máy chủ: {guild_name} ({guild_id}). Lý do: {reason}", flush=True)
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -278,7 +278,7 @@ def api_unsuspend_guild():
 
     try:
         run_coroutine_safe(bot.config_manager.unsuspend_guild(guild_id))
-        print(f"✅ [Admin Console] Đã gỡ tạm ngưng (Unsuspend) cho server: {guild_id}.", flush=True)
+        print(f"✅ [Admin Console] Đã gỡ tạm ngừng cho máy chủ: {guild_id}.", flush=True)
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

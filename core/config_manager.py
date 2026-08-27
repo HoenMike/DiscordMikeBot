@@ -34,8 +34,8 @@ class ConfigManager:
         self._channel_cache: dict[str, tuple[dict, float]] = {}
         # Cache proxy domains (proxy:{guild_id}:{platform_key} -> (list hoặc None, timestamp))
         self._proxy_cache: dict[str, tuple[list | None, float]] = {}
-        # Set guild bị tạm ngưng (suspended) để tra cứu O(1) tức thì
-        self._suspended_guilds: set[int] = set()
+        # Dict guild bị tạm ngừng (guild_id -> dict info) để tra cứu O(1) tức thì
+        self._suspended_guilds: dict[int, dict] = {}
 
     async def _get_db(self):
         """Lấy client kết nối đa tầng (Turso Cloud LibSQL / Local SQLite)."""
@@ -80,9 +80,17 @@ class ConfigManager:
         await db.commit()
 
         # Nạp danh sách suspended guilds vào RAM
-        async with db.execute("SELECT guild_id FROM suspended_guilds") as cursor:
+        async with db.execute("SELECT guild_id, guild_name, reason, suspended_at FROM suspended_guilds") as cursor:
             rows = await cursor.fetchall()
-            self._suspended_guilds = {row[0] for row in rows}
+            self._suspended_guilds = {
+                row[0]: {
+                    "guild_id": row[0],
+                    "guild_name": row[1] or "",
+                    "reason": row[2] or "Quản trị viên tạm ngừng",
+                    "suspended_at": row[3] or ""
+                }
+                for row in rows
+            }
 
     async def close(self) -> None:
         """Đóng kết nối database nếu đang mở."""
@@ -400,18 +408,33 @@ class ConfigManager:
         self._cache.pop(f"{guild_id}:{channel_id}", None)
 
     # ---------------------------------------------------------------------------
-    # Quản lý Tạm Ngưng Server (Guild Suspension)
+    # Quản lý Tạm Ngừng Máy Chủ (Guild Suspension)
     # ---------------------------------------------------------------------------
 
     def is_guild_suspended(self, guild_id: int | None) -> bool:
-        """Kiểm tra nhanh xem guild có đang bị Admin tạm ngưng hay không (O(1))."""
+        """Kiểm tra nhanh xem guild có đang bị Admin tạm ngừng hay không (O(1))."""
         if not guild_id:
             return False
         return guild_id in self._suspended_guilds
 
+    def get_guild_suspension_reason(self, guild_id: int | None) -> str | None:
+        """Lấy lý do tạm ngừng của guild (O(1))."""
+        if not guild_id or guild_id not in self._suspended_guilds:
+            return None
+        info = self._suspended_guilds.get(guild_id)
+        if isinstance(info, dict):
+            return info.get("reason", "Quản trị viên tạm ngừng")
+        return "Quản trị viên tạm ngừng"
+
     async def suspend_guild(self, guild_id: int, guild_name: str = "", reason: str = "") -> None:
-        """Tạm ngưng hoạt động của bot trên một server Discord."""
-        self._suspended_guilds.add(guild_id)
+        """Tạm ngừng hoạt động của bot trên một server Discord."""
+        reason_clean = reason.strip() if reason else "Quản trị viên tạm ngừng"
+        self._suspended_guilds[guild_id] = {
+            "guild_id": guild_id,
+            "guild_name": guild_name,
+            "reason": reason_clean,
+            "suspended_at": ""
+        }
         db = await self._get_db()
         await db.execute("""
             CREATE TABLE IF NOT EXISTS suspended_guilds (
@@ -426,13 +449,13 @@ class ConfigManager:
             INSERT OR REPLACE INTO suspended_guilds (guild_id, guild_name, reason, suspended_at)
             VALUES (?, ?, ?, datetime('now'))
             """,
-            (guild_id, guild_name, reason)
+            (guild_id, guild_name, reason_clean)
         )
         await db.commit()
 
     async def unsuspend_guild(self, guild_id: int) -> None:
-        """Gỡ tạm ngưng cho server Discord."""
-        self._suspended_guilds.discard(guild_id)
+        """Gỡ tạm ngừng cho server Discord."""
+        self._suspended_guilds.pop(guild_id, None)
         db = await self._get_db()
         await db.execute("""
             CREATE TABLE IF NOT EXISTS suspended_guilds (
@@ -446,7 +469,7 @@ class ConfigManager:
         await db.commit()
 
     async def get_suspended_guilds_info(self) -> dict[int, dict]:
-        """Lấy thông tin chi tiết các server đang bị tạm ngưng."""
+        """Lấy thông tin chi tiết các server đang bị tạm ngừng."""
         db = await self._get_db()
         async with db.execute("SELECT guild_id, guild_name, reason, suspended_at FROM suspended_guilds") as cursor:
             rows = await cursor.fetchall()

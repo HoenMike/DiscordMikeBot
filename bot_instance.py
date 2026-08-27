@@ -54,12 +54,15 @@ class SummaryBot(commands.Bot):
             print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
             traceback.print_exc(file=sys.stdout)
 
-        # Kiểm tra trạng thái Suspended của Guild trước khi xử lý Slash Command
+        # Kiểm tra trạng thái tạm ngừng của máy chủ trước khi xử lý Slash Command
         async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
             if interaction.guild and self.config_manager.is_guild_suspended(interaction.guild.id):
+                reason = self.config_manager.get_guild_suspension_reason(interaction.guild.id) or "Quản trị viên tạm ngừng"
+                guild_name = interaction.guild.name
                 msg = (
-                    "⛔ **Máy chủ này đã bị tạm ngừng (Suspended) sử dụng MikeDaBot.**\n"
-                    "👉 Vui lòng liên hệ Admin hệ thống để biết thêm chi tiết."
+                    f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng MikeDaBot.**\n"
+                    f"📝 **Lý do:** *{reason}*\n"
+                    f"👉 *Vui lòng liên hệ Quản trị viên bot để biết thêm chi tiết.*"
                 )
                 if interaction.response.is_done():
                     await interaction.followup.send(msg, ephemeral=True)
@@ -100,8 +103,17 @@ class SummaryBot(commands.Bot):
         if message.author.bot:
             return
 
-        # Nếu Server đang bị Admin tạm ngưng (Suspended), bỏ qua toàn bộ tương tác
+        # Nếu Server đang bị Admin tạm ngừng, phản hồi lý do nếu người dùng gõ lệnh $m
         if message.guild and self.config_manager.is_guild_suspended(message.guild.id):
+            if message.content.strip().startswith(("$m", "$M")):
+                reason = self.config_manager.get_guild_suspension_reason(message.guild.id) or "Quản trị viên tạm ngừng"
+                guild_name = message.guild.name
+                msg = (
+                    f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng MikeDaBot.**\n"
+                    f"📝 **Lý do:** *{reason}*\n"
+                    f"👉 *Vui lòng liên hệ Quản trị viên bot để biết thêm chi tiết.*"
+                )
+                await message.reply(msg, mention_author=False)
             return
 
         # Nếu người dùng chỉ gõ đúng "$m" hoặc "$M" không kèm lệnh, hiển thị bảng hướng dẫn
