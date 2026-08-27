@@ -142,7 +142,7 @@ async def validate_via_api(
         return False, False
     except (aiohttp.ClientError, ValueError) as e:
         print(
-            f"[ProxyValidator] API lỗi kết nối: {api_url} - {e}",
+            f"[ProxyValidator] API không phản hồi: {api_url} - {e}",
             flush=True,
         )
         return False, False
@@ -192,13 +192,13 @@ async def validate_via_og_metadata(
         return False, False
     except aiohttp.ClientError as e:
         print(
-            f"[ProxyValidator] Lỗi kết nối: {proxy_url} - {e}",
+            f"[ProxyValidator] Proxy không kết nối được: {proxy_url} - {e}",
             flush=True,
         )
         return False, False
     except Exception as e:
         print(
-            f"[ProxyValidator] Lỗi không xác định: {proxy_url} - {e}",
+            f"[ProxyValidator] Proxy tạm thời không phản hồi: {proxy_url} - {e}",
             flush=True,
         )
         return False, False

@@ -1540,7 +1540,7 @@
         // CONSOLE LOGS
         // ==========================================
         function isWarningLog(line) {
-            return /⚠️|warn|timeout|503|429|unavailable|resource_exhausted|chuyển sang model|thử proxy|không tìm thấy og/i.test(line);
+            return /⚠️|warn|timeout|503|429|unavailable|resource_exhausted|chuyển sang model|thử proxy|proxyvalidator|không tìm thấy og|không phản hồi|proxy thất bại/i.test(line);
         }
 
         function isRealErrorLog(line) {
@@ -1720,8 +1720,8 @@
 
                 // Logs
                 cachedLogs = statsData.logs || [];
-                const errorCount = cachedLogs.filter(l => /❌|lỗi|error|exception|traceback|failed/i.test(l)).length;
-                const warnCount = cachedLogs.filter(l => /⚠️|warn|timeout|503/i.test(l)).length;
+                const errorCount = cachedLogs.filter(l => isRealErrorLog(l)).length;
+                const warnCount = cachedLogs.filter(l => isWarningLog(l)).length;
 
                 document.getElementById('badge-total-logs').textContent = cachedLogs.length;
                 const badgeError = document.getElementById('badge-error-logs');
