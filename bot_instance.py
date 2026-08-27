@@ -55,7 +55,6 @@ class SummaryBot(commands.Bot):
             traceback.print_exc(file=sys.stdout)
 
         # Kiểm tra trạng thái Suspended của Guild trước khi xử lý Slash Command
-        @self.tree.interaction_check
         async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
             if interaction.guild and self.config_manager.is_guild_suspended(interaction.guild.id):
                 msg = (
@@ -68,6 +67,8 @@ class SummaryBot(commands.Bot):
                     await interaction.response.send_message(msg, ephemeral=True)
                 return False
             return True
+
+        self.tree.interaction_check = check_guild_not_suspended
 
         # Xử lý lỗi toàn cục cho Slash Commands (bao gồm Cooldown)
         @self.tree.error
