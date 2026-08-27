@@ -179,15 +179,17 @@ class TarotManager:
         self._user_last_action.clear()
         return True
 
-    async def record_daily_draw(self, user_id: int, drawn_card: DrawnCard) -> None:
-        """Lưu lại lượt bốc Daily Card hôm nay của user."""
+    async def record_daily_draw(self, user_id: int, drawn_card: DrawnCard, user_name: str = "", user_avatar: str = "") -> None:
+        """Lưu lại lượt bốc Daily Card hôm nay của user kèm tên và avatar."""
         today_str = self.get_current_vn_date_str()
         card_dict = {
             "id": drawn_card.card.id,
             "name_vi": drawn_card.card.name_vi,
             "name_en": drawn_card.card.name_en,
             "is_reversed": drawn_card.is_reversed,
-            "drawn_at": datetime.now(VN_TZ).strftime("%H:%M %d/%m/%Y")
+            "drawn_at": datetime.now(VN_TZ).strftime("%H:%M %d/%m/%Y"),
+            "user_name": user_name,
+            "user_avatar": user_avatar
         }
         card_json = json.dumps(card_dict, ensure_ascii=False)
 

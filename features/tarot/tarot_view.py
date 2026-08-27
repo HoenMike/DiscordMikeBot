@@ -979,7 +979,12 @@ class TarotFlipView(discord.ui.View):
 
             # Lưu vào Database
             if self.spread_key == "daily":
-                await self.tarot_manager.record_daily_draw(self.author_id, self.drawn_cards[0])
+                await self.tarot_manager.record_daily_draw(
+                    self.author_id,
+                    self.drawn_cards[0],
+                    user_name=self.author_name,
+                    user_avatar=self.author_avatar_url
+                )
 
             saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
             await self.tarot_manager.save_tarot_history(
@@ -1176,7 +1181,12 @@ class TarotFlipView(discord.ui.View):
 
             # Lưu vào Database
             if self.spread_key == "daily":
-                await self.tarot_manager.record_daily_draw(self.author_id, self.drawn_cards[0])
+                await self.tarot_manager.record_daily_draw(
+                    self.author_id,
+                    self.drawn_cards[0],
+                    user_name=self.author_name,
+                    user_avatar=self.author_avatar_url
+                )
 
             saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
             await self.tarot_manager.save_tarot_history(

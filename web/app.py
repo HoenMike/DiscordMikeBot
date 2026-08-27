@@ -325,24 +325,72 @@ def api_leave_guild():
 @login_required
 def api_tarot_cooldowns():
     from features.tarot.manager import TarotManager
+    from core.activity_logger import activity_logger
     tm = TarotManager()
     try:
         items = run_coroutine_safe(tm.get_active_daily_cooldowns())
         enriched = []
+
+        # Tạo map user_id -> (user_name, user_avatar) từ Activity Logger
+        activity_user_map = {}
+        for act in activity_logger.get_activities(limit=1000):
+            uid_str = str(act.get("user_id", ""))
+            if uid_str and uid_str not in activity_user_map:
+                activity_user_map[uid_str] = {
+                    "name": act.get("user_name"),
+                    "avatar": act.get("user_avatar")
+                }
+
         for item in items:
             uid = item["user_id"]
-            u = bot.get_user(uid) if bot.is_ready() else None
+            uid_str = str(uid)
             card = item.get("card_data", {})
             name_vi = card.get("name_vi", "Lá bài")
             name_en = card.get("name_en", "")
             is_rev = card.get("is_reversed", False)
             drawn_at = card.get("drawn_at", "")
 
+            # 1. Tìm thông tin user theo thứ tự ưu tiên:
+            # - card_data đã lưu lúc bốc bài
+            # - Activity Logger map
+            # - Discord bot cache / fetch_user
+            username = card.get("user_name")
+            display_name = card.get("user_name")
+            avatar_url = card.get("user_avatar")
+
+            if not avatar_url and uid_str in activity_user_map:
+                if not username:
+                    username = activity_user_map[uid_str]["name"]
+                    display_name = activity_user_map[uid_str]["name"]
+                if activity_user_map[uid_str]["avatar"]:
+                    avatar_url = activity_user_map[uid_str]["avatar"]
+
+            if (not avatar_url or not username) and bot.is_ready():
+                u = bot.get_user(uid)
+                if u:
+                    username = username or u.name
+                    display_name = display_name or u.display_name
+                    avatar_url = avatar_url or (u.display_avatar.url if u.display_avatar else None)
+                else:
+                    try:
+                        fetched_u = run_coroutine_safe(bot.fetch_user(uid))
+                        if fetched_u:
+                            username = username or fetched_u.name
+                            display_name = display_name or fetched_u.display_name
+                            avatar_url = avatar_url or (fetched_u.display_avatar.url if fetched_u.display_avatar else None)
+                    except Exception:
+                        pass
+
+            username = username or f"User {uid}"
+            display_name = display_name or f"User {uid}"
+            if not avatar_url:
+                avatar_url = f"https://ui-avatars.com/api/?name={display_name}&background=8b5cf6&color=fff"
+
             enriched.append({
                 "user_id": str(uid),
-                "username": u.name if u else f"User {uid}",
-                "display_name": u.display_name if u else f"User {uid}",
-                "avatar_url": u.display_avatar.url if (u and u.display_avatar) else f"https://ui-avatars.com/api/?name={uid}&background=8b5cf6&color=fff",
+                "username": username,
+                "display_name": display_name,
+                "avatar_url": avatar_url,
                 "card_title": f"{name_vi} ({'[NGƯỢC]' if is_rev else '[XUÔI]'})" if name_vi else "Đã bốc bài",
                 "card_name_en": name_en,
                 "drawn_at": drawn_at,
