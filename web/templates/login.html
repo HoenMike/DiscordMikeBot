@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng Nhập Quản Trị - MikeDaBot Console</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                        },
+                        dark: {
+                            bg: '#090d16',
+                            card: '#111827',
+                            border: '#1f2937',
+                            input: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #090d16;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(124, 58, 237, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 40%);
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 text-slate-100 antialiased selection:bg-brand-500 selection:text-white">
+    <div class="w-full max-w-md">
+        <!-- Logo & Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 shadow-lg shadow-brand-500/25 mb-4 ring-1 ring-white/20">
+                <i data-lucide="shield" class="w-8 h-8 text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">MikeDaBot Console</h1>
+            <p class="text-sm text-slate-400 mt-1.5">Bảng điều khiển và giám sát tương tác Discord Bot</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-dark-card/90 backdrop-blur-xl border border-dark-border rounded-2xl p-7 shadow-2xl shadow-black/50">
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                        Mật khẩu Quản trị
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="lock" class="w-4 h-4"></i>
+                        </div>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            autofocus
+                            placeholder="Nhập mật khẩu truy cập..." 
+                            class="w-full pl-10 pr-11 py-3 bg-dark-input border border-dark-border rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-all code-font"
+                        >
+                        <button 
+                            type="button" 
+                            onclick="togglePasswordVisibility()" 
+                            tabindex="-1"
+                            class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
+                        >
+                            <i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error Message Banner -->
+                <div id="error-banner" class="hidden items-center gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium animate-shake">
+                    <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
+                    <span id="error-text">Mật khẩu không chính xác!</span>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    id="submit-btn"
+                    class="w-full py-3 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-brand-600/30 transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50"
+                >
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span>Xác Thực & Truy Cập</span>
+                </button>
+            </form>
+
+            <div class="mt-6 pt-5 border-t border-dark-border/80 flex items-center justify-between text-[11px] text-slate-400">
+                <span class="inline-flex items-center gap-1.5">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-brand-500"></i>
+                    Bảo mật Session
+                </span>
+                <span class="code-font text-slate-400">v2.4 • 2026</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('password');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                input.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const passwordInput = document.getElementById('password');
+            const submitBtn = document.getElementById('submit-btn');
+            const errorBanner = document.getElementById('error-banner');
+            const errorText = document.getElementById('error-text');
+
+            const password = passwordInput.value;
+            if (!password) return;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Đang xác thực...
+            `;
+            errorBanner.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    window.location.href = '/';
+                } else {
+                    errorText.textContent = data.error || 'Mật khẩu không chính xác!';
+                    errorBanner.classList.remove('hidden');
+                    passwordInput.focus();
+                    passwordInput.select();
+                }
+            } catch (err) {
+                errorText.textContent = 'Lỗi kết nối máy chủ. Vui lòng thử lại!';
+                errorBanner.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span>Xác Thực & Truy Cập</span>
+                `;
+                lucide.createIcons();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,1106 +1,875 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MikeDaBot - Discord Summary Dashboard</title>
+    <title>MikeDaBot - Admin & Activity Console</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            400: '#a78bfa',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                        },
+                        dark: {
+                            bg: '#090d16',
+                            surface: '#0f172a',
+                            card: '#111827',
+                            border: '#1e293b',
+                            terminal: '#05070c'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --bg-primary: #0b0f19;
-            --bg-secondary: #151d30;
-            --bg-card: rgba(26, 36, 57, 0.6);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-purple: #8b5cf6;
-            --accent-blue: #3b82f6;
-            --status-online: #10b981;
-            --status-offline: #ef4444;
-            --terminal-bg: #05070c;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.12) 0%, transparent 40%);
+            background-color: #090d16;
         }
-
-        header {
-            padding: 1rem 2rem;
-            height: 70px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            background: rgba(11, 15, 25, 0.8);
-            backdrop-filter: blur(12px);
-            z-index: 10;
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
         }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .bot-avatar {
-            width: 42px;
-            height: 42px;
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.2);
-        }
-
-        h1 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            background: linear-gradient(to right, #ffffff, #94a3b8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .status-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.4rem 0.8rem;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .dot.online {
-            background-color: var(--status-online);
-            box-shadow: 0 0 10px var(--status-online);
-            animation: pulse 2s infinite;
-        }
-
-        .dot.offline {
-            background-color: var(--status-offline);
-            box-shadow: 0 0 10px var(--status-offline);
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-
-        main {
-            flex: 1;
-            max-width: 1600px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 1.5rem 2rem;
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 1.5rem;
-            height: calc(100vh - 70px);
-            overflow: hidden;
-        }
-
-        @media (max-width: 1024px) {
-            main {
-                grid-template-columns: 1fr;
-                height: calc(100vh - 70px);
-                overflow-y: auto;
-            }
-            body {
-                overflow: auto;
-                height: auto;
-            }
-        }
-
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 1.25rem;
-            height: 100%;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.25rem;
-            backdrop-filter: blur(12px);
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: rgba(139, 92, 246, 0.2);
-        }
-
-        .card.flex-card {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 0.85rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .stat-label {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .stat-value {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .stat-value.green { color: var(--status-online); }
-        .stat-value.purple { color: #c084fc; }
-        .stat-value.sky { color: #38bdf8; }
-
-        .info-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: #f1f5f9;
-        }
-
-        .info-row-container {
-            flex: 1;
-            overflow-y: auto;
-            margin-bottom: 0.5rem;
-        }
-
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.6rem 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            font-size: 0.8rem;
-        }
-
-        .info-row:last-child {
-            border-bottom: none;
-        }
-
-        .info-label {
-            color: var(--text-secondary);
-        }
-
-        .info-value {
-            font-weight: 500;
-            color: #e2e8f0;
-        }
-
-        .sidebar-footer {
-            margin-top: auto;
-            padding-top: 0.75rem;
-            text-align: center;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            border-top: 1px solid rgba(255, 255, 255, 0.04);
-        }
-
-        .tabs-header {
-            display: flex;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        .tab-btn {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 0.5rem 1.25rem;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: 'Outfit', sans-serif;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .tab-btn:hover {
-            background: rgba(255, 255, 255, 0.07);
-            color: var(--text-primary);
-        }
-
-        .tab-btn.active {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            border-color: transparent;
-            color: white;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
-        }
-
-        .console-container {
-            display: flex;
-            flex-direction: column;
-            height: calc(100% - 50px);
-            overflow: hidden;
-        }
-
-        .console-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem 1.25rem;
-            background: #111827;
-            border: 1px solid var(--border-color);
-            border-bottom: none;
-            border-top-left-radius: 16px;
-            border-top-right-radius: 16px;
-        }
-
-        .console-title {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #94a3b8;
-        }
-
-        .live-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.7rem;
-            color: var(--status-online);
-            font-weight: 500;
-            text-transform: uppercase;
-        }
-
-        .live-dot {
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
-            border-radius: 50%;
-            background-color: var(--status-online);
-            animation: blink 1.5s infinite;
         }
-
-        @keyframes blink {
-            0%, 100% { opacity: 0.2; }
-            50% { opacity: 1; }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
         }
-
-        .console-body {
-            flex: 1;
-            background-color: var(--terminal-bg);
-            border: 1px solid var(--border-color);
-            border-bottom-left-radius: 16px;
-            border-bottom-right-radius: 16px;
-            padding: 1.25rem;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.8rem;
-            line-height: 1.5;
-            overflow-y: auto;
-            color: #38bdf8;
-            box-shadow: inset 0 4px 20px rgba(0, 0, 0, 0.5);
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }
-
-        .log-line {
-            word-break: break-all;
-            white-space: pre-wrap;
-        }
-
-        .log-timestamp {
-            color: #64748b;
-            margin-right: 0.5rem;
-        }
-
-        .log-info { color: #38bdf8; }
-        .log-warn { color: #f59e0b; }
-        .log-error { color: #ef4444; }
-        .log-success { color: #10b981; }
-
-        .btn-action {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.3rem 0.6rem;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-action.copy:hover {
-            background: var(--accent-purple);
-            border-color: var(--accent-purple);
-        }
-
-        .btn-action.clear:hover {
-            background: var(--status-offline);
-            border-color: var(--status-offline);
-        }
-
-        .log-filter-group {
-            display: flex;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 2px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            gap: 2px;
-        }
-
-        .btn-filter {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 0.25rem 0.55rem;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.35rem;
-            font-family: inherit;
-        }
-
-        .btn-filter:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .btn-filter.active {
-            background: rgba(139, 92, 246, 0.25);
-            color: #f8fafc;
-            font-weight: 600;
-        }
-
-        .btn-filter.active.btn-filter-error {
-            background: rgba(239, 68, 68, 0.25);
-            color: #fca5a5;
-        }
-
-        .btn-filter.active.btn-filter-warn {
-            background: rgba(245, 158, 11, 0.25);
-            color: #fde68a;
-        }
-
-        .filter-count-badge {
-            background: #ef4444;
-            color: #ffffff;
-            font-size: 0.65rem;
-            font-weight: 700;
-            padding: 1px 5px;
-            border-radius: 10px;
-            line-height: 1.2;
-        }
-
-        .filter-count-badge.warn-badge {
-            background: #f59e0b;
-        }
-
-        .audit-split-panel {
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 1.25rem;
-            flex: 1;
-            height: calc(100% - 50px);
-            overflow: hidden;
-        }
-
-        @media (max-width: 900px) {
-            .audit-split-panel {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .test-list-pane {
-            background: rgba(11, 15, 25, 0.4);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            overflow-y: auto;
-        }
-
-        .test-list-header {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            font-weight: 700;
-            color: var(--text-secondary);
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 0.5rem;
-        }
-
-        .test-list-container {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            overflow-y: auto;
-            flex: 1;
-        }
-
-        .test-item {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .test-item:hover {
-            border-color: rgba(139, 92, 246, 0.4);
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        .test-item.active {
-            border-color: var(--accent-purple);
-            background: rgba(139, 92, 246, 0.08);
-            box-shadow: inset 0 0 10px rgba(139, 92, 246, 0.15);
-        }
-
-        .test-meta {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.25rem;
-        }
-
-        .score-badge {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--status-online);
-            padding: 0.15rem 0.4rem;
+        ::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.4);
             border-radius: 4px;
-            font-weight: 700;
-            font-size: 0.75rem;
         }
-
-        .score-badge.low {
-            background: rgba(239, 44, 44, 0.1);
-            color: var(--status-offline);
-        }
-
-        .score-badge.mid {
-            background: rgba(245, 158, 11, 0.1);
-            color: #f59e0b;
-        }
-
-        .test-detail-pane {
-            background: var(--terminal-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.25rem;
-            overflow-y: auto;
-            height: 100%;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.9rem;
-            line-height: 1.6;
-            color: #f1f5f9;
-        }
-
-        .test-detail-section {
-            margin-bottom: 1.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 1.25rem;
-        }
-
-        .test-detail-section:last-child {
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-
-        .section-title {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--accent-purple);
-            margin-bottom: 0.5rem;
-            font-weight: 700;
-        }
-
-        .code-block {
-            font-family: 'Fira Code', monospace;
-            font-size: 0.8rem;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            padding: 0.75rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-            color: #e2e8f0;
-            border: 1px solid rgba(255, 255, 255, 0.02);
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .markdown-text {
-            white-space: pre-wrap;
-            color: #e2e8f0;
-        }
-
-        .markdown-text h3 {
-            font-size: 1.05rem;
-            margin-bottom: 0.5rem;
-            color: #c084fc;
-        }
-
-        .markdown-text h4 {
-            font-size: 0.95rem;
-            margin-top: 0.75rem;
-            margin-bottom: 0.25rem;
-            color: #38bdf8;
-        }
-
-        .markdown-text ul {
-            margin-left: 1.25rem;
-            margin-bottom: 0.5rem;
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 92, 246, 0.6);
         }
     </style>
 </head>
-<body>
+<body class="bg-dark-bg text-slate-100 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
 
-    <header>
-        <div class="logo-section">
-            <div class="bot-avatar">🤖</div>
-            <div>
-                <h1 id="header-bot-name">MikeDaBot</h1>
-                <p style="font-size: 0.7rem; color: var(--text-secondary);">Discord AI Agent & Dashboard</p>
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-30 border-b border-dark-border bg-dark-bg/85 backdrop-blur-xl px-4 lg:px-8 py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Left: Bot Branding -->
+            <div class="flex items-center gap-3.5">
+                <div id="header-avatar-container" class="relative">
+                    <img id="header-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot Avatar" class="w-10 h-10 rounded-xl ring-1 ring-white/15 object-cover bg-brand-600">
+                    <span id="header-status-indicator" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-dark-bg"></span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 id="header-bot-name" class="font-bold text-base text-white tracking-tight">MikeDaBot</h1>
+                        <span id="header-status-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Online
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-medium">Trung tâm Điều khiển & Hoạt động AI Agent</p>
+                </div>
             </div>
-        </div>
-        <div class="status-badge">
-            <span id="header-status-dot" class="dot offline"></span>
-            <span id="header-status-text">Đang kết nối...</span>
+
+            <!-- Middle: Quick Metric Badges (Desktop) -->
+            <div class="hidden md:flex items-center gap-5 text-xs text-slate-300">
+                <div class="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-dark-surface border border-dark-border">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span class="text-slate-400">Độ trễ:</span>
+                    <span id="header-latency" class="font-semibold text-white code-font">-- ms</span>
+                </div>
+                <div class="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-dark-surface border border-dark-border">
+                    <i data-lucide="server" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span class="text-slate-400">Máy chủ:</span>
+                    <span id="header-guilds" class="font-semibold text-white code-font">--</span>
+                </div>
+                <div class="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-dark-surface border border-dark-border">
+                    <i data-lucide="cpu" class="w-3.5 h-3.5 text-cyan-400"></i>
+                    <span class="text-slate-400">RAM:</span>
+                    <span id="header-ram" class="font-semibold text-white code-font">-- MB</span>
+                </div>
+            </div>
+
+            <!-- Right: Actions & Logout -->
+            <div class="flex items-center gap-2.5">
+                <button onclick="handleLogout()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all active:scale-95">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                    <span>Đăng xuất</span>
+                </button>
+            </div>
         </div>
     </header>
 
-    <main>
-        <div class="sidebar">
-            <div class="card">
-                <div class="info-title">📊 Trạng thái Hệ thống</div>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <span class="stat-label">Uptime</span>
-                        <span id="stat-uptime" class="stat-value">00h 00m 00s</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Độ trễ API</span>
-                        <span id="stat-latency" class="stat-value">N/A</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Số Máy Chủ</span>
-                        <span id="stat-guilds" class="stat-value">0</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Thành Viên</span>
-                        <span id="stat-users" class="stat-value">0</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Đã tóm tắt</span>
-                        <span id="stat-summaries" class="stat-value purple">0</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">RAM Sử Dụng</span>
-                        <span id="stat-ram" class="stat-value sky">0.0 MB</span>
-                    </div>
-                </div>
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col gap-6">
+
+        <!-- Navigation Tabs Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-dark-border pb-3">
+            <div class="flex items-center gap-2 p-1 rounded-xl bg-dark-surface border border-dark-border">
+                <button onclick="switchTab('activity')" id="tab-btn-activity" class="tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30">
+                    <i data-lucide="activity" class="w-4 h-4"></i>
+                    <span>Trace Tương Tác</span>
+                    <span id="badge-total-activities" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">0</span>
+                </button>
+                <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                    <span>Tổng Quan Hệ Thống</span>
+                </button>
+                <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="terminal" class="w-4 h-4"></i>
+                    <span>Console Logs</span>
+                    <span id="badge-total-logs" class="px-1.5 py-0.2 rounded-full text-[10px] bg-dark-border text-slate-300 font-mono">0</span>
+                </button>
             </div>
 
-            <div class="card flex-card">
-                <div class="info-title">⚙️ Thông tin Cấu hình</div>
-                <div class="info-row-container">
-                    <div class="info-row">
-                        <span class="info-label">Trí tuệ nhân tạo</span>
-                        <span class="info-value">Google Gemini</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Model AI</span>
-                        <span id="info-model-id" class="info-value">Loading...</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Lệnh Slash</span>
-                        <span class="info-value">/tomtat, /config</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Nền tảng / OS</span>
-                        <span id="info-os" class="info-value">Loading...</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Python Version</span>
-                        <span class="info-value">3.14+</span>
-                    </div>
-                </div>
-                <div class="sidebar-footer">
-                    <p>© 2026 MikeDaBot - Made with ❤️</p>
-                </div>
+            <!-- Auto-refresh status -->
+            <div class="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>Live Realtime • 3s</span>
             </div>
         </div>
 
-        <div style="display: flex; flex-direction: column; overflow: hidden; height: 100%;">
-            <div class="tabs-header">
-                <button id="tab-logs-btn" class="tab-btn active" onclick="switchTab('logs')">💻 Logs & Stats</button>
-                <button id="tab-audit-btn" class="tab-btn" onclick="switchTab('audit')">🔬 AI Self-Audit & Test</button>
+        <!-- ========================================== -->
+        <!-- TAB 1: USER INTERACTION & ACTIVITY TRACE -->
+        <!-- ========================================== -->
+        <section id="tab-content-activity" class="tab-content flex flex-col gap-4">
+            
+            <!-- Filters & Search Toolbar -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-dark-card border border-dark-border rounded-xl p-3.5">
+                <!-- Action Type Filter Buttons -->
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <button onclick="filterActivities('all')" id="filter-btn-all" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40">
+                        Tất cả (<span id="filter-count-all">0</span>)
+                    </button>
+                    <button onclick="filterActivities('tarot')" id="filter-btn-tarot" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 inline mr-1 text-purple-400"></i>
+                        Tarot AI (<span id="filter-count-tarot">0</span>)
+                    </button>
+                    <button onclick="filterActivities('summary')" id="filter-btn-summary" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5 inline mr-1 text-blue-400"></i>
+                        Tóm tắt Chat (<span id="filter-count-summary">0</span>)
+                    </button>
+                    <button onclick="filterActivities('embed')" id="filter-btn-embed" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="globe" class="w-3.5 h-3.5 inline mr-1 text-emerald-400"></i>
+                        Auto Embed (<span id="filter-count-embed">0</span>)
+                    </button>
+                    <button onclick="filterActivities('command')" id="filter-btn-command" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="terminal" class="w-3.5 h-3.5 inline mr-1 text-amber-400"></i>
+                        Lệnh Bot (<span id="filter-count-command">0</span>)
+                    </button>
+                </div>
+
+                <!-- Search Input & Actions -->
+                <div class="flex items-center gap-2">
+                    <div class="relative flex-1 sm:w-64">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input 
+                            type="text" 
+                            id="activity-search-input" 
+                            oninput="handleActivitySearch(this.value)"
+                            placeholder="Tìm user, câu hỏi, server..." 
+                            class="w-full pl-9 pr-3 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                    </div>
+                    <button onclick="clearActivities()" title="Xóa lịch sử tương tác" class="p-2 rounded-lg bg-dark-surface hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-dark-border transition-colors">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
             </div>
 
-            <!-- TAB LOGS CONTENT -->
-            <div id="tab-logs-content" class="console-container">
-                <div class="console-header">
-                    <div class="console-title">
-                        <span>💻 Console Logs</span>
+            <!-- Activities Feed List -->
+            <div class="bg-dark-card border border-dark-border rounded-xl p-4 flex flex-col gap-3 min-h-[500px]">
+                <div class="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider pb-2 border-b border-dark-border px-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                        <span>Thời Gian & Người Dùng</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <div class="log-filter-group">
-                            <button class="btn-filter active" id="filter-btn-all" onclick="setLogFilter('all')">Tất cả</button>
-                            <button class="btn-filter" id="filter-btn-error" onclick="setLogFilter('error')">
-                                <span>❌ Chỉ lỗi</span>
-                                <span id="error-badge" class="filter-count-badge" style="display:none;">0</span>
-                            </button>
-                            <button class="btn-filter" id="filter-btn-warn" onclick="setLogFilter('warn')">
-                                <span>⚠️ Cảnh báo</span>
-                                <span id="warn-badge" class="filter-count-badge" style="display:none;">0</span>
-                            </button>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+                        <span>Tương Tác & Phản Hồi</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                        <span>Chi Tiết</span>
+                    </div>
+                </div>
+
+                <div id="activities-list-container" class="flex flex-col gap-2.5 overflow-y-auto max-h-[650px] pr-1">
+                    <!-- Activities populated via JS -->
+                    <div class="py-16 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+                        <i data-lucide="inbox" class="w-8 h-8 text-slate-600"></i>
+                        <p class="text-sm">Đang tải danh sách hoạt động tương tác...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: SYSTEM OVERVIEW & METRICS -->
+        <!-- ========================================== -->
+        <section id="tab-content-overview" class="tab-content hidden flex-col gap-6">
+            <!-- Key Metric Cards Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Trạng Thái</span>
+                    <span id="overview-status" class="text-lg font-bold text-emerald-400 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
+                    </span>
+                </div>
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Độ Trễ API</span>
+                    <span id="overview-latency" class="text-lg font-bold text-amber-400 code-font">-- ms</span>
+                </div>
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Thời Gian Chạy</span>
+                    <span id="overview-uptime" class="text-lg font-bold text-white code-font">--</span>
+                </div>
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Bộ Nhớ RAM</span>
+                    <span id="overview-ram" class="text-lg font-bold text-cyan-400 code-font">-- MB</span>
+                </div>
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Máy Chủ</span>
+                    <span id="overview-guilds" class="text-lg font-bold text-indigo-400 code-font">--</span>
+                </div>
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Thành Viên</span>
+                    <span id="overview-users" class="text-lg font-bold text-brand-400 code-font">--</span>
+                </div>
+            </div>
+
+            <!-- Charts & Features Distribution -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <!-- Latency History Chart (2 Cols) -->
+                <div class="lg:col-span-2 p-5 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i data-lucide="line-chart" class="w-4 h-4 text-amber-400"></i>
+                            Độ Trễ Phản Hồi Gateway (ms)
+                        </h3>
+                        <span class="text-xs text-slate-400 code-font">20 mẫu gần nhất</span>
+                    </div>
+                    <div class="h-60 w-full">
+                        <canvas id="latencyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- AI Models & System Information (1 Col) -->
+                <div class="p-5 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-4">
+                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-4 h-4 text-brand-500"></i>
+                        Cấu Hình Mô Hình & Môi Trường
+                    </h3>
+                    <div class="flex flex-col gap-2.5 text-xs text-slate-300">
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-dark-surface border border-dark-border/80">
+                            <span class="text-slate-400">AI Engine:</span>
+                            <span class="font-semibold text-white">Google Gemini</span>
                         </div>
-                        <button class="btn-action copy" onclick="copyConsoleLogs()">Sao chép log</button>
-                        <button class="btn-action clear" onclick="clearConsoleLogs()">Xóa log</button>
-                        <div class="live-indicator" style="margin-left: 0.25rem;">
-                            <span class="live-dot"></span>
-                            <span>Live</span>
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-dark-surface border border-dark-border/80">
+                            <span class="text-slate-400">Model Tóm Tắt:</span>
+                            <span id="model-summary-id" class="font-semibold text-brand-300 code-font">gemini-3.5-flash-lite</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-dark-surface border border-dark-border/80">
+                            <span class="text-slate-400">Model Tarot:</span>
+                            <span id="model-tarot-id" class="font-semibold text-purple-300 code-font">gemini-3.7-flash</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-dark-surface border border-dark-border/80">
+                            <span class="text-slate-400">Hệ Điều Hành:</span>
+                            <span id="overview-os" class="font-semibold text-white">Linux</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2 rounded-lg bg-dark-surface border border-dark-border/80">
+                            <span class="text-slate-400">Python:</span>
+                            <span id="overview-python" class="font-semibold text-white code-font">3.14+</span>
                         </div>
                     </div>
                 </div>
-                <div id="console-body" class="console-body">
-                    <div class="log-line"><span class="log-timestamp">[--:--:--]</span> Đang tải log từ máy chủ...</div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: LIVE CONSOLE LOGS -->
+        <!-- ========================================== -->
+        <section id="tab-content-logs" class="tab-content hidden flex-col gap-3.5">
+            <!-- Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-dark-card border border-dark-border rounded-xl p-3.5">
+                <div class="flex items-center gap-2">
+                    <button onclick="filterLogs('all')" id="log-filter-all" class="log-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40">
+                        Tất cả
+                    </button>
+                    <button onclick="filterLogs('error')" id="log-filter-error" class="log-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="alert-octagon" class="w-3.5 h-3.5 inline mr-1 text-rose-400"></i>
+                        Chỉ Lỗi
+                    </button>
+                    <button onclick="filterLogs('warn')" id="log-filter-warn" class="log-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1 text-amber-400"></i>
+                        Cảnh báo
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <div class="relative w-48 sm:w-64">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input 
+                            type="text" 
+                            id="log-search-input" 
+                            oninput="handleLogSearch(this.value)"
+                            placeholder="Tìm kiếm log..." 
+                            class="w-full pl-8 pr-3 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                    </div>
+                    <button onclick="copyLogs()" title="Sao chép log" class="p-2 rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-colors">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="clearLogs()" title="Xóa log" class="p-2 rounded-lg bg-dark-surface hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-dark-border transition-colors">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </div>
 
-            <!-- TAB AUDIT CONTENT -->
-            <div id="tab-audit-content" class="audit-split-panel" style="display: none;">
-                <div class="test-list-pane">
-                    <div style="display: flex; justify-content: space-between; align-items: center;" class="test-list-header">
-                        <span>Lịch sử Test ({20 gần nhất})</span>
-                        <button class="btn-action copy" id="run-test-btn" onclick="runSelfAuditTest()">Chạy Test AI</button>
+            <!-- Terminal Window -->
+            <div class="rounded-xl border border-dark-border bg-dark-terminal overflow-hidden shadow-2xl flex flex-col h-[650px]">
+                <div class="bg-slate-900/90 border-b border-dark-border px-4 py-2.5 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
+                        <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
+                        <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
+                        <span class="text-xs text-slate-400 font-mono ml-2">stdout & stderr stream</span>
                     </div>
-                    <div id="test-loading" style="display:none; color: #a855f7; font-size: 0.75rem; text-align: center; padding: 0.5rem; background: rgba(139, 92, 246, 0.05); border-radius: 6px; border: 1px dashed rgba(139, 92, 246, 0.2);">
-                        ⏳ Đang chạy tóm tắt & AI QA đánh giá (khoảng 10-15s)...
-                    </div>
-                    <div id="test-runs-list" class="test-list-container">
-                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 1rem;">Chưa có lượt test nào được ghi nhận. Hãy bấm "Chạy Test AI".</div>
-                    </div>
+                    <label class="inline-flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" id="auto-scroll-toggle" checked class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
+                        <span>Tự cuộn xuống</span>
+                    </label>
                 </div>
-
-                <div id="test-details-pane" class="test-detail-pane">
-                    <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: var(--text-secondary); text-align: center; gap: 0.5rem;">
-                        <span style="font-size: 2rem;">🔬</span>
-                        <p style="font-weight: 500;">AI Self-Audit Playground</p>
-                        <p style="font-size: 0.75rem; max-width: 300px;">Chọn một lượt chạy thử nghiệm bên trái hoặc bấm nút "Chạy Test AI" để chạy phân tích đánh giá chất lượng tự động.</p>
-                    </div>
+                <div id="logs-container" class="flex-1 p-4 overflow-y-auto code-font text-xs leading-relaxed space-y-1 text-slate-300 select-text">
+                    <!-- Logs populated via JS -->
                 </div>
             </div>
-        </div>
+        </section>
+
     </main>
 
+    <!-- Activity Detail Modal Drawer -->
+    <div id="activity-detail-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-dark-card border border-dark-border rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-dark-border flex items-center justify-between bg-dark-surface/50">
+                <div class="flex items-center gap-2.5">
+                    <div id="modal-action-icon" class="p-2 rounded-lg bg-brand-600/20 text-brand-400">
+                        <i data-lucide="activity" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 id="modal-action-name" class="font-bold text-sm text-white">Chi Tiết Tương Tác</h3>
+                        <p id="modal-action-meta" class="text-xs text-slate-400">Thời gian • User</p>
+                    </div>
+                </div>
+                <button onclick="closeDetailModal()" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content Body -->
+            <div class="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed">
+                <!-- User & Channel Meta Info -->
+                <div class="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-dark-surface border border-dark-border">
+                    <div>
+                        <span class="text-slate-500 font-semibold block uppercase text-[10px]">Người dùng</span>
+                        <div class="flex items-center gap-1.5 mt-1 font-medium text-white">
+                            <img id="modal-user-avatar" src="" class="w-5 h-5 rounded-full object-cover">
+                            <span id="modal-user-name">User</span>
+                            <span id="modal-user-id" class="text-slate-500 code-font text-[10px]">(ID)</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-slate-500 font-semibold block uppercase text-[10px]">Vị trí</span>
+                        <div class="mt-1 font-medium text-slate-200" id="modal-location">
+                            Server / #channel
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Prompt / Input -->
+                <div>
+                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1.5">
+                        <i data-lucide="message-square" class="w-3.5 h-3.5 inline mr-1 text-brand-400"></i>
+                        Yêu Cầu / Câu Hỏi Của User:
+                    </label>
+                    <div id="modal-prompt" class="p-3 rounded-xl bg-dark-surface border border-dark-border text-slate-100 whitespace-pre-wrap code-font">
+                        --
+                    </div>
+                </div>
+
+                <!-- Bot Response / Output -->
+                <div>
+                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1.5">
+                        <i data-lucide="bot" class="w-3.5 h-3.5 inline mr-1 text-emerald-400"></i>
+                        Phản Hồi Từ MikeDaBot:
+                    </label>
+                    <div id="modal-response" class="p-3.5 rounded-xl bg-dark-terminal border border-dark-border text-slate-200 whitespace-pre-wrap max-h-72 overflow-y-auto leading-relaxed">
+                        --
+                    </div>
+                </div>
+
+                <!-- Additional Details / Cards / Model -->
+                <div id="modal-details-container" class="hidden">
+                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1.5">
+                        <i data-lucide="layers" class="w-3.5 h-3.5 inline mr-1 text-purple-400"></i>
+                        Dữ Liệu Mở Rộng:
+                    </label>
+                    <pre id="modal-details" class="p-3 rounded-xl bg-dark-surface border border-dark-border text-slate-300 text-[11px] code-font overflow-x-auto"></pre>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 border-t border-dark-border bg-dark-surface/50 flex justify-end">
+                <button onclick="closeDetailModal()" class="px-4 py-1.5 rounded-lg bg-dark-surface hover:bg-slate-700 text-xs font-semibold text-white border border-dark-border transition-colors">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client-side Logic Script -->
     <script>
-        let autoScroll = true;
-        let activeTab = 'logs';
-        let currentLogFilter = 'all'; // 'all' | 'error' | 'warn'
-        let cachedRawLogs = [];
-        let testRunsData = [];
-        let selectedTestIndex = null;
-        const consoleBody = document.getElementById('console-body');
+        // Tab Management
+        let currentTab = 'activity';
+        let currentActivityFilter = 'all';
+        let activitySearchQuery = '';
+        let logFilterType = 'all';
+        let logSearchQuery = '';
+        let cachedActivities = [];
+        let cachedLogs = [];
+        let latencyHistory = [];
+        let latencyChart = null;
 
-        consoleBody.addEventListener('scroll', () => {
-            const threshold = 40; 
-            const isAtBottom = consoleBody.scrollHeight - consoleBody.clientHeight - consoleBody.scrollTop < threshold;
-            autoScroll = isAtBottom;
-        });
-
-        function switchTab(tabName) {
-            activeTab = tabName;
-            document.getElementById('tab-logs-btn').className = tabName === 'logs' ? 'tab-btn active' : 'tab-btn';
-            document.getElementById('tab-audit-btn').className = tabName === 'audit' ? 'tab-btn active' : 'tab-btn';
-            
-            document.getElementById('tab-logs-content').style.display = tabName === 'logs' ? 'flex' : 'none';
-            document.getElementById('tab-audit-content').style.display = tabName === 'audit' ? 'grid' : 'none';
-            
-            if (tabName === 'audit') {
-                renderTestRuns();
-            }
-        }
-
-        function setLogFilter(filterType) {
-            currentLogFilter = filterType;
-            
-            const btnAll = document.getElementById('filter-btn-all');
-            const btnError = document.getElementById('filter-btn-error');
-            const btnWarn = document.getElementById('filter-btn-warn');
-
-            if (btnAll) btnAll.className = filterType === 'all' ? 'btn-filter active' : 'btn-filter';
-            if (btnError) btnError.className = filterType === 'error' ? 'btn-filter active btn-filter-error' : 'btn-filter';
-            if (btnWarn) btnWarn.className = filterType === 'warn' ? 'btn-filter active btn-filter-warn' : 'btn-filter';
-
-            renderLogs();
-        }
-
-        function getLogCategory(line) {
-            if (!line || typeof line !== 'string') return 'info';
-            const lower = line.toLowerCase();
-            if (line.includes("❌") || line.includes("Lỗi") || lower.includes("error") || lower.includes("exception") || lower.includes("[error]") || lower.includes("traceback") || lower.includes("failed")) {
-                return 'error';
-            } else if (line.includes("⚠️") || lower.includes("warning") || lower.includes("[warning]")) {
-                return 'warn';
-            } else if (line.includes("🎉") || line.includes("thành công") || lower.includes("success")) {
-                return 'success';
-            }
-            return 'info';
-        }
-
-        function formatLogLine(line) {
-            if (!line || typeof line !== 'string') return '';
-            
-            const timestampMatch = line.match(/^\[\d{2}:\d{2}:\d{2}\]/);
-            let timestamp = "";
-            let content = line;
-
-            if (timestampMatch) {
-                timestamp = timestampMatch[0];
-                content = line.substring(timestamp.length).trim();
-            }
-
-            const cat = getLogCategory(content);
-            let styleClass = "log-info";
-            if (cat === 'error') styleClass = "log-error";
-            else if (cat === 'warn') styleClass = "log-warn";
-            else if (cat === 'success') styleClass = "log-success";
-
-            return `<div class="log-line"><span class="log-timestamp">${timestamp}</span><span class="${styleClass}">${escapeHtml(content)}</span></div>`;
-        }
-
-        function renderLogs() {
-            if (!cachedRawLogs || cachedRawLogs.length === 0) {
-                consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
-                return;
-            }
-
-            // Update badge counts
-            let errorCount = 0;
-            let warnCount = 0;
-            cachedRawLogs.forEach(line => {
-                const cat = getLogCategory(line);
-                if (cat === 'error') errorCount++;
-                else if (cat === 'warn') warnCount++;
-            });
-
-            const errorBadge = document.getElementById('error-badge');
-            if (errorBadge) {
-                if (errorCount > 0) {
-                    errorBadge.textContent = errorCount;
-                    errorBadge.style.display = 'inline-block';
-                } else {
-                    errorBadge.style.display = 'none';
+        // Init Chart.js
+        function initLatencyChart() {
+            const ctx = document.getElementById('latencyChart').getContext('2d');
+            latencyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(20).fill(''),
+                    datasets: [{
+                        label: 'Latency (ms)',
+                        data: Array(20).fill(0),
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
                 }
-            }
-
-            const warnBadge = document.getElementById('warn-badge');
-            if (warnBadge) {
-                if (warnCount > 0) {
-                    warnBadge.textContent = warnCount;
-                    warnBadge.style.display = 'inline-block';
-                    warnBadge.className = 'filter-count-badge warn-badge';
-                } else {
-                    warnBadge.style.display = 'none';
-                }
-            }
-
-            let filteredLogs = cachedRawLogs;
-            if (currentLogFilter === 'error') {
-                filteredLogs = cachedRawLogs.filter(line => getLogCategory(line) === 'error');
-            } else if (currentLogFilter === 'warn') {
-                filteredLogs = cachedRawLogs.filter(line => {
-                    const cat = getLogCategory(line);
-                    return cat === 'warn' || cat === 'error';
-                });
-            }
-
-            if (filteredLogs.length === 0) {
-                if (currentLogFilter === 'error') {
-                    consoleBody.innerHTML = '<div class="log-line" style="color: var(--text-secondary);"><span class="log-timestamp">[--:--:--]</span> ✨ Tuyệt vời! Không có lỗi (Error) nào trong hệ thống.</div>';
-                } else if (currentLogFilter === 'warn') {
-                    consoleBody.innerHTML = '<div class="log-line" style="color: var(--text-secondary);"><span class="log-timestamp">[--:--:--]</span> ✨ Không có cảnh báo hoặc lỗi nào được ghi nhận.</div>';
-                } else {
-                    consoleBody.innerHTML = '<div class="log-line"><span class="log-timestamp">[--:--:--]</span> Không có log nào.</div>';
-                }
-            } else {
-                consoleBody.innerHTML = filteredLogs.map(formatLogLine).join('');
-            }
-
-            if (autoScroll) {
-                consoleBody.scrollTop = consoleBody.scrollHeight;
-            }
-        }
-
-        function escapeHtml(unsafe) {
-            if (!unsafe) return '';
-            return unsafe
-                 .replace(/&/g, "&amp;")
-                 .replace(/</g, "&lt;")
-                 .replace(/>/g, "&gt;")
-                 .replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
-        }
-
-        function copyConsoleLogs() {
-            const lines = Array.from(consoleBody.querySelectorAll('.log-line'))
-                .map(el => el.textContent)
-                .join('\n');
-            navigator.clipboard.writeText(lines).then(() => {
-                alert("Đã sao chép logs hiển thị vào Clipboard!");
-            }).catch(err => {
-                console.error("Không thể sao chép logs: ", err);
             });
         }
 
-        async function clearConsoleLogs() {
-            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ logs trên máy chủ không?")) {
-                return;
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.className = "tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all";
+            });
+
+            document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            activeBtn.className = "tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
+            
+            if (tab === 'overview' && !latencyChart) {
+                initLatencyChart();
             }
-            try {
-                const response = await fetch('/api/logs/clear', { method: 'POST' });
-                if (response.ok) {
-                    cachedRawLogs = [];
-                    renderLogs();
-                } else {
-                    alert("Không thể xóa logs trên máy chủ.");
-                }
-            } catch (err) {
-                console.error("Lỗi khi xóa logs: ", err);
-                alert("Lỗi kết nối khi xóa logs.");
+            lucide.createIcons();
+        }
+
+        // Action Type Icons & Badges
+        function getActionBadge(type) {
+            switch(type) {
+                case 'tarot':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                        <i data-lucide="sparkles" class="w-3 h-3 text-purple-400"></i> Tarot AI
+                    </span>`;
+                case 'summary':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                        <i data-lucide="file-text" class="w-3 h-3 text-blue-400"></i> Tóm Tắt
+                    </span>`;
+                case 'embed':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <i data-lucide="globe" class="w-3 h-3 text-emerald-400"></i> Auto Embed
+                    </span>`;
+                case 'command':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <i data-lucide="terminal" class="w-3 h-3 text-amber-400"></i> Lệnh Bot
+                    </span>`;
+                default:
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/30">
+                        <i data-lucide="activity" class="w-3 h-3"></i> Tương tác
+                    </span>`;
             }
         }
 
-        function renderTestRuns() {
-            const listContainer = document.getElementById('test-runs-list');
-            if (testRunsData.length === 0) {
-                listContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; margin-top: 1rem;">Chưa có lượt test nào được ghi nhận. Hãy bấm "Chạy Test AI".</div>`;
+        // Render Activities
+        function renderActivities() {
+            const container = document.getElementById('activities-list-container');
+            let items = cachedActivities;
+
+            if (currentActivityFilter !== 'all') {
+                items = items.filter(a => a.action_type === currentActivityFilter);
+            }
+
+            if (activitySearchQuery) {
+                const q = activitySearchQuery.toLowerCase();
+                items = items.filter(a => 
+                    a.user_name.toLowerCase().includes(q) ||
+                    a.prompt.toLowerCase().includes(q) ||
+                    a.response.toLowerCase().includes(q) ||
+                    a.guild_name.toLowerCase().includes(q) ||
+                    a.action_name.toLowerCase().includes(q)
+                );
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div class="py-16 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+                        <i data-lucide="inbox" class="w-8 h-8 text-slate-600"></i>
+                        <p class="text-sm">Chưa có tương tác nào phù hợp với bộ lọc.</p>
+                    </div>
+                `;
+                lucide.createIcons();
                 return;
             }
-            
-            listContainer.innerHTML = testRunsData.map((run, idx) => {
-                const isActive = idx === selectedTestIndex ? 'active' : '';
-                const score = parseFloat(run.score) || 0;
-                let scoreClass = 'green';
-                if (score < 5) scoreClass = 'low';
-                else if (score < 8) scoreClass = 'mid';
-                
+
+            container.innerHTML = items.map((a, idx) => {
+                const avatar = a.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.user_name)}&background=8b5cf6&color=fff`;
+                const promptSnippet = a.prompt ? (a.prompt.length > 80 ? a.prompt.substring(0, 80) + '...' : a.prompt) : 'Không có prompt';
+                const responseSnippet = a.response ? (a.response.length > 100 ? a.response.substring(0, 100) + '...' : a.response) : 'Không có response';
+                const statusBadge = a.status === 'success' 
+                    ? `<span class="inline-flex items-center text-[10px] text-emerald-400 font-semibold"><i data-lucide="check-circle" class="w-3 h-3 inline mr-1"></i> Thành công</span>`
+                    : `<span class="inline-flex items-center text-[10px] text-rose-400 font-semibold"><i data-lucide="x-circle" class="w-3 h-3 inline mr-1"></i> Lỗi</span>`;
+
                 return `
-                    <div class="test-item ${isActive}" onclick="selectTestRun(${idx})">
-                        <div class="test-meta">
-                            <span>${run.timestamp}</span>
-                            <span class="score-badge ${scoreClass}">${run.score} / 10</span>
+                    <div onclick="openDetailModal(${a.id})" class="p-3.5 rounded-xl bg-dark-surface/70 hover:bg-dark-surface border border-dark-border hover:border-brand-500/40 transition-all cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group">
+                        <!-- Col 1: Time & User -->
+                        <div class="flex items-center gap-3 min-w-[200px]">
+                            <img src="${avatar}" alt="${a.user_name}" class="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 flex-shrink-0">
+                            <div class="overflow-hidden">
+                                <div class="font-semibold text-xs text-white truncate flex items-center gap-1.5">
+                                    <span>${escapeHtml(a.user_name)}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                    <span class="code-font text-slate-300">${a.time_short}</span>
+                                    <span>•</span>
+                                    <span class="truncate max-w-[110px]" title="${escapeHtml(a.guild_name)}">${escapeHtml(a.guild_name)}</span>
+                                </div>
+                            </div>
                         </div>
-                        <div style="font-size: 0.8rem; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${escapeHtml(run.source)}
+
+                        <!-- Col 2: Action Badge & Prompt Snippet -->
+                        <div class="flex-1 min-w-0 pr-2">
+                            <div class="flex items-center gap-2 mb-1">
+                                ${getActionBadge(a.action_type)}
+                                <span class="text-xs font-semibold text-slate-200 truncate">${escapeHtml(a.action_name)}</span>
+                            </div>
+                            <div class="text-xs text-slate-300 line-clamp-1 code-font">
+                                <span class="text-brand-400 font-medium">Hỏi:</span> "${escapeHtml(promptSnippet)}"
+                            </div>
                         </div>
-                        <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.15rem;">
-                            Mode: ${run.mode} | Focus: ${run.focus ? run.focus : 'Không'}
+
+                        <!-- Col 3: Status, Duration & Arrow -->
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <div class="text-right hidden sm:block">
+                                ${statusBadge}
+                                <div class="text-[10px] text-slate-500 code-font">${a.duration_ms}ms</div>
+                            </div>
+                            <div class="p-1.5 rounded-lg bg-dark-border/50 group-hover:bg-brand-600/20 group-hover:text-brand-300 text-slate-400 transition-colors">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            lucide.createIcons();
         }
 
-        function selectTestRun(index) {
-            selectedTestIndex = index;
-            renderTestRuns();
-            
-            const detailPane = document.getElementById('test-details-pane');
-            const run = testRunsData[index];
-            if (!run) return;
-            
-            const scoreNum = parseFloat(run.score) || 0;
-            let scoreColor = 'var(--status-online)';
-            if (scoreNum < 5) scoreColor = 'var(--status-offline)';
-            else if (scoreNum < 8) scoreColor = '#f59e0b';
-            
-            let htmlReport = escapeHtml(run.evaluation)
-                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
-                .replace(/^\s*-\s*\*\*(.*?)\*\*:\s*(.*$)/gim, '<li><strong>$1</strong>: $2</li>')
-                .replace(/^\s*-\s*(.*$)/gim, '<li>$1</li>');
-                
-            htmlReport = htmlReport.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
-            htmlReport = htmlReport.replace(/<\/ul>\s*<ul>/g, '');
-
-            detailPane.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.75rem; margin-bottom:1rem;">
-                    <div>
-                        <h2 style="font-size:1.1rem; font-weight:700; color:#f1f5f9;">🔬 Kết Quả Kiểm Thử AI</h2>
-                        <p style="font-size:0.75rem; color:var(--text-secondary);">${run.timestamp} | Nguồn: ${run.source}</p>
-                    </div>
-                    <div style="text-align:right;">
-                        <span style="font-size:1.3rem; font-weight:700; color:${scoreColor};">${run.score}</span>
-                        <span style="font-size:0.8rem; color:var(--text-secondary);"> / 10</span>
-                    </div>
-                </div>
-                
-                <div class="test-detail-section">
-                    <div class="section-title">⚙️ Cấu Hình Chạy Test</div>
-                    <div style="font-size:0.8rem; display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; color:#cbd5e1;">
-                        <div>Phạm vi quét: <strong>${run.scan_info}</strong></div>
-                        <div>Số tin nhắn thực tế: <strong>${run.raw_count} tin nhắn</strong></div>
-                        <div>Chế độ tóm tắt: <strong>${run.mode}</strong></div>
-                        <div>Từ khóa focus: <strong>${run.focus ? run.focus : 'Không'}</strong></div>
-                    </div>
-                </div>
-
-                <div class="test-detail-section">
-                    <div class="section-title">🤖 AI QA Engineer Đánh Giá (Critique)</div>
-                    <div class="markdown-text">${htmlReport}</div>
-                </div>
-
-                <div class="test-detail-section">
-                    <div class="section-title">📝 Bản Tóm Tắt Được Tạo (Generated Summary)</div>
-                    <div class="code-block" style="background:#090d16; color:#f8fafc; border:1px solid rgba(255,255,255,0.05); max-height:400px;">${escapeHtml(run.summary)}</div>
-                </div>
-            `;
+        function filterActivities(type) {
+            currentActivityFilter = type;
+            document.querySelectorAll('.activity-filter-btn').forEach(el => {
+                el.className = "activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border";
+            });
+            const activeBtn = document.getElementById(`filter-btn-${type}`);
+            if (activeBtn) {
+                activeBtn.className = "activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
+            }
+            renderActivities();
         }
 
-        async function runSelfAuditTest() {
-            const btn = document.getElementById('run-test-btn');
-            const loading = document.getElementById('test-loading');
+        function handleActivitySearch(val) {
+            activitySearchQuery = val;
+            renderActivities();
+        }
+
+        // Activity Detail Modal
+        function openDetailModal(id) {
+            const item = cachedActivities.find(a => a.id === id);
+            if (!item) return;
+
+            document.getElementById('modal-action-name').textContent = item.action_name;
+            document.getElementById('modal-action-meta').textContent = `${item.timestamp} • ID: #${item.id} • ${item.duration_ms}ms`;
+            document.getElementById('modal-user-avatar').src = item.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user_name)}&background=8b5cf6&color=fff`;
+            document.getElementById('modal-user-name').textContent = item.user_name;
+            document.getElementById('modal-user-id').textContent = `(${item.user_id})`;
+            document.getElementById('modal-location').textContent = `${item.guild_name} / #${item.channel_name}`;
             
-            btn.disabled = true;
-            btn.style.opacity = 0.5;
-            loading.style.display = 'block';
-            
+            document.getElementById('modal-prompt').textContent = item.prompt || '(Không có nội dung yêu cầu cụ thể)';
+            document.getElementById('modal-response').textContent = item.response || '(Không có nội dung phản hồi)';
+
+            const detailsContainer = document.getElementById('modal-details-container');
+            const detailsPre = document.getElementById('modal-details');
+            if (item.details && Object.keys(item.details).length > 0) {
+                detailsPre.textContent = JSON.stringify(item.details, null, 2);
+                detailsContainer.classList.remove('hidden');
+            } else {
+                detailsContainer.classList.add('hidden');
+            }
+
+            document.getElementById('activity-detail-modal').classList.remove('hidden');
+            document.getElementById('activity-detail-modal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeDetailModal() {
+            document.getElementById('activity-detail-modal').classList.add('hidden');
+            document.getElementById('activity-detail-modal').classList.remove('flex');
+        }
+
+        async function clearActivities() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử hoạt động tương tác không?")) return;
             try {
-                const response = await fetch('/api/test/run', { method: 'POST' });
-                const result = await response.json();
-                if (result.success) {
-                    await updateDashboard();
-                    selectedTestIndex = 0;
-                    renderTestRuns();
-                    selectTestRun(0);
-                    alert("🎉 Đã chạy xong lượt test tự động! Xem chi tiết đánh giá ở bảng điều khiển.");
-                } else {
-                    alert("❌ Lỗi kiểm thử: " + result.error);
-                }
+                await fetch('/api/activities/clear', { method: 'POST' });
+                cachedActivities = [];
+                renderActivities();
             } catch (err) {
-                console.error("Test error:", err);
-                alert("❌ Lỗi kết nối máy chủ khi chạy kiểm thử.");
-            } finally {
-                btn.disabled = false;
-                btn.style.opacity = 1;
-                loading.style.display = 'none';
+                alert("Lỗi khi xóa lịch sử tương tác.");
             }
         }
 
-        async function updateDashboard() {
+        // Render Logs
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            let lines = cachedLogs;
+
+            if (logFilterType === 'error') {
+                lines = lines.filter(l => /❌|lỗi|error|exception|traceback|failed/i.test(l));
+            } else if (logFilterType === 'warn') {
+                lines = lines.filter(l => /⚠️|warn|timeout|503/i.test(l));
+            }
+
+            if (logSearchQuery) {
+                const q = logSearchQuery.toLowerCase();
+                lines = lines.filter(l => l.toLowerCase().includes(q));
+            }
+
+            container.innerHTML = lines.map(line => {
+                let colorClass = "text-slate-300";
+                if (/❌|lỗi|error|exception|traceback|failed/i.test(line)) {
+                    colorClass = "text-rose-400 font-medium bg-rose-500/5 px-1 py-0.5 rounded";
+                } else if (/⚠️|warn|timeout|503/i.test(line)) {
+                    colorClass = "text-amber-300 font-medium bg-amber-500/5 px-1 py-0.5 rounded";
+                } else if (/✅|thành công|success/i.test(line)) {
+                    colorClass = "text-emerald-400 font-medium";
+                } else if (/ℹ️|info|bắt đầu|kết nối/i.test(line)) {
+                    colorClass = "text-sky-300";
+                } else if (/🔮|tarot/i.test(line)) {
+                    colorClass = "text-purple-300";
+                }
+
+                return `<div class="${colorClass} hover:bg-white/5 px-1 rounded transition-colors whitespace-pre-wrap break-all">${escapeHtml(line)}</div>`;
+            }).join('');
+
+            const autoScroll = document.getElementById('auto-scroll-toggle').checked;
+            if (autoScroll) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function filterLogs(type) {
+            logFilterType = type;
+            document.querySelectorAll('.log-filter-btn').forEach(el => {
+                el.className = "log-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border";
+            });
+            const btn = document.getElementById(`log-filter-${type}`);
+            if (btn) {
+                btn.className = "log-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
+            }
+            renderLogs();
+        }
+
+        function handleLogSearch(val) {
+            logSearchQuery = val;
+            renderLogs();
+        }
+
+        function copyLogs() {
+            const text = cachedLogs.join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Đã sao chép toàn bộ logs vào Clipboard!");
+            });
+        }
+
+        async function clearLogs() {
+            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ logs trên máy chủ không?")) return;
             try {
-                const response = await fetch('/api/stats');
-                if (!response.ok) {
-                    throw new Error("HTTP error " + response.status);
-                }
-                const data = await response.json();
-
-                const isOnline = data.bot_status === "Online";
-                const statusDot = document.getElementById('header-status-dot');
-                const statusText = document.getElementById('header-status-text');
-
-                if (isOnline) {
-                    statusDot.className = "dot online";
-                    statusText.textContent = "Online";
-                } else {
-                    statusDot.className = "dot offline";
-                    statusText.textContent = "Offline";
-                }
-
-                if (data.bot_name !== "N/A" && data.bot_name) {
-                    document.getElementById('header-bot-name').textContent = data.bot_name;
-                }
-
-                document.getElementById('stat-latency').textContent = data.latency;
-                document.getElementById('stat-guilds').textContent = data.guilds;
-                document.getElementById('stat-users').textContent = data.total_users;
-                document.getElementById('stat-summaries').textContent = data.summaries;
-                document.getElementById('stat-uptime').textContent = data.uptime;
-                document.getElementById('stat-ram').textContent = data.ram_usage;
-                document.getElementById('info-os').textContent = data.os_info;
-                if (document.getElementById('info-model-id')) {
-                    document.getElementById('info-model-id').textContent = data.model || 'Gemini Flash';
-                }
-
-                cachedRawLogs = data.logs || [];
+                await fetch('/api/logs/clear', { method: 'POST' });
+                cachedLogs = [];
                 renderLogs();
+            } catch (err) {
+                alert("Lỗi khi xóa logs.");
+            }
+        }
 
-                if (data.test_runs) {
-                    testRunsData = data.test_runs;
-                    if (activeTab === 'audit') {
-                        renderTestRuns();
-                        if (selectedTestIndex !== null && selectedTestIndex < testRunsData.length) {
-                            selectTestRun(selectedTestIndex);
-                        }
+        async function handleLogout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+            } catch (err) {
+                window.location.href = '/login';
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Periodic Data Fetching
+        async function fetchDashboardData() {
+            try {
+                // 1. Fetch Stats & System Metrics
+                const statsRes = await fetch('/api/stats');
+                if (statsRes.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                const statsData = await statsRes.json();
+
+                // Header & Top bar
+                const isOnline = statsData.bot_status === 'Online';
+                document.getElementById('header-status-badge').innerHTML = isOnline
+                    ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online`
+                    : `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Offline`;
+                document.getElementById('header-status-indicator').className = isOnline
+                    ? "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-dark-bg"
+                    : "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-500 ring-2 ring-dark-bg";
+                
+                if (statsData.bot_avatar) {
+                    document.getElementById('header-avatar').src = statsData.bot_avatar;
+                }
+                if (statsData.bot_name && statsData.bot_name !== 'N/A') {
+                    document.getElementById('header-bot-name').textContent = statsData.bot_name;
+                }
+
+                document.getElementById('header-latency').textContent = statsData.latency;
+                document.getElementById('header-guilds').textContent = statsData.guilds;
+                document.getElementById('header-ram').textContent = statsData.ram_usage;
+
+                // Overview Tab
+                document.getElementById('overview-status').innerHTML = isOnline
+                    ? `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online`
+                    : `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Offline`;
+                document.getElementById('overview-latency').textContent = statsData.latency;
+                document.getElementById('overview-uptime').textContent = statsData.uptime;
+                document.getElementById('overview-ram').textContent = statsData.ram_usage;
+                document.getElementById('overview-guilds').textContent = statsData.guilds;
+                document.getElementById('overview-users').textContent = statsData.total_users;
+                document.getElementById('overview-os').textContent = statsData.os_info;
+                document.getElementById('overview-python').textContent = statsData.python_version;
+
+                if (statsData.models) {
+                    document.getElementById('model-summary-id').textContent = statsData.models.summary || 'N/A';
+                    document.getElementById('model-tarot-id').textContent = statsData.models.tarot || 'N/A';
+                }
+
+                // Update Latency Chart
+                if (latencyChart && statsData.latency_raw) {
+                    const dataArr = latencyChart.data.datasets[0].data;
+                    dataArr.shift();
+                    dataArr.push(statsData.latency_raw);
+                    latencyChart.update('none');
+                }
+
+                // Logs
+                cachedLogs = statsData.logs || [];
+                document.getElementById('badge-total-logs').textContent = cachedLogs.length;
+                if (currentTab === 'logs') {
+                    renderLogs();
+                }
+
+                // 2. Fetch User Activities
+                const actRes = await fetch('/api/activities?limit=150');
+                if (actRes.ok) {
+                    const actData = await actRes.json();
+                    cachedActivities = actData.items || [];
+                    document.getElementById('badge-total-activities').textContent = actData.total || 0;
+                    
+                    if (actData.counts) {
+                        document.getElementById('filter-count-all').textContent = actData.counts.all || 0;
+                        document.getElementById('filter-count-tarot').textContent = actData.counts.tarot || 0;
+                        document.getElementById('filter-count-summary').textContent = actData.counts.summary || 0;
+                        document.getElementById('filter-count-embed').textContent = actData.counts.embed || 0;
+                        document.getElementById('filter-count-command').textContent = actData.counts.command || 0;
+                    }
+
+                    if (currentTab === 'activity') {
+                        renderActivities();
                     }
                 }
 
-            } catch (error) {
-                console.error("Error updating dashboard:", error);
-                document.getElementById('header-status-dot').className = "dot offline";
-                document.getElementById('header-status-text').textContent = "Lỗi kết nối API";
+            } catch (err) {
+                console.error("Lỗi khi cập nhật dữ liệu Web Console:", err);
             }
         }
 
-        updateDashboard();
-        setInterval(updateDashboard, 3000);
+        // Initialize
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            fetchDashboardData();
+            setInterval(fetchDashboardData, 3000);
+        });
     </script>
 </body>
 </html>

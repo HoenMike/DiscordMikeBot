@@ -518,6 +518,35 @@ class SummaryCog(commands.Cog):
 
             config.summary_count += 1
 
+            # Ghi nhận hoạt động vào Live Activity Logger
+            try:
+                from core.activity_logger import activity_logger
+                user_avatar = user.display_avatar.url if user.display_avatar else None
+                guild_name_str = target_channel.guild.name if hasattr(target_channel, 'guild') and target_channel.guild else "Direct Message"
+                guild_id_val = target_channel.guild.id if hasattr(target_channel, 'guild') and target_channel.guild else None
+                activity_logger.log(
+                    action_type="summary",
+                    action_name=f"Tóm tắt: {summary_type.upper()}",
+                    user_id=user.id,
+                    user_name=user.display_name,
+                    user_avatar=user_avatar,
+                    guild_name=guild_name_str,
+                    guild_id=guild_id_val,
+                    channel_name=getattr(target_channel, 'name', 'Unknown'),
+                    channel_id=target_channel.id,
+                    prompt=f"Phạm vi: {scan_info} | Focus: {clean_focus or '(Không)'} | Chế độ: {summary_type}",
+                    response=summary_result,
+                    status="success",
+                    details={
+                        "mode": summary_type,
+                        "scan_info": scan_info,
+                        "focus": clean_focus,
+                        "message_count": len(raw_messages) if 'raw_messages' in locals() else 0
+                    }
+                )
+            except Exception as act_err:
+                print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Summary: {act_err}", flush=True)
+
             if followup_msg and not send_to_dm:
                 try:
                     await followup_msg.delete()
@@ -528,6 +557,28 @@ class SummaryCog(commands.Cog):
             print(f"❌ Lỗi trong quá trình xử lý AI của tomtat: {e}", flush=True)
             traceback.print_exc(file=sys.stdout)
             err_msg = "❌ Đã xảy ra lỗi trong quá trình AI xử lý dữ liệu!"
+
+            # Ghi nhận lỗi vào Activity Logger
+            try:
+                from core.activity_logger import activity_logger
+                user_avatar = user.display_avatar.url if user.display_avatar else None
+                guild_name_str = target_channel.guild.name if hasattr(target_channel, 'guild') and target_channel.guild else "Direct Message"
+                activity_logger.log(
+                    action_type="summary",
+                    action_name=f"Tóm tắt (Thất bại)",
+                    user_id=user.id,
+                    user_name=user.display_name,
+                    user_avatar=user_avatar,
+                    guild_name=guild_name_str,
+                    guild_id=target_channel.guild.id if hasattr(target_channel, 'guild') and target_channel.guild else None,
+                    channel_name=getattr(target_channel, 'name', 'Unknown'),
+                    channel_id=target_channel.id,
+                    prompt=f"Quét: {scan_info}",
+                    response=f"Lỗi: {e}",
+                    status="error"
+                )
+            except Exception:
+                pass
             if interaction:
                 try:
                     await interaction.followup.send(err_msg, ephemeral=send_to_dm)

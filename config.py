@@ -98,6 +98,10 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# Khóa bảo mật & Mật khẩu Admin Web Console
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Crtm123123@")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "mikedabot_secure_session_key_2026_salt")
+
 # ==========================================
 # 2. CẤU HÌNH AI & MÔ HÌNH (CENTRALIZED AI CONFIG)
 # ==========================================

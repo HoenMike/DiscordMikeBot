@@ -783,6 +783,34 @@ class TarotFlipView(discord.ui.View):
             # Await bài luận giải thông điệp
             ai_reading = await self.ai_task
 
+            # Ghi nhận hoạt động vào Live Activity Logger
+            try:
+                from core.activity_logger import activity_logger
+                cards_summary = ", ".join([f"{c.card.name_vi} ({'[NGƯỢC]' if c.is_reversed else '[XUÔI]'})" for c in self.drawn_cards])
+                guild_name_str = interaction.guild.name if interaction.guild else "Direct Message"
+                channel_name_str = interaction.channel.name if (interaction.channel and hasattr(interaction.channel, 'name')) else "Direct Message"
+                activity_logger.log(
+                    action_type="tarot",
+                    action_name=f"Tarot: {self.spread_info['name']}",
+                    user_id=self.author_id,
+                    user_name=self.author_name,
+                    user_avatar=self.author_avatar_url,
+                    guild_name=guild_name_str,
+                    guild_id=self.guild_id,
+                    channel_name=channel_name_str,
+                    channel_id=self.channel_id,
+                    prompt=f"Câu hỏi: {self.question or '(Không)'} | Bối cảnh: {self.context or '(Không)'}",
+                    response=f"Lá bài: {cards_summary}\n\nThông điệp: {ai_reading}",
+                    status="success",
+                    details={
+                        "spread": self.spread_key,
+                        "reader": self.reader_style,
+                        "cards": [c.card.name_vi for c in self.drawn_cards]
+                    }
+                )
+            except Exception as act_err:
+                print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Tarot: {act_err}", flush=True)
+
             # Lưu vào Database
             if self.spread_key == "daily":
                 await self.tarot_manager.record_daily_draw(self.author_id, self.drawn_cards[0])

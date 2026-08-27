@@ -398,6 +398,30 @@ async def send_bot_help(
     view = HelpView(author_id=user.id, current_tab=feature)
     embed = view.get_embed(user)
 
+    # Ghi nhận hoạt động vào Live Activity Logger
+    try:
+        from core.activity_logger import activity_logger
+        guild = target.guild
+        channel = target.channel
+        user_avatar = user.display_avatar.url if user.display_avatar else None
+        activity_logger.log(
+            action_type="command",
+            action_name="Xem hướng dẫn (Help)",
+            user_id=user.id,
+            user_name=user.display_name,
+            user_avatar=user_avatar,
+            guild_name=guild.name if guild else "Direct Message",
+            guild_id=guild.id if guild else None,
+            channel_name=getattr(channel, 'name', 'Direct Message'),
+            channel_id=channel.id if channel else None,
+            prompt=f"Mục: {feature}",
+            response="Đã hiển thị bảng hướng dẫn sử dụng tương tác.",
+            status="success",
+            details={"tab": feature}
+        )
+    except Exception as act_err:
+        print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Help: {act_err}", flush=True)
+
     if isinstance(target, commands.Context):
         sent_msg = await target.reply(embed=embed, view=view, mention_author=False)
         view.message = sent_msg

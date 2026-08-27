@@ -130,6 +130,34 @@ class EmbedCog(commands.Cog):
                 message, platform_key, url, match, config,
                 is_spoiler=is_spoiler, user_comment=current_comment
             )
+
+            # Ghi nhận hoạt động vào Live Activity Logger
+            try:
+                from core.activity_logger import activity_logger
+                platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
+                user_avatar = message.author.display_avatar.url if message.author.display_avatar else None
+                activity_logger.log(
+                    action_type="embed",
+                    action_name=f"Embed: {platform_name}",
+                    user_id=message.author.id,
+                    user_name=message.author.display_name,
+                    user_avatar=user_avatar,
+                    guild_name=message.guild.name if message.guild else "Direct Message",
+                    guild_id=message.guild.id if message.guild else None,
+                    channel_name=getattr(message.channel, 'name', 'Unknown'),
+                    channel_id=message.channel.id,
+                    prompt=url,
+                    response=f"Tạo bản xem trước {platform_name} thành công" if success else f"Không thể tạo bản xem trước {platform_name}",
+                    status="success" if success else "error",
+                    details={
+                        "platform": platform_key,
+                        "url": url,
+                        "is_spoiler": is_spoiler
+                    }
+                )
+            except Exception as act_err:
+                print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Embed: {act_err}", flush=True)
+
             if success:
                 any_success = True
                 comment_sent = True
