@@ -894,11 +894,12 @@ def draw_spread(
     spread_key: str,
     user_id: Optional[int] = None,
     question: Optional[str] = None,
-    seed: Optional[int] = None
+    seed: Optional[int] = None,
+    fatigue_card_ids: Optional[List[str]] = None
 ) -> List[DrawnCard]:
     """
     Rút N lá không trùng lặp từ bộ 78 lá bài với seed năng lượng vũ trụ theo từng khung giờ (1 giờ/khung).
-    Nếu cùng user hỏi cùng câu hỏi trong cùng 1 tiếng, bài rút ra sẽ hoàn toàn nhất quán.
+    Hỗ trợ Card Fatigue Tracking (giảm 70% xác suất bốc trùng các lá gần nhất).
     """
     if spread_key not in SPREAD_DEFINITIONS:
         raise ValueError(f"Kiểu trải bài không hợp lệ: {spread_key}")
@@ -913,7 +914,21 @@ def draw_spread(
     rng = random.Random(seed) if seed is not None else random.Random()
 
     all_cards = list(TAROT_DECK.values())
-    chosen_cards = rng.sample(all_cards, count)
+
+    # Thuật toán Card Fatigue: Nếu có danh sách lá bốc gần đây, giảm nhẹ trọng số
+    if fatigue_card_ids and len(all_cards) >= count:
+        fatigue_set = set(fatigue_card_ids)
+        pool = list(all_cards)
+        weights = [0.3 if c.id in fatigue_set else 1.0 for c in pool]
+        chosen_cards = []
+        for _ in range(count):
+            picked = rng.choices(pool, weights=weights, k=1)[0]
+            chosen_cards.append(picked)
+            idx = pool.index(picked)
+            pool.pop(idx)
+            weights.pop(idx)
+    else:
+        chosen_cards = rng.sample(all_cards, count)
 
     drawn: List[DrawnCard] = []
     for i, card in enumerate(chosen_cards):

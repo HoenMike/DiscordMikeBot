@@ -350,10 +350,13 @@ def api_tarot_cooldowns():
 @login_required
 def api_tarot_reset_cooldown():
     data = request.get_json(silent=True) or {}
-    user_id = int(data.get("user_id", 0))
+    try:
+        user_id = int(data.get("user_id", 0))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "User ID không hợp lệ! Vui lòng chỉ nhập các chữ số."}), 400
 
     if not user_id:
-        return jsonify({"success": False, "error": "Thiếu user_id"}), 400
+        return jsonify({"success": False, "error": "Vui lòng nhập User ID!"}), 400
 
     from features.tarot.manager import TarotManager
     tm = TarotManager()

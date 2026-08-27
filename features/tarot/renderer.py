@@ -181,8 +181,17 @@ def _generate_procedural_card(card: TarotCard, target_w: int, target_h: int) -> 
     return img
 
 
+# Cache in-memory cho mặt bài và lưng bài đã resize/xoay
+_CARD_IMAGE_CACHE: dict[Tuple[str, int, int, bool], Image.Image] = {}
+_CARD_BACK_CACHE: dict[Tuple[int, int], Image.Image] = {}
+
+
 def _generate_card_back(target_w: int, target_h: int) -> Image.Image:
-    """Vẽ mặt lưng bài Tarot huyền bí với hoa văn hoàng gia vàng kim và tinh tú."""
+    """Vẽ mặt lưng bài Tarot huyền bí với hoa văn hoàng gia vàng kim và tinh tú (kèm in-memory cache)."""
+    cache_key = (target_w, target_h)
+    if cache_key in _CARD_BACK_CACHE:
+        return _CARD_BACK_CACHE[cache_key].copy()
+
     img = Image.new("RGBA", (target_w, target_h), (18, 14, 30))
     draw = ImageDraw.Draw(img)
 
@@ -199,30 +208,24 @@ def _generate_card_back(target_w: int, target_h: int) -> Image.Image:
 
     # Họa tiết Sacred Geometry ở trung tâm
     cx, cy = target_w // 2, target_h // 2
-    r_outer = min(target_w, target_h) // 3
-    r_inner = r_outer // 2
+    r = min(target_w, target_h) // 4
+    draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], outline=COLOR_GOLD_LIGHT, width=1)
+    draw.ellipse([(cx - r + 4, cy - r + 4), (cx + r - 4, cy + r - 4)], outline=COLOR_GOLD_DARK, width=1)
+    _draw_sparkle_star(draw, cx, cy, size=int(r * 0.75))
 
-    # Vòng tròn ma thuật
-    draw.ellipse([(cx - r_outer, cy - r_outer), (cx + r_outer, cy + r_outer)], outline=COLOR_GOLD_DARK, width=1)
-    draw.ellipse([(cx - r_inner, cy - r_inner), (cx + r_inner, cy + r_inner)], outline=COLOR_GOLD_PRIMARY, width=1)
-
-    # Ngôi sao trung tâm
-    _draw_sparkle_star(draw, cx, cy, size=int(r_inner * 0.9), color=COLOR_GOLD_LIGHT)
-
-    # 4 ngôi sao vệ tinh nhỏ ở 4 góc trong
-    star_dist = int(r_outer * 0.75)
-    _draw_sparkle_star(draw, cx, cy - star_dist, size=4, color=COLOR_GOLD_LIGHT)
-    _draw_sparkle_star(draw, cx, cy + star_dist, size=4, color=COLOR_GOLD_LIGHT)
-    _draw_sparkle_star(draw, cx - star_dist, cy, size=4, color=COLOR_GOLD_LIGHT)
-    _draw_sparkle_star(draw, cx + star_dist, cy, size=4, color=COLOR_GOLD_LIGHT)
-
-    # Khung viền ngoài
+    # Viền ngoài cùng
     draw.rectangle([(0, 0), (target_w - 1, target_h - 1)], outline=COLOR_GOLD_PRIMARY, width=2)
+
+    _CARD_BACK_CACHE[cache_key] = img.copy()
     return img
 
 
 def _load_and_prepare_card_image(drawn: DrawnCard, target_w: int, target_h: int) -> Image.Image:
-    """Tải ảnh lá bài từ assets hoặc tạo procedural, xoay 180° nếu reversed."""
+    """Tải ảnh lá bài từ assets hoặc tạo procedural, xoay 180° nếu reversed (kèm in-memory cache)."""
+    cache_key = (drawn.card.id, target_w, target_h, drawn.is_reversed)
+    if cache_key in _CARD_IMAGE_CACHE:
+        return _CARD_IMAGE_CACHE[cache_key].copy()
+
     card = drawn.card
     asset_path = ensure_card_asset(card)
 
@@ -244,6 +247,7 @@ def _load_and_prepare_card_image(drawn: DrawnCard, target_w: int, target_h: int)
     draw_c = ImageDraw.Draw(card_img)
     draw_c.rectangle([(0, 0), (target_w - 1, target_h - 1)], outline=COLOR_GOLD_PRIMARY, width=2)
 
+    _CARD_IMAGE_CACHE[cache_key] = card_img.copy()
     return card_img
 
 

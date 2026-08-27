@@ -1116,7 +1116,7 @@
                     ? `<button onclick="handleUnsuspendGuild('${g.id}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all flex items-center justify-center gap-1.5">
                         <i data-lucide="play" class="w-3 h-3"></i> Mở Lại Hoạt Động
                     </button>`
-                    : `<button onclick="handleSuspendGuild('${g.id}', '${escapeHtml(g.name)}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all flex items-center justify-center gap-1.5">
+                    : `<button onclick="handleSuspendGuild('${g.id}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all flex items-center justify-center gap-1.5">
                         <i data-lucide="pause" class="w-3 h-3"></i> Tạm Ngưng (Suspend)
                     </button>`;
 
@@ -1149,7 +1149,7 @@
                         <!-- Action Controls -->
                         <div class="flex items-center gap-2 pt-1">
                             ${suspendActionBtn}
-                            <button onclick="handleLeaveGuild('${g.id}', '${escapeHtml(g.name)}')" title="Buộc Bot rời khỏi server này" class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/20 transition-all">
+                            <button onclick="handleLeaveGuild('${g.id}')" title="Buộc Bot rời khỏi server này" class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/20 transition-all">
                                 <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
@@ -1160,7 +1160,9 @@
             lucide.createIcons();
         }
 
-        async function handleSuspendGuild(guildId, guildName) {
+        async function handleSuspendGuild(guildId) {
+            const guild = cachedGuilds.find(x => String(x.id) === String(guildId));
+            const guildName = guild ? guild.name : `Server (${guildId})`;
             showConfirmModal({
                 title: "Tạm Ngưng (Suspend) Server",
                 message: `Server "${guildName}" sẽ bị chặn gọi tất cả lệnh AI & Slash commands của bot.`,
@@ -1192,9 +1194,11 @@
         }
 
         async function handleUnsuspendGuild(guildId) {
+            const guild = cachedGuilds.find(x => String(x.id) === String(guildId));
+            const guildName = guild ? guild.name : `Server (${guildId})`;
             showConfirmModal({
                 title: "Mở Lại Hoạt Động Server",
-                message: "Bạn có muốn gỡ tạm ngưng và kích hoạt lại quyền sử dụng bot cho server này?",
+                message: `Bạn có muốn gỡ tạm ngưng và kích hoạt lại quyền sử dụng bot cho server "${guildName}"?`,
                 confirmText: "Kích hoạt lại",
                 isDanger: false,
                 onConfirm: async () => {
@@ -1206,7 +1210,7 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            showToast("Đã gỡ tạm ngưng thành công! Server có thể sử dụng lại bot.", "success");
+                            showToast(`Đã gỡ tạm ngưng thành công cho server "${guildName}"!`, "success");
                             await fetchGuildsData();
                         } else {
                             showToast("Lỗi: " + data.error, "error");
@@ -1218,7 +1222,9 @@
             });
         }
 
-        async function handleLeaveGuild(guildId, guildName) {
+        async function handleLeaveGuild(guildId) {
+            const guild = cachedGuilds.find(x => String(x.id) === String(guildId));
+            const guildName = guild ? guild.name : `Server (${guildId})`;
             showConfirmModal({
                 title: "Buộc Bot Rời Khỏi Server",
                 message: `⚠️ CẢNH BÁO: Bạn đang yêu cầu bot rời khỏi server "${guildName}".\n\nSau khi rời, chủ server phải dùng link mời để thêm lại bot.\n\nNhập chính xác chữ "XÁC NHẬN" bên dưới để tiếp tục:`,
@@ -1326,7 +1332,7 @@
 
                         <!-- Action Controls -->
                         <div class="pt-0.5">
-                            <button onclick="handleResetCooldown('${item.user_id}', '${escapeHtml(item.display_name)}')" class="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-purple-600/20 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 hover:border-purple-600 transition-all active:scale-95 shadow-sm">
+                            <button onclick="handleResetCooldown('${item.user_id}')" class="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-purple-600/20 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 hover:border-purple-600 transition-all active:scale-95 shadow-sm">
                                 <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
                                 <span>Gỡ Cooldown Ngày</span>
                             </button>
@@ -1338,7 +1344,9 @@
             lucide.createIcons();
         }
 
-        async function handleResetCooldown(userId, displayName) {
+        async function handleResetCooldown(userId) {
+            const item = cachedTarotCooldowns.find(x => String(x.user_id) === String(userId));
+            const displayName = item ? item.display_name : `User (${userId})`;
             showConfirmModal({
                 title: "Gỡ Daily Cooldown Cho Người Dùng",
                 message: `Bạn có chắc muốn gỡ Cooldown bốc bài Daily hôm nay cho "${displayName}" (ID: ${userId})?\n\nNgười dùng này sẽ có thể gõ lệnh bốc bài Tarot ngày mới ngay lập tức!`,

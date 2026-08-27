@@ -50,6 +50,7 @@ class TarotManager:
                 question     TEXT,
                 cards_json   TEXT NOT NULL,
                 ai_reading   TEXT,
+                topic_tag    TEXT NOT NULL DEFAULT 'general',
                 created_at   TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
@@ -61,6 +62,38 @@ class TarotManager:
                 updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS tarot_user_preferences (
+                user_id         INTEGER PRIMARY KEY,
+                memory_enabled  INTEGER NOT NULL DEFAULT 1,
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS tarot_ratings (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL,
+                guild_id     INTEGER,
+                spread_type  TEXT NOT NULL,
+                reader_style TEXT,
+                is_positive  INTEGER NOT NULL,
+                created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS tarot_weekly_guild_config (
+                guild_id       INTEGER PRIMARY KEY,
+                channel_id     INTEGER NOT NULL,
+                last_sent_week TEXT NOT NULL DEFAULT '',
+                updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        # Tự động cập nhật thêm cột topic_tag nếu bảng tarot_history đã tồn tại từ trước
+        try:
+            await db.execute("ALTER TABLE tarot_history ADD COLUMN topic_tag TEXT NOT NULL DEFAULT 'general'")
+        except Exception:
+            pass
+
         await db.commit()
         print("[TarotManager] Đã khởi tạo cơ sở dữ liệu Tarot thành công.", flush=True)
 
@@ -172,9 +205,10 @@ class TarotManager:
         spread_type: str,
         question: Optional[str],
         drawn_cards: List[DrawnCard],
-        ai_reading: str
+        ai_reading: str,
+        topic_tag: str = "general"
     ) -> None:
-        """Lưu lịch sử bốc bài vào database."""
+        """Lưu lịch sử bốc bài vào database kèm topic_tag."""
         cards_list = [
             {
                 "position_index": c.position_index,
@@ -190,16 +224,16 @@ class TarotManager:
 
         db = await self._get_db()
         await db.execute("""
-            INSERT INTO tarot_history (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading))
+            INSERT INTO tarot_history (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag or "general"))
         await db.commit()
 
     async def get_user_history(self, user_id: int, limit: int = 5) -> List[dict]:
         """Lấy lịch sử các lượt bốc bài gần nhất của user."""
         db = await self._get_db()
         async with db.execute("""
-            SELECT id, spread_type, question, cards_json, ai_reading, created_at
+            SELECT id, spread_type, question, cards_json, ai_reading, topic_tag, created_at
             FROM tarot_history
             WHERE user_id = ?
             ORDER BY id DESC
@@ -215,6 +249,131 @@ class TarotManager:
                 "question": r[2],
                 "cards": json.loads(r[3]),
                 "ai_reading": r[4],
-                "created_at": r[5]
+                "topic_tag": r[5] if len(r) > 5 else "general",
+                "created_at": r[6] if len(r) > 6 else r[5]
             })
         return results
+
+    async def get_user_recent_context(self, user_id: int) -> Optional[dict]:
+        """
+        Lấy ngữ cảnh lần đọc trước gần nhất trong vòng 10 ngày (trừ khi user đã tắt memory).
+        Trả về dict: {"topic_tag": ..., "last_card_name": ..., "days_ago": ...} hoặc None.
+        """
+        if not await self.is_user_memory_enabled(user_id):
+            return None
+
+        db = await self._get_db()
+        async with db.execute("""
+            SELECT topic_tag, cards_json, created_at
+            FROM tarot_history
+            WHERE user_id = ? AND created_at >= datetime('now', '-10 days')
+            ORDER BY id DESC
+            LIMIT 1
+        """, (user_id,)) as cursor:
+            row = await cursor.fetchone()
+
+        if not row:
+            return None
+
+        topic_tag, cards_json, created_at = row
+        try:
+            cards = json.loads(cards_json)
+            lead_card = cards[0]["name_vi"] if cards else "Ẩn danh"
+            orient = "Ngược" if cards and cards[0].get("is_reversed") else "Xuôi"
+            lead_card_full = f"{lead_card} ({orient})"
+        except Exception:
+            lead_card_full = "Một lá bài"
+
+        # Tính khoảng thời gian
+        days_str = "vài ngày trước"
+        return {
+            "topic_tag": topic_tag or "general",
+            "last_card_name": lead_card_full,
+            "approx_time": days_str
+        }
+
+    async def get_user_recent_card_ids(self, user_id: int, limit: int = 5) -> List[str]:
+        """Lấy tối đa 5 lá bài gần nhất user vừa bốc để áp dụng Card Fatigue."""
+        db = await self._get_db()
+        async with db.execute("""
+            SELECT cards_json FROM tarot_history
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT 3
+        """, (user_id,)) as cursor:
+            rows = await cursor.fetchall()
+
+        recent_ids = []
+        for r in rows:
+            try:
+                cards = json.loads(r[0])
+                for c in cards:
+                    cid = c.get("id")
+                    if cid and cid not in recent_ids:
+                        recent_ids.append(cid)
+            except Exception:
+                pass
+        return recent_ids[:limit]
+
+    async def is_user_memory_enabled(self, user_id: int) -> bool:
+        """Kiểm tra xem user có cho phép bot nhớ ngữ cảnh không."""
+        db = await self._get_db()
+        async with db.execute("SELECT memory_enabled FROM tarot_user_preferences WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+        if row is not None:
+            return bool(row[0])
+        return True
+
+    async def set_user_memory_preference(self, user_id: int, enabled: bool) -> None:
+        """Bật/tắt tùy chọn nhớ ngữ cảnh cho user."""
+        db = await self._get_db()
+        await db.execute("""
+            INSERT INTO tarot_user_preferences (user_id, memory_enabled, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                memory_enabled = excluded.memory_enabled,
+                updated_at = excluded.updated_at
+        """, (user_id, 1 if enabled else 0))
+        await db.commit()
+
+    async def clear_user_history(self, user_id: int) -> None:
+        """Xóa toàn bộ lịch sử bốc bài và daily cooldown của user."""
+        db = await self._get_db()
+        await db.execute("DELETE FROM tarot_history WHERE user_id = ?", (user_id,))
+        await db.execute("DELETE FROM tarot_daily_tracker WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+    async def save_rating(self, user_id: int, guild_id: Optional[int], spread_type: str, reader_style: str, is_positive: bool) -> None:
+        """Lưu đánh giá 👍/👎 của user cho bài giải."""
+        db = await self._get_db()
+        await db.execute("""
+            INSERT INTO tarot_ratings (user_id, guild_id, spread_type, reader_style, is_positive, created_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        """, (user_id, guild_id, spread_type, reader_style, 1 if is_positive else 0))
+        await db.commit()
+
+    async def get_weekly_guild_configs(self) -> List[dict]:
+        """Lấy danh sách các server đã đăng ký nhận lá bài tuần."""
+        db = await self._get_db()
+        async with db.execute("SELECT guild_id, channel_id, last_sent_week FROM tarot_weekly_guild_config") as cursor:
+            rows = await cursor.fetchall()
+        return [{"guild_id": r[0], "channel_id": r[1], "last_sent_week": r[2]} for r in rows]
+
+    async def set_weekly_guild_channel(self, guild_id: int, channel_id: int) -> None:
+        """Đăng ký kênh nhận lá bài tuần cho server."""
+        db = await self._get_db()
+        await db.execute("""
+            INSERT INTO tarot_weekly_guild_config (guild_id, channel_id, last_sent_week, updated_at)
+            VALUES (?, ?, '', datetime('now'))
+            ON CONFLICT(guild_id) DO UPDATE SET
+                channel_id = excluded.channel_id,
+                updated_at = excluded.updated_at
+        """, (guild_id, channel_id))
+        await db.commit()
+
+    async def update_weekly_guild_sent(self, guild_id: int, week_str: str) -> None:
+        """Ghi nhận đã gửi bài tuần cho server."""
+        db = await self._get_db()
+        await db.execute("UPDATE tarot_weekly_guild_config SET last_sent_week = ?, updated_at = datetime('now') WHERE guild_id = ?", (week_str, guild_id))
+        await db.commit()
+

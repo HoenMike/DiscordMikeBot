@@ -1,10 +1,8 @@
-import asyncio
-import random
-import traceback
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Union
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
 from features.tarot.deck import (
@@ -14,7 +12,7 @@ from features.tarot.deck import (
     READER_STYLES
 )
 from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading
+from features.tarot.ai import generate_tarot_reading, recommend_spread_for_question
 from features.tarot.manager import TarotManager
 from features.tarot.tarot_view import (
     TarotFlipView,
@@ -22,6 +20,8 @@ from features.tarot.tarot_view import (
     WIDE_DIVIDER
 )
 from core.ai import split_text
+
+VN_TZ = timezone(timedelta(hours=7))
 
 
 SPREAD_ALIASES = {
@@ -91,9 +91,11 @@ class TarotCog(commands.Cog):
     async def cog_load(self):
         """Khởi tạo SQLite database cho Tarot khi nạp cog."""
         await self.tarot_manager.init_db()
+        self.weekly_card_loop.start()
 
     async def cog_unload(self):
         """Đóng kết nối database khi hủy nạp cog."""
+        self.weekly_card_loop.cancel()
         await self.tarot_manager.close()
 
     async def _show_history(
@@ -220,14 +222,19 @@ class TarotCog(commands.Cog):
             initial_msg = await ctx.reply("🔮 Đang kết nối năng lượng và trải bài Tarot...", mention_author=False)
 
         try:
-            # 1. Rút bài theo seed năng lượng vũ trụ theo khung giờ
+            # Lấy ngữ cảnh cũ (Trí nhớ bạn cũ) và danh sách lá bốc gần đây (Card Fatigue)
+            recent_ctx = await self.tarot_manager.get_user_recent_context(user.id)
+            fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(user.id)
+
+            # 1. Rút bài theo seed năng lượng vũ trụ theo khung giờ (kèm Card Fatigue)
             drawn_cards = draw_spread(
                 spread_key=spread_key,
                 user_id=user.id,
-                question=clean_question if clean_question else None
+                question=clean_question if clean_question else None,
+                fatigue_card_ids=fatigue_card_ids
             )
 
-            # 2. Zero-Latency Pre-fetch
+            # 2. Zero-Latency Pre-fetch (kèm Trí nhớ bạn cũ)
             ai_task = asyncio.create_task(
                 generate_tarot_reading(
                     spread_key=spread_key,
@@ -235,7 +242,8 @@ class TarotCog(commands.Cog):
                     question=clean_question if clean_question else None,
                     context=clean_context if clean_context else None,
                     reader_style=reader_key,
-                    user_name=user.display_name
+                    user_name=user.display_name,
+                    recent_context=recent_ctx
                 )
             )
 
@@ -413,6 +421,69 @@ class TarotCog(commands.Cog):
         await self._show_history(interaction.user, send_response, is_ephemeral=True)
 
     @app_commands.command(
+        name="tarot_recommend",
+        description="Gợi ý kiểu trải bài phù hợp nhất dựa trên câu hỏi của bạn"
+    )
+    @app_commands.describe(question="Nhập câu hỏi hoặc vấn đề bạn đang băn khoăn")
+    async def tarot_recommend_slash(self, interaction: discord.Interaction, question: str):
+        spread_key, spread_name, reason = recommend_spread_for_question(question)
+        embed = discord.Embed(
+            title="🧭 GỢI Ý KIỂU TRẢI BÀI TAROT",
+            description=f"**❓ Câu hỏi của bạn:**\n*{question}*\n\n"
+                        f"✨ **Kiểu trải bài đề xuất:** **{spread_name}** (`{spread_key}`)\n\n"
+                        f"💡 **Lý do gợi ý:**\n{reason}\n\n"
+                        f"👉 *Bạn có thể gõ `/tarot` hoặc `$m tarot {spread_key} {question}` để bắt đầu ngay!*",
+            color=0x8B5CF6
+        )
+        embed.set_footer(text="Gợi ý chiêm tinh thông minh MikeDaBot", icon_url=interaction.user.display_avatar.url)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(
+        name="tarot_memory",
+        description="Bật hoặc tắt tính năng AI nhớ ngữ cảnh các lần đọc trước (Trí nhớ bạn cũ)"
+    )
+    @app_commands.describe(status="Chọn bật hoặc tắt trí nhớ ngữ cảnh")
+    @app_commands.choices(status=[
+        app_commands.Choice(name="🟢 Bật trí nhớ (Nhớ mang máng chủ đề cũ)", value="on"),
+        app_commands.Choice(name="🔴 Tắt trí nhớ (Xem như người mới hoàn toàn)", value="off"),
+    ])
+    async def tarot_memory_slash(self, interaction: discord.Interaction, status: app_commands.Choice[str]):
+        is_on = (status.value == "on")
+        await self.tarot_manager.set_user_memory_preference(interaction.user.id, is_on)
+        if is_on:
+            msg = "🟢 **Đã BẬT trí nhớ bạn cũ:** Bot sẽ nhớ mang máng chủ đề và lá bài gần nhất để tạo cảm giác liên tục thân thiện."
+        else:
+            msg = "🔴 **Đã TẮT trí nhớ bạn cũ:** Bot sẽ không liên kết bất kỳ thông tin nào từ các quẻ bài trước đó của bạn."
+        await interaction.response.send_message(msg, ephemeral=True)
+
+    @app_commands.command(
+        name="tarot_forget",
+        description="Xóa sạch toàn bộ lịch sử bốc bài và dữ liệu ngữ cảnh của bạn khỏi hệ thống"
+    )
+    async def tarot_forget_slash(self, interaction: discord.Interaction):
+        await self.tarot_manager.clear_user_history(interaction.user.id)
+        await interaction.response.send_message(
+            "🧹 **Đã xóa sạch lịch sử:** Toàn bộ dữ liệu bốc bài và ngữ cảnh của bạn đã được xóa khỏi hệ thống!",
+            ephemeral=True
+        )
+
+    @app_commands.command(
+        name="tarot_weekly_setup",
+        description="Cài đặt kênh nhận Lá Bài Tuần của Server vào sáng Thứ Hai (Quản trị viên)"
+    )
+    @app_commands.describe(channel="Kênh text muốn nhận thông điệp tuần")
+    @app_commands.default_permissions(manage_guild=True)
+    async def tarot_weekly_setup_slash(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        if not interaction.guild:
+            await interaction.response.send_message("❌ Lệnh này chỉ dùng trong Server!", ephemeral=True)
+            return
+        await self.tarot_manager.set_weekly_guild_channel(interaction.guild.id, channel.id)
+        await interaction.response.send_message(
+            f"✨ **Cài đặt thành công:** Kênh {channel.mention} sẽ nhận **Lá Bài Năng Lượng Tuần Mới** vào mỗi sáng Thứ Hai (08:00 GMT+7)!",
+            ephemeral=True
+        )
+
+    @app_commands.command(
         name="tarot_help",
         description="Xem hướng dẫn chi tiết về 9 kiểu trải bài, 3 Reader và cách bốc bài Tarot"
     )
@@ -465,13 +536,54 @@ class TarotCog(commands.Cog):
             await self._show_history(ctx.author, send_reply, is_ephemeral=False)
             return
 
-        # 3. Xem hướng dẫn
+        # 3. Gợi ý trải bài
+        if spread_arg.lower() in ["recommend", "rec", "goiy", "tuvan"]:
+            if not rest:
+                await ctx.reply("❓ Vui lòng nhập câu hỏi để bot gợi ý trải bài! Ví dụ: `$m tarot recommend Tôi có nên chuyển việc không?`", mention_author=False)
+                return
+            s_key, s_name, reason = recommend_spread_for_question(rest)
+            embed = discord.Embed(
+                title="🧭 GỢI Ý KIỂU TRẢI BÀI TAROT",
+                description=f"**❓ Câu hỏi:** *{rest}*\n\n✨ **Đề xuất:** **{s_name}** (`{s_key}`)\n💡 **Lý do:** {reason}",
+                color=0x8B5CF6
+            )
+            await ctx.reply(embed=embed, mention_author=False)
+            return
+
+        # 4. Bật/Tắt Memory
+        if spread_arg.lower() in ["memory", "bonho"]:
+            is_on = rest and rest.lower() in ["on", "bat", "true", "1"]
+            await self.tarot_manager.set_user_memory_preference(ctx.author.id, is_on)
+            state_text = "🟢 Đã BẬT" if is_on else "🔴 Đã TẮT"
+            await ctx.reply(f"{state_text} tính năng trí nhớ bạn cũ.", mention_author=False)
+            return
+
+        # 5. Xóa lịch sử
+        if spread_arg.lower() in ["forget", "xoa", "clear"]:
+            await self.tarot_manager.clear_user_history(ctx.author.id)
+            await ctx.reply("🧹 Đã xóa sạch toàn bộ lịch sử bốc bài của bạn khỏi hệ thống!", mention_author=False)
+            return
+
+        # 6. Cài đặt kênh nhận bài tuần cho server
+        if spread_arg.lower() in ["weekly_setup", "weekly", "setup_weekly", "baituan"]:
+            if not ctx.guild:
+                await ctx.reply("❌ Lệnh này chỉ dùng được trong Server!", mention_author=False)
+                return
+            if not ctx.author.guild_permissions.manage_guild:
+                await ctx.reply("❌ Bạn cần có quyền `Manage Server` để cài đặt tính năng này!", mention_author=False)
+                return
+            target_channel = ctx.message.channel_mentions[0] if ctx.message.channel_mentions else ctx.channel
+            await self.tarot_manager.set_weekly_guild_channel(ctx.guild.id, target_channel.id)
+            await ctx.reply(f"✨ Đã cài đặt kênh {target_channel.mention} nhận **Lá Bài Tuần Mới** vào 08:00 sáng Thứ Hai hàng tuần!", mention_author=False)
+            return
+
+        # 7. Xem hướng dẫn
         if spread_arg.lower() in ["help", "huongdan", "h"]:
             from bot_instance import send_bot_help
             await send_bot_help(ctx, feature="tarot")
             return
 
-        # 4. Kiểm tra xem spread_arg có khớp với kiểu trải bài nào không
+        # 7. Kiểm tra xem spread_arg có khớp với kiểu trải bài nào không
         spread_lower = spread_arg.lower()
         if spread_lower in SPREAD_ALIASES:
             spread_key = SPREAD_ALIASES[spread_lower]
@@ -486,7 +598,7 @@ class TarotCog(commands.Cog):
             )
             return
 
-        # 5. Nếu spread_arg không khớp kiểu trải bài nào -> Người dùng có thể đã nhập thẳng câu hỏi
+        # 8. Nếu spread_arg không khớp kiểu trải bài nào -> Người dùng có thể đã nhập thẳng câu hỏi
         full_query = f"{spread_arg} {rest or ''}".strip()
         user_avatar = ctx.author.display_avatar.url if ctx.author.display_avatar else None
         launcher = TarotLauncherView(
@@ -494,7 +606,7 @@ class TarotCog(commands.Cog):
             author_name=ctx.author.display_name,
             author_avatar_url=user_avatar,
             tarot_manager=self.tarot_manager,
-            selected_spread="single",  # Mặc định Single Card nếu có câu hỏi
+            selected_spread="single",
             selected_reader="random",
             question=full_query
         )
@@ -516,6 +628,62 @@ class TarotCog(commands.Cog):
             kwargs.pop("ephemeral", None)
             await ctx.reply(*args, mention_author=False, **kwargs)
         await self._show_history(ctx.author, send_reply, is_ephemeral=False)
+
+    # =========================================================================
+    # 3. BACKGROUND TASKS (Lá bài tuần của Server)
+    # =========================================================================
+    @tasks.loop(minutes=30)
+    async def weekly_card_loop(self):
+        """Kiểm tra và gửi lá bài tuần cho các server vào 08:00 sáng Thứ Hai (GMT+7)."""
+        now_vn = datetime.now(VN_TZ)
+        if now_vn.weekday() != 0 or now_vn.hour < 8:
+            return
+
+        current_week_str = now_vn.strftime("%Y-W%W")
+        configs = await self.tarot_manager.get_weekly_guild_configs()
+        for cfg in configs:
+            guild_id = cfg["guild_id"]
+            channel_id = cfg["channel_id"]
+            last_sent = cfg.get("last_sent_week", "")
+
+            if last_sent == current_week_str:
+                continue
+
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                continue
+
+            try:
+                drawn_cards = draw_spread("daily", user_id=guild_id, question="Năng lượng tuần mới của máy chủ")
+                ai_res = await generate_tarot_reading(
+                    spread_key="daily",
+                    drawn_cards=drawn_cards,
+                    question="Năng lượng và thông điệp tuần mới cho toàn thể cộng đồng máy chủ",
+                    reader_style="neutral",
+                    user_name="Cộng Đồng Server"
+                )
+                ai_reading = ai_res[0] if isinstance(ai_res, tuple) else ai_res
+
+                img_bytes = await asyncio.to_thread(render_spread_to_bytes, "daily", drawn_cards, {0})
+                file = discord.File(fp=img_bytes, filename="weekly_tarot.png")
+
+                embed = discord.Embed(
+                    title=f"🌟 LÁ BÀI TUẦN MỚI CHO MÁY CHỦ ({now_vn.strftime('%d/%m/%Y')})",
+                    description=f"**🎴 Lá Bài Đại Diện:** **{drawn_cards[0].card.name_vi}** (*{drawn_cards[0].card.name_en}*)\n\n{ai_reading}",
+                    color=0xDAA520
+                )
+                embed.set_image(url="attachment://weekly_tarot.png")
+                embed.set_footer(text="Năng lượng chiêm tinh tuần mới • Chúc cả server một tuần ngập tràn may mắn!")
+
+                await channel.send(embed=embed, file=file)
+                await self.tarot_manager.update_weekly_guild_sent(guild_id, current_week_str)
+                print(f"✅ [Weekly Tarot] Đã gửi bài tuần cho server ID: {guild_id}", flush=True)
+            except Exception as e:
+                print(f"⚠️ [Weekly Tarot] Lỗi gửi bài tuần cho server {guild_id}: {e}", flush=True)
+
+    @weekly_card_loop.before_loop
+    async def before_weekly_card_loop(self):
+        await self.bot.wait_until_ready()
 
 
 async def setup(bot: commands.Bot):

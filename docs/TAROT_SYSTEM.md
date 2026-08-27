@@ -92,16 +92,15 @@ Toàn bộ mã nguồn tính năng Tarot nằm trong thư mục `features/tarot/
 ```
 features/tarot/
 ├── __init__.py
-├── deck.py          # 78 lá bài Tarot, từ điển ý nghĩa, định nghĩa trải bài & Reader
-├── renderer.py      # Bộ sinh đồ họa ảnh bài (Pillow), xếp layout đa dạng
-├── ai.py            # Tích hợp Google Gemini AI, kỹ thuật Prompting & Fallback
-├── tarot_view.py    # UI Discord (Buttons, Selects, Interactive Card Flipping)
-├── manager.py       # Quản lý SQLite DB, lịch sử bốc bài, Daily Cooldown
-├── cog.py           # Điều phối Slash commands, Prefix commands & Autocomplete
-└── assets/          # Khung viền đồ họa, Card back, Element icons
+├── deck.py          # 78 lá bài Tarot, từ điển ý nghĩa, định nghĩa trải bài, Reader & Card Fatigue
+├── flavor.py        # [NEW] Phát hiện combo hiếm, Easter eggs & sinh Flavor Text huyền bí
+├── renderer.py      # Bộ sinh đồ họa ảnh bài (Pillow), xếp layout đa dạng & In-memory Cache
+├── ai.py            # Gemini AI: Structured JSON output, Trí nhớ bạn cũ, Follow-up & Semaphore
+├── tarot_view.py    # UI Discord: Lật bài, Micro-interpretation, Follow-up Modal & Rating Buttons
+├── manager.py       # Quản lý Turso Cloud LibSQL / SQLite DB, Lịch sử, Cooldown, Ratings & Preferences
+├── cog.py           # Điều phối Slash commands, Prefix commands, Memory/Forget & Weekly Card Loop
+└── assets/          # Thư mục chứa tài nguyên ảnh bài & font chữ Unicode
 ```
-
----
 
 ### 3.1. Module Dữ Liệu Bài (`deck.py`)
 - **Lớp dữ liệu `TarotCard`**: Đại diện cho 1 lá bài với các trường:

@@ -14,7 +14,8 @@ from features.tarot.deck import (
     draw_spread
 )
 from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading
+from features.tarot.ai import generate_tarot_reading, generate_followup_answer
+from features.tarot.flavor import detect_spread_flavor
 from features.tarot.manager import TarotManager
 from core.ai import split_text
 
@@ -351,10 +352,15 @@ class TarotLauncherView(discord.ui.View):
         except Exception:
             pass
 
+        # Lấy ngữ cảnh cũ (Trí nhớ bạn cũ) và danh sách lá bốc gần đây (Card Fatigue)
+        recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
+        fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
+
         drawn_cards = draw_spread(
             spread_key=self.selected_spread,
             user_id=self.author_id,
-            question=self.question
+            question=self.question,
+            fatigue_card_ids=fatigue_card_ids
         )
         spread_info = SPREAD_DEFINITIONS[self.selected_spread]
 
@@ -370,7 +376,8 @@ class TarotLauncherView(discord.ui.View):
                 question=self.question,
                 context=self.context,
                 reader_style=actual_reader,
-                user_name=self.author_name
+                user_name=self.author_name,
+                recent_context=recent_ctx
             )
         )
 
@@ -568,6 +575,143 @@ class TarotLauncherView(discord.ui.View):
             pass
 
 
+class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Quẻ Bài"):
+    """Modal Discord cho phép người dùng hỏi thêm 1 câu đào sâu về quẻ bài vừa rút."""
+
+    def __init__(
+        self,
+        author_id: int,
+        drawn_cards: List[DrawnCard],
+        original_question: Optional[str],
+        original_reading: str,
+        reader_style: str,
+        user_name: str
+    ):
+        super().__init__()
+        self.author_id = author_id
+        self.drawn_cards = drawn_cards
+        self.original_question = original_question
+        self.original_reading = original_reading
+        self.reader_style = reader_style
+        self.user_name = user_name
+
+        self.followup_input = discord.ui.TextInput(
+            label="Điều bạn muốn làm rõ thêm về quẻ bài này",
+            style=discord.TextStyle.paragraph,
+            placeholder="Ví dụ: Lá bài này có ý nghĩa gì với kế hoạch tháng tới của mình?",
+            required=True,
+            max_length=250
+        )
+        self.add_item(self.followup_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        question_text = self.followup_input.value.strip()
+
+        answer = await generate_followup_answer(
+            drawn_cards=self.drawn_cards,
+            original_question=self.original_question,
+            original_reading=self.original_reading,
+            user_followup_question=question_text,
+            reader_style=self.reader_style,
+            user_name=self.user_name
+        )
+
+        embed = discord.Embed(
+            title=f"❓ GIẢI ĐÁP BỔ SUNG CHO {self.user_name.upper()}",
+            description=f"**Thắc mắc:** *\"{question_text}\"*\n\n{answer}",
+            color=0x8B5CF6
+        )
+        embed.set_footer(text="Phản hồi bổ sung từ Tarot Reader", icon_url=interaction.user.display_avatar.url)
+        await interaction.followup.send(embed=embed)
+
+
+class TarotResultActionView(discord.ui.View):
+    """View tương tác sau khi hoàn tất quẻ bài: Nút Hỏi Thêm AI & Nút Đánh Giá Luận Giải 👍/👎."""
+
+    def __init__(
+        self,
+        author_id: int,
+        author_name: str,
+        drawn_cards: List[DrawnCard],
+        question: Optional[str],
+        ai_reading: str,
+        reader_style: str,
+        spread_key: str,
+        tarot_manager: TarotManager,
+        guild_id: Optional[int] = None,
+        timeout: float = 600.0
+    ):
+        super().__init__(timeout=timeout)
+        self.author_id = author_id
+        self.author_name = author_name
+        self.drawn_cards = drawn_cards
+        self.question = question
+        self.ai_reading = ai_reading
+        self.reader_style = reader_style
+        self.spread_key = spread_key
+        self.tarot_manager = tarot_manager
+        self.guild_id = guild_id
+        self.has_asked_followup = False
+
+    @discord.ui.button(label="❓ Hỏi Thêm Ý Nghĩa", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
+    async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể hỏi thêm về quẻ bài này!", ephemeral=True)
+            return
+
+        if self.has_asked_followup:
+            await interaction.response.send_message("⚠️ Bạn đã sử dụng lượt hỏi thêm cho quẻ bài này rồi!", ephemeral=True)
+            return
+
+        modal = TarotFollowupModal(
+            author_id=self.author_id,
+            drawn_cards=self.drawn_cards,
+            original_question=self.question,
+            original_reading=self.ai_reading,
+            reader_style=self.reader_style,
+            user_name=self.author_name
+        )
+        await interaction.response.send_modal(modal)
+        self.has_asked_followup = True
+        button.disabled = True
+        try:
+            await interaction.message.edit(view=self)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
+    async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể đánh giá luận giải!", ephemeral=True)
+            return
+        await self.tarot_manager.save_rating(self.author_id, self.guild_id, self.spread_key, self.reader_style, is_positive=True)
+        await interaction.response.send_message("💖 Cảm ơn bạn đã gửi phản hồi tích cực!", ephemeral=True)
+        self._disable_rating_buttons()
+        try:
+            await interaction.message.edit(view=self)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="👎 Chưa chuẩn", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_neg", row=0)
+    async def rate_neg_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể đánh giá luận giải!", ephemeral=True)
+            return
+        await self.tarot_manager.save_rating(self.author_id, self.guild_id, self.spread_key, self.reader_style, is_positive=False)
+        await interaction.response.send_message("📝 Đã ghi nhận phản hồi của bạn để cải thiện luận giải tốt hơn!", ephemeral=True)
+        self._disable_rating_buttons()
+        try:
+            await interaction.message.edit(view=self)
+        except Exception:
+            pass
+
+    def _disable_rating_buttons(self):
+        for item in self.children:
+            if getattr(item, "custom_id", "") in ["tarot_rate_pos", "tarot_rate_neg"]:
+                item.disabled = True
+
+
 class TarotFlipView(discord.ui.View):
     """
     View tương tác Gamification: Cho phép người dùng bấm từng nút để lật mở từng lá bài,
@@ -747,6 +891,11 @@ class TarotFlipView(discord.ui.View):
             desc_cards.append(WIDE_DIVIDER)
             desc_cards.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines))
 
+            # Phát hiện Flavor Text / Easter Egg combo hiếm
+            flavor_text = detect_spread_flavor(self.drawn_cards)
+            if flavor_text:
+                desc_cards.append(f"\n{WIDE_DIVIDER}\n{flavor_text}")
+
             embed_cards = discord.Embed(
                 title=f"🔮 TRẢI BÀI TAROT: {self.spread_info['name'].upper()}",
                 description="\n".join(desc_cards),
@@ -783,7 +932,11 @@ class TarotFlipView(discord.ui.View):
                             pass
 
             # Await bài luận giải thông điệp
-            ai_reading = await self.ai_task
+            ai_res = await self.ai_task
+            if isinstance(ai_res, tuple):
+                ai_reading, topic_tag = ai_res
+            else:
+                ai_reading, topic_tag = ai_res, "general"
 
             # Ghi nhận hoạt động vào Live Activity Logger
             try:
@@ -809,6 +962,7 @@ class TarotFlipView(discord.ui.View):
                     details={
                         "spread": self.spread_key,
                         "reader": self.reader_style,
+                        "topic_tag": topic_tag,
                         "cards": [c.card.name_vi for c in self.drawn_cards]
                     }
                 )
@@ -827,7 +981,8 @@ class TarotFlipView(discord.ui.View):
                 spread_type=self.spread_key,
                 question=saved_q,
                 drawn_cards=self.drawn_cards,
-                ai_reading=ai_reading
+                ai_reading=ai_reading,
+                topic_tag=topic_tag
             )
 
             # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
@@ -854,26 +1009,39 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
-            # Cập nhật kết quả bài giải đầy đủ lên Discord
+            # View tương tác sau khi hoàn tất quẻ bài (Hỏi thêm AI & Đánh giá)
+            action_view = TarotResultActionView(
+                author_id=self.author_id,
+                author_name=self.author_name,
+                drawn_cards=self.drawn_cards,
+                question=self.question,
+                ai_reading=ai_reading,
+                reader_style=self.reader_style,
+                spread_key=self.spread_key,
+                tarot_manager=self.tarot_manager,
+                guild_id=self.guild_id
+            )
+
+            # Cập nhật kết quả bài giải đầy đủ lên Discord kèm Action View
             try:
                 if not sent_image_already:
                     await interaction.edit_original_response(
                         embeds=final_embeds,
                         attachments=[file],
-                        view=None
+                        view=action_view
                     )
                 else:
                     await interaction.edit_original_response(
                         embeds=final_embeds,
-                        view=None
+                        view=action_view
                     )
             except Exception:
                 if self.message:
                     try:
                         if not sent_image_already:
-                            await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
+                            await self.message.edit(embeds=final_embeds, attachments=[file], view=action_view)
                         else:
-                            await self.message.edit(embeds=final_embeds, view=None)
+                            await self.message.edit(embeds=final_embeds, view=action_view)
                     except Exception as ex:
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
             self.stop()
@@ -941,7 +1109,12 @@ class TarotFlipView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
 
-            ai_reading = await self.ai_task
+            ai_res = await self.ai_task
+            if isinstance(ai_res, tuple):
+                ai_reading, topic_tag = ai_res
+            else:
+                ai_reading, topic_tag = ai_res, "general"
+
             image_buffer = await asyncio.to_thread(
                 render_spread_to_bytes,
                 self.spread_key,
@@ -954,8 +1127,11 @@ class TarotFlipView(discord.ui.View):
             cards_summary_lines = []
             for drawn in self.drawn_cards:
                 orient = "`[NGƯỢC]`" if drawn.is_reversed else "`[XUÔI]`"
+                kw = drawn.card.keywords_reversed if drawn.is_reversed else drawn.card.keywords_upright
+                kw_text = ", ".join(kw[:3]) if kw else ""
+                kw_part = f"\n  ↳ ✨ *Từ khóa:* `{kw_text}`" if kw_text else ""
                 cards_summary_lines.append(
-                    f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
+                    f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}{kw_part}"
                 )
 
             # --- EMBED 1: QUẺ RÚT & HÌNH ẢNH TRẢI BÀI ---
@@ -972,12 +1148,32 @@ class TarotFlipView(discord.ui.View):
             desc_cards.append(WIDE_DIVIDER)
             desc_cards.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines))
 
+            flavor_text = detect_spread_flavor(self.drawn_cards)
+            if flavor_text:
+                desc_cards.append(f"\n{WIDE_DIVIDER}\n{flavor_text}")
+
             embed_cards = discord.Embed(
                 title=f"🔮 TRẢI BÀI TAROT: {self.spread_info['name'].upper()}",
                 description="\n".join(desc_cards),
                 color=self.embed_color
             )
             embed_cards.set_image(url="attachment://tarot_spread.png")
+
+            # Lưu vào Database
+            if self.spread_key == "daily":
+                await self.tarot_manager.record_daily_draw(self.author_id, self.drawn_cards[0])
+
+            saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
+            await self.tarot_manager.save_tarot_history(
+                user_id=self.author_id,
+                guild_id=self.guild_id,
+                channel_id=self.channel_id,
+                spread_type=self.spread_key,
+                question=saved_q,
+                drawn_cards=self.drawn_cards,
+                ai_reading=ai_reading,
+                topic_tag=topic_tag
+            )
 
             # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
             chunks = split_text(ai_reading, limit=4000)
@@ -1003,8 +1199,20 @@ class TarotFlipView(discord.ui.View):
                     )
                 final_embeds.append(emb_reading)
 
+            action_view = TarotResultActionView(
+                author_id=self.author_id,
+                author_name=self.author_name,
+                drawn_cards=self.drawn_cards,
+                question=self.question,
+                ai_reading=ai_reading,
+                reader_style=self.reader_style,
+                spread_key=self.spread_key,
+                tarot_manager=self.tarot_manager,
+                guild_id=self.guild_id
+            )
+
             if self.message:
-                await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
+                await self.message.edit(embeds=final_embeds, attachments=[file], view=action_view)
         except Exception as e:
             print(f"[TarotFlipView] Lỗi on_timeout: {e}", flush=True)
 
