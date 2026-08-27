@@ -36,18 +36,11 @@ class ConfigManager:
         self._proxy_cache: dict[str, tuple[list | None, float]] = {}
         # Set guild bị tạm ngưng (suspended) để tra cứu O(1) tức thì
         self._suspended_guilds: set[int] = set()
-        self._db_path = str(app_config.DB_PATH)
-        self._db: aiosqlite.Connection | None = None
 
-    async def _get_db(self) -> aiosqlite.Connection:
-        """Lấy kết nối persistent, tạo mới nếu chưa có hoặc khi chuyển đổi event loop."""
-        current_loop = asyncio.get_running_loop()
-        if self._db is None or getattr(self._db, '_loop', None) != current_loop:
-            self._db = await aiosqlite.connect(self._db_path)
-            # Tối ưu hiệu năng SQLite cho workload đọc nhiều
-            await self._db.execute("PRAGMA journal_mode=WAL")
-            await self._db.execute("PRAGMA synchronous=NORMAL")
-        return self._db
+    async def _get_db(self):
+        """Lấy client kết nối đa tầng (Turso Cloud LibSQL / Local SQLite)."""
+        from core.db import db_client
+        return db_client
 
     async def init_db(self) -> None:
         """Khởi tạo các bảng cấu hình, proxy domains và danh sách server tạm ngưng."""
@@ -93,9 +86,8 @@ class ConfigManager:
 
     async def close(self) -> None:
         """Đóng kết nối database nếu đang mở."""
-        if self._db is not None:
-            await self._db.close()
-            self._db = None
+        from core.db import db_client
+        await db_client.close()
 
     def _is_valid(self, cache_entry: tuple | None) -> bool:
         """Kiểm tra xem mục cache còn hạn không."""

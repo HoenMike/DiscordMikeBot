@@ -214,8 +214,20 @@ async def generate_tarot_reading(
             last_error = e
             print(f"⚠️ [Tarot AI] Model '{model_name}' gặp sự cố ({type(e).__name__}): {e}. Chuyển sang model tiếp theo...", flush=True)
 
-    print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Lỗi cuối: {last_error}", flush=True)
-    return (
-        "🌌 **Tín hiệu vũ trụ bị gián đoạn:** Nguồn năng lượng từ vũ trụ hiện đang bị nhiễu động tạm thời.\n"
-        "Tuy nhiên bạn vẫn có thể dựa vào hình ảnh và các lá bài phía trên để tự chiêm nghiệm câu trả lời cho riêng mình!"
+    print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Sử dụng bộ luận giải chiêm tinh cổ điển từ điển Tarot...", flush=True)
+    fallback_parts = [
+        "📖 **BÀI LUẬN GIẢI CHIÊM TINH (TỪ ĐIỂN TAROT CỔ ĐIỂN):**\n"
+    ]
+    for c in cards:
+        orient_str = "Ngược" if c.is_reversed else "Xuôi"
+        meaning = c.card.meaning_reversed if c.is_reversed else c.card.meaning_upright
+        kw = c.card.keywords_reversed if c.is_reversed else c.card.keywords_upright
+        fallback_parts.append(
+            f"**🎴 {c.position_title} — {c.card.name_vi} ({orient_str}):**\n"
+            f"• *Từ khóa:* {', '.join(kw)}\n"
+            f"• *Ý nghĩa:* {meaning}\n"
+        )
+    fallback_parts.append(
+        "💡 **Lời khuyên tổng kết:** Hãy nhìn nhận thông điệp từ góc độ khách quan, lắng nghe trực giác và đưa ra quyết định phù hợp nhất với hành trình của bạn!"
     )
+    return "\n".join(fallback_parts)

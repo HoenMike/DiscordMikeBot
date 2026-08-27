@@ -140,6 +140,11 @@
                     <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
                     <span>Tổng Quan Hệ Thống</span>
                 </button>
+                <button onclick="switchTab('tarot')" id="tab-btn-tarot" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400"></i>
+                    <span>Tarot Cooldowns</span>
+                    <span id="badge-total-cooldowns" class="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-500/20 text-purple-300 font-mono">0</span>
+                </button>
                 <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
                     <span>Console Logs</span>
@@ -387,7 +392,56 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- TAB 4: LIVE CONSOLE LOGS -->
+        <!-- TAB 4: TAROT DAILY COOLDOWNS -->
+        <!-- ========================================== -->
+        <section id="tab-content-tarot" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
+            <!-- Toolbar -->
+            <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-dark-card border border-dark-border rounded-xl p-2.5">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-white">Quản Lý Cooldown Daily Tarot</span>
+                            <span id="tarot-cooldown-count-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-500/20 text-purple-300 font-mono font-semibold">0 người</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Người dùng đã rút Daily Card hôm nay (GMT+7) được lưu trên Cloud Turso. Bạn có thể gỡ cooldown tức thì tại đây.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="relative flex items-center">
+                        <input 
+                            type="text" 
+                            id="manual-user-id-input" 
+                            placeholder="Nhập User ID..." 
+                            class="w-36 sm:w-44 pl-2.5 pr-14 py-1 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        >
+                        <button onclick="handleManualResetCooldown()" class="absolute right-1 px-2 py-0.5 text-[10px] font-semibold rounded bg-purple-600 hover:bg-purple-500 text-white transition-all">
+                            Gỡ ID
+                        </button>
+                    </div>
+                    <button onclick="handleResetAllCooldowns()" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all active:scale-95">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                        <span>Gỡ tất cả hôm nay</span>
+                    </button>
+                    <button onclick="fetchTarotCooldowns()" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-all">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span>Làm mới</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cooldowns Grid / Cards Container -->
+            <div class="flex-1 min-h-0 bg-dark-card border border-dark-border rounded-xl p-3 overflow-y-auto">
+                <div id="tarot-cooldowns-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Cards populated via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: LIVE CONSOLE LOGS -->
         <!-- ========================================== -->
         <section id="tab-content-logs" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
             <!-- Toolbar -->
@@ -764,6 +818,8 @@
                 initLatencyChart();
             } else if (tab === 'guilds') {
                 fetchGuildsData();
+            } else if (tab === 'tarot') {
+                fetchTarotCooldowns();
             }
             lucide.createIcons();
         }
@@ -1198,6 +1254,154 @@
         }
 
         // ==========================================
+        // TAROT DAILY COOLDOWNS MANAGEMENT
+        // ==========================================
+        let cachedTarotCooldowns = [];
+
+        async function fetchTarotCooldowns() {
+            try {
+                const res = await fetch('/api/tarot/cooldowns');
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                const data = await res.json();
+                cachedTarotCooldowns = data.cooldowns || [];
+                renderTarotCooldowns();
+
+                // Update Badges
+                const countBadge = document.getElementById('tarot-cooldown-count-badge');
+                if (countBadge) countBadge.textContent = `${data.total || 0} người`;
+                const tabBadge = document.getElementById('badge-total-cooldowns');
+                if (tabBadge) tabBadge.textContent = data.total || 0;
+            } catch (err) {
+                console.error("Lỗi khi nạp Tarot cooldowns:", err);
+            }
+        }
+
+        function renderTarotCooldowns() {
+            const container = document.getElementById('tarot-cooldowns-grid');
+            if (!container) return;
+
+            if (cachedTarotCooldowns.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-16 flex flex-col items-center justify-center text-center">
+                        <div class="p-3.5 rounded-2xl bg-purple-500/10 text-purple-400 mb-3 border border-purple-500/20">
+                            <i data-lucide="sparkles" class="w-8 h-8 opacity-80"></i>
+                        </div>
+                        <h3 class="font-bold text-sm text-white mb-1">Không có ai đang dính Cooldown hôm nay</h3>
+                        <p class="text-xs text-slate-400 max-w-md">Chưa có ai bốc Daily Card hôm nay hoặc tất cả người dùng đều đã được gỡ cooldown sẵn sàng bốc bài mới.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = cachedTarotCooldowns.map(item => {
+                return `
+                    <div class="p-3.5 rounded-xl bg-dark-surface/80 border border-purple-500/30 flex flex-col justify-between gap-3 shadow-lg hover:border-purple-500/50 transition-all">
+                        <!-- Top: User Info -->
+                        <div class="flex items-start gap-3">
+                            <img src="${escapeHtml(item.avatar_url)}" alt="Avatar" class="w-10 h-10 rounded-full object-cover border border-purple-500/30 flex-shrink-0" onerror="this.src='https://ui-avatars.com/api/?name=${item.user_id}&background=8b5cf6&color=fff'">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1 mb-0.5">
+                                    <h4 class="font-bold text-xs text-white truncate" title="${escapeHtml(item.display_name)}">${escapeHtml(item.display_name)}</h4>
+                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">Đang Cooldown</span>
+                                </div>
+                                <div class="text-[10px] text-slate-400 code-font truncate">@${escapeHtml(item.username)} • ID: ${item.user_id}</div>
+                            </div>
+                        </div>
+
+                        <!-- Card Drawn Info -->
+                        <div class="py-2 px-2.5 rounded-lg bg-dark-bg/80 border border-dark-border/80 text-[11px] space-y-1">
+                            <div class="flex items-center gap-1.5 text-purple-300 font-semibold truncate">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400 flex-shrink-0"></i>
+                                <span class="truncate">${escapeHtml(item.card_title)}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-0.5 border-t border-dark-border/40">
+                                <span>Giờ bốc:</span>
+                                <span class="text-slate-300 code-font">${escapeHtml(item.drawn_at || item.updated_at)}</span>
+                            </div>
+                        </div>
+
+                        <!-- Action Controls -->
+                        <div class="pt-0.5">
+                            <button onclick="handleResetCooldown('${item.user_id}', '${escapeHtml(item.display_name)}')" class="w-full inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold bg-purple-600/20 hover:bg-purple-600 text-purple-200 hover:text-white border border-purple-500/40 hover:border-purple-600 transition-all active:scale-95 shadow-sm">
+                                <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                                <span>Gỡ Cooldown Ngày</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        async function handleResetCooldown(userId, displayName) {
+            showConfirmModal({
+                title: "Gỡ Daily Cooldown Cho Người Dùng",
+                message: `Bạn có chắc muốn gỡ Cooldown bốc bài Daily hôm nay cho "${displayName}" (ID: ${userId})?\n\nNgười dùng này sẽ có thể gõ lệnh bốc bài Tarot ngày mới ngay lập tức!`,
+                confirmText: "Gỡ Cooldown",
+                isDanger: false,
+                onConfirm: async () => {
+                    try {
+                        const res = await fetch('/api/tarot/reset-cooldown', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: userId })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(`Đã gỡ Cooldown ngày cho "${displayName}" thành công!`, "success");
+                            await fetchTarotCooldowns();
+                        } else {
+                            showToast("Lỗi: " + data.error, "error");
+                        }
+                    } catch (err) {
+                        showToast("Lỗi kết nối khi gỡ Cooldown.", "error");
+                    }
+                }
+            });
+        }
+
+        async function handleResetAllCooldowns() {
+            showConfirmModal({
+                title: "Gỡ Toàn Bộ Daily Cooldown Hôm Nay",
+                message: "⚠️ Bạn có chắc muốn gỡ bỏ toàn bộ Cooldown bốc bài Daily cho tất cả người dùng hôm nay?\n\nMọi người trong tất cả server đều có thể bốc lại quẻ ngày mới.",
+                confirmText: "Gỡ tất cả",
+                isDanger: true,
+                onConfirm: async () => {
+                    try {
+                        const res = await fetch('/api/tarot/reset-all-cooldowns', {
+                            method: 'POST'
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast("Đã gỡ toàn bộ Daily Cooldown hôm nay cho tất cả user!", "success");
+                            await fetchTarotCooldowns();
+                        } else {
+                            showToast("Lỗi: " + data.error, "error");
+                        }
+                    } catch (err) {
+                        showToast("Lỗi kết nối khi gỡ toàn bộ Cooldown.", "error");
+                    }
+                }
+            });
+        }
+
+        async function handleManualResetCooldown() {
+            const input = document.getElementById('manual-user-id-input');
+            const uid = (input.value || '').trim();
+            if (!uid || !/^\d+$/.test(uid)) {
+                showToast("Vui lòng nhập User ID Discord hợp lệ (chuỗi số)!", "warning");
+                return;
+            }
+            handleResetCooldown(uid, "User ID " + uid);
+            input.value = "";
+        }
+
+        // ==========================================
         // CONSOLE LOGS
         // ==========================================
         function renderLogs() {
@@ -1420,6 +1624,11 @@
                     }
                 }
 
+                // 3. Fetch Tarot Cooldowns nếu đang ở tab tarot hoặc định kỳ cập nhật badge
+                if (currentTab === 'tarot') {
+                    fetchTarotCooldowns();
+                }
+
             } catch (err) {
                 console.error("Lỗi khi cập nhật dữ liệu Web Console:", err);
             }
@@ -1430,6 +1639,7 @@
             lucide.createIcons();
             fetchDashboardData();
             fetchGuildsData();
+            fetchTarotCooldowns();
             setInterval(fetchDashboardData, 3000);
         });
     </script>

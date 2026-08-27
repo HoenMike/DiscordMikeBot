@@ -146,6 +146,10 @@ DATA_DIR = pathlib.Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "bot_config.db"
 
+# Cấu hình Turso Cloud SQLite (Persistent Cloud Storage)
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "libsql://mikebotdb-hoenmike.aws-ap-northeast-1.turso.io")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
+
 # Stats variables
 start_time = datetime.now(timezone.utc)
 summary_count = 0

@@ -309,3 +309,72 @@ def api_leave_guild():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+# ==========================================
+# 6. TAROT COOLDOWNS MANAGEMENT APIS
+# ==========================================
+@app.route('/api/tarot/cooldowns')
+@login_required
+def api_tarot_cooldowns():
+    from features.tarot.manager import TarotManager
+    tm = TarotManager()
+    try:
+        items = run_coroutine_safe(tm.get_active_daily_cooldowns())
+        enriched = []
+        for item in items:
+            uid = item["user_id"]
+            u = bot.get_user(uid) if bot.is_ready() else None
+            card = item.get("card_data", {})
+            name_vi = card.get("name_vi", "Lá bài")
+            name_en = card.get("name_en", "")
+            is_rev = card.get("is_reversed", False)
+            drawn_at = card.get("drawn_at", "")
+
+            enriched.append({
+                "user_id": str(uid),
+                "username": u.name if u else f"User {uid}",
+                "display_name": u.display_name if u else f"User {uid}",
+                "avatar_url": u.display_avatar.url if (u and u.display_avatar) else f"https://ui-avatars.com/api/?name={uid}&background=8b5cf6&color=fff",
+                "card_title": f"{name_vi} ({'[NGƯỢC]' if is_rev else '[XUÔI]'})" if name_vi else "Đã bốc bài",
+                "card_name_en": name_en,
+                "drawn_at": drawn_at,
+                "last_daily_date": item["last_daily_date"],
+                "updated_at": item["updated_at"]
+            })
+        return jsonify({"total": len(enriched), "cooldowns": enriched})
+    except Exception as e:
+        return jsonify({"total": 0, "cooldowns": [], "error": str(e)}), 500
+
+
+@app.route('/api/tarot/reset-cooldown', methods=['POST'])
+@login_required
+def api_tarot_reset_cooldown():
+    data = request.get_json(silent=True) or {}
+    user_id = int(data.get("user_id", 0))
+
+    if not user_id:
+        return jsonify({"success": False, "error": "Thiếu user_id"}), 400
+
+    from features.tarot.manager import TarotManager
+    tm = TarotManager()
+    try:
+        run_coroutine_safe(tm.reset_daily_cooldown(user_id))
+        print(f"✨ [Admin Console] Đã gỡ Daily Cooldown cho User ID: {user_id}", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/tarot/reset-all-cooldowns', methods=['POST'])
+@login_required
+def api_tarot_reset_all_cooldowns():
+    from features.tarot.manager import TarotManager
+    tm = TarotManager()
+    try:
+        run_coroutine_safe(tm.reset_all_daily_cooldowns())
+        print("✨ [Admin Console] Đã gỡ toàn bộ Daily Cooldown hôm nay.", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+

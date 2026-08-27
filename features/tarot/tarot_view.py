@@ -892,8 +892,11 @@ class TarotFlipView(discord.ui.View):
             for idx, drawn in enumerate(self.drawn_cards):
                 if idx in self.revealed_indices:
                     orient = "`[NGƯỢC]`" if drawn.is_reversed else "`[XUÔI]`"
+                    kw = drawn.card.keywords_reversed if drawn.is_reversed else drawn.card.keywords_upright
+                    kw_text = ", ".join(kw[:3]) if kw else ""
+                    kw_part = f"\n  ↳ ✨ *Từ khóa:* `{kw_text}`" if kw_text else ""
                     cards_summary_lines.append(
-                        f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}"
+                        f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}{kw_part}"
                     )
                 else:
                     cards_summary_lines.append(

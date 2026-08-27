@@ -33,12 +33,9 @@ class TarotManager:
         import time
         self._user_last_action[user_id] = time.time()
 
-    async def _get_db(self) -> aiosqlite.Connection:
-        if self._db is None:
-            self._db = await aiosqlite.connect(self.db_path)
-            await self._db.execute("PRAGMA journal_mode=WAL")
-            await self._db.execute("PRAGMA synchronous=NORMAL")
-        return self._db
+    async def _get_db(self):
+        from core.db import db_client
+        return db_client
 
     async def init_db(self) -> None:
         """Tạo các bảng lịch sử Tarot nếu chưa có."""
@@ -69,12 +66,8 @@ class TarotManager:
 
     async def close(self) -> None:
         """Đóng kết nối SQLite khi shutdown."""
-        if self._db is not None:
-            try:
-                await self._db.close()
-            except Exception:
-                pass
-            self._db = None
+        from core.db import db_client
+        await db_client.close()
 
     @staticmethod
     def get_current_vn_date_str() -> str:
@@ -106,6 +99,47 @@ class TarotManager:
             return False, card_data
 
         return True, None
+
+    async def get_active_daily_cooldowns(self) -> List[dict]:
+        """Lấy danh sách tất cả người dùng đang có daily cooldown trong ngày hôm nay."""
+        today_str = self.get_current_vn_date_str()
+        db = await self._get_db()
+        async with db.execute(
+            "SELECT user_id, last_daily_date, last_drawn_json, updated_at FROM tarot_daily_tracker WHERE last_daily_date = ? ORDER BY updated_at DESC",
+            (today_str,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        results = []
+        for r in rows:
+            try:
+                card_data = json.loads(r[2])
+            except Exception:
+                card_data = {}
+            results.append({
+                "user_id": r[0],
+                "last_daily_date": r[1],
+                "card_data": card_data,
+                "updated_at": r[3]
+            })
+        return results
+
+    async def reset_daily_cooldown(self, user_id: int) -> bool:
+        """Gỡ bỏ Daily Cooldown cho 1 user cụ thể."""
+        db = await self._get_db()
+        await db.execute("DELETE FROM tarot_daily_tracker WHERE user_id = ?", (user_id,))
+        await db.commit()
+        self._user_last_action.pop(user_id, None)
+        return True
+
+    async def reset_all_daily_cooldowns(self) -> bool:
+        """Gỡ bỏ toàn bộ Daily Cooldown cho tất cả người dùng hôm nay."""
+        today_str = self.get_current_vn_date_str()
+        db = await self._get_db()
+        await db.execute("DELETE FROM tarot_daily_tracker WHERE last_daily_date = ?", (today_str,))
+        await db.commit()
+        self._user_last_action.clear()
+        return True
 
     async def record_daily_draw(self, user_id: int, drawn_card: DrawnCard) -> None:
         """Lưu lại lượt bốc Daily Card hôm nay của user."""
