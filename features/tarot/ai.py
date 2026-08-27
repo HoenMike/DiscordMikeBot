@@ -1,7 +1,8 @@
 import asyncio
 import json
 import re
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Any
+from pydantic import BaseModel, Field
 from google.genai import types
 import config
 from core.ai import get_ai_client
@@ -10,9 +11,36 @@ from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdic
 # Semaphore giới hạn tối đa 3 request AI đồng thời để tránh 429 Rate Limit
 AI_SEMAPHORE = asyncio.Semaphore(3)
 
-# Cấu hình AI Tarot: Nhiệt độ 0.65 để câu trả lời sinh động, giàu cá tính
+
+class TarotAIResponseSchema(BaseModel):
+    """Schema chuẩn hóa cho đầu ra JSON từ Gemini AI."""
+    topic_tag: str = Field(description="Phân loại chủ đề: career, love, finance, health, study, general", default="general")
+    mood_tag: str = Field(description="Tag vibe/tâm trạng chủ đạo bằng tiếng Việt", default="Cân bằng & Tĩnh tại")
+    summary_headline: str = Field(description="Tiêu đề vibe ngắn dưới 15 từ", default="")
+    conclusion: str = Field(description="Kết luận trực diện, đúc kết xu hướng trong 1-2 câu", default="")
+    cards_analysis: str = Field(description="Phân tích súc tích từng lá bài trong ngữ cảnh", default="")
+    advice: str = Field(description="Lời khuyên hành động thực tế và thông điệp khích lệ", default="")
+    full_reading: str = Field(description="Toàn bộ bài giải hoàn chỉnh bằng Markdown, chia rõ các mục", default="")
+
+
+# Cấu hình AI Tarot chính (buộc trả về JSON có cấu trúc an toàn, giới hạn thinking_budget để tránh timeout)
 TAROT_GEN_CONFIG = types.GenerateContentConfig(
     temperature=0.65,
+    response_mime_type="application/json",
+    response_schema=TarotAIResponseSchema,
+    thinking_config=types.ThinkingConfig(thinking_budget=1024),
+)
+
+# Cấu hình dự phòng nhẹ nếu model không hỗ trợ schema hoặc thinking config
+TAROT_GEN_CONFIG_FALLBACK = types.GenerateContentConfig(
+    temperature=0.65,
+    response_mime_type="application/json",
+)
+
+# Cấu hình dành cho câu hỏi phụ (trả lời trực tiếp dạng văn bản tự do)
+TAROT_FOLLOWUP_CONFIG = types.GenerateContentConfig(
+    temperature=0.65,
+    thinking_config=types.ThinkingConfig(thinking_budget=1024),
 )
 
 
@@ -69,25 +97,181 @@ def _build_tarot_prompt(
     - Danh sách lá bài:
     {cards_context}
 
-    🚨 YÊU CẦU ĐỊNH DẠNG:
-    1. Phân loại chủ đề (`topic_tag`): 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
-    2. Đặt tag tâm trạng / năng lượng (`mood_tag`): 1 cụm từ tiếng Việt ngắn gọn mô tả mood/vibe chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Khởi đầu mới bùng nổ', 'Rối bời & Do dự', 'Thăng hoa & Tự tin', 'Thận trọng & Phòng thủ'...).
-    3. Tiêu đề vibe ngắn (`summary_headline`): 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
-    
-    Hãy trả lời theo định dạng JSON có cấu trúc sau:
-    ```json
-    {{
-      "topic_tag": "career",
-      "mood_tag": "Cày cuốc chăm chỉ",
-      "summary_headline": "Tập trung cao độ cho chuyên môn, mài giũa tay nghề và tích lũy thực lực.",
-      "conclusion": "Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.",
-      "cards_analysis": "Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi.",
-      "advice": "Lời khuyên hành động thực tế và thông điệp khích lệ.",
-      "full_reading": "Toàn bộ bài giải hoàn chỉnh được format đẹp bằng Markdown, chia rõ các mục 🎯 KẾT LUẬN, 🃏 Ý NGHĨA CÁC LÁ BÀI, 💡 LỜI KHUYÊN & ĐỊNH HƯỚNG."
-    }}
-    ```
+    🚨 YÊU CẦU ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC TRẢ JSON CHUẨN):
+    1. `topic_tag`: 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
+    2. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Khởi đầu mới bùng nổ', 'Rối bời & Do dự', 'Thăng hoa & Tự tin', 'Thận trọng & Phòng thủ'...).
+    3. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
+    4. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.
+    5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi.
+    6. `advice`: Lời khuyên hành động thực tế và thông điệp khích lệ.
+    7. `full_reading`: Toàn bộ bài giải hoàn chỉnh được format đẹp bằng Markdown, chia rõ các mục 🎯 KẾT LUẬN, 🃏 Ý NGHĨA CÁC LÁ BÀI, 💡 LỜI KHUYÊN & ĐỊNH HƯỚNG.
     """.strip()
     return prompt
+
+
+def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
+    """
+    Phân tích và trích xuất dữ liệu an toàn từ phản hồi của Gemini AI.
+    Sử dụng cơ chế đa tầng (Direct JSON -> Regex Fallback -> Text Cleaning)
+    đảm bảo 100% không bao giờ làm lộ mã JSON thô ra giao diện người dùng Discord.
+    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline)
+    """
+    if not raw_text:
+        return "", "general", "Năng lượng tích cực", ""
+
+    text = raw_text.strip()
+
+    # Giá trị mặc định
+    topic_tag = "general"
+    mood_tag = "Năng lượng tích cực"
+    summary_headline = ""
+    full_reading = ""
+
+    # Bước 1: Trích xuất khối JSON candidate nếu có
+    json_candidate = text
+    match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
+    if match:
+        json_candidate = match.group(1).strip()
+    else:
+        first_brace = text.find("{")
+        last_brace = text.rfind("}")
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            json_candidate = text[first_brace:last_brace + 1].strip()
+
+    parsed_dict: Optional[Dict[str, Any]] = None
+
+    # Bước 2: Thử parse trực tiếp bằng json.loads
+    try:
+        data = json.loads(json_candidate)
+        if isinstance(data, dict):
+            parsed_dict = data
+    except Exception:
+        pass
+
+    # Bước 3: Fallback Regex Field Extraction nếu json.loads thất bại (do unescaped quotes hoặc format lỗi)
+    if parsed_dict is None and ("{" in text or '"topic_tag"' in text or '"full_reading"' in text):
+        extracted = {}
+        keys = [
+            "topic_tag",
+            "mood_tag",
+            "summary_headline",
+            "conclusion",
+            "cards_analysis",
+            "advice",
+            "full_reading"
+        ]
+        for i, key in enumerate(keys):
+            pattern = rf'"{key}"\s*:\s*"'
+            pos = re.search(pattern, json_candidate)
+            if not pos:
+                continue
+            start_val = pos.end()
+            next_keys = keys[i + 1:]
+            end_val = -1
+            if next_keys:
+                next_pattern = "|".join(next_keys)
+                next_match = re.search(rf'",?\s*\n\s*"(?:{next_pattern})"\s*:', json_candidate[start_val:])
+                if next_match:
+                    end_val = start_val + next_match.start()
+            if end_val == -1:
+                end_match = re.search(r'"\s*\n\s*\}', json_candidate[start_val:])
+                if end_match:
+                    end_val = start_val + end_match.start()
+                else:
+                    last_quote = json_candidate.rfind('"')
+                    end_val = last_quote if last_quote > start_val else len(json_candidate)
+
+            val = json_candidate[start_val:end_val]
+            val = val.replace(r"\n", "\n").replace(r'\"', '"').replace(r"\\", "\\").strip()
+            extracted[key] = val
+
+        if any(extracted.values()):
+            parsed_dict = extracted
+
+    # Bước 4: Chuyển đổi dữ liệu từ parsed_dict thành bài đọc và metadata
+    if parsed_dict:
+        # Xử lý topic_tag
+        raw_topic = parsed_dict.get("topic_tag", "general")
+        topic_tag = str(raw_topic).strip().strip('"').strip() or "general"
+
+        # Xử lý mood_tag
+        raw_mood = parsed_dict.get("mood_tag", "Cân bằng & Tĩnh tại")
+        mood_tag = str(raw_mood).strip().strip('"').strip() or "Cân bằng & Tĩnh tại"
+
+        # Xử lý summary_headline
+        raw_headline = parsed_dict.get("summary_headline", "")
+        summary_headline = str(raw_headline).strip().strip('"').strip()
+
+        # Xử lý full_reading
+        raw_full = parsed_dict.get("full_reading", "")
+        if isinstance(raw_full, list):
+            raw_full = "\n\n".join(str(item) for item in raw_full)
+        else:
+            raw_full = str(raw_full).strip()
+
+        if len(raw_full) > 50:
+            full_reading = raw_full
+        else:
+            # Tái tạo bài đọc có cấu trúc từ các trường thành phần
+            conc = parsed_dict.get("conclusion", "")
+            if isinstance(conc, list):
+                conc = "\n".join(str(c) for c in conc)
+            conc = str(conc).strip()
+
+            cards_an = parsed_dict.get("cards_analysis", "")
+            if isinstance(cards_an, list):
+                formatted_cards = []
+                for item in cards_an:
+                    if isinstance(item, dict):
+                        c_name = item.get("card_name", item.get("name", ""))
+                        c_meaning = item.get("meaning", item.get("analysis", ""))
+                        formatted_cards.append(f"• **{c_name}**: {c_meaning}" if c_name else f"• {c_meaning}")
+                    else:
+                        formatted_cards.append(f"• {item}")
+                cards_an = "\n".join(formatted_cards)
+            cards_an = str(cards_an).strip()
+
+            adv = parsed_dict.get("advice", "")
+            if isinstance(adv, list):
+                adv = "\n".join(str(a) for a in adv)
+            adv = str(adv).strip()
+
+            parts = []
+            if conc:
+                parts.append(f"🎯 **KẾT LUẬN & ĐỊNH HƯỚNG:**\n{conc}")
+            if cards_an:
+                parts.append(f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}")
+            if adv:
+                parts.append(f"💡 **LỜI KHUYÊN HÀNH ĐỘNG:**\n{adv}")
+
+            if parts:
+                full_reading = "\n\n".join(parts)
+            else:
+                full_reading = raw_full or text
+    else:
+        # Nếu hoàn toàn không phát hiện cấu trúc JSON -> coi như phản hồi Markdown thông thường
+        cleaned = text
+        if cleaned.startswith("```json"):
+            cleaned = re.sub(r"^```json\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+        full_reading = cleaned
+
+    # Bước 5: Dọn dẹp câu chào mở đầu rườm rà nếu có
+    full_reading = re.sub(
+        r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+",
+        "",
+        full_reading,
+        flags=re.IGNORECASE
+    ).strip()
+
+    # Bước 6: Chặn tuyệt đối rò rỉ mã JSON thô ra giao diện người dùng
+    if full_reading.startswith("{") and '"topic_tag"' in full_reading:
+        full_reading = re.sub(r'^\s*\{\s*', '', full_reading)
+        full_reading = re.sub(r'\s*\}\s*$', '', full_reading)
+        full_reading = re.sub(r'"[a-zA-Z_]+":\s*"', '', full_reading)
+        full_reading = full_reading.replace('",', '\n\n').replace('\\n', '\n').strip()
+
+    return full_reading, topic_tag, mood_tag, summary_headline
 
 
 async def generate_tarot_reading(
@@ -126,65 +310,48 @@ async def generate_tarot_reading(
             seen.add(m)
             ordered_models.append(m)
 
-    last_error = None
-
     async with AI_SEMAPHORE:
         for model_name in ordered_models:
-            try:
-                print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'...", flush=True)
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        client.models.generate_content,
-                        model=model_name,
-                        contents=prompt,
-                        config=TAROT_GEN_CONFIG,
-                    ),
-                    timeout=14.0
-                )
-                if response and response.text:
-                    raw_text = response.text.strip()
-                    
-                    # Thử parse JSON có cấu trúc
-                    topic_tag = "general"
-                    mood_tag = "Năng lượng tích cực"
-                    summary_headline = ""
-                    full_reading = raw_text
+            # Thử với cấu hình chuẩn có schema, nếu model không hỗ trợ thì fallback cấu hình cơ bản
+            configs_to_try = [TAROT_GEN_CONFIG, TAROT_GEN_CONFIG_FALLBACK]
 
-                    # Trích xuất JSON từ markdown block nếu có
-                    json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw_text, re.DOTALL)
-                    if json_match:
-                        raw_json_str = json_match.group(1)
+            for gen_config in configs_to_try:
+                try:
+                    print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'...", flush=True)
+                    response = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            client.models.generate_content,
+                            model=model_name,
+                            contents=prompt,
+                            config=gen_config,
+                        ),
+                        timeout=14.0
+                    )
+                    if response and response.text:
+                        raw_text = response.text.strip()
+                        full_reading, topic_tag, mood_tag, summary_headline = parse_tarot_ai_response(raw_text)
+
+                        if full_reading:
+                            print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag} | Mood: {mood_tag}).", flush=True)
+                            return full_reading, topic_tag, mood_tag, summary_headline
+
+                except asyncio.TimeoutError:
+                    print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>14s), chuyển sang model tiếp theo...", flush=True)
+                    break  # Chuyển ngay sang model tiếp theo trong cascade
+                except Exception as e:
+                    err_str = str(e)
+                    if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower():
+                        print(f"⚠️ [Tarot AI] Model '{model_name}' tạm thời quá tải (503 High Demand), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
+                        break
+                    elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
+                        print(f"⚠️ [Tarot AI] Model '{model_name}' chạm giới hạn quota (429 Rate Limit), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
+                        break
+                    elif "response_schema" in err_str or "schema" in err_str.lower():
+                        # Model không hỗ trợ response_schema, thử lại với TAROT_GEN_CONFIG_FALLBACK
+                        continue
                     else:
-                        raw_json_str = raw_text if raw_text.startswith("{") and raw_text.endswith("}") else ""
-
-                    if raw_json_str:
-                        try:
-                            parsed = json.loads(raw_json_str)
-                            topic_tag = parsed.get("topic_tag", "general")
-                            mood_tag = parsed.get("mood_tag", "Cân bằng & Tĩnh tại")
-                            summary_headline = parsed.get("summary_headline", "")
-                            if "full_reading" in parsed and len(parsed["full_reading"]) > 50:
-                                full_reading = parsed["full_reading"]
-                            else:
-                                full_reading = f"🎯 **KẾT LUẬN & ĐỊNH HƯỚNG:**\n{parsed.get('conclusion', '')}\n\n🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{parsed.get('cards_analysis', '')}\n\n💡 **LỜI KHUYÊN HÀNH ĐỘNG:**\n{parsed.get('advice', '')}"
-                        except Exception:
-                            pass
-
-                    # Dọn dẹp lời chào mở đầu nếu có
-                    clean_text = re.sub(r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+", "", full_reading, flags=re.IGNORECASE).strip()
-                    print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag} | Mood: {mood_tag}).", flush=True)
-                    return clean_text, topic_tag, mood_tag, summary_headline
-            except asyncio.TimeoutError:
-                print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>14s), chuyển sang model tiếp theo...", flush=True)
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower():
-                    print(f"⚠️ [Tarot AI] Model '{model_name}' tạm thời quá tải (503 High Demand), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
-                elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
-                    print(f"⚠️ [Tarot AI] Model '{model_name}' chạm giới hạn quota (429 Rate Limit), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
-                else:
-                    print(f"⚠️ [Tarot AI] Model '{model_name}' không khả dụng ({type(e).__name__}), chuyển sang model tiếp theo...", flush=True)
+                        print(f"⚠️ [Tarot AI] Model '{model_name}' không khả dụng ({type(e).__name__}: {e}), chuyển sang model tiếp theo...", flush=True)
+                        break
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Sử dụng bộ luận giải chiêm tinh cổ điển từ điển Tarot...", flush=True)
     fallback_parts = [
@@ -215,6 +382,7 @@ async def generate_followup_answer(
 ) -> str:
     """
     Trả lời câu hỏi đào sâu bổ sung của người dùng dựa trên ngữ cảnh quẻ bài vừa giải.
+    Hỗ trợ tự động fallback sang các model dự phòng nếu model chính quá tải.
     """
     cards_context = _format_cards_context(drawn_cards)
     style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
@@ -241,21 +409,49 @@ async def generate_followup_answer(
     """.strip()
 
     client = get_ai_client()
+
+    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
+        config.GEMINI_TAROT_MODEL,
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemma-4-31b-it"
+    ])
+
+    seen = set()
+    ordered_models = []
+    for m in models_to_try:
+        if m and m not in seen:
+            seen.add(m)
+            ordered_models.append(m)
+
     async with AI_SEMAPHORE:
-        try:
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    client.models.generate_content,
-                    model=config.GEMINI_TAROT_MODEL,
-                    contents=prompt,
-                    config=TAROT_GEN_CONFIG,
-                ),
-                timeout=12.0
-            )
-            if response and response.text:
-                return response.text.strip()
-        except Exception as e:
-            print(f"⚠️ [Tarot Follow-up] Lỗi trả lời câu hỏi phụ: {e}", flush=True)
+        for model_name in ordered_models:
+            try:
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.models.generate_content,
+                        model=model_name,
+                        contents=prompt,
+                        config=TAROT_FOLLOWUP_CONFIG,
+                    ),
+                    timeout=12.0
+                )
+                if response and response.text:
+                    clean_ans = response.text.strip()
+                    # Dọn dẹp nếu có codeblock bọc ngoài
+                    if clean_ans.startswith("```"):
+                        clean_ans = re.sub(r"^```[a-zA-Z]*\s*", "", clean_ans)
+                        clean_ans = re.sub(r"\s*```$", "", clean_ans).strip()
+                    return clean_ans
+            except Exception as e:
+                err_str = str(e)
+                if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower():
+                    continue
+                elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    continue
+                continue
 
     return f"✨ Dựa trên các lá bài đã rút, vũ trụ nhắc nhở bạn hãy giữ tâm thế vững vàng, lắng nghe trực giác bên trong khi đối diện với câu hỏi '{user_followup_question}'."
 
@@ -280,4 +476,3 @@ def recommend_spread_for_question(question: str) -> Tuple[str, str, str]:
         return ("celtic_cross", "Celtic Cross - Thập Tự Celtic (10 lá)", "Vấn đề phức tạp và mang tính bước ngoặt. Celtic Cross là trải bài kinh điển 10 lá phân tích toàn diện mọi khía cạnh ẩn sâu.")
 
     return ("ppf", "Quá Khứ - Hiện Tại - Tương Lai (3 lá)", "Trải bài 3 lá cổ điển, linh hoạt và phù hợp nhất để xem xét tiến trình của hầu hết mọi vấn đề trong cuộc sống.")
-
