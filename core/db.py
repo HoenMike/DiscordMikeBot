@@ -89,12 +89,30 @@ class DatabaseClient:
         """Khởi tạo kết nối đến Cloud hoặc Local DB."""
         current_loop = asyncio.get_running_loop()
         
+        # Nếu đã kết nối rồi và cùng event loop, tái sử dụng kết nối hiện tại
+        if self._is_cloud and self._turso_client is not None and self._loop == current_loop:
+            return
+        if not self._is_cloud and self._local_db is not None and self._loop == current_loop:
+            return
+
+        # Đóng an toàn client cũ nếu có trước khi tạo mới
+        if self._turso_client is not None:
+            try:
+                await self._turso_client.close()
+            except Exception:
+                pass
+            self._turso_client = None
+
+        if self._local_db is not None:
+            try:
+                await self._local_db.close()
+            except Exception:
+                pass
+            self._local_db = None
+
         # 1. Thử kết nối Turso Cloud nếu có token cấu hình
         if HAS_LIBSQL and config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL:
             try:
-                if self._turso_client is not None and self._loop != current_loop:
-                    self._turso_client = None
-
                 # Chuyển đổi giao thức libsql:// sang https:// nếu cần cho HTTP client
                 url = config.TURSO_DATABASE_URL
                 if url.startswith("libsql://"):
@@ -117,13 +135,12 @@ class DatabaseClient:
                 self._is_cloud = False
 
         # 2. Fallback sang Local aiosqlite
-        if self._local_db is None or getattr(self._local_db, '_loop', None) != current_loop:
-            self._local_db = await aiosqlite.connect(str(config.DB_PATH))
-            await self._local_db.execute("PRAGMA journal_mode=WAL")
-            await self._local_db.execute("PRAGMA synchronous=NORMAL")
-            self._is_cloud = False
-            self._loop = current_loop
-            print(f"💾 [Database] Đang sử dụng Local SQLite: {config.DB_PATH}", flush=True)
+        self._local_db = await aiosqlite.connect(str(config.DB_PATH))
+        await self._local_db.execute("PRAGMA journal_mode=WAL")
+        await self._local_db.execute("PRAGMA synchronous=NORMAL")
+        self._is_cloud = False
+        self._loop = current_loop
+        print(f"💾 [Database] Đang sử dụng Local SQLite: {config.DB_PATH}", flush=True)
 
     async def _execute_internal(self, sql: str, params: Union[Tuple, List, dict, None] = None) -> CursorWrapper:
         """Thực thi một câu lệnh SQL nội bộ và trả về CursorWrapper tương thích."""
