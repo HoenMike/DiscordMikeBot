@@ -1,5 +1,6 @@
 import json
 import time
+import asyncio
 import aiosqlite
 import config as app_config
 
@@ -33,12 +34,15 @@ class ConfigManager:
         self._channel_cache: dict[str, tuple[dict, float]] = {}
         # Cache proxy domains (proxy:{guild_id}:{platform_key} -> (list hoặc None, timestamp))
         self._proxy_cache: dict[str, tuple[list | None, float]] = {}
+        # Set guild bị tạm ngưng (suspended) để tra cứu O(1) tức thì
+        self._suspended_guilds: set[int] = set()
         self._db_path = str(app_config.DB_PATH)
         self._db: aiosqlite.Connection | None = None
 
     async def _get_db(self) -> aiosqlite.Connection:
-        """Lấy kết nối persistent, tạo mới nếu chưa có."""
-        if self._db is None:
+        """Lấy kết nối persistent, tạo mới nếu chưa có hoặc khi chuyển đổi event loop."""
+        current_loop = asyncio.get_running_loop()
+        if self._db is None or getattr(self._db, '_loop', None) != current_loop:
             self._db = await aiosqlite.connect(self._db_path)
             # Tối ưu hiệu năng SQLite cho workload đọc nhiều
             await self._db.execute("PRAGMA journal_mode=WAL")
@@ -46,7 +50,7 @@ class ConfigManager:
         return self._db
 
     async def init_db(self) -> None:
-        """Khởi tạo các bảng cấu hình và proxy domains."""
+        """Khởi tạo các bảng cấu hình, proxy domains và danh sách server tạm ngưng."""
         db = await self._get_db()
         await db.execute("""
             CREATE TABLE IF NOT EXISTS guild_config (
@@ -72,7 +76,20 @@ class ConfigManager:
                 PRIMARY KEY (guild_id, platform_key)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS suspended_guilds (
+                guild_id      INTEGER PRIMARY KEY,
+                guild_name    TEXT,
+                reason        TEXT,
+                suspended_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
         await db.commit()
+
+        # Nạp danh sách suspended guilds vào RAM
+        async with db.execute("SELECT guild_id FROM suspended_guilds") as cursor:
+            rows = await cursor.fetchall()
+            self._suspended_guilds = {row[0] for row in rows}
 
     async def close(self) -> None:
         """Đóng kết nối database nếu đang mở."""
@@ -389,3 +406,65 @@ class ConfigManager:
         """Xoá cache channel và effective cache của channel đó."""
         self._channel_cache.pop(f"channel:{channel_id}", None)
         self._cache.pop(f"{guild_id}:{channel_id}", None)
+
+    # ---------------------------------------------------------------------------
+    # Quản lý Tạm Ngưng Server (Guild Suspension)
+    # ---------------------------------------------------------------------------
+
+    def is_guild_suspended(self, guild_id: int | None) -> bool:
+        """Kiểm tra nhanh xem guild có đang bị Admin tạm ngưng hay không (O(1))."""
+        if not guild_id:
+            return False
+        return guild_id in self._suspended_guilds
+
+    async def suspend_guild(self, guild_id: int, guild_name: str = "", reason: str = "") -> None:
+        """Tạm ngưng hoạt động của bot trên một server Discord."""
+        self._suspended_guilds.add(guild_id)
+        db = await self._get_db()
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS suspended_guilds (
+                guild_id      INTEGER PRIMARY KEY,
+                guild_name    TEXT,
+                reason        TEXT,
+                suspended_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO suspended_guilds (guild_id, guild_name, reason, suspended_at)
+            VALUES (?, ?, ?, datetime('now'))
+            """,
+            (guild_id, guild_name, reason)
+        )
+        await db.commit()
+
+    async def unsuspend_guild(self, guild_id: int) -> None:
+        """Gỡ tạm ngưng cho server Discord."""
+        self._suspended_guilds.discard(guild_id)
+        db = await self._get_db()
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS suspended_guilds (
+                guild_id      INTEGER PRIMARY KEY,
+                guild_name    TEXT,
+                reason        TEXT,
+                suspended_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute("DELETE FROM suspended_guilds WHERE guild_id = ?", (guild_id,))
+        await db.commit()
+
+    async def get_suspended_guilds_info(self) -> dict[int, dict]:
+        """Lấy thông tin chi tiết các server đang bị tạm ngưng."""
+        db = await self._get_db()
+        async with db.execute("SELECT guild_id, guild_name, reason, suspended_at FROM suspended_guilds") as cursor:
+            rows = await cursor.fetchall()
+            return {
+                row[0]: {
+                    "guild_id": row[0],
+                    "guild_name": row[1],
+                    "reason": row[2],
+                    "suspended_at": row[3]
+                }
+                for row in rows
+            }
+

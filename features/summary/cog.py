@@ -1,5 +1,6 @@
 import sys
 import re
+import time
 import traceback
 from typing import Optional, Union, Tuple
 from datetime import datetime, timezone, timedelta
@@ -371,6 +372,7 @@ class SummaryCog(commands.Cog):
         if not is_valid:
             return
 
+        t_summary_start = time.monotonic()
         followup_msg = None
         if interaction:
             # Nếu gửi qua DM, defer dạng ephemeral để bảo đảm tính riêng tư tuyệt đối trên server
@@ -521,6 +523,7 @@ class SummaryCog(commands.Cog):
             # Ghi nhận hoạt động vào Live Activity Logger
             try:
                 from core.activity_logger import activity_logger
+                elapsed_ms = round((time.monotonic() - t_summary_start) * 1000, 1)
                 user_avatar = user.display_avatar.url if user.display_avatar else None
                 guild_name_str = target_channel.guild.name if hasattr(target_channel, 'guild') and target_channel.guild else "Direct Message"
                 guild_id_val = target_channel.guild.id if hasattr(target_channel, 'guild') and target_channel.guild else None
@@ -537,6 +540,7 @@ class SummaryCog(commands.Cog):
                     prompt=f"Phạm vi: {scan_info} | Focus: {clean_focus or '(Không)'} | Chế độ: {summary_type}",
                     response=summary_result,
                     status="success",
+                    duration_ms=elapsed_ms,
                     details={
                         "mode": summary_type,
                         "scan_info": scan_info,
@@ -561,6 +565,7 @@ class SummaryCog(commands.Cog):
             # Ghi nhận lỗi vào Activity Logger
             try:
                 from core.activity_logger import activity_logger
+                elapsed_ms = round((time.monotonic() - t_summary_start) * 1000, 1)
                 user_avatar = user.display_avatar.url if user.display_avatar else None
                 guild_name_str = target_channel.guild.name if hasattr(target_channel, 'guild') and target_channel.guild else "Direct Message"
                 activity_logger.log(

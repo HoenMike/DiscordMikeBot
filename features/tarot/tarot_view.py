@@ -1,4 +1,5 @@
 import asyncio
+import time
 import io
 import random
 from typing import List, Optional, Set, Any
@@ -619,6 +620,7 @@ class TarotFlipView(discord.ui.View):
             _, _, verdict_color = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
             self.embed_color = verdict_color
 
+        self.start_time = time.monotonic()
         self._build_buttons()
 
     def _build_buttons(self):
@@ -786,6 +788,7 @@ class TarotFlipView(discord.ui.View):
             # Ghi nhận hoạt động vào Live Activity Logger
             try:
                 from core.activity_logger import activity_logger
+                elapsed_ms = round((time.monotonic() - getattr(self, 'start_time', time.monotonic())) * 1000, 1)
                 cards_summary = ", ".join([f"{c.card.name_vi} ({'[NGƯỢC]' if c.is_reversed else '[XUÔI]'})" for c in self.drawn_cards])
                 guild_name_str = interaction.guild.name if interaction.guild else "Direct Message"
                 channel_name_str = interaction.channel.name if (interaction.channel and hasattr(interaction.channel, 'name')) else "Direct Message"
@@ -802,6 +805,7 @@ class TarotFlipView(discord.ui.View):
                     prompt=f"Câu hỏi: {self.question or '(Không)'} | Bối cảnh: {self.context or '(Không)'}",
                     response=f"Lá bài: {cards_summary}\n\nThông điệp: {ai_reading}",
                     status="success",
+                    duration_ms=elapsed_ms,
                     details={
                         "spread": self.spread_key,
                         "reader": self.reader_style,

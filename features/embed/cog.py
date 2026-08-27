@@ -126,10 +126,12 @@ class EmbedCog(commands.Cog):
 
             current_comment = user_comment if not comment_sent else None
 
+            t_embed_start = time.monotonic()
             success = await self._process_url_with_fallback(
                 message, platform_key, url, match, config,
                 is_spoiler=is_spoiler, user_comment=current_comment
             )
+            elapsed_ms = round((time.monotonic() - t_embed_start) * 1000, 1)
 
             # Ghi nhận hoạt động vào Live Activity Logger
             try:
@@ -149,6 +151,7 @@ class EmbedCog(commands.Cog):
                     prompt=url,
                     response=f"Tạo bản xem trước {platform_name} thành công" if success else f"Không thể tạo bản xem trước {platform_name}",
                     status="success" if success else "error",
+                    duration_ms=elapsed_ms,
                     details={
                         "platform": platform_key,
                         "url": url,

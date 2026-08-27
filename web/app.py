@@ -2,6 +2,7 @@ import os
 import math
 import hmac
 import hashlib
+import asyncio
 import platform
 import psutil
 from functools import wraps
@@ -130,12 +131,21 @@ def api_stats():
             bot_name = bot.user.name
             bot_avatar = bot.user.display_avatar.url if bot.user.display_avatar else ""
 
+    bot_id = ""
+    invite_url = ""
+    if bot.is_ready() and bot.user:
+        bot_id = str(bot.user.id)
+        # Quyền tối thiểu: Send Messages, Read Messages/History, Embed Links, Attach Files, Manage Messages (để xóa tin gốc/ẩn embed), Manage Webhooks + Slash Commands
+        invite_url = f"https://discord.com/oauth2/authorize?client_id={bot_id}&permissions=275414838784&scope=bot%20applications.commands"
+
     activities_overview = activity_logger.get_activities(limit=1)
 
     return jsonify({
         "bot_status": bot_status,
+        "bot_id": bot_id,
         "bot_name": bot_name,
         "bot_avatar": bot_avatar,
+        "invite_url": invite_url,
         "uptime": uptime_str,
         "uptime_seconds": int(uptime_delta.total_seconds()),
         "latency": bot_latency,
@@ -191,3 +201,111 @@ def api_clear_logs():
     config.log_buffer.clear()
     print("🧹 Đã xóa toàn bộ logs hệ thống theo yêu cầu từ Web Console.", flush=True)
     return jsonify({"success": True})
+
+
+# ==========================================
+# 5. GUILDS / SERVERS MANAGEMENT APIS
+# ==========================================
+@app.route('/api/guilds')
+@login_required
+def api_guilds():
+    guild_list = []
+    if bot.is_ready():
+        for g in bot.guilds:
+            is_susp = bot.config_manager.is_guild_suspended(g.id)
+            guild_list.append({
+                "id": str(g.id),
+                "name": g.name,
+                "icon": g.icon.url if g.icon else "",
+                "member_count": g.member_count or len(g.members),
+                "owner_id": str(g.owner_id) if g.owner_id else "",
+                "is_suspended": is_susp,
+                "created_at": g.created_at.strftime("%d/%m/%Y") if g.created_at else "",
+                "joined_at": g.me.joined_at.strftime("%d/%m/%Y") if (g.me and g.me.joined_at) else ""
+            })
+    return jsonify({
+        "total": len(guild_list),
+        "guilds": guild_list
+    })
+
+
+def run_coroutine_safe(coro):
+    """Chạy an toàn một coroutine bất kể bot đang chạy trong event loop hay bot đang offline."""
+    loop = None
+    try:
+        if bot.is_ready():
+            loop = bot.loop
+    except Exception:
+        loop = None
+
+    if loop and loop.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout=15)
+    else:
+        return asyncio.run(coro)
+
+
+@app.route('/api/guilds/suspend', methods=['POST'])
+@login_required
+def api_suspend_guild():
+    data = request.get_json(silent=True) or {}
+    guild_id = int(data.get("guild_id", 0))
+    reason = data.get("reason", "Admin tạm ngưng hoạt động").strip()
+
+    if not guild_id:
+        return jsonify({"success": False, "error": "Thiếu guild_id"}), 400
+
+    guild_name = ""
+    target_guild = bot.get_guild(guild_id) if bot.is_ready() else None
+    if target_guild:
+        guild_name = target_guild.name
+
+    try:
+        run_coroutine_safe(bot.config_manager.suspend_guild(guild_id, guild_name=guild_name, reason=reason))
+        print(f"⛔ [Admin Console] Đã tạm ngưng (Suspend) server: {guild_name} ({guild_id}). Lý do: {reason}", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/guilds/unsuspend', methods=['POST'])
+@login_required
+def api_unsuspend_guild():
+    data = request.get_json(silent=True) or {}
+    guild_id = int(data.get("guild_id", 0))
+
+    if not guild_id:
+        return jsonify({"success": False, "error": "Thiếu guild_id"}), 400
+
+    try:
+        run_coroutine_safe(bot.config_manager.unsuspend_guild(guild_id))
+        print(f"✅ [Admin Console] Đã gỡ tạm ngưng (Unsuspend) cho server: {guild_id}.", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/guilds/leave', methods=['POST'])
+@login_required
+def api_leave_guild():
+    data = request.get_json(silent=True) or {}
+    guild_id = int(data.get("guild_id", 0))
+
+    if not guild_id:
+        return jsonify({"success": False, "error": "Thiếu guild_id"}), 400
+
+    target_guild = bot.get_guild(guild_id) if bot.is_ready() else None
+    if not target_guild:
+        return jsonify({"success": False, "error": "Bot không còn ở trong server này."}), 404
+
+    guild_name = target_guild.name
+
+    async def do_leave():
+        await target_guild.leave()
+
+    try:
+        run_coroutine_safe(do_leave())
+        print(f"👋 [Admin Console] Bot đã rời khỏi server: {guild_name} ({guild_id}) theo yêu cầu của Admin.", flush=True)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+

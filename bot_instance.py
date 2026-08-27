@@ -1,9 +1,10 @@
+import sys
+import time
+import traceback
+from typing import Optional, Union, List, Dict
 import discord
 from discord import app_commands
 from discord.ext import commands
-import sys
-import traceback
-from typing import Optional, Union, List, Dict
 from core.config_manager import ConfigManager
 
 intents = discord.Intents.default()
@@ -53,6 +54,21 @@ class SummaryBot(commands.Bot):
             print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
             traceback.print_exc(file=sys.stdout)
 
+        # Kiểm tra trạng thái Suspended của Guild trước khi xử lý Slash Command
+        @self.tree.interaction_check
+        async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
+            if interaction.guild and self.config_manager.is_guild_suspended(interaction.guild.id):
+                msg = (
+                    "⛔ **Máy chủ này đã bị tạm ngừng (Suspended) sử dụng MikeDaBot.**\n"
+                    "👉 Vui lòng liên hệ Admin hệ thống để biết thêm chi tiết."
+                )
+                if interaction.response.is_done():
+                    await interaction.followup.send(msg, ephemeral=True)
+                else:
+                    await interaction.response.send_message(msg, ephemeral=True)
+                return False
+            return True
+
         # Xử lý lỗi toàn cục cho Slash Commands (bao gồm Cooldown)
         @self.tree.error
         async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
@@ -81,6 +97,10 @@ class SummaryBot(commands.Bot):
 
     async def on_message(self, message: discord.Message):
         if message.author.bot:
+            return
+
+        # Nếu Server đang bị Admin tạm ngưng (Suspended), bỏ qua toàn bộ tương tác
+        if message.guild and self.config_manager.is_guild_suspended(message.guild.id):
             return
 
         # Nếu người dùng chỉ gõ đúng "$m" hoặc "$M" không kèm lệnh, hiển thị bảng hướng dẫn
@@ -398,6 +418,17 @@ async def send_bot_help(
     view = HelpView(author_id=user.id, current_tab=feature)
     embed = view.get_embed(user)
 
+    t_help_start = time.monotonic()
+    if isinstance(target, commands.Context):
+        sent_msg = await target.reply(embed=embed, view=view, mention_author=False)
+        view.message = sent_msg
+    else:
+        if target.response.is_done():
+            await target.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+        else:
+            await target.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+    elapsed_ms = round((time.monotonic() - t_help_start) * 1000, 1)
+
     # Ghi nhận hoạt động vào Live Activity Logger
     try:
         from core.activity_logger import activity_logger
@@ -417,19 +448,11 @@ async def send_bot_help(
             prompt=f"Mục: {feature}",
             response="Đã hiển thị bảng hướng dẫn sử dụng tương tác.",
             status="success",
+            duration_ms=elapsed_ms,
             details={"tab": feature}
         )
     except Exception as act_err:
         print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Help: {act_err}", flush=True)
-
-    if isinstance(target, commands.Context):
-        sent_msg = await target.reply(embed=embed, view=view, mention_author=False)
-        view.message = sent_msg
-    else:
-        if target.response.is_done():
-            await target.followup.send(embed=embed, view=view, ephemeral=ephemeral)
-        else:
-            await target.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
 
 
 @bot.tree.command(name="help", description="Xem hướng dẫn sử dụng chi tiết các tính năng của MikeBot")

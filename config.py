@@ -85,8 +85,6 @@ if hasattr(sys.stderr, 'reconfigure'):
 sys.stdout = LogStreamRedirector(sys.stdout, is_stderr=False)
 sys.stderr = LogStreamRedirector(sys.stderr, is_stderr=True)
 
-print("ℹ️ Hệ thống Logging, Dashboard Buffer (500 dòng) và Error Persistence (logs/error.log) đã hoạt động từ config.py.", flush=True)
-
 # Config variables
 import pathlib
 from dotenv import load_dotenv

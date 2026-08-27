@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" class="dark">
+<html lang="vi" class="dark h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -50,8 +50,8 @@
         }
         /* Custom scrollbars */
         ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
         }
         ::-webkit-scrollbar-track {
             background: rgba(15, 23, 42, 0.6);
@@ -65,31 +65,30 @@
         }
     </style>
 </head>
-<body class="bg-dark-bg text-slate-100 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+<body class="bg-dark-bg text-slate-100 h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white overflow-hidden">
 
     <!-- Top Navigation Header -->
-    <header class="sticky top-0 z-30 border-b border-dark-border bg-dark-bg/85 backdrop-blur-xl px-4 lg:px-8 py-3.5">
+    <header class="flex-shrink-0 border-b border-dark-border bg-dark-bg/90 backdrop-blur-xl px-4 lg:px-6 py-2.5">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <!-- Left: Bot Branding -->
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-3">
                 <div id="header-avatar-container" class="relative">
-                    <img id="header-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot Avatar" class="w-10 h-10 rounded-xl ring-1 ring-white/15 object-cover bg-brand-600">
-                    <span id="header-status-indicator" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-dark-bg"></span>
+                    <img id="header-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Bot Avatar" class="w-8 h-8 rounded-lg ring-1 ring-white/15 object-cover bg-brand-600">
+                    <span id="header-status-indicator" class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-dark-bg"></span>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 id="header-bot-name" class="font-bold text-base text-white tracking-tight">MikeDaBot</h1>
-                        <span id="header-status-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <h1 id="header-bot-name" class="font-bold text-sm text-white tracking-tight">MikeDaBot</h1>
+                        <span id="header-status-badge" class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             Online
                         </span>
                     </div>
-                    <p class="text-xs text-slate-400 font-medium">Trung tâm Điều khiển & Hoạt động AI Agent</p>
                 </div>
             </div>
 
             <!-- Middle: Quick Metric Badges (Desktop) -->
-            <div class="hidden md:flex items-center gap-5 text-xs text-slate-300">
+            <div class="hidden md:flex items-center gap-3 text-xs text-slate-300">
                 <div class="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-dark-surface border border-dark-border">
                     <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
                     <span class="text-slate-400">Độ trễ:</span>
@@ -108,8 +107,12 @@
             </div>
 
             <!-- Right: Actions & Logout -->
-            <div class="flex items-center gap-2.5">
-                <button onclick="handleLogout()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all active:scale-95">
+            <div class="flex items-center gap-2">
+                <a id="header-invite-btn" href="#" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-all active:scale-95">
+                    <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                    <span>Mời Bot</span>
+                </a>
+                <button onclick="handleLogout()" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all active:scale-95">
                     <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
                     <span>Đăng xuất</span>
                 </button>
@@ -117,25 +120,31 @@
         </div>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 flex flex-col gap-6">
+    <!-- Main Content Container: Fixed Single Screen Layout -->
+    <main class="flex-1 min-h-0 max-w-7xl w-full mx-auto p-3 lg:p-4 flex flex-col gap-3 overflow-hidden">
 
         <!-- Navigation Tabs Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-dark-border pb-3">
-            <div class="flex items-center gap-2 p-1 rounded-xl bg-dark-surface border border-dark-border">
-                <button onclick="switchTab('activity')" id="tab-btn-activity" class="tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30">
-                    <i data-lucide="activity" class="w-4 h-4"></i>
-                    <span>Trace Tương Tác</span>
+        <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 border-b border-dark-border pb-2.5">
+            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-dark-surface border border-dark-border">
+                <button onclick="switchTab('activity')" id="tab-btn-activity" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30">
+                    <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+                    <span>Log Tương Tác</span>
                     <span id="badge-total-activities" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">0</span>
                 </button>
-                <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
-                    <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                <button onclick="switchTab('guilds')" id="tab-btn-guilds" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="server" class="w-3.5 h-3.5"></i>
+                    <span>Máy Chủ Đang Tham Gia</span>
+                    <span id="badge-total-guilds" class="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300 font-mono">0</span>
+                </button>
+                <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
                     <span>Tổng Quan Hệ Thống</span>
                 </button>
-                <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
-                    <i data-lucide="terminal" class="w-4 h-4"></i>
+                <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
                     <span>Console Logs</span>
                     <span id="badge-total-logs" class="px-1.5 py-0.2 rounded-full text-[10px] bg-dark-border text-slate-300 font-mono">0</span>
+                    <span id="badge-error-logs" class="hidden px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono font-bold">0 lỗi</span>
                 </button>
             </div>
 
@@ -147,137 +156,211 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- TAB 1: USER INTERACTION & ACTIVITY TRACE -->
+        <!-- TAB 1: USER INTERACTION & ACTIVITY LOGS -->
         <!-- ========================================== -->
-        <section id="tab-content-activity" class="tab-content flex flex-col gap-4">
+        <section id="tab-content-activity" class="tab-content flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
             
             <!-- Filters & Search Toolbar -->
-            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-dark-card border border-dark-border rounded-xl p-3.5">
+            <div class="flex-shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-dark-card border border-dark-border rounded-xl p-2.5">
                 <!-- Action Type Filter Buttons -->
                 <div class="flex flex-wrap items-center gap-1.5">
-                    <button onclick="filterActivities('all')" id="filter-btn-all" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40">
+                    <button onclick="filterActivities('all')" id="filter-btn-all" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40">
                         Tất cả (<span id="filter-count-all">0</span>)
                     </button>
-                    <button onclick="filterActivities('tarot')" id="filter-btn-tarot" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
-                        <i data-lucide="sparkles" class="w-3.5 h-3.5 inline mr-1 text-purple-400"></i>
+                    <button onclick="filterActivities('tarot')" id="filter-btn-tarot" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="sparkles" class="w-3 h-3 inline mr-1 text-purple-400"></i>
                         Tarot AI (<span id="filter-count-tarot">0</span>)
                     </button>
-                    <button onclick="filterActivities('summary')" id="filter-btn-summary" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
-                        <i data-lucide="file-text" class="w-3.5 h-3.5 inline mr-1 text-blue-400"></i>
+                    <button onclick="filterActivities('summary')" id="filter-btn-summary" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="file-text" class="w-3 h-3 inline mr-1 text-blue-400"></i>
                         Tóm tắt Chat (<span id="filter-count-summary">0</span>)
                     </button>
-                    <button onclick="filterActivities('embed')" id="filter-btn-embed" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
-                        <i data-lucide="globe" class="w-3.5 h-3.5 inline mr-1 text-emerald-400"></i>
+                    <button onclick="filterActivities('embed')" id="filter-btn-embed" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="globe" class="w-3 h-3 inline mr-1 text-emerald-400"></i>
                         Auto Embed (<span id="filter-count-embed">0</span>)
                     </button>
-                    <button onclick="filterActivities('command')" id="filter-btn-command" class="activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
-                        <i data-lucide="terminal" class="w-3.5 h-3.5 inline mr-1 text-amber-400"></i>
+                    <button onclick="filterActivities('command')" id="filter-btn-command" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="terminal" class="w-3 h-3 inline mr-1 text-amber-400"></i>
                         Lệnh Bot (<span id="filter-count-command">0</span>)
                     </button>
                 </div>
 
-                <!-- Search Input & Actions -->
+                <!-- Search Input & Status Filter -->
                 <div class="flex items-center gap-2">
-                    <div class="relative flex-1 sm:w-64">
-                        <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <select id="activity-status-filter" onchange="handleActivityStatusFilter(this.value)" class="bg-dark-surface border border-dark-border text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        <option value="all">Mọi trạng thái</option>
+                        <option value="success">Thành công</option>
+                        <option value="error">Gặp lỗi</option>
+                    </select>
+
+                    <div class="relative flex-1 sm:w-48">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2"></i>
                         <input 
                             type="text" 
                             id="activity-search-input" 
                             oninput="handleActivitySearch(this.value)"
-                            placeholder="Tìm user, câu hỏi, server..." 
-                            class="w-full pl-9 pr-3 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            placeholder="Tìm user, server, text..." 
+                            class="w-full pl-7 pr-2.5 py-1 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                     </div>
-                    <button onclick="clearActivities()" title="Xóa lịch sử tương tác" class="p-2 rounded-lg bg-dark-surface hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-dark-border transition-colors">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <button onclick="clearActivities()" title="Xóa toàn bộ log tương tác" class="p-1.5 rounded-lg bg-dark-surface hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-dark-border transition-colors">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                 </div>
             </div>
 
-            <!-- Activities Feed List -->
-            <div class="bg-dark-card border border-dark-border rounded-xl p-4 flex flex-col gap-3 min-h-[500px]">
-                <div class="flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider pb-2 border-b border-dark-border px-2">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="clock" class="w-3.5 h-3.5"></i>
-                        <span>Thời Gian & Người Dùng</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
-                        <span>Tương Tác & Phản Hồi</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="info" class="w-3.5 h-3.5"></i>
-                        <span>Chi Tiết</span>
-                    </div>
-                </div>
-
-                <div id="activities-list-container" class="flex flex-col gap-2.5 overflow-y-auto max-h-[650px] pr-1">
-                    <!-- Activities populated via JS -->
-                    <div class="py-16 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
-                        <i data-lucide="inbox" class="w-8 h-8 text-slate-600"></i>
-                        <p class="text-sm">Đang tải danh sách hoạt động tương tác...</p>
-                    </div>
+            <!-- Activities Data Table Container -->
+            <div class="flex-1 min-h-0 bg-dark-card border border-dark-border rounded-xl flex flex-col overflow-hidden shadow-xl">
+                <div class="flex-1 min-h-0 overflow-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 z-10 bg-dark-surface border-b border-dark-border text-slate-400 uppercase text-[10px] tracking-wider select-none font-semibold">
+                            <tr>
+                                <th class="py-2.5 px-3 whitespace-nowrap">
+                                    <div class="flex items-center gap-1 cursor-pointer hover:text-white" onclick="toggleActivitySort()" title="Bấm để đổi chiều sắp xếp">
+                                        <i data-lucide="clock" class="w-3 h-3 text-slate-400"></i>
+                                        <span>Thời gian</span>
+                                        <i data-lucide="arrow-up-down" class="w-3 h-3 opacity-60"></i>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 whitespace-nowrap">
+                                    <div class="flex items-center gap-1">
+                                        <i data-lucide="user" class="w-3 h-3 text-slate-400"></i>
+                                        <span>Người dùng</span>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 whitespace-nowrap">
+                                    <div class="flex items-center gap-1">
+                                        <i data-lucide="server" class="w-3 h-3 text-slate-400"></i>
+                                        <span>Máy chủ & Kênh</span>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 whitespace-nowrap">
+                                    <div class="flex items-center gap-1">
+                                        <i data-lucide="layers" class="w-3 h-3 text-slate-400"></i>
+                                        <span>Loại tác vụ</span>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 min-w-[150px] max-w-[210px]">
+                                    <div class="flex items-center gap-1">
+                                        <i data-lucide="message-square" class="w-3 h-3 text-brand-400"></i>
+                                        <span>Yêu cầu (Prompt)</span>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 min-w-[160px] max-w-[240px]">
+                                    <div class="flex items-center gap-1">
+                                        <i data-lucide="bot" class="w-3 h-3 text-emerald-400"></i>
+                                        <span>Bot phản hồi</span>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 whitespace-nowrap text-center">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <i data-lucide="shield-check" class="w-3 h-3 text-slate-400"></i>
+                                        <span>Trạng thái</span>
+                                    </div>
+                                </th>
+                                <th class="py-2.5 px-3 whitespace-nowrap text-center">
+                                    <span>Chi tiết</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="activities-table-body" class="divide-y divide-dark-border/60 text-slate-300">
+                            <!-- Rows populated via JS -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
 
         <!-- ========================================== -->
-        <!-- TAB 2: SYSTEM OVERVIEW & METRICS -->
+        <!-- TAB 2: SERVERS / GUILDS MANAGEMENT -->
         <!-- ========================================== -->
-        <section id="tab-content-overview" class="tab-content hidden flex-col gap-6">
+        <section id="tab-content-guilds" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
+            <!-- Toolbar -->
+            <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-dark-card border border-dark-border rounded-xl p-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-300 font-medium">Danh sách các máy chủ Discord mà MikeDaBot đang có mặt</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="copyInviteLink()" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-all">
+                        <i data-lucide="link" class="w-3 h-3"></i>
+                        <span>Sao chép link mời</span>
+                    </button>
+                    <a id="guilds-invite-btn" href="#" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-600 hover:bg-brand-500 text-white shadow-sm transition-all">
+                        <i data-lucide="external-link" class="w-3 h-3"></i>
+                        <span>Mời Bot vào Server mới</span>
+                    </a>
+                    <button onclick="fetchGuildsData()" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-all">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        <span>Làm mới</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Guilds Grid Container -->
+            <div class="flex-1 min-h-0 bg-dark-card border border-dark-border rounded-xl p-3 overflow-y-auto">
+                <div id="guilds-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- Guild cards populated via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: SYSTEM OVERVIEW & METRICS -->
+        <!-- ========================================== -->
+        <section id="tab-content-overview" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
             <!-- Key Metric Cards Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
-                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Trạng Thái</span>
-                    <span id="overview-status" class="text-lg font-bold text-emerald-400 flex items-center gap-1.5">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-0.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Trạng Thái</span>
+                    <span id="overview-status" class="text-base font-bold text-emerald-400 flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
                     </span>
                 </div>
-                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
-                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Độ Trễ API</span>
-                    <span id="overview-latency" class="text-lg font-bold text-amber-400 code-font">-- ms</span>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-0.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Độ Trễ API</span>
+                    <span id="overview-latency" class="text-base font-bold text-amber-400 code-font">-- ms</span>
                 </div>
-                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
-                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Thời Gian Chạy</span>
-                    <span id="overview-uptime" class="text-lg font-bold text-white code-font">--</span>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-0.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Thời Gian Chạy</span>
+                    <span id="overview-uptime" class="text-base font-bold text-white code-font">--</span>
                 </div>
-                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
-                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Bộ Nhớ RAM</span>
-                    <span id="overview-ram" class="text-lg font-bold text-cyan-400 code-font">-- MB</span>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-0.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Bộ Nhớ RAM</span>
+                    <span id="overview-ram" class="text-base font-bold text-cyan-400 code-font">-- MB</span>
                 </div>
-                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
-                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Máy Chủ</span>
-                    <span id="overview-guilds" class="text-lg font-bold text-indigo-400 code-font">--</span>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-0.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Máy Chủ</span>
+                    <span id="overview-guilds" class="text-base font-bold text-indigo-400 code-font">--</span>
                 </div>
-                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-1">
-                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Thành Viên</span>
-                    <span id="overview-users" class="text-lg font-bold text-brand-400 code-font">--</span>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-0.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Thành Viên</span>
+                    <span id="overview-users" class="text-base font-bold text-brand-400 code-font">--</span>
                 </div>
             </div>
 
             <!-- Charts & Features Distribution -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-[300px]">
                 <!-- Latency History Chart (2 Cols) -->
-                <div class="lg:col-span-2 p-5 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-3">
+                <div class="lg:col-span-2 p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-2">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                            <i data-lucide="line-chart" class="w-4 h-4 text-amber-400"></i>
+                        <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                            <i data-lucide="line-chart" class="w-3.5 h-3.5 text-amber-400"></i>
                             Độ Trễ Phản Hồi Gateway (ms)
                         </h3>
-                        <span class="text-xs text-slate-400 code-font">20 mẫu gần nhất</span>
+                        <span class="text-[11px] text-slate-400 code-font">20 mẫu gần nhất</span>
                     </div>
-                    <div class="h-60 w-full">
+                    <div class="flex-1 min-h-[220px] w-full">
                         <canvas id="latencyChart"></canvas>
                     </div>
                 </div>
 
                 <!-- AI Models & System Information (1 Col) -->
-                <div class="p-5 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-4">
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i data-lucide="cpu" class="w-4 h-4 text-brand-500"></i>
+                <div class="p-4 rounded-xl bg-dark-card border border-dark-border flex flex-col gap-2.5">
+                    <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i data-lucide="cpu" class="w-3.5 h-3.5 text-brand-500"></i>
                         Cấu Hình Mô Hình & Môi Trường
                     </h3>
-                    <div class="flex flex-col gap-2.5 text-xs text-slate-300">
+                    <div class="flex flex-col gap-2 text-xs text-slate-300">
                         <div class="flex items-center justify-between p-2 rounded-lg bg-dark-surface border border-dark-border/80">
                             <span class="text-slate-400">AI Engine:</span>
                             <span class="font-semibold text-white">Google Gemini</span>
@@ -304,60 +387,60 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- TAB 3: LIVE CONSOLE LOGS -->
+        <!-- TAB 4: LIVE CONSOLE LOGS -->
         <!-- ========================================== -->
-        <section id="tab-content-logs" class="tab-content hidden flex-col gap-3.5">
+        <section id="tab-content-logs" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
             <!-- Toolbar -->
-            <div class="flex flex-wrap items-center justify-between gap-3 bg-dark-card border border-dark-border rounded-xl p-3.5">
-                <div class="flex items-center gap-2">
-                    <button onclick="filterLogs('all')" id="log-filter-all" class="log-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40">
-                        Tất cả
+            <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-dark-card border border-dark-border rounded-xl p-2.5">
+                <div class="flex items-center gap-1.5">
+                    <button onclick="filterLogs('all')" id="log-filter-all" class="log-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40">
+                        Tất cả (<span id="log-count-all">0</span>)
                     </button>
-                    <button onclick="filterLogs('error')" id="log-filter-error" class="log-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
-                        <i data-lucide="alert-octagon" class="w-3.5 h-3.5 inline mr-1 text-rose-400"></i>
-                        Chỉ Lỗi
+                    <button onclick="filterLogs('error')" id="log-filter-error" class="log-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="alert-octagon" class="w-3 h-3 inline mr-1 text-rose-400"></i>
+                        Chỉ Lỗi (<span id="log-count-error">0</span>)
                     </button>
-                    <button onclick="filterLogs('warn')" id="log-filter-warn" class="log-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
-                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 inline mr-1 text-amber-400"></i>
-                        Cảnh báo
+                    <button onclick="filterLogs('warn')" id="log-filter-warn" class="log-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="alert-triangle" class="w-3 h-3 inline mr-1 text-amber-400"></i>
+                        Cảnh báo (<span id="log-count-warn">0</span>)
                     </button>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative w-48 sm:w-64">
-                        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                    <div class="relative w-44 sm:w-56">
+                        <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
                         <input 
                             type="text" 
                             id="log-search-input" 
                             oninput="handleLogSearch(this.value)"
                             placeholder="Tìm kiếm log..." 
-                            class="w-full pl-8 pr-3 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            class="w-full pl-8 pr-3 py-1 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                     </div>
-                    <button onclick="copyLogs()" title="Sao chép log" class="p-2 rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-colors">
-                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    <button onclick="copyLogs()" title="Sao chép log" class="p-1.5 rounded-lg bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border transition-colors">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                     </button>
-                    <button onclick="clearLogs()" title="Xóa log" class="p-2 rounded-lg bg-dark-surface hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-dark-border transition-colors">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <button onclick="clearLogs()" title="Xóa log" class="p-1.5 rounded-lg bg-dark-surface hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 border border-dark-border transition-colors">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                     </button>
                 </div>
             </div>
 
             <!-- Terminal Window -->
-            <div class="rounded-xl border border-dark-border bg-dark-terminal overflow-hidden shadow-2xl flex flex-col h-[650px]">
-                <div class="bg-slate-900/90 border-b border-dark-border px-4 py-2.5 flex items-center justify-between">
+            <div class="flex-1 min-h-0 rounded-xl border border-dark-border bg-dark-terminal overflow-hidden shadow-2xl flex flex-col">
+                <div class="flex-shrink-0 bg-slate-900/90 border-b border-dark-border px-3 py-1.5 flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-full bg-rose-500/80"></span>
-                        <span class="w-3 h-3 rounded-full bg-amber-500/80"></span>
-                        <span class="w-3 h-3 rounded-full bg-emerald-500/80"></span>
-                        <span class="text-xs text-slate-400 font-mono ml-2">stdout & stderr stream</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                        <span class="text-[11px] text-slate-400 font-mono ml-2">stdout & stderr stream</span>
                     </div>
-                    <label class="inline-flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
+                    <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer">
                         <input type="checkbox" id="auto-scroll-toggle" checked class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
                         <span>Tự cuộn xuống</span>
                     </label>
                 </div>
-                <div id="logs-container" class="flex-1 p-4 overflow-y-auto code-font text-xs leading-relaxed space-y-1 text-slate-300 select-text">
+                <div id="logs-container" class="flex-1 p-3 overflow-y-auto code-font text-[11px] leading-relaxed space-y-0.5 text-slate-300 select-text">
                     <!-- Logs populated via JS -->
                 </div>
             </div>
@@ -369,28 +452,28 @@
     <div id="activity-detail-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4">
         <div class="bg-dark-card border border-dark-border rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <!-- Modal Header -->
-            <div class="p-4 border-b border-dark-border flex items-center justify-between bg-dark-surface/50">
+            <div class="p-3.5 border-b border-dark-border flex items-center justify-between bg-dark-surface/50">
                 <div class="flex items-center gap-2.5">
-                    <div id="modal-action-icon" class="p-2 rounded-lg bg-brand-600/20 text-brand-400">
-                        <i data-lucide="activity" class="w-5 h-5"></i>
+                    <div id="modal-action-icon" class="p-1.5 rounded-lg bg-brand-600/20 text-brand-400">
+                        <i data-lucide="activity" class="w-4 h-4"></i>
                     </div>
                     <div>
                         <h3 id="modal-action-name" class="font-bold text-sm text-white">Chi Tiết Tương Tác</h3>
                         <p id="modal-action-meta" class="text-xs text-slate-400">Thời gian • User</p>
                     </div>
                 </div>
-                <button onclick="closeDetailModal()" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+                <button onclick="closeDetailModal()" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
                 </button>
             </div>
 
             <!-- Modal Content Body -->
-            <div class="p-5 overflow-y-auto space-y-4 text-xs leading-relaxed">
+            <div class="p-4 overflow-y-auto space-y-3 text-xs leading-relaxed">
                 <!-- User & Channel Meta Info -->
-                <div class="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-dark-surface border border-dark-border">
+                <div class="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-dark-surface border border-dark-border">
                     <div>
                         <span class="text-slate-500 font-semibold block uppercase text-[10px]">Người dùng</span>
-                        <div class="flex items-center gap-1.5 mt-1 font-medium text-white">
+                        <div class="flex items-center gap-1.5 mt-0.5 font-medium text-white">
                             <img id="modal-user-avatar" src="" class="w-5 h-5 rounded-full object-cover">
                             <span id="modal-user-name">User</span>
                             <span id="modal-user-id" class="text-slate-500 code-font text-[10px]">(ID)</span>
@@ -398,7 +481,7 @@
                     </div>
                     <div>
                         <span class="text-slate-500 font-semibold block uppercase text-[10px]">Vị trí</span>
-                        <div class="mt-1 font-medium text-slate-200" id="modal-location">
+                        <div class="mt-0.5 font-medium text-slate-200" id="modal-location">
                             Server / #channel
                         </div>
                     </div>
@@ -406,44 +489,82 @@
 
                 <!-- User Prompt / Input -->
                 <div>
-                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1.5">
+                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1">
                         <i data-lucide="message-square" class="w-3.5 h-3.5 inline mr-1 text-brand-400"></i>
                         Yêu Cầu / Câu Hỏi Của User:
                     </label>
-                    <div id="modal-prompt" class="p-3 rounded-xl bg-dark-surface border border-dark-border text-slate-100 whitespace-pre-wrap code-font">
+                    <div id="modal-prompt" class="p-2.5 rounded-xl bg-dark-surface border border-dark-border text-slate-100 whitespace-pre-wrap code-font">
                         --
                     </div>
                 </div>
 
                 <!-- Bot Response / Output -->
                 <div>
-                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1.5">
+                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1">
                         <i data-lucide="bot" class="w-3.5 h-3.5 inline mr-1 text-emerald-400"></i>
                         Phản Hồi Từ MikeDaBot:
                     </label>
-                    <div id="modal-response" class="p-3.5 rounded-xl bg-dark-terminal border border-dark-border text-slate-200 whitespace-pre-wrap max-h-72 overflow-y-auto leading-relaxed">
+                    <div id="modal-response" class="p-3 rounded-xl bg-dark-terminal border border-dark-border text-slate-200 whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed">
                         --
                     </div>
                 </div>
 
                 <!-- Additional Details / Cards / Model -->
                 <div id="modal-details-container" class="hidden">
-                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1.5">
+                    <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1">
                         <i data-lucide="layers" class="w-3.5 h-3.5 inline mr-1 text-purple-400"></i>
                         Dữ Liệu Mở Rộng:
                     </label>
-                    <pre id="modal-details" class="p-3 rounded-xl bg-dark-surface border border-dark-border text-slate-300 text-[11px] code-font overflow-x-auto"></pre>
+                    <pre id="modal-details" class="p-2.5 rounded-xl bg-dark-surface border border-dark-border text-slate-300 text-[10px] code-font overflow-x-auto"></pre>
                 </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="p-3 border-t border-dark-border bg-dark-surface/50 flex justify-end">
-                <button onclick="closeDetailModal()" class="px-4 py-1.5 rounded-lg bg-dark-surface hover:bg-slate-700 text-xs font-semibold text-white border border-dark-border transition-colors">
+            <div class="p-2.5 border-t border-dark-border bg-dark-surface/50 flex justify-end">
+                <button onclick="closeDetailModal()" class="px-3 py-1 rounded-lg bg-dark-surface hover:bg-slate-700 text-xs font-semibold text-white border border-dark-border transition-colors">
                     Đóng
                 </button>
             </div>
         </div>
     </div>
+
+    <!-- Reusable Action Confirmation & Prompt Modal -->
+    <div id="action-confirm-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-dark-card border border-dark-border rounded-2xl max-w-md w-full p-4 flex flex-col gap-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <div class="flex items-start gap-3">
+                <div id="confirm-modal-icon-container" class="p-2 rounded-xl bg-amber-500/20 text-amber-400 flex-shrink-0">
+                    <i id="confirm-modal-icon" data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 id="confirm-modal-title" class="font-bold text-sm text-white">Xác nhận hành động</h3>
+                    <p id="confirm-modal-message" class="text-xs text-slate-400 mt-1 leading-relaxed whitespace-pre-line">Nội dung xác nhận...</p>
+                </div>
+            </div>
+
+            <!-- Optional Input Field -->
+            <div id="confirm-modal-input-container" class="hidden flex-col gap-1 mt-1">
+                <label id="confirm-modal-input-label" class="text-[11px] font-semibold text-slate-300">Nhập thông tin:</label>
+                <input 
+                    type="text" 
+                    id="confirm-modal-input" 
+                    class="w-full px-3 py-1.5 bg-dark-surface border border-dark-border rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-dark-border/60 mt-1">
+                <button onclick="closeConfirmModal(false)" class="px-3 py-1.5 rounded-lg bg-dark-surface hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-dark-border transition-colors">
+                    Hủy bỏ
+                </button>
+                <button id="confirm-modal-ok-btn" onclick="closeConfirmModal(true)" class="px-3.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs font-semibold text-white shadow-sm transition-all">
+                    Xác nhận
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast / Snackbar Notifications Floating Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full"></div>
 
     <!-- Client-side Logic Script -->
     <script>
@@ -454,9 +575,143 @@
         let logFilterType = 'all';
         let logSearchQuery = '';
         let cachedActivities = [];
+        let cachedGuilds = [];
         let cachedLogs = [];
-        let latencyHistory = [];
         let latencyChart = null;
+        let botInviteUrl = "";
+        let confirmModalCallback = null;
+
+        // ==========================================
+        // TOAST / SNACKBAR NOTIFICATION SYSTEM
+        // ==========================================
+        function showToast(message, type = 'success', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const toastId = 'toast-' + Date.now();
+            toast.id = toastId;
+
+            let iconHtml = '';
+            let borderBgClass = '';
+
+            if (type === 'success') {
+                iconHtml = '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>';
+                borderBgClass = 'border-emerald-500/30 bg-emerald-950/90 text-emerald-100 shadow-emerald-900/30';
+            } else if (type === 'error') {
+                iconHtml = '<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 flex-shrink-0"></i>';
+                borderBgClass = 'border-rose-500/30 bg-rose-950/90 text-rose-100 shadow-rose-900/30';
+            } else if (type === 'warning') {
+                iconHtml = '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>';
+                borderBgClass = 'border-amber-500/30 bg-amber-950/90 text-amber-100 shadow-amber-900/30';
+            } else {
+                iconHtml = '<i data-lucide="info" class="w-4 h-4 text-brand-400 flex-shrink-0"></i>';
+                borderBgClass = 'border-brand-500/30 bg-slate-900/95 text-slate-100 shadow-brand-900/30';
+            }
+
+            toast.className = `flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border ${borderBgClass} backdrop-blur-xl shadow-2xl text-xs font-medium transform transition-all duration-300 translate-y-3 opacity-0 pointer-events-auto select-none`;
+
+            toast.innerHTML = `
+                ${iconHtml}
+                <span class="flex-1 leading-snug">${escapeHtml(message)}</span>
+                <button onclick="dismissToast('${toastId}')" class="text-white/60 hover:text-white transition-colors ml-1 p-0.5">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+            `;
+
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-3', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            });
+
+            setTimeout(() => {
+                dismissToast(toastId);
+            }, duration);
+        }
+
+        function dismissToast(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.remove('translate-y-0', 'opacity-100');
+            el.classList.add('translate-y-2', 'opacity-0');
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 300);
+        }
+
+        // ==========================================
+        // ACTION CONFIRMATION MODAL ENGINE
+        // ==========================================
+        function showConfirmModal({ title, message, requireInput = false, inputLabel = "Nhập thông tin:", inputPlaceholder = "", defaultValue = "", confirmText = "Xác nhận", isDanger = false, onConfirm }) {
+            document.getElementById('confirm-modal-title').textContent = title || "Xác nhận";
+            document.getElementById('confirm-modal-message').textContent = message || "";
+            
+            const inputContainer = document.getElementById('confirm-modal-input-container');
+            const inputField = document.getElementById('confirm-modal-input');
+            const inputLabelEl = document.getElementById('confirm-modal-input-label');
+            const okBtn = document.getElementById('confirm-modal-ok-btn');
+            const iconContainer = document.getElementById('confirm-modal-icon-container');
+
+            if (requireInput) {
+                inputContainer.classList.remove('hidden');
+                inputContainer.classList.add('flex');
+                inputLabelEl.textContent = inputLabel;
+                inputField.placeholder = inputPlaceholder;
+                inputField.value = defaultValue;
+            } else {
+                inputContainer.classList.add('hidden');
+                inputContainer.classList.remove('flex');
+                inputField.value = '';
+            }
+
+            if (isDanger) {
+                iconContainer.className = "p-2 rounded-xl bg-rose-500/20 text-rose-400 flex-shrink-0";
+                okBtn.className = "px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white shadow-sm transition-all";
+            } else {
+                iconContainer.className = "p-2 rounded-xl bg-brand-500/20 text-brand-400 flex-shrink-0";
+                okBtn.className = "px-3.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-xs font-semibold text-white shadow-sm transition-all";
+            }
+
+            okBtn.textContent = confirmText;
+            confirmModalCallback = onConfirm;
+
+            const modal = document.getElementById('action-confirm-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+
+            if (requireInput) {
+                setTimeout(() => inputField.focus(), 50);
+            }
+        }
+
+        function closeConfirmModal(isConfirm) {
+            const modal = document.getElementById('action-confirm-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            if (isConfirm && confirmModalCallback) {
+                const inputField = document.getElementById('confirm-modal-input');
+                const val = inputField.value;
+                confirmModalCallback(val);
+            }
+            confirmModalCallback = null;
+        }
+
+        function copyInviteLink() {
+            if (!botInviteUrl) {
+                showToast("Bot đang offline hoặc chưa lấy được Client ID.", "warning");
+                return;
+            }
+            navigator.clipboard.writeText(botInviteUrl).then(() => {
+                showToast("Đã sao chép link mời bot (Quyền tối thiểu) vào Clipboard!", "success");
+            }).catch(() => {
+                showToast("Không thể tự động sao chép link mời.", "error");
+            });
+        }
 
         // Init Chart.js
         function initLatencyChart() {
@@ -474,7 +729,7 @@
                         fill: true,
                         tension: 0.4,
                         pointRadius: 2,
-                        pointHoverRadius: 5
+                        pointHoverRadius: 4
                     }]
                 },
                 options: {
@@ -498,15 +753,17 @@
             currentTab = tab;
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => {
-                el.className = "tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all";
+                el.className = "tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all";
             });
 
             document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
             const activeBtn = document.getElementById(`tab-btn-${tab}`);
-            activeBtn.className = "tab-btn inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
+            activeBtn.className = "tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
             
             if (tab === 'overview' && !latencyChart) {
                 initLatencyChart();
+            } else if (tab === 'guilds') {
+                fetchGuildsData();
             }
             lucide.createIcons();
         }
@@ -515,106 +772,166 @@
         function getActionBadge(type) {
             switch(type) {
                 case 'tarot':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30">
                         <i data-lucide="sparkles" class="w-3 h-3 text-purple-400"></i> Tarot AI
                     </span>`;
                 case 'summary':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30">
                         <i data-lucide="file-text" class="w-3 h-3 text-blue-400"></i> Tóm Tắt
                     </span>`;
                 case 'embed':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                         <i data-lucide="globe" class="w-3 h-3 text-emerald-400"></i> Auto Embed
                     </span>`;
                 case 'command':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                         <i data-lucide="terminal" class="w-3 h-3 text-amber-400"></i> Lệnh Bot
                     </span>`;
                 default:
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/30">
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/30">
                         <i data-lucide="activity" class="w-3 h-3"></i> Tương tác
                     </span>`;
             }
         }
 
-        // Render Activities
+        // Activity Filters & Sorting
+        let activityStatusFilter = 'all';
+        let activitySortOrder = 'desc';
+
+        function handleActivityStatusFilter(val) {
+            activityStatusFilter = val;
+            renderActivities();
+        }
+
+        function toggleActivitySort() {
+            activitySortOrder = activitySortOrder === 'desc' ? 'asc' : 'desc';
+            renderActivities();
+        }
+
+        // Render Activities as Data Table
         function renderActivities() {
-            const container = document.getElementById('activities-list-container');
-            let items = cachedActivities;
+            const tbody = document.getElementById('activities-table-body');
+            if (!tbody) return;
+
+            let items = [...cachedActivities];
 
             if (currentActivityFilter !== 'all') {
                 items = items.filter(a => a.action_type === currentActivityFilter);
             }
 
+            if (activityStatusFilter !== 'all') {
+                items = items.filter(a => a.status === activityStatusFilter);
+            }
+
             if (activitySearchQuery) {
                 const q = activitySearchQuery.toLowerCase();
                 items = items.filter(a => 
-                    a.user_name.toLowerCase().includes(q) ||
-                    a.prompt.toLowerCase().includes(q) ||
-                    a.response.toLowerCase().includes(q) ||
-                    a.guild_name.toLowerCase().includes(q) ||
-                    a.action_name.toLowerCase().includes(q)
+                    (a.user_name && a.user_name.toLowerCase().includes(q)) ||
+                    (a.prompt && a.prompt.toLowerCase().includes(q)) ||
+                    (a.response && a.response.toLowerCase().includes(q)) ||
+                    (a.guild_name && a.guild_name.toLowerCase().includes(q)) ||
+                    (a.action_name && a.action_name.toLowerCase().includes(q))
                 );
             }
 
+            if (activitySortOrder === 'asc') {
+                items.sort((a, b) => a.id - b.id);
+            } else {
+                items.sort((a, b) => b.id - a.id);
+            }
+
             if (items.length === 0) {
-                container.innerHTML = `
-                    <div class="py-16 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
-                        <i data-lucide="inbox" class="w-8 h-8 text-slate-600"></i>
-                        <p class="text-sm">Chưa có tương tác nào phù hợp với bộ lọc.</p>
-                    </div>
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="py-12 text-center text-slate-500">
+                            <div class="flex flex-col items-center justify-center gap-1.5">
+                                <i data-lucide="inbox" class="w-7 h-7 text-slate-600"></i>
+                                <p class="text-xs">Chưa có log tương tác nào phù hợp với bộ lọc.</p>
+                            </div>
+                        </td>
+                    </tr>
                 `;
                 lucide.createIcons();
                 return;
             }
 
-            container.innerHTML = items.map((a, idx) => {
+            tbody.innerHTML = items.map(a => {
                 const avatar = a.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.user_name)}&background=8b5cf6&color=fff`;
-                const promptSnippet = a.prompt ? (a.prompt.length > 80 ? a.prompt.substring(0, 80) + '...' : a.prompt) : 'Không có prompt';
-                const responseSnippet = a.response ? (a.response.length > 100 ? a.response.substring(0, 100) + '...' : a.response) : 'Không có response';
+                const promptSnippet = a.prompt ? (a.prompt.length > 55 ? a.prompt.substring(0, 55) + '...' : a.prompt) : '—';
+                const responseSnippet = a.response ? (a.response.length > 65 ? a.response.substring(0, 65) + '...' : a.response) : '—';
                 const statusBadge = a.status === 'success' 
                     ? `<span class="inline-flex items-center text-[10px] text-emerald-400 font-semibold"><i data-lucide="check-circle" class="w-3 h-3 inline mr-1"></i> Thành công</span>`
                     : `<span class="inline-flex items-center text-[10px] text-rose-400 font-semibold"><i data-lucide="x-circle" class="w-3 h-3 inline mr-1"></i> Lỗi</span>`;
 
+                let durText = '0ms';
+                if (a.duration_ms !== undefined && a.duration_ms !== null) {
+                    if (a.duration_ms >= 1000) {
+                        durText = (a.duration_ms / 1000).toFixed(2) + 's';
+                    } else {
+                        durText = Math.round(a.duration_ms) + 'ms';
+                    }
+                }
+
                 return `
-                    <div onclick="openDetailModal(${a.id})" class="p-3.5 rounded-xl bg-dark-surface/70 hover:bg-dark-surface border border-dark-border hover:border-brand-500/40 transition-all cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group">
-                        <!-- Col 1: Time & User -->
-                        <div class="flex items-center gap-3 min-w-[200px]">
-                            <img src="${avatar}" alt="${a.user_name}" class="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 flex-shrink-0">
-                            <div class="overflow-hidden">
-                                <div class="font-semibold text-xs text-white truncate flex items-center gap-1.5">
-                                    <span>${escapeHtml(a.user_name)}</span>
-                                </div>
-                                <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                                    <span class="code-font text-slate-300">${a.time_short}</span>
-                                    <span>•</span>
-                                    <span class="truncate max-w-[110px]" title="${escapeHtml(a.guild_name)}">${escapeHtml(a.guild_name)}</span>
-                                </div>
-                            </div>
-                        </div>
+                    <tr class="hover:bg-dark-surface/60 transition-colors group">
+                        <!-- 1. Time -->
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <span class="code-font text-slate-300 font-medium">${a.time_short}</span>
+                        </td>
 
-                        <!-- Col 2: Action Badge & Prompt Snippet -->
-                        <div class="flex-1 min-w-0 pr-2">
-                            <div class="flex items-center gap-2 mb-1">
+                        <!-- 2. User -->
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                <img src="${avatar}" alt="${a.user_name}" class="w-6 h-6 rounded-md object-cover ring-1 ring-white/10 flex-shrink-0">
+                                <span class="font-semibold text-xs text-white truncate max-w-[110px]" title="${escapeHtml(a.user_name)}">${escapeHtml(a.user_name)}</span>
+                            </div>
+                        </td>
+
+                        <!-- 3. Server & Channel -->
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <div class="text-xs text-slate-200 truncate max-w-[130px]" title="${escapeHtml(a.guild_name)}">${escapeHtml(a.guild_name)}</div>
+                            <div class="text-[10px] text-slate-400 truncate max-w-[130px]">#${escapeHtml(a.channel_name)}</div>
+                        </td>
+
+                        <!-- 4. Type & Action Name -->
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
                                 ${getActionBadge(a.action_type)}
-                                <span class="text-xs font-semibold text-slate-200 truncate">${escapeHtml(a.action_name)}</span>
                             </div>
-                            <div class="text-xs text-slate-300 line-clamp-1 code-font">
-                                <span class="text-brand-400 font-medium">Hỏi:</span> "${escapeHtml(promptSnippet)}"
-                            </div>
-                        </div>
+                            <div class="text-[10px] text-slate-400 truncate max-w-[120px] mt-0.5" title="${escapeHtml(a.action_name)}">${escapeHtml(a.action_name)}</div>
+                        </td>
 
-                        <!-- Col 3: Status, Duration & Arrow -->
-                        <div class="flex items-center gap-3 flex-shrink-0">
-                            <div class="text-right hidden sm:block">
-                                ${statusBadge}
-                                <div class="text-[10px] text-slate-500 code-font">${a.duration_ms}ms</div>
+                        <!-- 5. Prompt -->
+                        <td class="py-2.5 px-3 min-w-[150px] max-w-[210px]">
+                            <div class="text-xs text-slate-300 truncate code-font" title="${escapeHtml(a.prompt)}">
+                                ${escapeHtml(promptSnippet)}
                             </div>
-                            <div class="p-1.5 rounded-lg bg-dark-border/50 group-hover:bg-brand-600/20 group-hover:text-brand-300 text-slate-400 transition-colors">
-                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </td>
+
+                        <!-- 6. Response -->
+                        <td class="py-2.5 px-3 min-w-[160px] max-w-[240px]">
+                            <div class="text-xs text-slate-300 truncate" title="${escapeHtml(a.response)}">
+                                ${escapeHtml(responseSnippet)}
                             </div>
-                        </div>
-                    </div>
+                        </td>
+
+                        <!-- 7. Status & Duration -->
+                        <td class="py-2.5 px-3 whitespace-nowrap text-center">
+                            <div>${statusBadge}</div>
+                            <div class="text-[10px] font-semibold text-amber-300/90 code-font flex items-center justify-center gap-0.5 mt-0.5">
+                                <i data-lucide="timer" class="w-2.5 h-2.5 text-amber-400"></i>
+                                <span>${durText}</span>
+                            </div>
+                        </td>
+
+                        <!-- 8. View More Action -->
+                        <td class="py-2.5 px-3 whitespace-nowrap text-center">
+                            <button onclick="openDetailModal(${a.id})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-brand-600/15 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 text-[11px] font-semibold transition-all active:scale-95">
+                                <i data-lucide="eye" class="w-3 h-3"></i>
+                                <span>Chi tiết</span>
+                            </button>
+                        </td>
+                    </tr>
                 `;
             }).join('');
 
@@ -624,11 +941,11 @@
         function filterActivities(type) {
             currentActivityFilter = type;
             document.querySelectorAll('.activity-filter-btn').forEach(el => {
-                el.className = "activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border";
+                el.className = "activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border";
             });
             const activeBtn = document.getElementById(`filter-btn-${type}`);
             if (activeBtn) {
-                activeBtn.className = "activity-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
+                activeBtn.className = "activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
             }
             renderActivities();
         }
@@ -643,8 +960,13 @@
             const item = cachedActivities.find(a => a.id === id);
             if (!item) return;
 
+            let durFormatted = '0ms';
+            if (item.duration_ms !== undefined && item.duration_ms !== null) {
+                durFormatted = item.duration_ms >= 1000 ? (item.duration_ms / 1000).toFixed(2) + 's' : Math.round(item.duration_ms) + 'ms';
+            }
+
             document.getElementById('modal-action-name').textContent = item.action_name;
-            document.getElementById('modal-action-meta').textContent = `${item.timestamp} • ID: #${item.id} • ${item.duration_ms}ms`;
+            document.getElementById('modal-action-meta').textContent = `${item.timestamp} • ID: #${item.id} • Tổng thời gian: ${durFormatted}`;
             document.getElementById('modal-user-avatar').src = item.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.user_name)}&background=8b5cf6&color=fff`;
             document.getElementById('modal-user-name').textContent = item.user_name;
             document.getElementById('modal-user-id').textContent = `(${item.user_id})`;
@@ -673,17 +995,211 @@
         }
 
         async function clearActivities() {
-            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ lịch sử hoạt động tương tác không?")) return;
+            showConfirmModal({
+                title: "Xóa Lịch Sử Tương Tác",
+                message: "Bạn có chắc chắn muốn làm sạch toàn bộ log tương tác người dùng hiện tại không?",
+                confirmText: "Xóa tất cả",
+                isDanger: true,
+                onConfirm: async () => {
+                    try {
+                        await fetch('/api/activities/clear', { method: 'POST' });
+                        cachedActivities = [];
+                        renderActivities();
+                        showToast("Đã xóa sạch toàn bộ log tương tác.", "info");
+                    } catch (err) {
+                        showToast("Lỗi khi xóa lịch sử tương tác.", "error");
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // GUILDS / SERVERS MANAGEMENT
+        // ==========================================
+        async function fetchGuildsData() {
             try {
-                await fetch('/api/activities/clear', { method: 'POST' });
-                cachedActivities = [];
-                renderActivities();
+                const res = await fetch('/api/guilds');
+                if (res.ok) {
+                    const data = await res.json();
+                    cachedGuilds = data.guilds || [];
+                    document.getElementById('badge-total-guilds').textContent = data.total || 0;
+                    renderGuilds();
+                }
             } catch (err) {
-                alert("Lỗi khi xóa lịch sử tương tác.");
+                console.error("Lỗi khi lấy danh sách máy chủ:", err);
             }
         }
 
-        // Render Logs
+        function renderGuilds() {
+            const container = document.getElementById('guilds-grid-container');
+            if (cachedGuilds.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+                        <i data-lucide="server-off" class="w-8 h-8 text-slate-600"></i>
+                        <p class="text-xs">Hiện tại Bot chưa tham gia vào máy chủ nào hoặc Bot đang offline.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = cachedGuilds.map(g => {
+                const iconHtml = g.icon 
+                    ? `<img src="${g.icon}" class="w-11 h-11 rounded-xl object-cover ring-1 ring-white/10 flex-shrink-0">`
+                    : `<div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center font-bold text-white text-base ring-1 ring-white/10 flex-shrink-0">${escapeHtml(g.name.substring(0, 2).toUpperCase())}</div>`;
+
+                const statusBadge = g.is_suspended
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                        <i data-lucide="ban" class="w-3 h-3 text-rose-400"></i> Đã Tạm Ngưng
+                    </span>`
+                    : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i> Đang Hoạt Động
+                    </span>`;
+
+                const suspendActionBtn = g.is_suspended
+                    ? `<button onclick="handleUnsuspendGuild('${g.id}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 transition-all flex items-center justify-center gap-1.5">
+                        <i data-lucide="play" class="w-3 h-3"></i> Mở Lại Hoạt Động
+                    </button>`
+                    : `<button onclick="handleSuspendGuild('${g.id}', '${escapeHtml(g.name)}')" class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all flex items-center justify-center gap-1.5">
+                        <i data-lucide="pause" class="w-3 h-3"></i> Tạm Ngưng (Suspend)
+                    </button>`;
+
+                return `
+                    <div class="p-3.5 rounded-xl bg-dark-surface/80 border ${g.is_suspended ? 'border-rose-500/40 bg-rose-500/5' : 'border-dark-border'} flex flex-col justify-between gap-3 shadow-lg">
+                        <!-- Top: Server Info -->
+                        <div class="flex items-start gap-3">
+                            ${iconHtml}
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1 mb-1">
+                                    <h4 class="font-bold text-xs text-white truncate" title="${escapeHtml(g.name)}">${escapeHtml(g.name)}</h4>
+                                </div>
+                                <div class="text-[10px] text-slate-400 code-font truncate mb-1">ID: ${g.id}</div>
+                                <div>${statusBadge}</div>
+                            </div>
+                        </div>
+
+                        <!-- Stats Row -->
+                        <div class="grid grid-cols-2 gap-2 py-2 px-2.5 rounded-lg bg-dark-bg/60 border border-dark-border/60 text-[11px]">
+                            <div class="flex items-center gap-1.5 text-slate-300">
+                                <i data-lucide="users" class="w-3.5 h-3.5 text-brand-400"></i>
+                                <span><strong>${g.member_count}</strong> thành viên</span>
+                            </div>
+                            <div class="flex items-center gap-1.5 text-slate-400">
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                <span>Tham gia: ${g.joined_at || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                        <!-- Action Controls -->
+                        <div class="flex items-center gap-2 pt-1">
+                            ${suspendActionBtn}
+                            <button onclick="handleLeaveGuild('${g.id}', '${escapeHtml(g.name)}')" title="Buộc Bot rời khỏi server này" class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/20 transition-all">
+                                <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        async function handleSuspendGuild(guildId, guildName) {
+            showConfirmModal({
+                title: "Tạm Ngưng (Suspend) Server",
+                message: `Server "${guildName}" sẽ bị chặn gọi tất cả lệnh AI & Slash commands của bot.`,
+                requireInput: true,
+                inputLabel: "Lý do tạm ngưng:",
+                inputPlaceholder: "Nhập lý do tạm ngưng...",
+                defaultValue: "Admin tạm ngưng theo yêu cầu quản trị",
+                confirmText: "Tạm ngưng",
+                isDanger: true,
+                onConfirm: async (reason) => {
+                    try {
+                        const res = await fetch('/api/guilds/suspend', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ guild_id: guildId, reason: reason || "Admin tạm ngưng" })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(`Đã tạm ngưng server "${guildName}". Bot sẽ từ chối mọi lệnh từ server này!`, "warning");
+                            await fetchGuildsData();
+                        } else {
+                            showToast("Lỗi: " + data.error, "error");
+                        }
+                    } catch (err) {
+                        showToast("Lỗi kết nối khi tạm ngưng server.", "error");
+                    }
+                }
+            });
+        }
+
+        async function handleUnsuspendGuild(guildId) {
+            showConfirmModal({
+                title: "Mở Lại Hoạt Động Server",
+                message: "Bạn có muốn gỡ tạm ngưng và kích hoạt lại quyền sử dụng bot cho server này?",
+                confirmText: "Kích hoạt lại",
+                isDanger: false,
+                onConfirm: async () => {
+                    try {
+                        const res = await fetch('/api/guilds/unsuspend', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ guild_id: guildId })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast("Đã gỡ tạm ngưng thành công! Server có thể sử dụng lại bot.", "success");
+                            await fetchGuildsData();
+                        } else {
+                            showToast("Lỗi: " + data.error, "error");
+                        }
+                    } catch (err) {
+                        showToast("Lỗi kết nối khi gỡ tạm ngưng.", "error");
+                    }
+                }
+            });
+        }
+
+        async function handleLeaveGuild(guildId, guildName) {
+            showConfirmModal({
+                title: "Buộc Bot Rời Khỏi Server",
+                message: `⚠️ CẢNH BÁO: Bạn đang yêu cầu bot rời khỏi server "${guildName}".\n\nSau khi rời, chủ server phải dùng link mời để thêm lại bot.\n\nNhập chính xác chữ "XÁC NHẬN" bên dưới để tiếp tục:`,
+                requireInput: true,
+                inputLabel: "Xác nhận hành động:",
+                inputPlaceholder: 'Nhập "XÁC NHẬN"...',
+                confirmText: "Rời khỏi server",
+                isDanger: true,
+                onConfirm: async (inputVal) => {
+                    if (!inputVal || inputVal.trim().toUpperCase() !== "XÁC NHẬN") {
+                        showToast("Xác nhận không chính xác. Đã hủy thao tác rời server!", "warning");
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch('/api/guilds/leave', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ guild_id: guildId })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast(`MikeDaBot đã rời khỏi server "${guildName}" thành công.`, "info");
+                            await fetchGuildsData();
+                        } else {
+                            showToast("Lỗi: " + data.error, "error");
+                        }
+                    } catch (err) {
+                        showToast("Lỗi kết nối khi yêu cầu bot rời server.", "error");
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // CONSOLE LOGS
+        // ==========================================
         function renderLogs() {
             const container = document.getElementById('logs-container');
             let lines = cachedLogs;
@@ -725,11 +1241,11 @@
         function filterLogs(type) {
             logFilterType = type;
             document.querySelectorAll('.log-filter-btn').forEach(el => {
-                el.className = "log-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border";
+                el.className = "log-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border";
             });
             const btn = document.getElementById(`log-filter-${type}`);
             if (btn) {
-                btn.className = "log-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
+                btn.className = "log-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
             }
             renderLogs();
         }
@@ -741,20 +1257,34 @@
 
         function copyLogs() {
             const text = cachedLogs.join('\n');
+            if (!text) {
+                showToast("Không có logs nào để sao chép.", "warning");
+                return;
+            }
             navigator.clipboard.writeText(text).then(() => {
-                alert("Đã sao chép toàn bộ logs vào Clipboard!");
+                showToast("Đã sao chép toàn bộ logs vào Clipboard!", "success");
+            }).catch(() => {
+                showToast("Không thể tự động sao chép logs.", "error");
             });
         }
 
         async function clearLogs() {
-            if (!confirm("Bạn có chắc chắn muốn xóa toàn bộ logs trên máy chủ không?")) return;
-            try {
-                await fetch('/api/logs/clear', { method: 'POST' });
-                cachedLogs = [];
-                renderLogs();
-            } catch (err) {
-                alert("Lỗi khi xóa logs.");
-            }
+            showConfirmModal({
+                title: "Xóa Toàn Bộ Console Logs",
+                message: "Hành động này sẽ làm sạch bộ đệm logs trên console của máy chủ.",
+                confirmText: "Xóa logs",
+                isDanger: true,
+                onConfirm: async () => {
+                    try {
+                        await fetch('/api/logs/clear', { method: 'POST' });
+                        cachedLogs = [];
+                        renderLogs();
+                        showToast("Đã xóa sạch bộ đệm logs.", "info");
+                    } catch (err) {
+                        showToast("Lỗi khi xóa logs.", "error");
+                    }
+                }
+            });
         }
 
         async function handleLogout() {
@@ -793,14 +1323,22 @@
                     ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Online`
                     : `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Offline`;
                 document.getElementById('header-status-indicator').className = isOnline
-                    ? "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-dark-bg"
-                    : "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-500 ring-2 ring-dark-bg";
+                    ? "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-dark-bg"
+                    : "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-dark-bg";
                 
                 if (statsData.bot_avatar) {
                     document.getElementById('header-avatar').src = statsData.bot_avatar;
                 }
                 if (statsData.bot_name && statsData.bot_name !== 'N/A') {
                     document.getElementById('header-bot-name').textContent = statsData.bot_name;
+                }
+
+                if (statsData.invite_url) {
+                    botInviteUrl = statsData.invite_url;
+                    const headerInvite = document.getElementById('header-invite-btn');
+                    if (headerInvite) headerInvite.href = botInviteUrl;
+                    const guildsInvite = document.getElementById('guilds-invite-btn');
+                    if (guildsInvite) guildsInvite.href = botInviteUrl;
                 }
 
                 document.getElementById('header-latency').textContent = statsData.latency;
@@ -834,7 +1372,30 @@
 
                 // Logs
                 cachedLogs = statsData.logs || [];
+                const errorCount = cachedLogs.filter(l => /❌|lỗi|error|exception|traceback|failed/i.test(l)).length;
+                const warnCount = cachedLogs.filter(l => /⚠️|warn|timeout|503/i.test(l)).length;
+
                 document.getElementById('badge-total-logs').textContent = cachedLogs.length;
+                const badgeError = document.getElementById('badge-error-logs');
+                if (badgeError) {
+                    if (errorCount > 0) {
+                        badgeError.textContent = `${errorCount} lỗi`;
+                        badgeError.classList.remove('hidden');
+                    } else {
+                        badgeError.classList.add('hidden');
+                    }
+                }
+
+                if (document.getElementById('log-count-all')) {
+                    document.getElementById('log-count-all').textContent = cachedLogs.length;
+                }
+                if (document.getElementById('log-count-error')) {
+                    document.getElementById('log-count-error').textContent = errorCount;
+                }
+                if (document.getElementById('log-count-warn')) {
+                    document.getElementById('log-count-warn').textContent = warnCount;
+                }
+
                 if (currentTab === 'logs') {
                     renderLogs();
                 }
@@ -868,6 +1429,7 @@
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
             fetchDashboardData();
+            fetchGuildsData();
             setInterval(fetchDashboardData, 3000);
         });
     </script>
