@@ -199,7 +199,7 @@ class TarotCog(commands.Cog):
                     await ctx.reply(cooldown_msg, mention_author=False)
                 return
 
-        # 3. Kiểm tra Cooldown 1 phút chống spam giữa 2 lần bốc bài liên tiếp của 1 người
+        # 3. Kiểm tra Cooldown 30s chống spam giữa 2 lần bốc bài liên tiếp của 1 người
         can_proceed, wait_sec = self.tarot_manager.check_user_cooldown(
             user.id,
             cooldown_seconds=config.COMMAND_COOLDOWN_SECONDS
@@ -211,8 +211,6 @@ class TarotCog(commands.Cog):
             elif ctx:
                 await ctx.reply(cd_msg, mention_author=False)
             return
-
-        self.tarot_manager.record_user_action(user.id)
 
         # 4. Phản hồi ban đầu
         initial_msg = None
@@ -306,17 +304,36 @@ class TarotCog(commands.Cog):
                 await initial_msg.edit(content=None, embed=embed, attachments=[file], view=view)
                 view.message = initial_msg
 
+            # Chỉ ghi nhận cooldown sau khi gửi bài thành công
+            self.tarot_manager.record_user_action(user.id)
+
         except Exception as e:
             print(f"❌ [TarotCog] Lỗi trong quá trình bốc bài: {e}", flush=True)
             traceback.print_exc()
-            err_text = "❌ Đã xảy ra lỗi trong quá trình bốc và giải bài Tarot. Vui lòng thử lại sau!"
+            if isinstance(e, discord.Forbidden):
+                err_text = (
+                    "⚠️ **Bot thiếu quyền gửi tin nhắn hoặc đính kèm ảnh (Send Messages / Attach Files) trong kênh này!**\n"
+                    "Vui lòng kiểm tra và cấp quyền cho Bot trong cài đặt kênh."
+                )
+            else:
+                err_text = "❌ Đã xảy ra lỗi trong quá trình bốc và giải bài Tarot. Vui lòng thử lại sau!"
+
             if interaction:
-                await interaction.followup.send(err_text, ephemeral=True)
+                try:
+                    await interaction.followup.send(err_text, ephemeral=True)
+                except Exception:
+                    pass
             elif ctx:
                 if initial_msg:
-                    await initial_msg.edit(content=err_text)
+                    try:
+                        await initial_msg.edit(content=err_text)
+                    except Exception:
+                        pass
                 else:
-                    await ctx.reply(err_text, mention_author=False)
+                    try:
+                        await ctx.reply(err_text, mention_author=False)
+                    except Exception:
+                        pass
 
     # =========================================================================
     # 1. SLASH COMMANDS

@@ -11,7 +11,10 @@ async def fetch_twitter(session: aiohttp.ClientSession, url: str, match) -> Post
         async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            content_type = resp.headers.get("Content-Type", "").lower()
+            if "application/json" not in content_type and "text/json" not in content_type:
+                return None
+            data = await resp.json(content_type=None)
 
         tweet = data.get("tweet", {})
         if not tweet:
@@ -53,6 +56,8 @@ async def fetch_twitter(session: aiohttp.ClientSession, url: str, match) -> Post
             url=tweet.get("url", url),
             timestamp=tweet.get("created_at"),
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/Twitter] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
@@ -73,6 +78,9 @@ async def fetch_reddit(session: aiohttp.ClientSession, url: str, match) -> PostD
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
         async with session.get(api_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
+                return None
+            content_type = resp.headers.get("Content-Type", "").lower()
+            if "application/json" not in content_type and "text/json" not in content_type:
                 return None
             data = await resp.json(content_type=None)
 
@@ -129,6 +137,8 @@ async def fetch_reddit(session: aiohttp.ClientSession, url: str, match) -> PostD
             url=f"https://www.reddit.com{post.get('permalink', '')}",
             timestamp=None,
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/Reddit] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
@@ -141,7 +151,10 @@ async def fetch_tiktok(session: aiohttp.ClientSession, url: str, match) -> PostD
         async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            content_type = resp.headers.get("Content-Type", "").lower()
+            if "application/json" not in content_type and "text/json" not in content_type:
+                return None
+            data = await resp.json(content_type=None)
 
         video_data = data.get("data", {})
         if not video_data:
@@ -173,6 +186,8 @@ async def fetch_tiktok(session: aiohttp.ClientSession, url: str, match) -> PostD
             url=url,
             timestamp=video_data.get("createTime"),
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/TikTok] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
@@ -183,28 +198,9 @@ async def fetch_instagram(session: aiohttp.ClientSession, url: str, match) -> Po
 
 
 async def fetch_facebook(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    try:
-        api_url = f"https://www.facebook.com/plugins/post/oembed.json/?url={quote(url, safe='')}"
-
-        async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-
-        return PostData(
-            platform="facebook",
-            author=data.get("author_name", "Unknown"),
-            author_url=data.get("author_url"),
-            text=data.get("title") or "Facebook Post",
-            media_urls=[],
-            media_type="text",
-            is_nsfw=False,
-            url=url,
-            timestamp=None,
-        )
-    except Exception as e:
-        print(f"[Fetcher/Facebook] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
-        return None
+    # Facebook unauthenticated oEmbed endpoint không còn hỗ trợ và luôn chuyển hướng sang trang login HTML.
+    # Trả về None để hệ thống tự động fallback sang Tier 1 (Proxy facebed) hoặc Tier 2 (yt-dlp).
+    return None
 
 
 async def fetch_bluesky(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
@@ -216,7 +212,7 @@ async def fetch_bluesky(session: aiohttp.ClientSession, url: str, match) -> Post
             async with session.get(resolve_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
                     return None
-                resolve_data = await resp.json()
+                resolve_data = await resp.json(content_type=None)
                 did = resolve_data.get("did")
         else:
             did = handle
@@ -230,7 +226,7 @@ async def fetch_bluesky(session: aiohttp.ClientSession, url: str, match) -> Post
         async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            data = await resp.json(content_type=None)
 
         thread = data.get("thread", {})
         post = thread.get("post", {})
@@ -272,6 +268,8 @@ async def fetch_bluesky(session: aiohttp.ClientSession, url: str, match) -> Post
             url=url,
             timestamp=record.get("createdAt"),
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/Bluesky] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
@@ -284,7 +282,7 @@ async def fetch_twitch(session: aiohttp.ClientSession, url: str, match) -> PostD
         async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            data = await resp.json(content_type=None)
 
         media_urls = []
         if data.get("thumbnail_url"):
@@ -301,6 +299,8 @@ async def fetch_twitch(session: aiohttp.ClientSession, url: str, match) -> PostD
             url=url,
             timestamp=None,
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/Twitch] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
@@ -314,7 +314,7 @@ async def fetch_pixiv(session: aiohttp.ClientSession, url: str, match) -> PostDa
         async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            data = await resp.json(content_type=None)
 
         media_urls = []
         media_type = "image"
@@ -356,6 +356,8 @@ async def fetch_pixiv(session: aiohttp.ClientSession, url: str, match) -> PostDa
             url=f"https://www.pixiv.net/artworks/{artwork_id}",
             timestamp=data.get("upload_timestamp") or data.get("create_date"),
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/Pixiv] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None
@@ -372,7 +374,7 @@ async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> Post
         async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
-            data = await resp.json()
+            data = await resp.json(content_type=None)
 
         media_urls = []
         if data.get("thumbnail_url"):
@@ -391,6 +393,8 @@ async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> Post
             url=original_url,
             timestamp=None,
         )
+    except (aiohttp.ContentTypeError, ValueError):
+        return None
     except Exception as e:
         print(f"[Fetcher/Threads] Lỗi khi tải dữ liệu {url}: {e}", flush=True)
         return None

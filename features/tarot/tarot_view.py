@@ -350,8 +350,6 @@ class TarotLauncherView(discord.ui.View):
         except Exception:
             pass
 
-        self.tarot_manager.record_user_action(self.author_id)
-
         drawn_cards = draw_spread(
             spread_key=self.selected_spread,
             user_id=self.author_id,
@@ -426,24 +424,64 @@ class TarotLauncherView(discord.ui.View):
             icon_url=self.author_avatar_url
         )
 
-        # 1. Nếu mở từ Prefix ($m tarot -> self.message tồn tại): Edit trực tiếp vào tin nhắn đó (mượt mà, 0 tin nhắn thừa)
+        sent_msg = None
+        # 1. Nếu mở từ Prefix ($m tarot -> self.message tồn tại): Edit trực tiếp vào tin nhắn đó
         if self.message:
             try:
                 await self.message.edit(embed=embed, attachments=[file], view=flip_view)
-                flip_view.message = self.message
-            except Exception:
+                sent_msg = self.message
+            except Exception as e:
+                print(f"⚠️ [TarotLauncherView] Không thể edit tin nhắn gốc ({e}), thử gửi mới...", flush=True)
                 if interaction.channel:
-                    sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
-                    flip_view.message = sent_msg
+                    try:
+                        sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
+                    except Exception:
+                        pass
+                if not sent_msg:
+                    try:
+                        sent_msg = await interaction.followup.send(embed=embed, file=file, view=flip_view)
+                    except Exception:
+                        pass
         else:
             # 2. Nếu mở từ Slash Command (/tarot -> ephemeral): Gửi quẻ bài ra kênh và xóa sạch bảng ephemeral
             if interaction.channel:
-                sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
-                flip_view.message = sent_msg
+                try:
+                    sent_msg = await interaction.channel.send(embed=embed, file=file, view=flip_view)
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    print(f"⚠️ [TarotLauncherView] channel.send bị chặn ({e}), fallback sang interaction.followup.send...", flush=True)
+                except Exception as e:
+                    print(f"⚠️ [TarotLauncherView] Lỗi channel.send: {e}", flush=True)
+
+            if not sent_msg:
+                try:
+                    sent_msg = await interaction.followup.send(embed=embed, file=file, view=flip_view)
+                except Exception as ex:
+                    print(f"❌ [TarotLauncherView] Không thể gửi quẻ bài ra kênh: {ex}", flush=True)
+
             try:
                 await interaction.delete_original_response()
             except Exception:
                 pass
+
+        if not sent_msg:
+            # Nếu cả 2 phương thức đều thất bại do bot thiếu quyền Attach Files / Send Messages
+            ai_task.cancel()
+            err_text = (
+                "⚠️ **Bot không thể gửi quẻ bài ra kênh do thiếu quyền hạn!**\n"
+                "Vui lòng đảm bảo Bot có các quyền sau trong kênh chat này:\n"
+                "• `Xem kênh (View Channel)`\n"
+                "• `Gửi tin nhắn (Send Messages)`\n"
+                "• `Đính kèm tệp / ảnh (Attach Files)`\n"
+                "• `Nhúng liên kết (Embed Links)`"
+            )
+            try:
+                await interaction.followup.send(err_text, ephemeral=True)
+            except Exception:
+                pass
+            return
+
+        flip_view.message = sent_msg
+        self.tarot_manager.record_user_action(self.author_id)
 
         # 3. Dọn dẹp trigger message nếu có
         if self.trigger_message:
@@ -511,6 +549,22 @@ class TarotLauncherView(discord.ui.View):
                 await self.message.delete()
             except Exception:
                 pass
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item) -> None:
+        print(f"❌ [TarotLauncherView] Lỗi tương tác ({type(error).__name__}): {error}", flush=True)
+        err_msg = "❌ Đã xảy ra lỗi khi xử lý thao tác bốc bài."
+        if isinstance(error, discord.Forbidden):
+            err_msg = (
+                "⚠️ **Bot thiếu quyền hạn trong kênh này!**\n"
+                "Vui lòng đảm bảo Bot có quyền `Send Messages`, `Embed Links` và `Attach Files` trong kênh."
+            )
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(err_msg, ephemeral=True)
+            else:
+                await interaction.followup.send(err_msg, ephemeral=True)
+        except Exception:
+            pass
 
 
 class TarotFlipView(discord.ui.View):
@@ -918,3 +972,19 @@ class TarotFlipView(discord.ui.View):
                 await self.message.edit(embeds=final_embeds, attachments=[file], view=None)
         except Exception as e:
             print(f"[TarotFlipView] Lỗi on_timeout: {e}", flush=True)
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item) -> None:
+        print(f"❌ [TarotFlipView] Lỗi tương tác ({type(error).__name__}): {error}", flush=True)
+        err_msg = "❌ Đã xảy ra lỗi khi lật mở lá bài."
+        if isinstance(error, discord.Forbidden):
+            err_msg = (
+                "⚠️ **Bot thiếu quyền chỉnh sửa hoặc gửi hình ảnh trong kênh này!**\n"
+                "Vui lòng đảm bảo Bot có quyền `Send Messages`, `Embed Links` và `Attach Files`."
+            )
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(err_msg, ephemeral=True)
+            else:
+                await interaction.followup.send(err_msg, ephemeral=True)
+        except Exception:
+            pass
