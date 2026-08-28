@@ -14,6 +14,7 @@ from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy
 from features.embed.fallback import extract_media_ytdlp
+from core.webhook_sender import BoundedDict
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
 MAX_LINKS_PER_MESSAGE = 3
@@ -38,8 +39,8 @@ def _validate_domain(domain: str) -> bool:
 
 
 def _parse_domain_list(raw: str) -> list[str]:
-    parts = [d.strip().lower() for d in raw.split(",")]
-    return [d for d in parts if d]
+    parts = re.split(r"[,\s]+", raw.strip())
+    return [p.strip().lower() for p in parts if p.strip()]
 
 
 class EmbedCog(commands.Cog):
@@ -50,6 +51,8 @@ class EmbedCog(commands.Cog):
         self.config_manager = getattr(bot, "config_manager", None)
         self.nsfw_filter = NSFWFilter()
         self.session: aiohttp.ClientSession | None = None
+        # Cache liên kết message_id gốc của user -> (channel_id, bot_embed_message_id)
+        self._origin_to_preview_map = BoundedDict(max_size=3000)
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession(
@@ -167,6 +170,31 @@ class EmbedCog(commands.Cog):
             except (discord.Forbidden, discord.HTTPException) as e:
                 print(f"[EmbedCog] Không thể suppress embed tin nhắn gốc: {e}", flush=True)
 
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        """Tự động xóa Embed Preview nếu người dùng xóa tin nhắn gốc chứa link."""
+        target = self._origin_to_preview_map.pop(payload.message_id, None)
+        if not target:
+            return
+
+        channel_id, preview_msg_id = target
+        try:
+            channel = self.bot.get_channel(channel_id)
+            if channel is None:
+                try:
+                    channel = await self.bot.fetch_channel(channel_id)
+                except Exception:
+                    channel = None
+
+            if channel:
+                partial_msg = channel.get_partial_message(preview_msg_id)
+                await partial_msg.delete()
+                print(f"[EmbedCog] 🗑️ Đã tự động xóa Embed Preview (ID: {preview_msg_id}) do tin nhắn gốc bị xóa.", flush=True)
+        except (discord.NotFound, discord.Forbidden):
+            pass
+        except Exception as e:
+            print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
+
     async def _send_embed_preview(
         self,
         message: discord.Message,
@@ -184,7 +212,9 @@ class EmbedCog(commands.Cog):
             kwargs["file"] = file
 
         try:
-            await message.channel.send(**kwargs)
+            sent_msg = await message.channel.send(**kwargs)
+            # Lưu liên kết giữa tin nhắn gốc và bản xem trước để tự động xóa khi tin gốc bị xóa
+            self._origin_to_preview_map[message.id] = (message.channel.id, sent_msg.id)
             return True
         except discord.HTTPException as e:
             print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
