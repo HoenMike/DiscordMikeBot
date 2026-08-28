@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
-from features.embed.ui import create_platform_view, PlatformToggleView
+from features.embed.ui import PlatformToggleView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy
@@ -173,9 +173,8 @@ class EmbedCog(commands.Cog):
         content: str | None = None,
         embeds: list[discord.Embed] | None = None,
         file: discord.File | None = None,
-        view: discord.ui.View | None = None,
     ) -> bool:
-        """Gửi bản xem trước bên dưới tin nhắn gốc, KHÔNG tag người gửi (mention_author=False)."""
+        """Gửi bản xem trước vào kênh chat ngay bên dưới tin nhắn gốc (không reply, không button thừa)."""
         kwargs = {}
         if content:
             kwargs["content"] = content
@@ -183,26 +182,13 @@ class EmbedCog(commands.Cog):
             kwargs["embeds"] = embeds
         if file:
             kwargs["file"] = file
-        if view:
-            kwargs["view"] = view
 
         try:
-            await message.reply(**kwargs, mention_author=False)
+            await message.channel.send(**kwargs)
             return True
         except discord.HTTPException as e:
-            if view is not None and ("components" in str(e).lower() or e.code == 50035):
-                kwargs.pop("view", None)
-                try:
-                    await message.reply(**kwargs, mention_author=False)
-                    return True
-                except Exception:
-                    pass
-            try:
-                await message.channel.send(**kwargs)
-                return True
-            except Exception as send_err:
-                print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {send_err}", flush=True)
-                return False
+            print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
+            return False
 
     async def _process_url_with_fallback(
         self,
@@ -291,13 +277,10 @@ class EmbedCog(commands.Cog):
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
 
-            view = create_platform_view(platform_key, post_data.url or url, author_id=message.author.id)
-
             return await self._send_embed_preview(
                 message=message,
                 embeds=embeds,
                 file=file,
-                view=view,
             )
         except Exception as e:
             print(f"[EmbedCog] Tier 0 (API) lỗi cho {platform_key} ({url}): {e}", flush=True)
@@ -355,12 +338,9 @@ class EmbedCog(commands.Cog):
             else:
                 wrapped_proxy_url = proxy_url
 
-            view = create_platform_view(platform_key, url, author_id=message.author.id)
-
             return await self._send_embed_preview(
                 message=message,
                 content=wrapped_proxy_url,
-                view=view,
             )
         except Exception as e:
             print(f"[EmbedCog] Tier 1 (Proxy) lỗi cho {platform_key} ({url}): {e}", flush=True)
@@ -416,13 +396,10 @@ class EmbedCog(commands.Cog):
                 except Exception as dl_err:
                     print(f"[EmbedCog] Không thể tải video fallback {url}: {dl_err}", flush=True)
 
-            view = create_platform_view(platform_key, url, author_id=message.author.id)
-
             return await self._send_embed_preview(
                 message=message,
                 embeds=[single_embed],
                 file=file,
-                view=view,
             )
         except Exception as e:
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)

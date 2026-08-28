@@ -2,44 +2,32 @@ import discord
 from features.embed.constants import PLATFORMS, remove_query_params
 
 
-class EmbedPreviewView(discord.ui.View):
+def create_platform_view(platform_key: str, original_url: str) -> discord.ui.View | None:
+    """Tạo discord.ui.View chứa button link tới bài viết gốc."""
+    if not original_url:
+        return None
 
-    """View cho bản xem trước Embed: Nút link bài viết gốc + Nút 🗑️ xóa preview."""
-    def __init__(self, platform_key: str, original_url: str, author_id: int | None = None, timeout: float | None = None):
-        super().__init__(timeout=timeout)
-        self.author_id = author_id
+    # Làm sạch URL và bỏ query params thừa nếu quá dài
+    clean_url = remove_query_params(original_url)
+    if len(clean_url) > 512:
+        clean_url = original_url.split("?")[0]
 
-        clean_url = remove_query_params(original_url) if original_url else None
-        if clean_url and len(clean_url) > 512:
-            clean_url = original_url.split("?")[0]
+    # Discord giới hạn URL trong Link Button tối đa 512 ký tự
+    if len(clean_url) > 512 or not clean_url.startswith(("http://", "https://")):
+        return None
 
-        if clean_url and len(clean_url) <= 512 and clean_url.startswith(("http://", "https://")):
-            platform_info = PLATFORMS.get(platform_key, {})
-            label = platform_info.get("button_label", "Xem bài viết gốc")
-            self.add_item(discord.ui.Button(label=label, url=clean_url, style=discord.ButtonStyle.link, row=0))
+    platform_info = PLATFORMS.get(platform_key, {})
+    label = platform_info.get("button_label", "Xem bài viết gốc")
 
-        if author_id is not None:
-            del_btn = discord.ui.Button(emoji="🗑️", style=discord.ButtonStyle.secondary, custom_id="delete_embed_preview", row=0)
-            del_btn.callback = self._delete_callback
-            self.add_item(del_btn)
+    view = discord.ui.View()
+    button = discord.ui.Button(
+        label=label,
+        url=clean_url,
+        style=discord.ButtonStyle.link,
+    )
+    view.add_item(button)
+    return view
 
-    async def _delete_callback(self, interaction: discord.Interaction):
-        # Cho phép người gửi tin nhắn gốc hoặc Quản trị viên (manage_messages) xóa preview
-        is_author = self.author_id is None or interaction.user.id == self.author_id
-        is_admin = interaction.user.guild_permissions.manage_messages if interaction.guild else False
-        if is_author or is_admin:
-            try:
-                await interaction.message.delete()
-            except Exception:
-                pass
-        else:
-            await interaction.response.send_message("🔒 Chỉ người gửi tin nhắn hoặc Quản trị viên mới có thể xóa bản xem trước này!", ephemeral=True)
-
-
-def create_platform_view(platform_key: str, original_url: str, author_id: int | None = None) -> discord.ui.View | None:
-    """Tạo discord.ui.View chứa button link tới bài viết gốc và nút xóa preview."""
-    view = EmbedPreviewView(platform_key, original_url, author_id=author_id)
-    return view if view.children else None
 
 
 
