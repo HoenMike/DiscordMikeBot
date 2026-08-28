@@ -85,7 +85,7 @@
                         </span>
                         <button onclick="switchTab('version')" id="header-version-badge" title="Bấm để xem thông tin phiên bản & patchnotes" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30 hover:bg-brand-500/30 transition-all cursor-pointer">
                             <i data-lucide="tag" class="w-2.5 h-2.5"></i>
-                            <span id="header-version-text">v2.0.0</span>
+                            <span id="header-version-text">v2.4.2</span>
                         </button>
                     </div>
                 </div>
@@ -610,7 +610,7 @@
                                 🔁 Xoay tua 45s
                             </span>
                         </div>
-                        <p id="presence-text-preview" class="text-xs text-slate-300 font-medium">Live v2.0.1 | $m help</p>
+                        <p id="presence-text-preview" class="text-xs text-slate-300 font-medium">Live v2.4.2 | $m help</p>
                     </div>
                 </div>
 
@@ -710,7 +710,7 @@
                         <button onclick="applyPresencePreset('live')" class="p-3 rounded-xl bg-dark-surface hover:bg-emerald-500/10 border border-dark-border hover:border-emerald-500/30 text-left transition-all group">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live v2.0.1
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live v2.4.2
                                 </span>
                                 <span class="text-[10px] text-slate-500 group-hover:text-emerald-300">Áp dụng →</span>
                             </div>
@@ -2381,7 +2381,7 @@
             if (preset === 'live') {
                 selectPresenceStatus('online');
                 document.getElementById('presence-activity-type').value = 'custom';
-                document.getElementById('presence-activity-text').value = 'Live v2.0.1 | $m help';
+                document.getElementById('presence-activity-text').value = 'Live v2.4.2 | $m help';
                 document.getElementById('presence-is-rotating-toggle').checked = true;
             } else if (preset === 'redeploy') {
                 selectPresenceStatus('idle');

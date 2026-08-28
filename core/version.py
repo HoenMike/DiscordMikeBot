@@ -10,12 +10,28 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.1"
+CURRENT_VERSION = "2.4.2"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & Threads Enhancement"
+CODENAME = "Hybrid Engine & WSGI Stability"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.2",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Khắc Phục Lỗi Import Flask & Ổn Định Khởi Động Gunicorn WSGI",
+        "summary": "Bổ sung đầy đủ các dependency của Flask vào Web Console, giải quyết triệt để lỗi NameError và đảm bảo tiến trình khởi chạy mượt mà 100% trên Render.",
+        "changes": [
+            {
+                "category": "🛠️ Sửa Lỗi Triển Khai (Deployment BugFix)",
+                "items": [
+                    "Bổ sung các thành phần Flask (render_template, request, jsonify, redirect, url_for, session, Response) vào web/app.py.",
+                    "Đồng bộ tiến trình WSGI Gunicorn với luồng chạy ngầm của Discord Bot Gateway, tự động khởi động không chờ HTTP request."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.1",
         "date": "2026-08-28",

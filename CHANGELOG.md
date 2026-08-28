@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.2] - 2026-08-28 — *WSGI Stability & Flask Imports*
+
+### Fixed
+- **Flask Imports**: Bổ sung đầy đủ các dependency của Flask (`render_template`, `request`, `jsonify`, `redirect`, `url_for`, `session`, `Response`) vào `web/app.py`, khắc phục lỗi `NameError: name 'Flask' is not defined` trên Gunicorn Render.
+- **Eager Bot Startup**: Đảm bảo Discord Bot worker thread tự động khởi chạy an toàn khi Gunicorn nạp module.
+
+---
+
 ## [2.4.1] - 2026-08-28 — *Threads Enhancement & Centralized Constants*
 
 ### Added
