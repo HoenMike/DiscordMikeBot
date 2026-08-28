@@ -551,17 +551,23 @@
 
             <!-- Terminal Window -->
             <div class="flex-1 min-h-0 rounded-xl border border-dark-border bg-dark-terminal overflow-hidden shadow-2xl flex flex-col">
-                <div class="flex-shrink-0 bg-slate-900/90 border-b border-dark-border px-3 py-1.5 flex items-center justify-between">
+                <div class="flex-shrink-0 bg-slate-900/90 border-b border-dark-border px-3 py-1.5 flex items-center justify-between flex-wrap gap-2">
                     <div class="flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
                         <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                         <span class="text-[11px] text-slate-400 font-mono ml-2">stdout & stderr stream</span>
                     </div>
-                    <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer">
-                        <input type="checkbox" id="auto-scroll-toggle" checked class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
-                        <span>Tự cuộn xuống</span>
-                    </label>
+                    <div class="flex items-center gap-3">
+                        <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-200 transition-colors" title="Bật để xem lại toàn bộ log từ các lần chạy / deploy trước đó">
+                            <input type="checkbox" id="show-history-toggle" onchange="renderLogs()" class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
+                            <span>Xem log cũ (History)</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
+                            <input type="checkbox" id="auto-scroll-toggle" checked class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
+                            <span>Tự cuộn xuống</span>
+                        </label>
+                    </div>
                 </div>
                 <div id="logs-container" class="flex-1 p-3 overflow-y-auto code-font text-[11px] leading-relaxed space-y-0.5 text-slate-300 select-text">
                     <!-- Logs populated via JS -->
@@ -1715,9 +1721,29 @@
             return /❌|\[error\]|traceback|syntaxerror|nameerror|typeerror|critical/i.test(line);
         }
 
-        function renderLogs() {
-            const container = document.getElementById('logs-container');
-            let lines = cachedLogs;
+        function getActiveScopeLogs() {
+            let lines = [...cachedLogs];
+            const showHistory = document.getElementById('show-history-toggle') ? document.getElementById('show-history-toggle').checked : false;
+
+            if (!showHistory) {
+                // Mặc định ẩn log cũ từ các lần deploy trước: Chỉ lấy từ mốc khởi động gần nhất
+                let sessionStartIndex = -1;
+                for (let i = lines.length - 1; i >= 0; i--) {
+                    const l = lines[i];
+                    if (l.includes("=== PHIÊN CHẠY MỚI") || l.includes("ActivityLogger] Đã nạp") || l.includes("Starting bot") || l.includes("Khởi động bot")) {
+                        sessionStartIndex = i;
+                        break;
+                    }
+                }
+                if (sessionStartIndex !== -1) {
+                    lines = lines.slice(sessionStartIndex);
+                }
+            }
+            return lines;
+        }
+
+        function getFilteredLogs() {
+            let lines = getActiveScopeLogs();
 
             if (logFilterType === 'error') {
                 lines = lines.filter(l => isRealErrorLog(l));
@@ -1730,7 +1756,26 @@
                 lines = lines.filter(l => l.toLowerCase().includes(q));
             }
 
+            return lines;
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logs-container');
+            const lines = getFilteredLogs();
+
+            if (lines.length === 0) {
+                container.innerHTML = `<div class="text-slate-500 italic py-6 text-center text-xs">Không có logs nào phù hợp với bộ lọc hoặc phiên chạy hiện tại.</div>`;
+                return;
+            }
+
             container.innerHTML = lines.map(line => {
+                if (line.includes("=== PHIÊN CHẠY MỚI")) {
+                    return `<div class="my-2 py-1 px-3 rounded-lg bg-brand-600/20 border border-brand-500/30 text-brand-300 font-bold text-center select-none text-[11px] tracking-wide shadow-sm flex items-center justify-center gap-2">
+                        <i data-lucide="rocket" class="w-3.5 h-3.5 text-brand-400"></i>
+                        <span>${escapeHtml(line)}</span>
+                    </div>`;
+                }
+
                 let colorClass = "text-slate-300";
                 if (isRealErrorLog(line)) {
                     colorClass = "text-rose-400 font-medium bg-rose-500/5 px-1 py-0.5 rounded";
@@ -1746,6 +1791,8 @@
 
                 return `<div class="${colorClass} hover:bg-white/5 px-1 rounded transition-colors whitespace-pre-wrap break-all">${escapeHtml(line)}</div>`;
             }).join('');
+
+            lucide.createIcons();
 
             const autoScroll = document.getElementById('auto-scroll-toggle').checked;
             if (autoScroll) {
@@ -1771,13 +1818,15 @@
         }
 
         function copyLogs() {
-            const text = cachedLogs.join('\n');
+            // Chỉ sao chép những dòng logs đang thực sự hiển thị trên màn hình
+            const visibleLines = getFilteredLogs();
+            const text = visibleLines.join('\n');
             if (!text) {
-                showToast("Không có logs nào để sao chép.", "warning");
+                showToast("Không có logs nào đang hiển thị để sao chép.", "warning");
                 return;
             }
             navigator.clipboard.writeText(text).then(() => {
-                showToast("Đã sao chép toàn bộ logs vào Clipboard!", "success");
+                showToast(`Đã sao chép ${visibleLines.length} dòng logs đang hiển thị vào Clipboard!`, "success");
             }).catch(() => {
                 showToast("Không thể tự động sao chép logs.", "error");
             });
@@ -1887,10 +1936,11 @@
 
                 // Logs
                 cachedLogs = statsData.logs || [];
-                const errorCount = cachedLogs.filter(l => isRealErrorLog(l)).length;
-                const warnCount = cachedLogs.filter(l => isWarningLog(l)).length;
+                const activeScope = getActiveScopeLogs();
+                const errorCount = activeScope.filter(l => isRealErrorLog(l)).length;
+                const warnCount = activeScope.filter(l => isWarningLog(l)).length;
 
-                document.getElementById('badge-total-logs').textContent = cachedLogs.length;
+                document.getElementById('badge-total-logs').textContent = activeScope.length;
                 const badgeError = document.getElementById('badge-error-logs');
                 if (badgeError) {
                     if (errorCount > 0) {
@@ -1902,7 +1952,7 @@
                 }
 
                 if (document.getElementById('log-count-all')) {
-                    document.getElementById('log-count-all').textContent = cachedLogs.length;
+                    document.getElementById('log-count-all').textContent = activeScope.length;
                 }
                 if (document.getElementById('log-count-error')) {
                     document.getElementById('log-count-error').textContent = errorCount;

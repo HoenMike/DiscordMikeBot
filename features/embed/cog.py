@@ -174,7 +174,7 @@ class EmbedCog(commands.Cog):
         embeds: list[discord.Embed] | None = None,
         file: discord.File | None = None,
     ) -> bool:
-        """Gửi bản xem trước vào kênh chat ngay bên dưới tin nhắn gốc (không reply, không button thừa)."""
+        """Gửi bản xem trước dạng Reply vào tin nhắn gốc, KHÔNG tag người gửi (mention_author=False)."""
         kwargs = {}
         if content:
             kwargs["content"] = content
@@ -184,11 +184,15 @@ class EmbedCog(commands.Cog):
             kwargs["file"] = file
 
         try:
-            await message.channel.send(**kwargs)
+            await message.reply(**kwargs, mention_author=False)
             return True
         except discord.HTTPException as e:
-            print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
-            return False
+            try:
+                await message.channel.send(**kwargs)
+                return True
+            except Exception as send_err:
+                print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {send_err}", flush=True)
+                return False
 
     async def _process_url_with_fallback(
         self,
@@ -318,6 +322,10 @@ class EmbedCog(commands.Cog):
             is_effective_nsfw = is_proxy_nsfw and not is_nsfw_channel
             nsfw_mode = config.get("nsfw_mode", "spoiler")
 
+            # Ẩn dòng chữ link thô bằng cách bọc URL vào masked markdown với ký tự tàng hình (zero-width space)
+            # Discord vẫn kích hoạt embed / video preview đầy đủ nhưng không hiển thị dòng link bên trên
+            invisible_link = f"[\u200b]({proxy_url})"
+
             if is_effective_nsfw:
                 if nsfw_mode == "block":
                     try:
@@ -330,13 +338,13 @@ class EmbedCog(commands.Cog):
                         pass
                     return True
                 elif nsfw_mode == "spoiler":
-                    wrapped_proxy_url = f"||{proxy_url}||"
+                    wrapped_proxy_url = f"||{invisible_link}||"
                 else:  # allow
-                    wrapped_proxy_url = f"||{proxy_url}||" if is_spoiler else proxy_url
+                    wrapped_proxy_url = f"||{invisible_link}||" if is_spoiler else invisible_link
             elif is_spoiler:
-                wrapped_proxy_url = f"||{proxy_url}||"
+                wrapped_proxy_url = f"||{invisible_link}||"
             else:
-                wrapped_proxy_url = proxy_url
+                wrapped_proxy_url = invisible_link
 
             return await self._send_embed_preview(
                 message=message,

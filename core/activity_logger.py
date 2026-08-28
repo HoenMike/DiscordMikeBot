@@ -99,6 +99,10 @@ class ActivityLogger:
             config.log_buffer.clear()
             for r in reversed(c_rows):
                 config.log_buffer.append(r[0])
+            
+            if c_rows:
+                config.log_buffer.append(f"🚀 === PHIÊN CHẠY MỚI (DEPLOY/STARTUP) ===")
+
             for l in existing_logs:
                 if l not in config.log_buffer:
                     config.log_buffer.append(l)
