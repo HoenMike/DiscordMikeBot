@@ -5,9 +5,9 @@ import signal
 import traceback
 from threading import Thread, Lock
 
-import config  # Khởi tạo log redirection trước
 from bot_instance import bot
 from web import app
+from core.presence_manager import presence_manager
 
 bot_started = False
 bot_start_lock = Lock()
@@ -16,6 +16,11 @@ bot_start_lock = Lock()
 @bot.event
 async def on_ready():
     print(f"🎉 Bot Discord đã kết nối thành công: {bot.user} (ID: {bot.user.id})", flush=True)
+    # Khởi tạo trạng thái Presence động từ cấu hình
+    try:
+        await presence_manager.init_db(bot)
+    except Exception as e:
+        print(f"⚠️ [Presence] Lỗi khởi tạo presence on_ready: {e}", flush=True)
 
 
 def run_discord_bot():
@@ -48,6 +53,12 @@ async def graceful_shutdown():
     """Dọn dẹp an toàn các tiến trình trước khi tắt bot."""
     config.is_shutting_down = True
     print("👋 Bắt đầu quy trình tắt bot graceful...", flush=True)
+
+    # Đổi trạng thái bot sang Đang Redeploy / Tắt
+    try:
+        await presence_manager.set_redeploying(bot)
+    except Exception:
+        pass
 
     wait_time = 0
     while config.active_interactions and wait_time < 15:

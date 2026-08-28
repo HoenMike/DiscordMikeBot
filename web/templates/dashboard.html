@@ -83,6 +83,10 @@
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             Online
                         </span>
+                        <button onclick="switchTab('version')" id="header-version-badge" title="Bấm để xem thông tin phiên bản & patchnotes" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30 hover:bg-brand-500/30 transition-all cursor-pointer">
+                            <i data-lucide="tag" class="w-2.5 h-2.5"></i>
+                            <span id="header-version-text">v2.0.0</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -125,11 +129,21 @@
 
         <!-- Navigation Tabs Bar -->
         <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 border-b border-dark-border pb-2.5">
-            <div class="flex items-center gap-1.5 p-1 rounded-xl bg-dark-surface border border-dark-border">
+            <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-dark-surface border border-dark-border">
                 <button onclick="switchTab('activity')" id="tab-btn-activity" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30">
                     <i data-lucide="activity" class="w-3.5 h-3.5"></i>
                     <span>Log Tương Tác</span>
                     <span id="badge-total-activities" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">0</span>
+                </button>
+                <button onclick="switchTab('presence')" id="tab-btn-presence" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>Trạng Thái Bot</span>
+                    <span id="badge-presence-status" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                </button>
+                <button onclick="switchTab('version')" id="tab-btn-version" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="git-commit" class="w-3.5 h-3.5 text-brand-400"></i>
+                    <span>Phiên Bản & Patchnotes</span>
+                    <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-500/20 text-brand-300 font-mono font-bold">v2.0.0</span>
                 </button>
                 <button onclick="switchTab('tarot')" id="tab-btn-tarot" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400"></i>
@@ -575,6 +589,195 @@
             </div>
         </section>
 
+        <!-- ========================================== -->
+        <!-- TAB 6: DYNAMIC BOT PRESENCE & STATUS -->
+        <!-- ========================================== -->
+        <section id="tab-content-presence" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
+            <!-- Top Summary Card -->
+            <div class="p-4 rounded-2xl bg-dark-card border border-dark-border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+                <div class="flex items-center gap-3.5">
+                    <div class="relative">
+                        <img id="presence-avatar-preview" src="https://cdn.discordapp.com/embed/avatars/0.png" class="w-14 h-14 rounded-2xl ring-2 ring-brand-500/40 object-cover bg-brand-600 shadow-lg">
+                        <span id="presence-status-dot-preview" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-4 ring-dark-card"></span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <h3 id="presence-bot-name-preview" class="text-base font-bold text-white">MikeDaBot</h3>
+                            <span id="presence-status-badge-preview" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                Online
+                            </span>
+                            <span id="presence-rotating-badge-preview" class="hidden inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30">
+                                🔁 Xoay tua 45s
+                            </span>
+                        </div>
+                        <p id="presence-text-preview" class="text-xs text-slate-300 font-medium">Live v2.0.0 | $m help & /help</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="fetchPresenceData()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-dark-surface hover:bg-slate-700 text-slate-300 border border-dark-border text-xs font-semibold transition-all">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        <span>Đồng bộ từ Discord</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Presence Control Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <!-- Left 2 Cols: Form Điều Khiển -->
+                <div class="lg:col-span-2 p-4 rounded-2xl bg-dark-card border border-dark-border flex flex-col gap-4 shadow-xl">
+                    <div class="flex items-center justify-between border-b border-dark-border pb-2.5">
+                        <h4 class="text-xs font-bold text-white flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-brand-400"></i>
+                            Bảng Điều Khiển Trạng Thái Động
+                        </h4>
+                        <span class="text-[11px] text-slate-400">Áp dụng trực tiếp vào Discord Gateway</span>
+                    </div>
+
+                    <!-- 1. Chọn Trạng Thái (Status) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-2">1. Trạng Thái Kết Nối (Status):</label>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <button type="button" onclick="selectPresenceStatus('online')" id="presence-btn-online" class="presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 font-semibold text-xs transition-all shadow-sm">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400"></span>
+                                <span>Online</span>
+                            </button>
+                            <button type="button" onclick="selectPresenceStatus('idle')" id="presence-btn-idle" class="presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dark-border bg-dark-surface text-slate-400 hover:text-white font-medium text-xs transition-all">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                                <span>Idle (Chờ / Redeploy)</span>
+                            </button>
+                            <button type="button" onclick="selectPresenceStatus('dnd')" id="presence-btn-dnd" class="presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dark-border bg-dark-surface text-slate-400 hover:text-white font-medium text-xs transition-all">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                                <span>DND (Đang Sửa Bug)</span>
+                            </button>
+                            <button type="button" onclick="selectPresenceStatus('invisible')" id="presence-btn-invisible" class="presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dark-border bg-dark-surface text-slate-400 hover:text-white font-medium text-xs transition-all">
+                                <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                                <span>Invisible (Ẩn)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 2. Chọn Loại Hoạt Động & Nội Dung -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">2. Loại Hoạt Động:</label>
+                            <select id="presence-activity-type" class="w-full bg-dark-surface border border-dark-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                <option value="custom">Custom Status (Tùy chỉnh)</option>
+                                <option value="playing">Playing (Đang chơi)</option>
+                                <option value="watching">Watching (Đang xem)</option>
+                                <option value="listening">Listening (Đang nghe)</option>
+                                <option value="competing">Competing (Đang thi đấu)</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-300 mb-1.5">3. Dòng Chữ Trạng Thái (Status Text):</label>
+                            <input type="text" id="presence-activity-text" placeholder="Nhập nội dung trạng thái hiển thị trên Discord..." class="w-full bg-dark-surface border border-dark-border rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                        </div>
+                    </div>
+
+                    <!-- 3. Toggle Xoay Tua Tự Động -->
+                    <div class="p-3 rounded-xl bg-dark-surface/60 border border-dark-border/80 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2.5">
+                            <i data-lucide="repeat" class="w-4 h-4 text-brand-400"></i>
+                            <div>
+                                <h5 class="text-xs font-semibold text-white">Chế độ Xoay Tua Tự Động (Auto-Rotation)</h5>
+                                <p class="text-[11px] text-slate-400">Tự động đổi trạng thái qua lại giữa các tính năng: Tarot, Tóm tắt, Auto-Embed mỗi 45s.</p>
+                            </div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="presence-is-rotating-toggle" class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- Nút Submit -->
+                    <div class="flex items-center justify-end gap-2 pt-2">
+                        <button type="button" onclick="savePresenceData()" id="presence-save-btn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs shadow-lg shadow-brand-600/30 transition-all active:scale-95">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                            <span>Lưu & Cập Nhật Lên Discord Ngay</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right 1 Col: Quick Presets -->
+                <div class="p-4 rounded-2xl bg-dark-card border border-dark-border flex flex-col gap-3 shadow-xl">
+                    <h4 class="text-xs font-bold text-white flex items-center gap-2 border-b border-dark-border pb-2.5">
+                        <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+                        Cấu Hình Mẫu Nhanh (Presets)
+                    </h4>
+
+                    <div class="flex flex-col gap-2">
+                        <button onclick="applyPresencePreset('live')" class="p-3 rounded-xl bg-dark-surface hover:bg-emerald-500/10 border border-dark-border hover:border-emerald-500/30 text-left transition-all group">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Live v2.0.0
+                                </span>
+                                <span class="text-[10px] text-slate-500 group-hover:text-emerald-300">Áp dụng →</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Trực tuyến bình thường + Bật xoay tua tính năng.</p>
+                        </button>
+
+                        <button onclick="applyPresencePreset('redeploy')" class="p-3 rounded-xl bg-dark-surface hover:bg-amber-500/10 border border-dark-border hover:border-amber-500/30 text-left transition-all group">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span> Đang Redeploy
+                                </span>
+                                <span class="text-[10px] text-slate-500 group-hover:text-amber-300">Áp dụng →</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Chuyển sang trạng thái Idle (Chờ) khi đang update.</p>
+                        </button>
+
+                        <button onclick="applyPresencePreset('bugfix')" class="p-3 rounded-xl bg-dark-surface hover:bg-rose-500/10 border border-dark-border hover:border-rose-500/30 text-left transition-all group">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-rose-400"></span> Sửa Bug / Bảo Trì
+                                </span>
+                                <span class="text-[10px] text-slate-500 group-hover:text-rose-300">Áp dụng →</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Chuyển sang DND (Đỏ) thông báo đang sửa lỗi.</p>
+                        </button>
+                    </div>
+
+                    <div class="mt-auto p-3 rounded-xl bg-dark-bg/60 border border-dark-border text-[11px] text-slate-400 leading-relaxed">
+                        💡 <strong>Mẹo:</strong> Bạn cũng có thể dùng lệnh Discord Slash <code>/setstatus</code> hoặc Prefix <code>$m setstatus &lt;status&gt; &lt;text&gt;</code> trực tiếp từ kênh chat.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 7: VERSION TRACKING & PATCHNOTES -->
+        <!-- ========================================== -->
+        <section id="tab-content-version" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
+            <!-- Version Header Banner -->
+            <div class="p-4 rounded-2xl bg-gradient-to-r from-brand-900/40 via-purple-900/30 to-dark-card border border-brand-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xl">
+                <div class="flex items-center gap-3.5">
+                    <div class="p-3 rounded-2xl bg-brand-600/30 text-brand-300 border border-brand-500/30 shadow-lg">
+                        <i data-lucide="package-check" class="w-7 h-7"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-lg font-black text-white tracking-tight">MikeDaBot</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-brand-500 text-white shadow-md shadow-brand-500/40">v2.0.0</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Major Release</span>
+                        </div>
+                        <p class="text-xs text-slate-300">Codename: <span class="font-semibold text-brand-300">Hybrid Engine & Dynamic Presence</span> • Phát hành: <span class="text-slate-400">28/08/2026</span></p>
+                    </div>
+                </div>
+
+                <!-- Versioning Rule Pill -->
+                <div class="p-2.5 rounded-xl bg-dark-card/90 border border-dark-border text-xs text-slate-300">
+                    <span class="font-bold text-white block mb-0.5">Quy tắc đặt phiên bản (Major.Minor.BugFix):</span>
+                    <span class="text-[11px] text-slate-400 font-mono">2 (Kiến trúc lớn) . x (Tính năng mới) . x (Hotfix/Sửa lỗi)</span>
+                </div>
+            </div>
+
+            <!-- Version Timeline Container -->
+            <div id="version-timeline-container" class="flex flex-col gap-3">
+                <!-- Dynamically populated via loadVersionData() -->
+            </div>
+        </section>
+
     </main>
 
     <!-- Activity Detail Modal Drawer -->
@@ -913,10 +1116,16 @@
 
             document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
             const activeBtn = document.getElementById(`tab-btn-${tab}`);
-            activeBtn.className = "tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
+            if (activeBtn) {
+                activeBtn.className = "tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
+            }
             
             if (tab === 'overview' && !latencyChart) {
                 initLatencyChart();
+            } else if (tab === 'presence') {
+                fetchPresenceData();
+            } else if (tab === 'version') {
+                fetchVersionData();
             } else if (tab === 'guilds') {
                 fetchGuildsData();
             } else if (tab === 'tarot') {
@@ -1984,6 +2193,27 @@
                     renderLogs();
                 }
 
+                // Version & Presence Info in Top Bar & Overview
+                if (statsData.version) {
+                    const verEl = document.getElementById('header-version-text');
+                    if (verEl) verEl.textContent = `v${statsData.version}`;
+                }
+
+                if (statsData.bot_name && statsData.bot_name !== 'N/A') {
+                    const presBotName = document.getElementById('presence-bot-name-preview');
+                    if (presBotName) presBotName.textContent = statsData.bot_name;
+                }
+
+                if (statsData.bot_avatar) {
+                    const presAvatar = document.getElementById('presence-avatar-preview');
+                    if (presAvatar) presAvatar.src = statsData.bot_avatar;
+                }
+
+                if (statsData.presence) {
+                    currentPresenceConfig = statsData.presence;
+                    updatePresencePreview(statsData.presence);
+                }
+
                 // 2. Fetch User Activities
                 const actRes = await fetch('/api/activities?limit=150');
                 if (actRes.ok) {
@@ -2015,6 +2245,230 @@
             }
         }
 
+        // ==========================================
+        // DYNAMIC PRESENCE MANAGEMENT
+        // ==========================================
+        let currentPresenceConfig = {
+            status: "online",
+            activity_type: "custom",
+            activity_text: "",
+            is_rotating: true
+        };
+        let selectedPresenceStatus = "online";
+
+        function selectPresenceStatus(status) {
+            selectedPresenceStatus = status;
+            document.querySelectorAll('.presence-status-btn').forEach(btn => {
+                btn.className = "presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dark-border bg-dark-surface text-slate-400 hover:text-white font-medium text-xs transition-all";
+            });
+
+            const activeBtn = document.getElementById(`presence-btn-${status}`);
+            if (activeBtn) {
+                if (status === 'online') {
+                    activeBtn.className = "presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 font-semibold text-xs transition-all shadow-sm";
+                } else if (status === 'idle') {
+                    activeBtn.className = "presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-amber-500/50 bg-amber-500/15 text-amber-300 font-semibold text-xs transition-all shadow-sm";
+                } else if (status === 'dnd') {
+                    activeBtn.className = "presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-rose-500/50 bg-rose-500/15 text-rose-300 font-semibold text-xs transition-all shadow-sm";
+                } else {
+                    activeBtn.className = "presence-status-btn flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-500/50 bg-slate-500/15 text-slate-300 font-semibold text-xs transition-all shadow-sm";
+                }
+            }
+        }
+
+        async function fetchPresenceData() {
+            try {
+                const res = await fetch('/api/presence');
+                if (res.ok) {
+                    const data = await res.json();
+                    currentPresenceConfig = data;
+                    updatePresenceUI(data);
+                }
+            } catch (err) {
+                console.error("Lỗi khi tải cấu hình Presence:", err);
+            }
+        }
+
+        function updatePresencePreview(data) {
+            if (!data) return;
+            const statusDot = document.getElementById('presence-status-dot-preview');
+            const statusBadge = document.getElementById('presence-status-badge-preview');
+            const rotBadge = document.getElementById('presence-rotating-badge-preview');
+            const textPreview = document.getElementById('presence-text-preview');
+            const badgePresence = document.getElementById('badge-presence-status');
+
+            const statusColors = {
+                online: { dot: "bg-emerald-500", badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", label: "Online" },
+                idle: { dot: "bg-amber-500", badge: "bg-amber-500/15 text-amber-300 border-amber-500/30", label: "Idle" },
+                dnd: { dot: "bg-rose-500", badge: "bg-rose-500/15 text-rose-300 border-rose-500/30", label: "DND" },
+                invisible: { dot: "bg-slate-500", badge: "bg-slate-500/15 text-slate-300 border-slate-500/30", label: "Invisible" }
+            };
+
+            const cfg = statusColors[data.status] || statusColors.online;
+            if (statusDot) statusDot.className = `absolute -bottom-1 -right-1 w-4 h-4 rounded-full ${cfg.dot} ring-4 ring-dark-card`;
+            if (badgePresence) badgePresence.className = `w-2 h-2 rounded-full ${cfg.dot} animate-pulse`;
+            if (statusBadge) {
+                statusBadge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.badge}`;
+                statusBadge.textContent = cfg.label;
+            }
+            if (rotBadge) {
+                if (data.is_rotating) {
+                    rotBadge.classList.remove('hidden');
+                } else {
+                    rotBadge.classList.add('hidden');
+                }
+            }
+            if (textPreview) {
+                textPreview.textContent = data.activity_text || (data.is_rotating ? '🔁 Tự động xoay tua trạng thái mỗi 45s' : 'Không có nội dung');
+            }
+        }
+
+        function updatePresenceUI(data) {
+            if (!data) return;
+            selectPresenceStatus(data.status || 'online');
+            
+            const actTypeSelect = document.getElementById('presence-activity-type');
+            if (actTypeSelect) actTypeSelect.value = data.activity_type || 'custom';
+
+            const actTextInput = document.getElementById('presence-activity-text');
+            if (actTextInput) actTextInput.value = data.activity_text || '';
+
+            const rotToggle = document.getElementById('presence-is-rotating-toggle');
+            if (rotToggle) rotToggle.checked = Boolean(data.is_rotating);
+
+            updatePresencePreview(data);
+        }
+
+        async function savePresenceData() {
+            const btn = document.getElementById('presence-save-btn');
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Đang áp dụng...`;
+                lucide.createIcons();
+            }
+
+            const payload = {
+                status: selectedPresenceStatus,
+                activity_type: document.getElementById('presence-activity-type').value,
+                activity_text: document.getElementById('presence-activity-text').value.trim(),
+                is_rotating: document.getElementById('presence-is-rotating-toggle').checked
+            };
+
+            try {
+                const res = await fetch('/api/presence', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast("Đã cập nhật trạng thái Discord Bot thành công!", "success");
+                    updatePresenceUI(data.presence);
+                } else {
+                    showToast("Lỗi: " + (data.error || "Không thể cập nhật trạng thái"), "error");
+                }
+            } catch (err) {
+                showToast("Lỗi kết nối khi cập nhật trạng thái.", "error");
+            } finally {
+                if (btn) {
+                    btn.innerHTML = originalHtml;
+                    lucide.createIcons();
+                }
+            }
+        }
+
+        function applyPresencePreset(preset) {
+            if (preset === 'live') {
+                selectPresenceStatus('online');
+                document.getElementById('presence-activity-type').value = 'custom';
+                document.getElementById('presence-activity-text').value = 'Live v2.0.0 | $m help & /help';
+                document.getElementById('presence-is-rotating-toggle').checked = true;
+            } else if (preset === 'redeploy') {
+                selectPresenceStatus('idle');
+                document.getElementById('presence-activity-type').value = 'custom';
+                document.getElementById('presence-activity-text').value = 'Đang redeploy / cập nhật phiên bản mới...';
+                document.getElementById('presence-is-rotating-toggle').checked = false;
+            } else if (preset === 'bugfix') {
+                selectPresenceStatus('dnd');
+                document.getElementById('presence-activity-type').value = 'custom';
+                document.getElementById('presence-activity-text').value = 'Đang bảo trì / fix bug đợi sửa xíu nhé...';
+                document.getElementById('presence-is-rotating-toggle').checked = false;
+            }
+            savePresenceData();
+        }
+
+        // ==========================================
+        // VERSION & CHANGELOG MANAGEMENT
+        // ==========================================
+        let cachedVersionInfo = null;
+
+        async function fetchVersionData() {
+            try {
+                const res = await fetch('/api/version');
+                if (res.ok) {
+                    const data = await res.json();
+                    cachedVersionInfo = data;
+                    renderVersionData(data);
+                }
+            } catch (err) {
+                console.error("Lỗi khi tải dữ liệu Version:", err);
+            }
+        }
+
+        function renderVersionData(data) {
+            const container = document.getElementById('version-timeline-container');
+            if (!container || !data || !data.changelog) return;
+
+            const badgeStyles = {
+                major: { badge: "bg-brand-500 text-white shadow-brand-500/30", label: "🚀 MAJOR RELEASE" },
+                minor: { badge: "bg-purple-500/20 text-purple-300 border border-purple-500/30", label: "✨ FEATURE UPDATE" },
+                bugfix: { badge: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30", label: "🛠️ HOTFIX / BUGFIX" }
+            };
+
+            container.innerHTML = data.changelog.map((rel, idx) => {
+                const style = badgeStyles[rel.type] || badgeStyles.minor;
+                const isCurrent = idx === 0;
+
+                const categoriesHtml = (rel.changes || []).map(cat => `
+                    <div class="p-3 rounded-xl bg-dark-surface/70 border border-dark-border/70 flex flex-col gap-2">
+                        <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                            ${escapeHtml(cat.category)}
+                        </span>
+                        <ul class="space-y-1 text-xs text-slate-300">
+                            ${cat.items.map(item => `
+                                <li class="flex items-start gap-2">
+                                    <span class="text-brand-400 mt-0.5">•</span>
+                                    <span class="leading-relaxed">${escapeHtml(item)}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="p-4 rounded-2xl bg-dark-card border ${isCurrent ? 'border-brand-500/50 ring-1 ring-brand-500/20 shadow-2xl' : 'border-dark-border'} flex flex-col gap-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-dark-border/80 pb-2.5">
+                            <div class="flex items-center gap-2.5">
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-black font-mono bg-white/10 text-white">v${escapeHtml(rel.version)}</span>
+                                <h4 class="font-bold text-sm text-white">${escapeHtml(rel.title)}</h4>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${style.badge}">${style.label}</span>
+                                ${isCurrent ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Phiên Bản Hiện Tại</span>' : ''}
+                            </div>
+                            <span class="text-xs text-slate-400 font-mono">📅 Ngày phát hành: ${escapeHtml(rel.date)}</span>
+                        </div>
+
+                        <p class="text-xs text-slate-300 italic">${escapeHtml(rel.summary)}</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                            ${categoriesHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
         // Initialize
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
@@ -2022,6 +2476,8 @@
             fetchGuildsData();
             fetchTarotCooldowns();
             fetchTarotRatingStats();
+            fetchPresenceData();
+            fetchVersionData();
             setInterval(fetchDashboardData, 3000);
         });
     </script>

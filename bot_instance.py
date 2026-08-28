@@ -174,8 +174,17 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         ),
         inline=False
     )
+    embed.add_field(
+        name="⚙️ 4. HỆ THỐNG & QUẢN TRỊ (SYSTEM & STATUS)",
+        value=(
+            "• `/version` (`$m ver`): Xem phiên bản hiện tại & toàn bộ nhật ký cập nhật (Patchnotes).\n"
+            "• `/setstatus`: Đổi trạng thái bot động (Online, Idle, DND, Xoay tua tính năng) dành cho Admin.\n"
+            "• Web Dashboard Quản trị: Xem Live Console, Live Activity & cấu hình máy chủ."
+        ),
+        inline=False
+    )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.0",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.0.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -545,4 +554,105 @@ async def help_cmd(ctx: commands.Context, *, feature_arg: Optional[str] = None):
         elif arg_lower in ["embed", "fixembed", "link"]:
             chosen = "embed"
     await send_bot_help(ctx, feature=chosen)
+
+
+# ==========================================
+# 6. VERSION & PATCHNOTES COMMANDS
+# ==========================================
+@bot.tree.command(name="version", description="Xem thông tin phiên bản và nhật ký cập nhật (Patchnotes / Changelog)")
+async def version_slash(interaction: discord.Interaction):
+    from core.version import build_version_embed
+    embed = build_version_embed(interaction.user)
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.command(name="version", aliases=["ver", "patchnotes", "changelog", "patchnote"])
+async def version_cmd(ctx: commands.Context):
+    from core.version import build_version_embed
+    embed = build_version_embed(ctx.author)
+    await ctx.reply(embed=embed, mention_author=False)
+
+
+# ==========================================
+# 7. DYNAMIC PRESENCE COMMANDS (ADMIN ONLY)
+# ==========================================
+@bot.tree.command(name="setstatus", description="Cập nhật trạng thái hiển thị của Bot (Quản trị viên)")
+@app_commands.describe(
+    status="Chọn trạng thái: online, idle, dnd, invisible",
+    activity_type="Loại hoạt động: custom, playing, watching, listening, competing",
+    text="Nội dung hiển thị trạng thái",
+    rotating="Tự động xoay tua trạng thái tính năng định kỳ"
+)
+@app_commands.choices(
+    status=[
+        app_commands.Choice(name="Online (Trực tuyến)", value="online"),
+        app_commands.Choice(name="Idle (Chờ / Đang redeploy)", value="idle"),
+        app_commands.Choice(name="Do Not Disturb (Bận / Đang fix bug)", value="dnd"),
+        app_commands.Choice(name="Invisible (Ẩn)", value="invisible"),
+    ],
+    activity_type=[
+        app_commands.Choice(name="Custom Status (Tùy chỉnh)", value="custom"),
+        app_commands.Choice(name="Playing (Đang chơi)", value="playing"),
+        app_commands.Choice(name="Watching (Đang xem)", value="watching"),
+        app_commands.Choice(name="Listening (Đang nghe)", value="listening"),
+        app_commands.Choice(name="Competing (Đang thi đấu)", value="competing"),
+    ]
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def setstatus_slash(
+    interaction: discord.Interaction,
+    status: app_commands.Choice[str],
+    activity_type: Optional[app_commands.Choice[str]] = None,
+    text: Optional[str] = None,
+    rotating: Optional[bool] = None
+):
+    from core.presence_manager import presence_manager
+    act_type = activity_type.value if activity_type else "custom"
+    is_rot = rotating if rotating is not None else False
+    status_val = status.value
+    status_text = text or f"Live | $m help"
+
+    success = await presence_manager.apply_presence(
+        bot=bot,
+        status=status_val,
+        activity_type=act_type,
+        text=status_text,
+        is_rotating=is_rot,
+        save_db=True
+    )
+    if success:
+        mode_str = " (Xoay tua tự động)" if is_rot else ""
+        await interaction.response.send_message(
+            f"✨ **Đã cập nhật trạng thái bot thành công!**\n"
+            f"• Trạng thái: **{status_val.upper()}**\n"
+            f"• Loại hoạt động: **{act_type}**\n"
+            f"• Nội dung: `{status_text}`{mode_str}",
+            ephemeral=True
+        )
+    else:
+        await interaction.response.send_message("❌ Không thể cập nhật trạng thái bot lúc này.", ephemeral=True)
+
+
+@bot.command(name="setstatus", aliases=["status", "setpresence"])
+@commands.has_permissions(administrator=True)
+async def setstatus_cmd(ctx: commands.Context, status_arg: str = "online", *, text_arg: str = ""):
+    from core.presence_manager import presence_manager
+    status_val = status_arg.lower()
+    if status_val not in ["online", "idle", "dnd", "invisible"]:
+        status_val = "online"
+        text_arg = f"{status_arg} {text_arg}".strip()
+
+    status_text = text_arg or "Live | $m help"
+    success = await presence_manager.apply_presence(
+        bot=bot,
+        status=status_val,
+        activity_type="custom",
+        text=status_text,
+        is_rotating=False,
+        save_db=True
+    )
+    if success:
+        await ctx.reply(f"✨ Đã cập nhật trạng thái bot: `[{status_val.upper()}]` {status_text}", mention_author=False)
+    else:
+        await ctx.reply("❌ Cập nhật trạng thái thất bại.", mention_author=False)
 

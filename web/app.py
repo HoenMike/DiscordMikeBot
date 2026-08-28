@@ -7,11 +7,11 @@ import platform
 import psutil
 from functools import wraps
 from datetime import datetime, timezone
-from flask import Flask, jsonify, render_template, request, session, redirect, url_for
-
 import config
 from bot_instance import bot
 from core.activity_logger import activity_logger
+from core.presence_manager import presence_manager
+from core.version import CURRENT_VERSION, get_version_info, get_changelog
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 app.secret_key = config.FLASK_SECRET_KEY
@@ -156,6 +156,9 @@ def api_stats():
         "ram_raw": ram_raw,
         "os_info": f"{platform.system()} ({platform.release()})",
         "python_version": platform.python_version(),
+        "version": CURRENT_VERSION,
+        "version_info": get_version_info(),
+        "presence": presence_manager.get_info(),
         "summaries_count": config.summary_count,
         "models": {
             "summary": config.GEMINI_SUMMARY_MODEL,
@@ -494,5 +497,51 @@ def api_tarot_ratings_export():
             return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# 10. PRESENCE & STATUS CONTROL APIS
+# ==========================================
+@app.route('/api/presence', methods=['GET'])
+@login_required
+def api_get_presence():
+    return jsonify(presence_manager.get_info())
+
+
+@app.route('/api/presence', methods=['POST'])
+@login_required
+def api_update_presence():
+    data = request.get_json(silent=True) or {}
+    status = data.get("status", "online")
+    activity_type = data.get("activity_type", "custom")
+    activity_text = data.get("activity_text", "").strip()
+    is_rotating = bool(data.get("is_rotating", False))
+
+    success = run_coroutine_safe(
+        presence_manager.apply_presence(
+            bot=bot,
+            status=status,
+            activity_type=activity_type,
+            text=activity_text,
+            is_rotating=is_rotating,
+            save_db=True
+        )
+    )
+    if success:
+        return jsonify({"success": True, "presence": presence_manager.get_info()})
+    return jsonify({"success": False, "error": "Bot chưa kết nối Discord hoặc xảy ra lỗi."}), 500
+
+
+# ==========================================
+# 11. VERSION & CHANGELOG APIS
+# ==========================================
+@app.route('/api/version', methods=['GET'])
+@login_required
+def api_version():
+    return jsonify({
+        "info": get_version_info(),
+        "changelog": get_changelog()
+    })
+
 
 
