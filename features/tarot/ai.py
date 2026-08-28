@@ -118,37 +118,77 @@ def _build_tarot_prompt(
     5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt.
     6. `advice`: Lời khuyên hành động thực tế, thông thái và khích lệ người hỏi.
     7. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown, BẮT BUỘC phân tách các mục rõ ràng bằng 2 dấu xuống dòng (\\n\\n):
-       🎯 **KẾT LUẬN**
+       🎯 **KẾT LUẬN & TỔNG QUAN:**
        (Nội dung kết luận)
 
-       🃏 **Ý NGHĨA CÁC LÁ BÀI**
+       🃏 **Ý NGHĨA CÁC LÁ BÀI:**
        • **[Tên lá bài 1]**: (Phân tích)
        • **[Tên lá bài 2]**: (Phân tích)
 
-       💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG**
+       💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
        (Nội dung lời khuyên)
     """.strip()
     return prompt
 
 
 def _clean_and_format_tarot_markdown(text: str) -> str:
-    """Chuẩn hóa cấu trúc Markdown bài giải Tarot, tách đoạn rõ ràng và xuống hàng các mục."""
+    """
+    Chuẩn hóa cấu trúc Markdown bài giải Tarot:
+    - Loại bỏ ký tự thừa hoặc tag in đậm bị treo (dangling **).
+    - Chuẩn hóa các đề mục icon chính (🎯, 🃏, 💡, 🔮, ⚡, 📖, 🎭, 💖, ✨).
+    - Giữ nguyên các dấu gạch nối giữa dòng (' - Ngược', 'A - B') và chỉ chuyển đổi gạch đầu dòng.
+    """
     if not text:
         return ""
 
     t = text.strip()
 
-    # 1. Chèn \n\n trước các tiêu đề icon chính (🎯, 🃏, 💡, 🔮, ⚡, 📖, 🎭, 💖, ✨)
-    t = re.sub(
-        r"(?<!^)\s*([🎯🃏💡🔮⚡📖🎭💖✨])\s*(\*{0,2})([A-ZĐÀ-Ỹa-zđà-ỹ\s&/—\-]+?)(\*{0,2})(?::|\n)",
-        r"\n\n\1 **\3**\n",
-        t
-    )
+    # 1. Loại bỏ các ký tự đánh dấu heading Markdown (#, ##, ###) ở đầu dòng
+    t = re.sub(r"^[ \t]*#+[ \t]*", "", t, flags=re.MULTILINE)
 
-    # 2. Chuẩn hóa xuống dòng cho các gạch đầu dòng (•, -, *)
-    t = re.sub(r"(?<!^)(?<!\n)\s*([•\-])\s*", r"\n• ", t)
+    # 2. Xóa các dòng rác chỉ chứa dấu sao hoặc dấu cách
+    t = re.sub(r"^\s*\*+\s*$", "", t, flags=re.MULTILINE)
 
-    # 3. Gom bớt các dòng trống liên tiếp (> 2 dòng thành 2 dòng)
+    icons = "🎯🃏💡🔮⚡📖🎭💖✨"
+
+    # 3a. Chèn 2 dòng trống trước các icon chính nếu chúng bị dính liền vào câu trước
+    t = re.sub(rf"(?<!\A)(?<!\n)\s*([{icons}])", r"\n\n\1", t)
+
+    # 3b. Chuẩn hóa dòng tiêu đề chứa icon: tách tiêu đề và nội dung cùng dòng nếu có
+    def _fix_header_line(line: str) -> str:
+        m = re.match(rf"^\s*([{icons}])\s*(.*)$", line)
+        if not m:
+            return line
+        icon = m.group(1)
+        rest = m.group(2).strip()
+
+        colon_pos = rest.find(":") if ":" in rest else -1
+        if colon_pos != -1:
+            raw_title = rest[:colon_pos].strip()
+            after_colon = rest[colon_pos + 1:].strip()
+            clean_title = re.sub(r"[*]", "", raw_title).strip()
+            if clean_title:
+                res = f"{icon} **{clean_title}:**"
+                if after_colon:
+                    after_colon = re.sub(r"^\*+\s*", "", after_colon).strip()
+                    res += f"\n{after_colon}"
+                return res
+
+        clean_title = re.sub(r"[*]", "", rest).strip()
+        return f"{icon} **{clean_title}:**" if clean_title else icon
+
+    lines = t.split("\n")
+    processed_lines = [_fix_header_line(l) for l in lines]
+    t = "\n".join(processed_lines)
+
+    # 4. Chuẩn hóa gạch đầu dòng: Chỉ chuyển đổi dấu '-', '*', '+' ở ĐẦU DÒNG thành bullet '• '
+    # TUYỆT ĐỐI không thay thế dấu '-' ở giữa dòng (ví dụ: ' - Ngược' hay 'A - B')
+    t = re.sub(r"^[ \t]*[-*+][ \t]+", "• ", t, flags=re.MULTILINE)
+
+    # 5. Dọn dẹp dòng rác chỉ chứa dấu sao một lần nữa
+    t = re.sub(r"^\s*\*+\s*$", "", t, flags=re.MULTILINE)
+
+    # 6. Gom bớt các dòng trống liên tiếp (> 2 dòng thành 2 dòng)
     t = re.sub(r"\n{3,}", "\n\n", t)
 
     return t.strip()
@@ -278,6 +318,11 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
             adv = "\n".join(str(a) for a in adv)
         adv = str(adv).strip()
 
+        # Dọn dẹp nếu Gemini vô tình chèn header vào trong các trường con
+        conc = re.sub(r"^(?:🎯|[#*_\s])*\s*(?:KẾT LUẬN|TỔNG QUAN)[^:\n]*[:\n]*", "", conc, flags=re.IGNORECASE).strip()
+        cards_an = re.sub(r"^(?:🃏|[#*_\s])*\s*(?:Ý NGHĨA CÁC LÁ BÀI|Ý NGHĨA)[^:\n]*[:\n]*", "", cards_an, flags=re.IGNORECASE).strip()
+        adv = re.sub(r"^(?:💡|[#*_\s])*\s*(?:LỜI KHUYÊN & ĐỊNH HƯỚNG|LỜI KHUYÊN|ĐỊNH HƯỚNG)[^:\n]*[:\n]*", "", adv, flags=re.IGNORECASE).strip()
+
         if conc and cards_an:
             # Tái tạo đầy đủ bài đọc chuẩn Markdown với các mục phân tách đẹp mắt
             parts = [
@@ -292,7 +337,7 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
         else:
             parts = []
             if conc:
-                parts.append(f"🎯 **KẾT LUẬN:**\n{conc}")
+                parts.append(f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}")
             if cards_an:
                 parts.append(f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}")
             if adv:
