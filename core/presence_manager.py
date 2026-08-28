@@ -240,7 +240,18 @@ class PresenceManager:
                 pass
 
     async def set_maintenance(self, bot: discord.Client, reason: str = "Đang bảo trì / fix bug đợi sửa..."):
-        """Đặt trạng thái bot đang bảo trì / gặp sự cố."""
+        """Đặt trạng thái bot đang bảo trì sang DND để người dùng vẫn xem được lý do."""
+        await self.apply_presence(
+            bot=bot,
+            status="dnd",
+            activity_type="custom",
+            text=reason,
+            is_rotating=False,
+            save_db=True
+        )
+
+    async def set_error(self, bot: discord.Client, reason: str = "Đang gặp lỗi kỹ thuật / fix bug đợi xíu..."):
+        """Đặt trạng thái bot khi gặp lỗi sang DND (tuyệt đối không để offline)."""
         await self.apply_presence(
             bot=bot,
             status="dnd",

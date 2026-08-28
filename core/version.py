@@ -10,12 +10,28 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.3"
+CURRENT_VERSION = "2.4.4"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & Thread Safety"
+CODENAME = "Hybrid Engine & DND Status Policy"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.4",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Chính Sách Trạng Thái DND Cho Sự Cố & Bảo Trì",
+        "summary": "Quy định trạng thái bot khi gặp sự cố, lỗi hoặc bảo trì luôn được chuyển sang chế độ Do Not Disturb (DND - Chấm đỏ) thay vì Offline để đảm bảo người dùng luôn đọc được lý do và tiến độ xử lý.",
+        "changes": [
+            {
+                "category": "🎭 Tinh Chỉnh Presence & Trạng Thái Sự Cố",
+                "items": [
+                    "Bổ sung hàm set_error() tự động chuyển sang DND kèm lý do chi tiết khi gặp sự cố kỹ thuật.",
+                    "Tuyệt đối không chuyển trạng thái bot sang Offline tự động, giữ nguyên dòng Custom Status hiển thị công khai."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.3",
         "date": "2026-08-28",

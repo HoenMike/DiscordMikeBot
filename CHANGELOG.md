@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.4] - 2026-08-28 — *DND Status Policy & Presence Refinement*
+
+### Changed
+- **DND Error Policy**: Quy định trạng thái bot khi gặp sự cố hoặc bảo trì luôn được chuyển sang chế độ Do Not Disturb (DND - Chấm đỏ) thay vì Offline để đảm bảo người dùng luôn đọc được lý do và tiến độ xử lý trực tiếp trên Discord.
+- **Set Error Handler**: Bổ sung hàm `presence_manager.set_error()` kích hoạt DND và cập nhật lý do lỗi tự động.
+
+---
+
 ## [2.4.3] - 2026-08-28 — *Thread Safety & Config Import Fix*
 
 ### Fixed
