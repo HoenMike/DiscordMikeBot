@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 # ---------------------------------------------------------------------------
 # Cấu hình chung cho Bot
 # ---------------------------------------------------------------------------
-BOT_DEFAULT_PREFIXES = ["$m", "$M"]
+BOT_DEFAULT_PREFIXES = [".m", ".M"]
 DEFAULT_COLOR_PRIMARY = 0x7851A9
 DEFAULT_COLOR_SUCCESS = 0x2ECC71
 DEFAULT_COLOR_WARNING = 0xF1C40F

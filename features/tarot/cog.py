@@ -111,7 +111,7 @@ class TarotCog(commands.Cog):
         history = await self.tarot_manager.get_user_history(target_user.id, limit=5)
         if not history:
             await sender(
-                "📜 Bạn chưa có lượt bốc bài Tarot nào được lưu lại. Hãy dùng `/tarot` hoặc `$m tarot` để bốc quẻ đầu tiên nhé!",
+                "📜 Bạn chưa có lượt bốc bài Tarot nào được lưu lại. Hãy dùng `/tarot` hoặc `.m tarot` để bốc quẻ đầu tiên nhé!",
                 ephemeral=is_ephemeral
             )
             return
@@ -158,7 +158,7 @@ class TarotCog(commands.Cog):
         """Hàm dùng chung xử lý quy trình bốc bài cho cả Slash Command và Prefix Command."""
         spread_info = SPREAD_DEFINITIONS.get(spread_key)
         if not spread_info:
-            err = "❌ Kiểu trải bài không hợp lệ! Hãy dùng `$m tarot` hoặc `/tarot` để xem danh sách."
+            err = "❌ Kiểu trải bài không hợp lệ! Hãy dùng `.m tarot` hoặc `/tarot` để xem danh sách."
             if interaction:
                 await interaction.response.send_message(err, ephemeral=True)
             elif ctx:
@@ -176,8 +176,8 @@ class TarotCog(commands.Cog):
         if spread_info.get("requires_question", True) and not clean_question:
             err = (
                 f"❌ Với kiểu trải bài **{spread_info['name']}**, bạn **bắt buộc** phải nhập câu hỏi hoặc chủ đề cần xem!\n"
-                f"💡 *Ví dụ cú pháp: `$m tarot {spread_key} Công việc tháng tới của tôi sẽ tiến triển thế nào?`*\n"
-                f"💡 *Hoặc gõ `$m tarot` để mở giao diện nhập câu hỏi trực quan.*"
+                f"💡 *Ví dụ cú pháp: `.m tarot {spread_key} Công việc tháng tới của tôi sẽ tiến triển thế nào?`*\n"
+                f"💡 *Hoặc gõ `.m tarot` để mở giao diện nhập câu hỏi trực quan.*"
             )
             if interaction:
                 await interaction.response.send_message(err, ephemeral=True)
@@ -196,7 +196,7 @@ class TarotCog(commands.Cog):
                     f"☀️ **Bạn đã rút Daily Card của ngày hôm nay rồi!**\n\n"
                     f"🃏 Lá bài hôm nay của bạn: {last_card_str} - `{orient_str}` *(Rút lúc {drawn_time})*\n"
                     f"⏰ *Mỗi người chỉ nên nhận 1 thông điệp năng lượng mỗi ngày. Lượt bốc bài sẽ được làm mới vào lúc 00:00 (Giờ VN)!*\n\n"
-                    f"💡 *Nếu bạn có câu hỏi cụ thể khác, hãy dùng `$m tarot single` hoặc `$m tarot yes_no` nhé!*"
+                    f"💡 *Nếu bạn có câu hỏi cụ thể khác, hãy dùng `.m tarot single` hoặc `.m tarot yes_no` nhé!*"
                 )
                 if interaction:
                     await interaction.response.send_message(cooldown_msg, ephemeral=True)
@@ -435,7 +435,7 @@ class TarotCog(commands.Cog):
             description=f"**❓ Câu hỏi của bạn:**\n*{question}*\n\n"
                         f"✨ **Kiểu trải bài đề xuất:** **{spread_name}** (`{spread_key}`)\n\n"
                         f"💡 **Lý do gợi ý:**\n{reason}\n\n"
-                        f"👉 *Bạn có thể gõ `/tarot` hoặc `$m tarot {spread_key} {question}` để bắt đầu ngay!*",
+                        f"👉 *Bạn có thể gõ `/tarot` hoặc `.m tarot {spread_key} {question}` để bắt đầu ngay!*",
             color=0x8B5CF6
         )
         embed.set_footer(text="Gợi ý chiêm tinh thông minh MikeDaBot", icon_url=interaction.user.display_avatar.url)
@@ -495,7 +495,7 @@ class TarotCog(commands.Cog):
         await send_bot_help(interaction, feature="tarot", ephemeral=True)
 
     # =========================================================================
-    # 2. PREFIX COMMANDS ($m tarot ...)
+    # 2. PREFIX COMMANDS (.m tarot ...)
     # =========================================================================
     @commands.command(
         name="tarot",
@@ -542,7 +542,7 @@ class TarotCog(commands.Cog):
         # 3. Gợi ý trải bài
         if spread_arg.lower() in ["recommend", "rec", "goiy", "tuvan"]:
             if not rest:
-                await ctx.reply("❓ Vui lòng nhập câu hỏi để bot gợi ý trải bài! Ví dụ: `$m tarot recommend Tôi có nên chuyển việc không?`", mention_author=False)
+                await ctx.reply("❓ Vui lòng nhập câu hỏi để bot gợi ý trải bài! Ví dụ: `.m tarot recommend Tôi có nên chuyển việc không?`", mention_author=False)
                 return
             s_key, s_name, reason = recommend_spread_for_question(rest)
             embed = discord.Embed(

@@ -10,12 +10,29 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.5"
+CURRENT_VERSION = "2.4.6"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & Terminology Polish"
+CODENAME = "Hybrid Engine & Dot Prefix Migration"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.6",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Chuyển Đổi Prefix Mặc Định Sang .m",
+        "summary": "Cập nhật tiền tố lệnh mặc định của bot từ $m sang .m (.m, .M) trên toàn bộ hệ thống xử lý, menu tương tác, ví dụ lệnh và trạng thái Presence.",
+        "changes": [
+            {
+                "category": "⚡ Chuyển Đổi Tiền Tố (Prefix Migration)",
+                "items": [
+                    "Cập nhật BOT_DEFAULT_PREFIXES = ['.m', '.M'] trong core/constants.py và bot_instance.py.",
+                    "Đồng bộ toàn bộ chuỗi trạng thái Presence sang dạng: Live v2.4.6 | .m help.",
+                    "Cập nhật toàn bộ các menu hướng dẫn /help, overview, tarot, tomtat sang prefix .m."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.5",
         "date": "2026-08-28",

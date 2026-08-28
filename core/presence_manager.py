@@ -35,7 +35,7 @@ ACTIVITY_TYPE_MAP = {
 }
 
 DEFAULT_ROTATION_ITEMS = [
-    f"Live v{CURRENT_VERSION} | $m help",
+    f"Live v{CURRENT_VERSION} | .m help",
     "🔮 /tarot - Bốc bài Tarot chiêm tinh",
     "📝 /tomtat - Tóm tắt kênh chat thông minh",
     "👑 AutoEmbed 9 mạng xã hội siêu gọn",
@@ -48,7 +48,7 @@ class PresenceManager:
     def __init__(self):
         self._status: str = "online"
         self._activity_type: str = "custom"
-        self._activity_text: str = f"Live v{CURRENT_VERSION} | $m help"
+        self._activity_text: str = f"Live v{CURRENT_VERSION} | .m help"
         self._is_rotating: bool = True
         self._rotation_index: int = 0
         self._rotation_items: List[str] = list(DEFAULT_ROTATION_ITEMS)
@@ -106,7 +106,7 @@ class PresenceManager:
                     with self._lock:
                         self._status = row[0] or "online"
                         self._activity_type = row[1] or "custom"
-                        self._activity_text = row[2] or f"Live v{CURRENT_VERSION} | $m help"
+                        self._activity_text = row[2] or f"Live v{CURRENT_VERSION} | .m help"
                         self._is_rotating = bool(row[3])
         except Exception as e:
             print(f"⚠️ [PresenceManager] Lỗi nạp cấu hình Presence: {e}", flush=True)
@@ -155,7 +155,7 @@ class PresenceManager:
         with self._lock:
             self._status = status_clean
             self._activity_type = activity_type.lower()
-            self._activity_text = text or f"Live v{CURRENT_VERSION} | $m help"
+            self._activity_text = text or f"Live v{CURRENT_VERSION} | .m help"
             self._is_rotating = is_rotating
 
         # Dừng vòng lặp xoay tua cũ nếu đang chạy
@@ -267,7 +267,7 @@ class PresenceManager:
             bot=bot,
             status="online",
             activity_type="custom",
-            text=f"Live v{CURRENT_VERSION} | $m help",
+            text=f"Live v{CURRENT_VERSION} | .m help",
             is_rotating=True,
             save_db=True
         )

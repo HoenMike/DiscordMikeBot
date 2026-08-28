@@ -19,8 +19,8 @@ FEATURE_EXTENSIONS = [
 
 
 def get_prefix(bot, message):
-    """Hỗ trợ các prefix $m, $M và Bot Mention linh hoạt."""
-    prefixes = ["$m ", "$m", "$M ", "$M"]
+    """Hỗ trợ các prefix .m, .M và Bot Mention linh hoạt."""
+    prefixes = [".m ", ".m", ".M ", ".M"]
     if bot.user:
         return commands.when_mentioned_or(*prefixes)(bot, message)
     return prefixes
@@ -97,7 +97,7 @@ class SummaryBot(commands.Bot):
                 traceback.print_exception(type(error), error, error.__traceback__, file=sys.stdout)
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        """Xử lý lỗi toàn cục cho các lệnh Prefix ($m ...)."""
+        """Xử lý lỗi toàn cục cho các lệnh Prefix (.m ...)."""
         if isinstance(error, commands.CommandOnCooldown):
             await ctx.reply(
                 f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(error.retry_after) + 1}s` nữa trước khi dùng lại lệnh.",
@@ -113,9 +113,9 @@ class SummaryBot(commands.Bot):
         if message.author.bot:
             return
 
-        # Nếu Server đang bị Admin tạm ngừng, phản hồi lý do nếu người dùng gõ lệnh $m
+        # Nếu Server đang bị Admin tạm ngừng, phản hồi lý do nếu người dùng gõ lệnh .m
         if message.guild and self.config_manager.is_guild_suspended(message.guild.id):
-            if message.content.strip().startswith(("$m", "$M")):
+            if message.content.strip().startswith((".m", ".M")):
                 reason = self.config_manager.get_guild_suspension_reason(message.guild.id) or "Quản trị viên tạm ngừng"
                 guild_name = message.guild.name
                 msg = (
@@ -126,9 +126,9 @@ class SummaryBot(commands.Bot):
                 await message.reply(msg, mention_author=False)
             return
 
-        # Nếu người dùng chỉ gõ đúng "$m" hoặc "$M" không kèm lệnh, hiển thị bảng hướng dẫn
+        # Nếu người dùng chỉ gõ đúng ".m" hoặc ".M" không kèm lệnh, hiển thị bảng hướng dẫn
         content_clean = message.content.strip().lower()
-        if content_clean in ["$m", "$m help"]:
+        if content_clean in [".m", ".m help"]:
             ctx = await self.get_context(message)
             if not ctx.valid or ctx.command is None:
                 await send_bot_help(ctx)
@@ -149,7 +149,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         title="🤖 HƯỚNG DẪN SỬ DỤNG MIKEBOT (TỔNG QUAN & TÍNH NĂNG MỚI)",
         description=(
             "Chào mừng bạn đến với **MikeDaBot**! Trợ lý Discord thông minh tích hợp AI đa nhiệm, "
-            "hỗ trợ cả **Slash Command** (`/`) lẫn **Prefix Command** (`$m`, `$M`).\n\n"
+            "hỗ trợ cả **Slash Command** (`/`) lẫn **Prefix Command** (`.m`, `.M`).\n\n"
             "💡 *Hãy sử dụng menu thả xuống bên dưới để tra cứu chi tiết từng tính năng & cơ chế QoL!*"
         ),
         color=0x7851A9
@@ -160,7 +160,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
             "• Rút bài 78 lá Rider-Waite với hình ảnh Canvas trực quan độ phân giải cao.\n"
             "• Luận giải đa tầng với 3 tính cách Reader độc đáo (`Orion`, `Celeste`, `Jester`).\n"
             "• Hạt nhân năng lượng vũ trụ theo khung giờ (1 tiếng/khung) & Nút đánh giá phản hồi.\n"
-            "👉 **Lệnh:** `/tarot`, `$m tarot` | **Xem chi tiết:** Chọn mục `🔮 Tarot` bên dưới."
+            "👉 **Lệnh:** `/tarot`, `.m tarot` | **Xem chi tiết:** Chọn mục `🔮 Tarot` bên dưới."
         ),
         inline=False
     )
@@ -169,7 +169,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         value=(
             "• Đọc và đúc kết nội dung kênh chat bằng Gemini Flash AI tốc độ cao.\n"
             "• Quét sâu tới 2500 tin nhắn, tự động trích xuất chủ đề, việc cần làm (Action Items) & Top thành viên.\n"
-            "👉 **Lệnh:** `/tomtat`, `$m tomtat` | **Xem chi tiết:** Chọn mục `📝 Tóm tắt` bên dưới."
+            "👉 **Lệnh:** `/tomtat`, `.m tomtat` | **Xem chi tiết:** Chọn mục `📝 Tóm tắt` bên dưới."
         ),
         inline=False
     )
@@ -185,14 +185,14 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
     embed.add_field(
         name="⚙️ 4. HỆ THỐNG & QUẢN TRỊ (SYSTEM & STATUS)",
         value=(
-            "• `/version` (`$m ver`): Xem phiên bản hiện tại & toàn bộ nhật ký cập nhật (Patchnotes).\n"
+            "• `/version` (`.m ver`): Xem phiên bản hiện tại & toàn bộ nhật ký cập nhật (Patchnotes).\n"
             "• `/setstatus`: Đổi trạng thái bot động (Online, Idle, DND, Xoay tua tính năng) dành cho Admin.\n"
             "• Web Dashboard Quản trị: Xem Live Console, Live Activity & cấu hình máy chủ."
         ),
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.4.5",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.4.6",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -235,12 +235,12 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
     embed.add_field(
         name="💡 DANH SÁCH LỆNH TAROT ĐẦY ĐỦ",
         value=(
-            "• `/tarot` hoặc `$m tarot` : Mở bảng chọn kiểu bài & Reader trực quan\n"
-            "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `$m tarot yes_no Có nên đổi việc?`\n"
-            "• `/tarot_history` hoặc `$m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
-            "• `/tarot_recommend [question]` hoặc `$m tarot recommend [câu hỏi]` : AI gợi ý kiểu trải bài phù hợp nhất\n"
-            "• `/tarot_memory [on/off]` hoặc `$m tarot memory [on/off]` : Bật / tắt trí nhớ ngữ cảnh bạn cũ\n"
-            "• `/tarot_forget` hoặc `$m tarot forget` : Xóa sạch toàn bộ lịch sử bốc bài khỏi hệ thống\n"
+            "• `/tarot` hoặc `.m tarot` : Mở bảng chọn kiểu bài & Reader trực quan\n"
+            "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `.m tarot yes_no Có nên đổi việc?`\n"
+            "• `/tarot_history` hoặc `.m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
+            "• `/tarot_recommend [question]` hoặc `.m tarot recommend [câu hỏi]` : AI gợi ý kiểu trải bài phù hợp nhất\n"
+            "• `/tarot_memory [on/off]` hoặc `.m tarot memory [on/off]` : Bật / tắt trí nhớ ngữ cảnh bạn cũ\n"
+            "• `/tarot_forget` hoặc `.m tarot forget` : Xóa sạch toàn bộ lịch sử bốc bài khỏi hệ thống\n"
             "• `/tarot_weekly_setup [channel]` : Cài đặt kênh nhận bài tuần vào sáng Thứ Hai (Admin)"
         ),
         inline=False
@@ -277,8 +277,8 @@ def build_summary_help_embed(user: Union[discord.User, discord.Member]) -> disco
         name="⚙️ CÚ PHÁP SỬ DỤNG",
         value=(
             "• **Slash Command**: `/tomtat [hours] [limit] [summary_type] [focus] [date] [from_time] [to_time] [message_link] [send_to_dm] [channel]`\n"
-            "• **Prefix Command**: `$m tomtat [hours] [limit] [summary_type] [focus]`\n"
-            "• **Lệnh tắt / bí danh**: `$m tt`, `$m summary`"
+            "• **Prefix Command**: `.m tomtat [hours] [limit] [summary_type] [focus]`\n"
+            "• **Lệnh tắt / bí danh**: `.m tt`, `.m summary`"
         ),
         inline=False
     )
@@ -298,9 +298,9 @@ def build_summary_help_embed(user: Union[discord.User, discord.Member]) -> disco
     embed.add_field(
         name="💡 VÍ DỤ MẪU",
         value=(
-            "• `$m tomtat` : Tóm tắt nhanh 2 tiếng gần nhất (150 tin nhắn)\n"
-            "• `$m tomtat 5 300 long bug` : Quét 5 tiếng (300 tin), chi tiết timeline, tập trung vào `bug`\n"
-            "• `$m tomtat 100 dm` : Quét 100 tin gần nhất và gửi kết quả vào tin nhắn riêng DM\n"
+            "• `.m tomtat` : Tóm tắt nhanh 2 tiếng gần nhất (150 tin nhắn)\n"
+            "• `.m tomtat 5 300 long bug` : Quét 5 tiếng (300 tin), chi tiết timeline, tập trung vào `bug`\n"
+            "• `.m tomtat 100 dm` : Quét 100 tin gần nhất và gửi kết quả vào tin nhắn riêng DM\n"
             "• `/tomtat hours:24.0 limit:500 summary_type:Tóm tắt dài & Timeline chi tiết focus:deadline`"
         ),
         inline=False
@@ -618,7 +618,7 @@ async def setstatus_slash(
     act_type = activity_type.value if activity_type else "custom"
     is_rot = rotating if rotating is not None else False
     status_val = status.value
-    status_text = text or f"Live | $m help"
+    status_text = text or f"Live | .m help"
 
     success = await presence_manager.apply_presence(
         bot=bot,
@@ -650,7 +650,7 @@ async def setstatus_cmd(ctx: commands.Context, status_arg: str = "online", *, te
         status_val = "online"
         text_arg = f"{status_arg} {text_arg}".strip()
 
-    status_text = text_arg or "Live | $m help"
+    status_text = text_arg or "Live | .m help"
     success = await presence_manager.apply_presence(
         bot=bot,
         status=status_val,

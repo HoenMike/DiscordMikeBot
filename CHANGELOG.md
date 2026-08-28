@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.6] - 2026-08-28 — *Dot Prefix Migration (.m)*
+
+### Changed
+- **Prefix Migration**: Chuyển đổi tiền tố lệnh mặc định từ `$m` sang `.m` (`.m`, `.M`) trên toàn bộ hệ thống xử lý tin nhắn, bộ định tuyến lệnh và Bot Mention.
+- **Presence Status & Help Views**: Cập nhật chuỗi trạng thái hoạt động sang `Live v2.4.6 | .m help` và đồng bộ cú pháp các lệnh `.m tarot`, `.m tomtat`, `.m ver` trong toàn bộ menu tương tác Discord.
+
+---
+
 ## [2.4.5] - 2026-08-28 — *Tarot Terminology Polish & Help Updates*
 
 ### Changed
