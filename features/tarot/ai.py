@@ -45,13 +45,16 @@ TAROT_FOLLOWUP_CONFIG = types.GenerateContentConfig(
 
 
 def _format_cards_context(drawn_cards: List[DrawnCard]) -> str:
-    """Tạo văn bản mô tả danh sách lá bài rút được cô đọng, giàu dữ kiện."""
+    """Tạo văn bản mô tả danh sách lá bài rút được cô đọng, giàu dữ kiện chuẩn Tarot."""
     lines = []
     for drawn in drawn_cards:
         orient = "Ngược" if drawn.is_reversed else "Xuôi"
-        keywords = ", ".join(drawn.current_keywords[:2])
+        kw = drawn.card.keywords_reversed if drawn.is_reversed else drawn.card.keywords_upright
+        keywords_str = ", ".join(kw)
         lines.append(
-            f"• [{drawn.position_title}]: {drawn.card.name_vi} ({drawn.card.name_en}) - [{orient}] (Từ khóa: {keywords})"
+            f"• [{drawn.position_title}]: {drawn.card.name_vi} ({drawn.card.name_en}) - [{orient}]\n"
+            f"  - Biểu tượng cốt lõi: {drawn.card.description}\n"
+            f"  - Từ khóa trạng thái ({orient}): {keywords_str}"
         )
     return "\n".join(lines)
 
@@ -86,7 +89,9 @@ def _build_tarot_prompt(
     q_str = f'"{question}"' if question else "Tổng quan năng lượng ngày"
 
     prompt = f"""
-    Bạn là Tarot Reader chuyên nghiệp. Hãy đọc quẻ bài cho `{user_name}`.
+    Bạn là Tarot Reader chuyên nghiệp và am tường triết lý 78 lá bài Tarot Rider-Waite.
+    Hãy đọc quẻ bài cho `{user_name}` dựa trên đúng ý nghĩa biểu tượng của các lá bài được rút.
+
     {persona_prompt}
 
     {memory_prompt}
@@ -94,16 +99,24 @@ def _build_tarot_prompt(
     THÔNG TIN QUẺ BÀI:
     - Người hỏi: `{user_name}` | Câu hỏi: {q_str}{ctx_str}
     - Kiểu trải bài: {spread_name} ({len(drawn_cards)} lá)
-    - Danh sách lá bài:
+    - Danh sách lá bài & Ý nghĩa biểu tượng chuẩn:
     {cards_context}
+
+    🚨 NGUYÊN TẮC GIẢI BÀI BẮT BUỘC (QUAN TRỌNG):
+    1. ĐÚNG BẢN CHẤT Ý NGHĨA TAROT: Cả 3 Persona (Orion, Celeste, Jester) đều phải giải đúng ý nghĩa nguyên bản của lá bài (ví dụ: The Empress Ngược là tắc nghẽn sáng tạo, thiếu chăm sóc bản thân, phụ thuộc cảm xúc; KHÔNG PHẢI lười biếng hay xúc phạm người hỏi).
+    2. SỰ KHÁC BIỆT CHỈ Ở PHONG CÁCH DIỄN ĐẠT:
+       - Orion: phân tích điềm tĩnh, triết lý, thực tế và sâu sắc.
+       - Celeste: vỗ về, chữa lành, dịu dàng và tìm ánh sáng hy vọng.
+       - Jester: dí dỏm, tếu táo, trào phúng vui tươi nhưng mang tính xây dựng, tuyệt đối KHÔNG công kích cá nhân, KHÔNG tiêu cực hóa độc hại.
+    3. Mọi lá bài ngược (Reversed) là lời nhắc nhở nhẹ nhàng để cân bằng lại năng lượng bên trong, luôn kết thúc bằng lời khuyên và động lực tích cực.
 
     🚨 YÊU CẦU ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC TRẢ JSON CHUẨN):
     1. `topic_tag`: 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
     2. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Khởi đầu mới bùng nổ', 'Rối bời & Do dự', 'Thăng hoa & Tự tin', 'Thận trọng & Phòng thủ'...).
     3. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
     4. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.
-    5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi.
-    6. `advice`: Lời khuyên hành động thực tế và thông điệp khích lệ.
+    5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, tôn trọng đúng ý nghĩa biểu tượng của lá bài.
+    6. `advice`: Lời khuyên hành động thực tế, thông thái và khích lệ người hỏi.
     7. `full_reading`: Toàn bộ bài giải hoàn chỉnh được format đẹp bằng Markdown, chia rõ các mục 🎯 KẾT LUẬN, 🃏 Ý NGHĨA CÁC LÁ BÀI, 💡 LỜI KHUYÊN & ĐỊNH HƯỚNG.
     """.strip()
     return prompt
@@ -359,12 +372,11 @@ async def generate_tarot_reading(
     ]
     for c in drawn_cards:
         orient_str = "Ngược" if c.is_reversed else "Xuôi"
-        meaning = c.card.meaning_reversed if c.is_reversed else c.card.meaning_upright
         kw = c.card.keywords_reversed if c.is_reversed else c.card.keywords_upright
         fallback_parts.append(
             f"**🎴 {c.position_title} — {c.card.name_vi} ({orient_str}):**\n"
             f"• *Từ khóa:* {', '.join(kw)}\n"
-            f"• *Ý nghĩa:* {meaning}\n"
+            f"• *Ý nghĩa:* {c.card.description}\n"
         )
     fallback_parts.append(
         "💡 **Lời khuyên tổng kết:** Hãy nhìn nhận thông điệp từ góc độ khách quan, lắng nghe trực giác và đưa ra quyết định phù hợp nhất với hành trình của bạn!"

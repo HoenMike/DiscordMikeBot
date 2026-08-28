@@ -333,7 +333,8 @@ def api_tarot_cooldowns():
 
         # Tạo map user_id -> (user_name, user_avatar) từ Activity Logger
         activity_user_map = {}
-        for act in activity_logger.get_activities(limit=1000):
+        act_res = activity_logger.get_activities(limit=1000)
+        for act in act_res.get("items", []):
             uid_str = str(act.get("user_id", ""))
             if uid_str and uid_str not in activity_user_map:
                 activity_user_map[uid_str] = {

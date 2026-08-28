@@ -275,6 +275,41 @@ class ActivityLogger:
         await db_client.execute("DELETE FROM console_logs")
         await db_client.commit()
 
+    def update_activity(self, activity_id: int, updates: dict):
+        """Cập nhật thông tin (ví dụ: likes, dislikes, status, response) cho một activity đã log."""
+        target_entry = None
+        with self._lock:
+            for item in self._activities:
+                if item["id"] == activity_id:
+                    if "details" in updates and isinstance(item.get("details"), dict):
+                        item["details"].update(updates["details"])
+                        updates_copy = dict(updates)
+                        updates_copy["details"] = item["details"]
+                        item.update({k: v for k, v in updates_copy.items() if k != "details"})
+                    else:
+                        item.update(updates)
+                    target_entry = dict(item)
+                    break
+
+        if target_entry:
+            async def _do_update():
+                try:
+                    from core.db import db_client
+                    await db_client.execute(
+                        "UPDATE bot_activities SET details_json = ?, status = COALESCE(?, status) WHERE id = ?",
+                        (json.dumps(target_entry.get("details", {}), ensure_ascii=False), updates.get("status"), activity_id)
+                    )
+                    await db_client.commit()
+                except Exception:
+                    pass
+
+            try:
+                loop = asyncio.get_running_loop()
+                if loop and loop.is_running():
+                    asyncio.create_task(_do_update())
+            except RuntimeError:
+                pass
+
     def clear(self):
         """Xóa bộ đệm hoạt động (sync fallback)."""
         with self._lock:

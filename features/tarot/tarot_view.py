@@ -627,7 +627,7 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
 
 
 class TarotResultActionView(discord.ui.View):
-    """View tương tác sau khi hoàn tất quẻ bài: Nút Hỏi Thêm AI & Nút Đánh Giá Luận Giải 👍/👎."""
+    """View tương tác sau khi hoàn tất quẻ bài: Nút Hỏi Thêm AI & Nút Đánh Giá Luận Giải 👍/👎 cộng dồn nhiều người."""
 
     def __init__(
         self,
@@ -640,6 +640,7 @@ class TarotResultActionView(discord.ui.View):
         spread_key: str,
         tarot_manager: TarotManager,
         guild_id: Optional[int] = None,
+        activity_id: Optional[int] = None,
         timeout: float = 600.0
     ):
         super().__init__(timeout=timeout)
@@ -652,7 +653,10 @@ class TarotResultActionView(discord.ui.View):
         self.spread_key = spread_key
         self.tarot_manager = tarot_manager
         self.guild_id = guild_id
+        self.activity_id = activity_id
         self.has_asked_followup = False
+        self.liked_user_ids: set[int] = set()
+        self.disliked_user_ids: set[int] = set()
 
     @discord.ui.button(label="❓ Hỏi Thêm Ý Nghĩa", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -682,12 +686,20 @@ class TarotResultActionView(discord.ui.View):
 
     @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
     async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể đánh giá luận giải!", ephemeral=True)
-            return
-        await self.tarot_manager.save_rating(self.author_id, self.guild_id, self.spread_key, self.reader_style, is_positive=True)
-        await interaction.response.send_message("💖 Cảm ơn bạn đã gửi phản hồi tích cực!", ephemeral=True)
-        self._disable_rating_buttons()
+        uid = interaction.user.id
+        if uid in self.liked_user_ids:
+            self.liked_user_ids.remove(uid)
+            msg = "🔄 Bạn đã bỏ thích quẻ bài này."
+        else:
+            self.liked_user_ids.add(uid)
+            self.disliked_user_ids.discard(uid)
+            msg = "💖 Cảm ơn bạn đã đánh giá hữu ích!"
+            await self.tarot_manager.save_rating(uid, self.guild_id, self.spread_key, self.reader_style, is_positive=True)
+
+        self._update_rating_button_labels()
+        self._sync_activity_logger()
+
+        await interaction.response.send_message(msg, ephemeral=True)
         try:
             await interaction.message.edit(view=self)
         except Exception:
@@ -695,21 +707,49 @@ class TarotResultActionView(discord.ui.View):
 
     @discord.ui.button(label="👎 Chưa chuẩn", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_neg", row=0)
     async def rate_neg_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể đánh giá luận giải!", ephemeral=True)
-            return
-        await self.tarot_manager.save_rating(self.author_id, self.guild_id, self.spread_key, self.reader_style, is_positive=False)
-        await interaction.response.send_message("📝 Đã ghi nhận phản hồi của bạn để cải thiện luận giải tốt hơn!", ephemeral=True)
-        self._disable_rating_buttons()
+        uid = interaction.user.id
+        if uid in self.disliked_user_ids:
+            self.disliked_user_ids.remove(uid)
+            msg = "🔄 Bạn đã bỏ đánh giá chưa chuẩn."
+        else:
+            self.disliked_user_ids.add(uid)
+            self.liked_user_ids.discard(uid)
+            msg = "📝 Đã ghi nhận phản hồi của bạn để cải thiện luận giải tốt hơn!"
+            await self.tarot_manager.save_rating(uid, self.guild_id, self.spread_key, self.reader_style, is_positive=False)
+
+        self._update_rating_button_labels()
+        self._sync_activity_logger()
+
+        await interaction.response.send_message(msg, ephemeral=True)
         try:
             await interaction.message.edit(view=self)
         except Exception:
             pass
 
-    def _disable_rating_buttons(self):
+    def _update_rating_button_labels(self):
+        likes_count = len(self.liked_user_ids)
+        dislikes_count = len(self.disliked_user_ids)
         for item in self.children:
-            if getattr(item, "custom_id", "") in ["tarot_rate_pos", "tarot_rate_neg"]:
-                item.disabled = True
+            cid = getattr(item, "custom_id", "")
+            if cid == "tarot_rate_pos":
+                item.label = f"👍 Hữu ích ({likes_count})" if likes_count > 0 else "👍 Hữu ích"
+                item.style = discord.ButtonStyle.success if likes_count > 0 else discord.ButtonStyle.secondary
+            elif cid == "tarot_rate_neg":
+                item.label = f"👎 Chưa chuẩn ({dislikes_count})" if dislikes_count > 0 else "👎 Chưa chuẩn"
+                item.style = discord.ButtonStyle.danger if dislikes_count > 0 else discord.ButtonStyle.secondary
+
+    def _sync_activity_logger(self):
+        if self.activity_id:
+            try:
+                from core.activity_logger import activity_logger
+                activity_logger.update_activity(self.activity_id, {
+                    "details": {
+                        "likes": len(self.liked_user_ids),
+                        "dislikes": len(self.disliked_user_ids)
+                    }
+                })
+            except Exception as e:
+                print(f"⚠️ [TarotResultActionView] Lỗi đồng bộ rating vào ActivityLogger: {e}", flush=True)
 
 
 class TarotFlipView(discord.ui.View):
@@ -883,8 +923,7 @@ class TarotFlipView(discord.ui.View):
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
             if self.context:
                 desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-            if self.reader_style != "neutral":
-                desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
+            desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
@@ -944,6 +983,7 @@ class TarotFlipView(discord.ui.View):
             else:
                 ai_reading, topic_tag, mood_tag, summary_headline = str(ai_res), "general", "", ""
 
+            act_id = None
             # Ghi nhận hoạt động vào Live Activity Logger
             try:
                 from core.activity_logger import activity_logger
@@ -951,7 +991,7 @@ class TarotFlipView(discord.ui.View):
                 cards_summary = ", ".join([f"{c.card.name_vi} ({'[NGƯỢC]' if c.is_reversed else '[XUÔI]'})" for c in self.drawn_cards])
                 guild_name_str = interaction.guild.name if interaction.guild else "Direct Message"
                 channel_name_str = interaction.channel.name if (interaction.channel and hasattr(interaction.channel, 'name')) else "Direct Message"
-                activity_logger.log(
+                act_entry = activity_logger.log(
                     action_type="tarot",
                     action_name=f"Tarot: {self.spread_info['name']}",
                     user_id=self.author_id,
@@ -971,9 +1011,13 @@ class TarotFlipView(discord.ui.View):
                         "topic_tag": topic_tag,
                         "mood_tag": mood_tag,
                         "summary_headline": summary_headline,
-                        "cards": [c.card.name_vi for c in self.drawn_cards]
+                        "cards": [c.card.name_vi for c in self.drawn_cards],
+                        "likes": 0,
+                        "dislikes": 0
                     }
                 )
+                if act_entry:
+                    act_id = act_entry.get("id")
             except Exception as act_err:
                 print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Tarot: {act_err}", flush=True)
 
@@ -1033,7 +1077,8 @@ class TarotFlipView(discord.ui.View):
                 reader_style=self.reader_style,
                 spread_key=self.spread_key,
                 tarot_manager=self.tarot_manager,
-                guild_id=self.guild_id
+                guild_id=self.guild_id,
+                activity_id=act_id
             )
 
             # Cập nhật kết quả bài giải đầy đủ lên Discord kèm Action View
@@ -1160,8 +1205,7 @@ class TarotFlipView(discord.ui.View):
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
             if self.context:
                 desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-            if self.reader_style != "neutral":
-                desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
+            desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
@@ -1178,6 +1222,44 @@ class TarotFlipView(discord.ui.View):
                 color=self.embed_color
             )
             embed_cards.set_image(url="attachment://tarot_spread.png")
+
+            act_id = None
+            # Ghi nhận hoạt động vào Live Activity Logger
+            try:
+                from core.activity_logger import activity_logger
+                elapsed_ms = round((time.monotonic() - getattr(self, 'start_time', time.monotonic())) * 1000, 1)
+                cards_summary = ", ".join([f"{c.card.name_vi} ({'[NGƯỢC]' if c.is_reversed else '[XUÔI]'})" for c in self.drawn_cards])
+                guild_name_str = self.message.guild.name if (self.message and self.message.guild) else "Direct Message"
+                channel_name_str = self.message.channel.name if (self.message and self.message.channel and hasattr(self.message.channel, 'name')) else "Direct Message"
+                act_entry = activity_logger.log(
+                    action_type="tarot",
+                    action_name=f"Tarot: {self.spread_info['name']}",
+                    user_id=self.author_id,
+                    user_name=self.author_name,
+                    user_avatar=self.author_avatar_url,
+                    guild_name=guild_name_str,
+                    guild_id=self.guild_id,
+                    channel_name=channel_name_str,
+                    channel_id=self.channel_id,
+                    prompt=f"Câu hỏi: {self.question or '(Không)'} | Bối cảnh: {self.context or '(Không)'}",
+                    response=f"Lá bài: {cards_summary}\n\nThông điệp: {ai_reading}",
+                    status="success",
+                    duration_ms=elapsed_ms,
+                    details={
+                        "spread": self.spread_key,
+                        "reader": self.reader_style,
+                        "topic_tag": topic_tag,
+                        "mood_tag": mood_tag,
+                        "summary_headline": summary_headline,
+                        "cards": [c.card.name_vi for c in self.drawn_cards],
+                        "likes": 0,
+                        "dislikes": 0
+                    }
+                )
+                if act_entry:
+                    act_id = act_entry.get("id")
+            except Exception as act_err:
+                print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Tarot (timeout): {act_err}", flush=True)
 
             # Lưu vào Database
             if self.spread_key == "daily":
@@ -1234,7 +1316,8 @@ class TarotFlipView(discord.ui.View):
                 reader_style=self.reader_style,
                 spread_key=self.spread_key,
                 tarot_manager=self.tarot_manager,
-                guild_id=self.guild_id
+                guild_id=self.guild_id,
+                activity_id=act_id
             )
 
             if self.message:
