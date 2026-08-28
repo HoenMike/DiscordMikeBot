@@ -560,7 +560,7 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-200 transition-colors" title="Bật để xem lại toàn bộ log từ các lần chạy / deploy trước đó">
-                            <input type="checkbox" id="show-history-toggle" onchange="renderLogs()" class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
+                            <input type="checkbox" id="show-history-toggle" onchange="renderLogs(true)" class="rounded bg-dark-surface border-dark-border text-brand-600 focus:ring-0">
                             <span>Xem log cũ (History)</span>
                         </label>
                         <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-400 cursor-pointer hover:text-slate-200 transition-colors">
@@ -922,6 +922,8 @@
             } else if (tab === 'tarot') {
                 fetchTarotCooldowns();
                 fetchTarotRatingStats();
+            } else if (tab === 'logs') {
+                renderLogs(true);
             }
             lucide.createIcons();
         }
@@ -1759,9 +1761,24 @@
             return lines;
         }
 
-        function renderLogs() {
+        let lastRenderedLogKey = "";
+
+        function renderLogs(forceUpdate = false) {
             const container = document.getElementById('logs-container');
+            if (!container) return;
+
             const lines = getFilteredLogs();
+            const showHistory = document.getElementById('show-history-toggle') ? document.getElementById('show-history-toggle').checked : false;
+            const currentKey = `${logFilterType}|${logSearchQuery}|${showHistory}|${lines.length}|${lines[lines.length - 1] || ''}`;
+
+            const hasNewLogs = currentKey !== lastRenderedLogKey;
+
+            // Nếu không có log mới và không bị ép buộc (ví dụ đổi tab/filter/search), giữ nguyên DOM và vị trí cuộn
+            if (!hasNewLogs && !forceUpdate) {
+                return;
+            }
+
+            lastRenderedLogKey = currentKey;
 
             if (lines.length === 0) {
                 container.innerHTML = `<div class="text-slate-500 italic py-6 text-center text-xs">Không có logs nào phù hợp với bộ lọc hoặc phiên chạy hiện tại.</div>`;
@@ -1794,8 +1811,9 @@
 
             lucide.createIcons();
 
+            // CHỈ tự cuộn xuống khi thực sự có log mới hoặc người dùng vừa đổi tab/filter
             const autoScroll = document.getElementById('auto-scroll-toggle').checked;
-            if (autoScroll) {
+            if (autoScroll && (hasNewLogs || forceUpdate)) {
                 container.scrollTop = container.scrollHeight;
             }
         }
@@ -1809,12 +1827,12 @@
             if (btn) {
                 btn.className = "log-filter-btn px-2.5 py-1 rounded-lg text-xs font-semibold bg-brand-600/30 text-brand-300 border border-brand-500/40";
             }
-            renderLogs();
+            renderLogs(true);
         }
 
         function handleLogSearch(val) {
             logSearchQuery = val;
-            renderLogs();
+            renderLogs(true);
         }
 
         function copyLogs() {
@@ -1842,7 +1860,8 @@
                     try {
                         await fetch('/api/logs/clear', { method: 'POST' });
                         cachedLogs = [];
-                        renderLogs();
+                        lastRenderedLogKey = "";
+                        renderLogs(true);
                         showToast("Đã xóa sạch bộ đệm logs.", "info");
                     } catch (err) {
                         showToast("Lỗi khi xóa logs.", "error");

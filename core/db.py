@@ -98,15 +98,17 @@ class DatabaseClient:
         # Đóng an toàn client cũ nếu có trước khi tạo mới
         if self._turso_client is not None:
             try:
-                await self._turso_client.close()
-            except Exception:
+                res = self._turso_client.close()
+                if asyncio.iscoroutine(res):
+                    await res
+            except (Exception, BaseException):
                 pass
             self._turso_client = None
 
         if self._local_db is not None:
             try:
                 await self._local_db.close()
-            except Exception:
+            except (Exception, BaseException):
                 pass
             self._local_db = None
 
@@ -122,15 +124,21 @@ class DatabaseClient:
                     url=url,
                     auth_token=config.TURSO_AUTH_TOKEN
                 )
-                # Thử ping nhẹ 1 query để xác thực token
-                ping_task = asyncio.create_task(self._turso_client.execute("SELECT 1"))
-                await ping_task
+                # Thử ping trực tiếp 1 query để xác thực kết nối
+                await self._turso_client.execute("SELECT 1")
                 self._is_cloud = True
                 self._loop = current_loop
                 print(f"☁️ [Database] Đã kết nối thành công tới Turso Cloud LibSQL ({config.TURSO_DATABASE_URL})!", flush=True)
                 return
-            except Exception as e:
+            except (Exception, BaseException) as e:
                 print(f"⚠️ [Database] Không thể kết nối Turso Cloud ({e}). Đang tự động chuyển sang Local SQLite...", flush=True)
+                if self._turso_client is not None:
+                    try:
+                        res = self._turso_client.close()
+                        if asyncio.iscoroutine(res):
+                            await res
+                    except (Exception, BaseException):
+                        pass
                 self._turso_client = None
                 self._is_cloud = False
 
@@ -151,8 +159,7 @@ class DatabaseClient:
         # Thực thi trên Turso Cloud
         if self._is_cloud and self._turso_client:
             args = list(params) if isinstance(params, (tuple, list)) else (params or [])
-            exec_task = asyncio.create_task(self._turso_client.execute(sql, args))
-            rs = await exec_task
+            rs = await self._turso_client.execute(sql, args)
             return CursorWrapper(
                 rows=rs.rows,
                 last_insert_id=getattr(rs, 'last_insert_rowid', None),
@@ -184,15 +191,17 @@ class DatabaseClient:
         """Đóng kết nối."""
         if self._turso_client:
             try:
-                await self._turso_client.close()
-            except Exception:
+                res = self._turso_client.close()
+                if asyncio.iscoroutine(res):
+                    await res
+            except (Exception, BaseException):
                 pass
             self._turso_client = None
 
         if self._local_db:
             try:
                 await self._local_db.close()
-            except Exception:
+            except (Exception, BaseException):
                 pass
             self._local_db = None
 
