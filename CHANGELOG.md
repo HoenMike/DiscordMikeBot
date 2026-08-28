@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.5] - 2026-08-28 — *Tarot Terminology Polish & Help Updates*
+
+### Changed
+- **Tarot Terminology Polish**: Chuẩn hóa thuật ngữ sang `Bốc bài Tarot chiêm tinh` (lược bỏ chữ AI) trong chuỗi xoay tua trạng thái Presence và menu trợ giúp Discord.
+- **Help Embed Consistency**: Đồng bộ footer và tiêu đề menu Help với phiên bản hiện tại.
+
+---
+
 ## [2.4.4] - 2026-08-28 — *DND Status Policy & Presence Refinement*
 
 ### Changed

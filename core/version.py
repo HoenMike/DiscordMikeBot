@@ -10,12 +10,28 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.4"
+CURRENT_VERSION = "2.4.5"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & DND Status Policy"
+CODENAME = "Hybrid Engine & Terminology Polish"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.5",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Tinh Chỉnh Danh Xưng Tarot & Cập Nhật Giao Diện Trợ Giúp",
+        "summary": "Chuẩn hóa thuật ngữ tính năng Tarot sang 'Bốc bài Tarot chiêm tinh' (lược bỏ chữ AI) trong chuỗi xoay tua trạng thái Presence và menu Help của bot.",
+        "changes": [
+            {
+                "category": "🔮 Tinh Chỉnh Thuật Ngữ Tarot",
+                "items": [
+                    "Đổi chuỗi trạng thái xoay tua: '🔮 /tarot - Bốc bài Tarot chiêm tinh'.",
+                    "Chuẩn hóa tiêu đề và mô tả trong Overview Help Embed & Tarot Help View."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.4",
         "date": "2026-08-28",

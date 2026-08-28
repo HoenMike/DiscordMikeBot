@@ -36,7 +36,7 @@ ACTIVITY_TYPE_MAP = {
 
 DEFAULT_ROTATION_ITEMS = [
     f"Live v{CURRENT_VERSION} | $m help",
-    "🔮 /tarot - Bốc bài Tarot AI chiêm tinh",
+    "🔮 /tarot - Bốc bài Tarot chiêm tinh",
     "📝 /tomtat - Tóm tắt kênh chat thông minh",
     "👑 AutoEmbed 9 mạng xã hội siêu gọn",
 ]

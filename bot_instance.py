@@ -155,10 +155,10 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         color=0x7851A9
     )
     embed.add_field(
-        name="🔮 1. BỐC BÀI TAROT (AI CHIÊM TINH)",
+        name="🔮 1. BỐC BÀI TAROT (CHIÊM TINH)",
         value=(
             "• Rút bài 78 lá Rider-Waite với hình ảnh Canvas trực quan độ phân giải cao.\n"
-            "• Luận giải bằng AI đa tầng với 3 tính cách Reader độc đáo (`Orion`, `Celeste`, `Jester`).\n"
+            "• Luận giải đa tầng với 3 tính cách Reader độc đáo (`Orion`, `Celeste`, `Jester`).\n"
             "• Hạt nhân năng lượng vũ trụ theo khung giờ (1 tiếng/khung) & Nút đánh giá phản hồi.\n"
             "👉 **Lệnh:** `/tarot`, `$m tarot` | **Xem chi tiết:** Chọn mục `🔮 Tarot` bên dưới."
         ),
@@ -192,7 +192,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.0.0",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.4.5",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -200,10 +200,10 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
 
 def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
     embed = discord.Embed(
-        title="🔮 HƯỚNG DẪN CHI TIẾT TÍNH NĂNG BỐC BÀI TAROT (AI)",
+        title="🔮 HƯỚNG DẪN CHI TIẾT TÍNH NĂNG BỐC BÀI TAROT",
         description=(
-            "Hệ thống Tarot tích hợp trí tuệ nhân tạo (AI Deep Reasoning) kết hợp công nghệ "
-            "kết xuất hình ảnh trải bài sống động, cơ chế hạt nhân năng lượng và tương tác hỏi thêm AI."
+            "Hệ thống Tarot kết hợp công nghệ kết xuất hình ảnh trải bài sống động, "
+            "cơ chế hạt nhân năng lượng và tương tác hỏi thêm sâu sắc."
         ),
         color=0x9B59B6
     )
