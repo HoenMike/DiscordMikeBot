@@ -33,17 +33,26 @@ def run_discord_bot():
         traceback.print_exc(file=sys.stdout)
 
 
-@app.before_request
-def start_bot_on_first_request():
-    """Tự động kích hoạt bot khi chạy trên môi trường Gunicorn / WSGI server."""
+def ensure_bot_started():
+    """Khởi động bot Discord ngay lập tức khi ứng dụng được nạp."""
     global bot_started
     if not bot_started:
         with bot_start_lock:
             if not bot_started:
                 bot_started = True
-                print("🚀 [Gunicorn Worker] Nhận request đầu tiên, bắt đầu khởi chạy Discord Bot trong luồng phụ...", flush=True)
+                print("🚀 [Bot Runner] Khởi động Discord Bot worker thread trong luồng phụ...", flush=True)
                 bot_thread = Thread(target=run_discord_bot, daemon=True)
                 bot_thread.start()
+
+
+# Tự động kích hoạt bot ngay khi Gunicorn import module app.py
+ensure_bot_started()
+
+
+@app.before_request
+def start_bot_on_first_request():
+    """Safety net: Kích hoạt bot nếu vì lý do nào đó luồng chưa chạy."""
+    ensure_bot_started()
 
 
 # ==========================================

@@ -56,6 +56,14 @@ class SummaryBot(commands.Bot):
             print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
             traceback.print_exc(file=sys.stdout)
 
+    async def on_ready(self):
+        print(f"🎉 Bot Discord đã kết nối thành công: {self.user} (ID: {self.user.id})", flush=True)
+        try:
+            from core.presence_manager import presence_manager
+            await presence_manager.init_db(self)
+        except Exception as e:
+            print(f"⚠️ [Presence] Lỗi khởi tạo presence on_ready: {e}", flush=True)
+
         # Kiểm tra trạng thái tạm ngừng của máy chủ trước khi xử lý Slash Command
         async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
             if interaction.guild and self.config_manager.is_guild_suspended(interaction.guild.id):

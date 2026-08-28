@@ -35,7 +35,7 @@ ACTIVITY_TYPE_MAP = {
 }
 
 DEFAULT_ROTATION_ITEMS = [
-    f"Live v{CURRENT_VERSION} | $m help & /help",
+    f"Live v{CURRENT_VERSION} | $m help",
     "🔮 /tarot - Bốc bài Tarot AI chiêm tinh",
     "📝 /tomtat - Tóm tắt kênh chat thông minh",
     "👑 AutoEmbed 9 mạng xã hội siêu gọn",
@@ -48,7 +48,7 @@ class PresenceManager:
     def __init__(self):
         self._status: str = "online"
         self._activity_type: str = "custom"
-        self._activity_text: str = f"Live v{CURRENT_VERSION} | $m help & /help"
+        self._activity_text: str = f"Live v{CURRENT_VERSION} | $m help"
         self._is_rotating: bool = True
         self._rotation_index: int = 0
         self._rotation_items: List[str] = list(DEFAULT_ROTATION_ITEMS)
@@ -128,7 +128,7 @@ class PresenceManager:
 
         act_type_lower = activity_type.lower()
         if act_type_lower == "custom":
-            return discord.CustomActivity(name=text)
+            return discord.CustomActivity(name="Custom Status", state=text)
         elif act_type_lower == "playing":
             return discord.Game(name=text)
         elif act_type_lower == "watching":
@@ -138,7 +138,7 @@ class PresenceManager:
         elif act_type_lower == "competing":
             return discord.Activity(type=discord.ActivityType.competing, name=text)
         else:
-            return discord.CustomActivity(name=text)
+            return discord.CustomActivity(name="Custom Status", state=text)
 
     async def apply_presence(
         self,
@@ -151,7 +151,6 @@ class PresenceManager:
     ) -> bool:
         """Áp dụng trạng thái mới lên Discord Bot và lưu cấu hình."""
         status_clean = status.lower()
-        discord_status = STATUS_MAP.get(status_clean, discord.Status.online)
         
         with self._lock:
             self._status = status_clean
@@ -164,19 +163,41 @@ class PresenceManager:
             self._rotation_task.cancel()
             self._rotation_task = None
 
+        if save_db:
+            asyncio.create_task(self._save_to_db())
+
+        if not bot.is_ready():
+            # Nếu bot chưa kết nối xong, tự động đợi kết nối rồi áp dụng
+            asyncio.create_task(self._wait_and_apply(bot))
+            return True
+
+        return await self._do_change_presence(bot)
+
+    async def _wait_and_apply(self, bot: discord.Client):
+        """Đợi bot kết nối Discord Gateway hoàn tất rồi mới áp dụng trạng thái."""
+        try:
+            await bot.wait_until_ready()
+            await asyncio.sleep(1.0)
+            await self._do_change_presence(bot)
+        except Exception as e:
+            print(f"⚠️ [PresenceManager] Lỗi khi chờ bot ready để áp dụng presence: {e}", flush=True)
+
+    async def _do_change_presence(self, bot: discord.Client) -> bool:
+        """Thực hiện cập nhật presence trực tiếp lên Discord Gateway."""
         if not bot.is_ready():
             return False
 
+        discord_status = STATUS_MAP.get(self._status, discord.Status.online)
         try:
-            if is_rotating:
+            if self._is_rotating:
+                if self._rotation_task and not self._rotation_task.done():
+                    self._rotation_task.cancel()
                 self._rotation_task = asyncio.create_task(self._rotation_loop(bot))
+                print(f"✨ [PresenceManager] Đã kích hoạt xoay tua trạng thái [{self._status.upper()}].", flush=True)
             else:
                 act = self._build_activity(self._activity_type, self._activity_text)
                 await bot.change_presence(status=discord_status, activity=act)
-                print(f"✨ [PresenceManager] Đã cập nhật trạng thái: [{status_clean.upper()}] - {self._activity_text}", flush=True)
-
-            if save_db:
-                asyncio.create_task(self._save_to_db())
+                print(f"✨ [PresenceManager] Đã cập nhật trạng thái: [{self._status.upper()}] ({self._activity_type}) - {self._activity_text}", flush=True)
             return True
         except Exception as e:
             print(f"❌ [PresenceManager] Lỗi khi đổi trạng thái bot: {e}", flush=True)
@@ -193,7 +214,7 @@ class PresenceManager:
                 self._rotation_index += 1
 
                 discord_status = STATUS_MAP.get(self._status, discord.Status.online)
-                act = discord.CustomActivity(name=text)
+                act = self._build_activity(self._activity_type, text)
                 if bot.is_ready():
                     await bot.change_presence(status=discord_status, activity=act)
 
@@ -212,7 +233,7 @@ class PresenceManager:
 
         if bot.is_ready():
             try:
-                act = discord.CustomActivity(name="Đang redeploy / cập nhật phiên bản mới...")
+                act = discord.CustomActivity(name="Custom Status", state="Đang redeploy / cập nhật phiên bản mới...")
                 await bot.change_presence(status=discord.Status.idle, activity=act)
                 print("🔄 [PresenceManager] Đã chuyển trạng thái sang REDEPLOYING (Idle).", flush=True)
             except Exception:
@@ -235,7 +256,7 @@ class PresenceManager:
             bot=bot,
             status="online",
             activity_type="custom",
-            text=f"Live v{CURRENT_VERSION} | $m help & /help",
+            text=f"Live v{CURRENT_VERSION} | $m help",
             is_rotating=True,
             save_db=True
         )
