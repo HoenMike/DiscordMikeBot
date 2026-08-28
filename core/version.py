@@ -1,27 +1,27 @@
 """
 core/version.py - Quản lý phiên bản (Semantic Versioning) và Nhật ký phát hành (Patchnotes / Changelog).
 
-Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.0.0)
-- Major: Đại tu kiến trúc hoặc thay đổi nền tảng lớn (1.x.x -> 2.x.x)
+Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
+- Major: Đại tu kiến trúc hoặc thay đổi nền tảng lớn (1.x.x -> 2.0.0)
 - Minor: Bổ sung tính năng mới hoặc nâng cấp module lớn (2.0.0 -> 2.1.0)
-- BugFix: Sửa lỗi / Hotfix / Tinh chỉnh cho phiên bản hiện tại (2.0.0 -> 2.0.1)
+- BugFix: Sửa lỗi / Hotfix / Tinh chỉnh cho phiên bản hiện tại (2.4.0 -> 2.4.1)
 """
 
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.0.1"
+CURRENT_VERSION = "2.4.1"
 RELEASE_DATE = "2026-08-28"
 CODENAME = "Hybrid Engine & Threads Enhancement"
 
-# Lịch sử các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
+# Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
     {
-        "version": "2.0.1",
+        "version": "2.4.1",
         "date": "2026-08-28",
         "type": "bugfix",
-        "title": "Tối Ưu Embed Threads, Tập Trung Constants & Làm Sạch Trạng Thái Bot",
-        "summary": "Nâng cấp bộ giải mã link Threads.net (vxthreads, shortlinks /t/, /share/), chuyển toàn bộ constants và AI models về core/constants.py và tinh chỉnh hiển thị trạng thái bot sạch đẹp.",
+        "title": "Tối Ưu Embed Threads, Tập Trung Constants & Sửa Hiển Thị Trạng Thái Bot",
+        "summary": "Nâng cấp bộ giải mã link Threads.net (vxthreads, shortlinks /t/, /share/), chuyển toàn bộ constants và AI models về core/constants.py và sửa lỗi hiển thị CustomActivity trên Discord.",
         "changes": [
             {
                 "category": "👑 Nâng Cấp Threads Embed Toàn Diện",
@@ -41,19 +41,21 @@ CHANGELOG: List[Dict[str, Any]] = [
                 ]
             },
             {
-                "category": "🎭 Tinh Chỉnh Giao Diện Trạng Thái (Presence UI)",
+                "category": "🎭 Tinh Chỉnh Giao Diện Trạng Thái (Presence Engine)",
                 "items": [
-                    "Loại bỏ emoji bóng tròn màu sắc khỏi dòng trạng thái bot và các preset điều khiển, giúp hiển thị thanh lịch và tận dụng chấm trạng thái gốc của Discord."
+                    "Sửa lỗi không hiện trạng thái do thiếu trường state trong CustomActivity payload của Discord Gateway.",
+                    "Tự động khởi chạy bot worker thread ngay khi Gunicorn nạp module (không cần chờ request đầu tiên).",
+                    "Đổi text Live sang dạng ngắn gọn: Live v2.4.1 | $m help và loại bỏ emoji bóng tròn màu sắc."
                 ]
             }
         ]
     },
     {
-        "version": "2.0.0",
+        "version": "2.4.0",
         "date": "2026-08-28",
-        "type": "major",
-        "title": "Đại Tu Kiến Trúc Hybrid Engine & Nâng Cấp Toàn Diện",
-        "summary": "Nâng cấp lớn 2.0 với hệ thống Auto-Embed 9 MXH tinh gọn, Tarot AI Deep Reasoning, Tóm tắt 2500 tin, Web Dashboard Real-time, Dynamic Presence & Tự động dọn dẹp Database.",
+        "type": "minor",
+        "title": "Đại Tu Auto-Embed QoL Toàn Diện & Dynamic Presence",
+        "summary": "Nâng cấp cơ chế Suppress Embed gốc bảo toàn tin nhắn, Subtext Jump link siêu gọn, Auto-delete đồng bộ, Force Spoiler NSFW, DB Auto-Pruning và Dynamic Presence.",
         "changes": [
             {
                 "category": "👑 Auto-Embed 9 Nền Tảng Tinh Gọn",
@@ -64,24 +66,6 @@ CHANGELOG: List[Dict[str, Any]] = [
                     "Tự động xóa Embed đồng bộ khi người dùng xóa tin nhắn gốc chứa link.",
                     "Force Spoiler & Tự động nhận diện từ khóa nhạy cảm (nsfw, 18+, spoiler, nhạy cảm...) để che mờ khung embed.",
                     "Làm sạch tên người dùng (Sanitize display name), sửa lỗi vỡ format Markdown Link khi tên chứa ký tự đặc biệt hoặc khoảng trắng."
-                ]
-            },
-            {
-                "category": "🔮 Tarot AI Deep Reasoning 2.0",
-                "items": [
-                    "9 kiểu trải bài chuyên sâu từ 1 lá đến 10 lá Celtic Cross, Horseshoe, Two Paths, Mind-Body-Spirit.",
-                    "3 Reader AI tính cách độc đáo (Orion, Celeste, Jester) + Chế độ Reader ngẫu nhiên.",
-                    "Canvas Renderer kết xuất hình ảnh 78 lá Rider-Waite độ nét cao.",
-                    "Cơ chế Cosmic Energy Seed (1h) đảm bảo tính nhất quán tâm linh và chống spam đổi quẻ.",
-                    "Nút tương tác sau quẻ bài: Hỏi Thêm Ý Nghĩa (Modal AI) & Nút Đánh Giá Hài Lòng (👍/👎)."
-                ]
-            },
-            {
-                "category": "📝 Tóm Tắt Tin Nhắn AI 2.0",
-                "items": [
-                    "Sử dụng Gemini Flash AI quét sâu tới 2500 tin nhắn với tốc độ cao.",
-                    "Tự động lọc spam/lệnh bot, trích xuất Action Items (kèm người phụ trách) & Top thành viên tích cực.",
-                    "Hỗ trợ lọc theo số giờ, ngày cụ thể, khung giờ, message anchor link và gửi kết quả về DM riêng."
                 ]
             },
             {
@@ -96,10 +80,27 @@ CHANGELOG: List[Dict[str, Any]] = [
         ]
     },
     {
-        "version": "1.2.5",
-        "date": "2026-08-27",
+        "version": "2.3.1",
+        "date": "2026-08-28",
         "type": "bugfix",
-        "title": "Tối Ưu Hoá Turso DB, Lưu Bền Hoạt Động & Quản Trị Server",
+        "title": "Cải Tiến Parser Markdown & Tích Hợp Đánh Giá Tarot AI",
+        "summary": "Bổ sung nút đánh giá cộng đồng (👍/👎), tối ưu hóa prompt AI và tái cấu trúc parser phân tích quẻ bài Tarot.",
+        "changes": [
+            {
+                "category": "🔮 Tarot AI Refinements",
+                "items": [
+                    "Bổ sung nút đánh giá chất lượng luận giải quẻ bài (👍/👎) lưu trữ bền vững vào cơ sở dữ liệu.",
+                    "Modal tương tác hỏi thêm ý nghĩa (Follow-up AI Question Modal) cho phép người dùng đào sâu chi tiết quẻ bài.",
+                    "Tái cấu trúc parser markdown cho phản hồi AI (tự động tách riêng Topic, Mood, Summary headline và Content)."
+                ]
+            }
+        ]
+    },
+    {
+        "version": "2.3.0",
+        "date": "2026-08-27",
+        "type": "minor",
+        "title": "Tích Hợp Turso LibSQL Cloud DB, Quản Trị Server & Logging Bền Vững",
         "summary": "Tích hợp Turso LibSQL Cloud, lưu trữ bền vững bot activities & console logs, và hoàn thiện hệ thống phân quyền máy chủ.",
         "changes": [
             {
@@ -114,26 +115,74 @@ CHANGELOG: List[Dict[str, Any]] = [
                 "category": "🛡️ Quản Trị Máy Chủ (Guild Management)",
                 "items": [
                     "Bổ sung hệ thống tạm ngừng / mở lại quyền sử dụng bot cho từng Server (Guild Suspension) kèm lý do chi tiết.",
-                    "In-memory Cache cho Guild Configs giúp phản hồi tức thì với độ trễ 0ms."
+                    "In-memory Cache cho Guild Configs giúp phản hồi tức thì với độ trễ 0ms.",
+                    "Xác thực đăng nhập Web Console bằng HMAC SHA-256 an toàn chống timing attack."
                 ]
             },
             {
                 "category": "🔮 Tarot AI Enhancements",
                 "items": [
-                    "Bổ sung Mood Tags, Summary Headlines và tính năng xuất dữ liệu đánh giá quẻ bài (Rating Export JSON/CSV)."
+                    "Bổ sung Mood Tags, Summary Headlines và API xuất dữ liệu đánh giá quẻ bài (/api/tarot/ratings/export)."
                 ]
             }
         ]
     },
     {
-        "version": "1.2.0",
+        "version": "2.2.0",
         "date": "2026-08-25",
         "type": "minor",
-        "title": "Kiến Trúc Modular Cogs, Ra Mắt Tarot Engine 78 Lá & Multi-Tier Embed Pipeline",
-        "summary": "Tái cấu trúc mã nguồn sang hệ thống Modular Discord Cogs, ra mắt tính năng bốc bài Tarot Canvas 78 lá và pipeline link preview đa tầng.",
+        "title": "Tối Ưu Summary Scan, Lọc Thời Gian & Nâng Cấp Logging",
+        "summary": "Nâng cấp tính năng tóm tắt kênh chat với bộ lọc thời gian chuyên sâu và hệ thống lưu trữ error logs.",
         "changes": [
             {
-                "category": "🔮 Khởi Tạo Tarot Engine 78 Lá",
+                "category": "📝 Summary Engine",
+                "items": [
+                    "Bổ sung bộ lọc theo ngày cụ thể, khung giờ bắt đầu - kết thúc và message anchor link.",
+                    "Hỗ trợ gửi kết quả tóm tắt trực tiếp qua Direct Message (DM) bảo mật.",
+                    "Tăng giới hạn quét tin nhắn tới 2500 tin và hỗ trợ tùy chỉnh kích thước MapReduce chunk."
+                ]
+            },
+            {
+                "category": "📊 Logging & Debugging",
+                "items": [
+                    "Lưu trữ error logs tự động và hỗ trợ bộ lọc cấp độ log trên Web Dashboard."
+                ]
+            }
+        ]
+    },
+    {
+        "version": "2.1.0",
+        "date": "2026-08-25",
+        "type": "minor",
+        "title": "Tối Ưu UX/UI Tarot Launcher, Help View & Tinh Giản Kiến Trúc",
+        "summary": "Tối ưu hóa giao diện bốc bài Tarot, hỗ trợ Hybrid Commands và tinh giản các module thử nghiệm để đạt hiệu năng cao nhất.",
+        "changes": [
+            {
+                "category": "🔮 Tarot UX & Optimization",
+                "items": [
+                    "Cải tiến giao diện chọn kiểu trải bài và người giải bài trực quan.",
+                    "Cài đặt Cooldown 30s và tính toán quẻ bài dựa trên Cosmic Energy Seed (1h).",
+                    "Tinh giản các module thử nghiệm phụ (TTS Voice, Meme Engine) để tập trung tài nguyên vào AI Reasoning và Canvas Image."
+                ]
+            },
+            {
+                "category": "💡 Hybrid Commands & Help UI",
+                "items": [
+                    "Hỗ trợ Hybrid Command linh hoạt giữa Slash Command (/) và Prefix ($m).",
+                    "Giao diện HelpView phân loại rõ ràng theo từng tính năng kèm nút đóng tin nhắn."
+                ]
+            }
+        ]
+    },
+    {
+        "version": "2.0.0",
+        "date": "2026-08-24",
+        "type": "major",
+        "title": "Đại Tu Modular Cogs, Ra Mắt Tarot Engine 78 Lá & Multi-Tier Embed Pipeline",
+        "summary": "Bước nhảy vọt kiến trúc 2.0: Chuyển đổi mã nguồn sang hệ thống Modular Discord Cogs, ra mắt tính năng bốc bài Tarot Canvas 78 lá, 3 Reader Personas và pipeline link preview đa tầng.",
+        "changes": [
+            {
+                "category": "🔮 Khởi Tạo Tarot Engine 78 Lá Rider-Waite",
                 "items": [
                     "Xây dựng bộ bài 78 lá Tarot Rider-Waite hoàn chỉnh.",
                     "Tích hợp thư viện Pillow render hình ảnh trải bài Canvas trực quan độ phân giải cao.",
@@ -153,8 +202,7 @@ CHANGELOG: List[Dict[str, Any]] = [
                 "category": "📁 Kiến Trúc Modular Cogs & Web Dashboard",
                 "items": [
                     "Tái cấu trúc mã nguồn sang các thư mục tính năng độc lập (features/tarot, features/embed, features/summary).",
-                    "Hỗ trợ Hybrid Command (Slash Command `/` & Prefix Command `$m`).",
-                    "Ra mắt phiên bản đầu tiên của Web Admin Dashboard."
+                    "Ra mắt phiên bản đầu tiên của Web Admin Dashboard phục vụ giám sát và cấu hình."
                 ]
             }
         ]
