@@ -14,7 +14,6 @@ from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy
 from features.embed.fallback import extract_media_ytdlp
-from core.webhook_sender import send_via_webhook
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
 MAX_LINKS_PER_MESSAGE = 3
@@ -61,16 +60,6 @@ class EmbedCog(commands.Cog):
         if self.session and not self.session.closed:
             await self.session.close()
 
-    def _extract_user_comment(self, content: str, urls: list[str]) -> str | None:
-        if not content:
-            return None
-        cleaned = content
-        for u in urls:
-            escaped_u = re.escape(u)
-            pattern = re.compile(rf"(\|\|{escaped_u}\|\||<{escaped_u}>|{escaped_u})")
-            cleaned = pattern.sub("", cleaned)
-        cleaned = cleaned.strip()
-        return cleaned if cleaned else None
 
     def _detect_urls(self, content: str) -> list[tuple[str, str, object, bool]]:
         raw_urls = extract_urls(content)
@@ -116,20 +105,15 @@ class EmbedCog(commands.Cog):
 
         any_success = False
         platforms_enabled = config.get("platforms_enabled", {})
-        processed_urls = [u for _, u, _, _ in detected[:MAX_LINKS_PER_MESSAGE]]
-        user_comment = self._extract_user_comment(message.content, processed_urls)
-        comment_sent = False
 
         for platform_key, url, match, is_spoiler in detected[:MAX_LINKS_PER_MESSAGE]:
             if not platforms_enabled.get(platform_key, True):
                 continue
 
-            current_comment = user_comment if not comment_sent else None
-
             t_embed_start = time.monotonic()
             success = await self._process_url_with_fallback(
                 message, platform_key, url, match, config,
-                is_spoiler=is_spoiler, user_comment=current_comment
+                is_spoiler=is_spoiler
             )
             elapsed_ms = round((time.monotonic() - t_embed_start) * 1000, 1)
 
@@ -163,7 +147,6 @@ class EmbedCog(commands.Cog):
 
             if success:
                 any_success = True
-                comment_sent = True
             else:
                 platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
                 try:
@@ -176,16 +159,50 @@ class EmbedCog(commands.Cog):
                 except Exception:
                     pass
 
-        if any_success:
+        # Ẩn khung embed lỗi mặc định của Discord trên tin nhắn gốc của người dùng
+        # Giữ nguyên 100% tin nhắn gốc (ảnh, nội dung, danh tính) để tránh mất ảnh và hỗ trợ Reply vàng chat chuẩn Discord
+        if any_success and config.get("suppress_original_embed", True):
             try:
-                await message.delete()
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException) as e:
-                print(f"[EmbedCog] Không thể xoá tin nhắn gốc: {e}", flush=True)
-                if config.get("suppress_original_embed", True):
-                    try:
-                        await message.edit(suppress=True)
-                    except (discord.Forbidden, discord.HTTPException):
-                        pass
+                await message.edit(suppress=True)
+            except (discord.Forbidden, discord.HTTPException) as e:
+                print(f"[EmbedCog] Không thể suppress embed tin nhắn gốc: {e}", flush=True)
+
+    async def _send_embed_preview(
+        self,
+        message: discord.Message,
+        content: str | None = None,
+        embeds: list[discord.Embed] | None = None,
+        file: discord.File | None = None,
+        view: discord.ui.View | None = None,
+    ) -> bool:
+        """Gửi bản xem trước bên dưới tin nhắn gốc, KHÔNG tag người gửi (mention_author=False)."""
+        kwargs = {}
+        if content:
+            kwargs["content"] = content
+        if embeds:
+            kwargs["embeds"] = embeds
+        if file:
+            kwargs["file"] = file
+        if view:
+            kwargs["view"] = view
+
+        try:
+            await message.reply(**kwargs, mention_author=False)
+            return True
+        except discord.HTTPException as e:
+            if view is not None and ("components" in str(e).lower() or e.code == 50035):
+                kwargs.pop("view", None)
+                try:
+                    await message.reply(**kwargs, mention_author=False)
+                    return True
+                except Exception:
+                    pass
+            try:
+                await message.channel.send(**kwargs)
+                return True
+            except Exception as send_err:
+                print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {send_err}", flush=True)
+                return False
 
     async def _process_url_with_fallback(
         self,
@@ -195,14 +212,13 @@ class EmbedCog(commands.Cog):
         match: object,
         config: dict,
         is_spoiler: bool = False,
-        user_comment: str | None = None,
     ) -> bool:
         t_start = time.monotonic()
         try:
             result = await asyncio.wait_for(
                 self._run_fallback_chain(
                     message, platform_key, url, match, config,
-                    is_spoiler=is_spoiler, user_comment=user_comment
+                    is_spoiler=is_spoiler
                 ),
                 timeout=_PIPELINE_TIMEOUT,
             )
@@ -223,16 +239,15 @@ class EmbedCog(commands.Cog):
         match: object,
         config: dict,
         is_spoiler: bool = False,
-        user_comment: str | None = None,
     ) -> bool:
         # Tier 0: API Fetcher
-        if await self._try_api_fetcher(message, platform_key, url, match, config, is_spoiler=is_spoiler, user_comment=user_comment):
+        if await self._try_api_fetcher(message, platform_key, url, match, config, is_spoiler=is_spoiler):
             return True
         # Tier 1: Proxy URL Chain
-        if await self._try_proxy_chain(message, platform_key, url, config, is_spoiler=is_spoiler, user_comment=user_comment):
+        if await self._try_proxy_chain(message, platform_key, url, config, is_spoiler=is_spoiler):
             return True
         # Tier 2: yt-dlp Fallback
-        if await self._try_ytdlp_fallback(message, platform_key, url, config, is_spoiler=is_spoiler, user_comment=user_comment):
+        if await self._try_ytdlp_fallback(message, platform_key, url, config, is_spoiler=is_spoiler):
             return True
 
         print(f"[EmbedCog] Tất cả các tier đã thất bại cho {platform_key}: {url}", flush=True)
@@ -246,7 +261,6 @@ class EmbedCog(commands.Cog):
         match: object,
         config: dict,
         is_spoiler: bool = False,
-        user_comment: str | None = None,
     ) -> bool:
         fetcher = FETCHER_MAP.get(platform_key)
         if not fetcher or self.session is None:
@@ -277,29 +291,17 @@ class EmbedCog(commands.Cog):
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
 
-            view = create_platform_view(platform_key, post_data.url or url)
+            view = create_platform_view(platform_key, post_data.url or url, author_id=message.author.id)
 
-            return await send_via_webhook(
-                channel=message.channel,
-                user=message.author,
-                content=user_comment,
+            return await self._send_embed_preview(
+                message=message,
                 embeds=embeds,
                 file=file,
                 view=view,
-                original_message=message,
             )
         except Exception as e:
             print(f"[EmbedCog] Tier 0 (API) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
-
-    def _replace_url_in_content(self, content: str, original_url: str, new_url: str) -> str:
-        if not content:
-            return new_url
-        escaped = re.escape(original_url)
-        pattern = re.compile(rf"(\|\|{escaped}\|\||<{escaped}>|{escaped})")
-        if pattern.search(content):
-            return pattern.sub(new_url, content, count=1)
-        return new_url
 
     async def _try_proxy_chain(
         self,
@@ -308,7 +310,6 @@ class EmbedCog(commands.Cog):
         url: str,
         config: dict,
         is_spoiler: bool = False,
-        user_comment: str | None = None,
     ) -> bool:
         if self.session is None:
             return False
@@ -354,15 +355,12 @@ class EmbedCog(commands.Cog):
             else:
                 wrapped_proxy_url = proxy_url
 
-            view = create_platform_view(platform_key, url)
-            full_content = self._replace_url_in_content(message.content, url, wrapped_proxy_url)
+            view = create_platform_view(platform_key, url, author_id=message.author.id)
 
-            return await send_via_webhook(
-                channel=message.channel,
-                user=message.author,
-                content=full_content,
+            return await self._send_embed_preview(
+                message=message,
+                content=wrapped_proxy_url,
                 view=view,
-                original_message=message,
             )
         except Exception as e:
             print(f"[EmbedCog] Tier 1 (Proxy) lỗi cho {platform_key} ({url}): {e}", flush=True)
@@ -375,7 +373,6 @@ class EmbedCog(commands.Cog):
         url: str,
         config: dict,
         is_spoiler: bool = False,
-        user_comment: str | None = None,
     ) -> bool:
         try:
             post_data = await extract_media_ytdlp(url, platform_key)
@@ -419,16 +416,13 @@ class EmbedCog(commands.Cog):
                 except Exception as dl_err:
                     print(f"[EmbedCog] Không thể tải video fallback {url}: {dl_err}", flush=True)
 
-            view = create_platform_view(platform_key, url)
+            view = create_platform_view(platform_key, url, author_id=message.author.id)
 
-            return await send_via_webhook(
-                channel=message.channel,
-                user=message.author,
-                content=user_comment,
+            return await self._send_embed_preview(
+                message=message,
                 embeds=[single_embed],
                 file=file,
                 view=view,
-                original_message=message,
             )
         except Exception as e:
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)
