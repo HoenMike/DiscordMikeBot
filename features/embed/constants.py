@@ -228,11 +228,18 @@ def format_count(n: int | None) -> str:
     return str(n)
 
 
+_NSFW_KEYWORD_PATTERN = re.compile(
+    r"(?:\b(?:nsfw|18\+|r18|r-18|spoiler|nhạy\s*cảm|sensitive|hentai|ecchi|lewd|porn)\b)",
+    re.IGNORECASE,
+)
+
+
 def extract_urls(text: str) -> list[tuple[str, bool]]:
-    """Trích xuất URL từ nội dung tin nhắn Discord."""
+    """Trích xuất URL từ nội dung tin nhắn Discord và phát hiện cờ spoiler/nsfw."""
+    has_nsfw_keyword = bool(_NSFW_KEYWORD_PATTERN.search(text))
     spoiler_urls = [(match, True) for match in _SPOILER_URL_PATTERN.findall(text)]
     text_without_spoilers = _SPOILER_URL_PATTERN.sub("", text)
-    regular_urls = [(match, False) for match in _REGULAR_URL_PATTERN.findall(text_without_spoilers)]
+    regular_urls = [(match, has_nsfw_keyword) for match in _REGULAR_URL_PATTERN.findall(text_without_spoilers)]
     return spoiler_urls + regular_urls
 
 
