@@ -330,7 +330,7 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
             "• **TikTok**: Video trực tiếp, Photo Slide (`vxtiktok.com`, `tnktok.com`)\n"
             "• **Twitter / X**: Video, Ảnh HD, Bài viết dài (`fxtwitter.com`, `fixupx.com`)\n"
             "• **Reddit**: Video có âm thanh, GIF, Bài viết (`rxddit.com`, `fxreddit.seria.moe`)\n"
-            "• **Threads**: Video, Ảnh bài viết (`fixthreads.net`)\n"
+            "• **Threads**: Video, Ảnh bài viết, Share link (`vxthreads.com`, `fixthreads.seria.moe`)\n"
             "• **Pixiv**: Tranh minh họa, Manga nhiều trang (`phixiv.net`)\n"
             "• **Bluesky & Twitch**: Bài viết Bluesky & Clip ngắn Twitch"
         ),

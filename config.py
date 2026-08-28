@@ -124,44 +124,74 @@ FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "mikedabot_secure_session_key_2
 # ==========================================
 # 2. CẤU HÌNH AI & MÔ HÌNH (CENTRALIZED AI CONFIG)
 # ==========================================
+try:
+    from core.constants import (
+        DEFAULT_GEMINI_DATA_MODEL,
+        DEFAULT_GEMINI_SUMMARY_MODEL,
+        DEFAULT_GEMINI_QA_MODEL,
+        DEFAULT_GEMINI_TAROT_MODEL,
+        DEFAULT_TAROT_FALLBACK_MODELS,
+        DEFAULT_SUMMARY_TEMPERATURE,
+        DEFAULT_QA_TEMPERATURE,
+        DEFAULT_TAROT_TEMPERATURE,
+        DEFAULT_SINGLE_PASS_MSG_LIMIT,
+        DEFAULT_MAPREDUCE_CHUNK_SIZE,
+        DEFAULT_DISCORD_EMBED_CHAR_LIMIT,
+        MAX_FETCH_MESSAGES_LIMIT,
+        DEFAULT_COMMAND_COOLDOWN_SECONDS,
+        DEFAULT_SCAN_HOURS,
+        DEFAULT_SCAN_LIMIT,
+    )
+except ImportError:
+    DEFAULT_GEMINI_DATA_MODEL = "gemini-3.1-flash-lite"
+    DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.5-flash-lite"
+    DEFAULT_GEMINI_QA_MODEL = "gemini-3.5-flash-lite"
+    DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.7-flash"
+    DEFAULT_TAROT_FALLBACK_MODELS = [
+        "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+        "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemma-4-31b-it"
+    ]
+    DEFAULT_SUMMARY_TEMPERATURE = 0.1
+    DEFAULT_QA_TEMPERATURE = 0.3
+    DEFAULT_TAROT_TEMPERATURE = 0.7
+    DEFAULT_SINGLE_PASS_MSG_LIMIT = 300
+    DEFAULT_MAPREDUCE_CHUNK_SIZE = 200
+    DEFAULT_DISCORD_EMBED_CHAR_LIMIT = 3500
+    MAX_FETCH_MESSAGES_LIMIT = 4000
+    DEFAULT_COMMAND_COOLDOWN_SECONDS = 30.0
+    DEFAULT_SCAN_HOURS = 2.0
+    DEFAULT_SCAN_LIMIT = 150
+
 # Model chính dùng cho xử lý dữ liệu nền, trích xuất dữ liệu thô (nhẹ, nhanh, tiết kiệm token)
-GEMINI_DATA_MODEL = os.getenv("GEMINI_DATA_MODEL", "gemini-3.1-flash-lite")
+GEMINI_DATA_MODEL = os.getenv("GEMINI_DATA_MODEL", DEFAULT_GEMINI_DATA_MODEL)
 
 # Model dùng cho tóm tắt nội dung tin nhắn (Single-Pass & MapReduce Reduce)
-GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_SUMMARY_MODEL = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_SUMMARY_MODEL)
 
 # Model dùng cho AI QA Evaluator tự động đánh giá và chấm điểm
-GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", "gemini-3.5-flash-lite")
+GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", DEFAULT_GEMINI_QA_MODEL)
 
 # Model chuyên sâu dùng cho bốc và luận giải Tarot AI (Thinking / Deep Reasoning)
-# Mặc định ưu tiên gemini-3.7-flash -> fallback gemini-3.6-flash -> gemini-3.5-flash-lite -> gemma-4-31b-it
-GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", "gemini-3.7-flash")
+GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", DEFAULT_GEMINI_TAROT_MODEL)
 
 # Danh sách chuỗi Fallback mô hình dự phòng khi gặp quá tải (503 / 429 Quota Exceeded)
 TAROT_FALLBACK_MODELS = [
     GEMINI_TAROT_MODEL,
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-    "gemma-4-31b-it"
+    *[m for m in DEFAULT_TAROT_FALLBACK_MODELS if m != GEMINI_TAROT_MODEL]
 ]
 
 # Tham số Generation
-SUMMARY_TEMPERATURE = float(os.getenv("SUMMARY_TEMPERATURE", "0.1"))
-QA_TEMPERATURE = float(os.getenv("QA_TEMPERATURE", "0.3"))
-TAROT_TEMPERATURE = float(os.getenv("TAROT_TEMPERATURE", "0.7"))
+SUMMARY_TEMPERATURE = float(os.getenv("SUMMARY_TEMPERATURE", str(DEFAULT_SUMMARY_TEMPERATURE)))
+QA_TEMPERATURE = float(os.getenv("QA_TEMPERATURE", str(DEFAULT_QA_TEMPERATURE)))
+TAROT_TEMPERATURE = float(os.getenv("TAROT_TEMPERATURE", str(DEFAULT_TAROT_TEMPERATURE)))
 
 # ==========================================
 # 3. THAM SỐ XỬ LÝ DỮ LIỆU & GIỚI HẠN (LIMITS)
 # ==========================================
-SINGLE_PASS_MSG_LIMIT = int(os.getenv("SINGLE_PASS_MSG_LIMIT", "300"))       # <= 300 msg: Single-Pass; > 300 msg: MapReduce
-MAPREDUCE_CHUNK_SIZE = int(os.getenv("MAPREDUCE_CHUNK_SIZE", "200"))         # Kích thước chunk phân đoạn MapReduce
-DISCORD_EMBED_CHAR_LIMIT = int(os.getenv("DISCORD_EMBED_CHAR_LIMIT", "3500")) # Giới hạn ký tự mỗi embed Discord
-MAX_FETCH_MESSAGES_LIMIT = 4000   # Giới hạn trần quét tin nhắn tối đa
-COMMAND_COOLDOWN_SECONDS = float(os.getenv("COMMAND_COOLDOWN_SECONDS", "30.0"))   # Cooldown 30s per user
-DEFAULT_SCAN_HOURS = 2.0
-DEFAULT_SCAN_LIMIT = 150
+SINGLE_PASS_MSG_LIMIT = int(os.getenv("SINGLE_PASS_MSG_LIMIT", str(DEFAULT_SINGLE_PASS_MSG_LIMIT)))
+MAPREDUCE_CHUNK_SIZE = int(os.getenv("MAPREDUCE_CHUNK_SIZE", str(DEFAULT_MAPREDUCE_CHUNK_SIZE)))
+DISCORD_EMBED_CHAR_LIMIT = int(os.getenv("DISCORD_EMBED_CHAR_LIMIT", str(DEFAULT_DISCORD_EMBED_CHAR_LIMIT)))
+COMMAND_COOLDOWN_SECONDS = float(os.getenv("COMMAND_COOLDOWN_SECONDS", str(DEFAULT_COMMAND_COOLDOWN_SECONDS)))
 
 DATA_DIR = pathlib.Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)

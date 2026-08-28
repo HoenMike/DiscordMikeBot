@@ -54,7 +54,11 @@ def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> 
 
     for orig_domain in original_domains:
         if domain_in_url(original_url, orig_domain):
-            return replace_domain(original_url, orig_domain, proxy_domain)
+            res_url = replace_domain(original_url, orig_domain, proxy_domain)
+            if platform_key == "threads" and "vxthreads" in proxy_domain:
+                # vxthreads.com xử lý đường dẫn dạng /t/ hoặc /@user/post/ tốt nhất
+                res_url = re.sub(r"/share/(?:post/)?", "/t/", res_url)
+            return res_url
 
     return None
 

@@ -10,37 +10,70 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.0.0)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.0.0"
+CURRENT_VERSION = "2.0.1"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & Dynamic Presence"
+CODENAME = "Hybrid Engine & Threads Enhancement"
 
-# Lịch sử các phiên bản phát hành (Mới nhất nằm ở đầu)
+# Lịch sử các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.0.1",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Tối Ưu Embed Threads, Tập Trung Constants & Làm Sạch Trạng Thái Bot",
+        "summary": "Nâng cấp bộ giải mã link Threads.net (vxthreads, shortlinks /t/, /share/), chuyển toàn bộ constants và AI models về core/constants.py và tinh chỉnh hiển thị trạng thái bot sạch đẹp.",
+        "changes": [
+            {
+                "category": "👑 Nâng Cấp Threads Embed Toàn Diện",
+                "items": [
+                    "Hỗ trợ đầy đủ các định dạng liên kết Threads: @user/post/ID, threads.net/t/ID, threads.net/share/post/ID và threads.net/share/ID.",
+                    "Tích hợp proxy chính vxthreads.com siêu nhẹ kèm cơ chế fallback fixthreads.seria.moe.",
+                    "Tự động chuẩn hóa đường dẫn /share/ sang /t/ tăng tốc độ resolve dữ liệu OpenGraph.",
+                    "Mở rộng regex nhận diện ID chứa ký tự gạch ngang (-) và gạch dưới (_)."
+                ]
+            },
+            {
+                "category": "📁 Tái Cấu Trúc Centralized Constants (core/constants.py)",
+                "items": [
+                    "Tập trung toàn bộ cấu hình AI Models (gemini-3.7-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite) và nhiệt độ generation vào core/constants.py.",
+                    "Gom nhóm toàn bộ tham số giới hạn (Limits), cấu hình mặc định nền tảng (PLATFORMS) và danh sách proxy vào core.",
+                    "Loại bỏ hoàn toàn phụ thuộc ngược từ core vào features, đảm bảo tính đóng gói kiến trúc chuẩn mực."
+                ]
+            },
+            {
+                "category": "🎭 Tinh Chỉnh Giao Diện Trạng Thái (Presence UI)",
+                "items": [
+                    "Loại bỏ emoji bóng tròn màu sắc khỏi dòng trạng thái bot và các preset điều khiển, giúp hiển thị thanh lịch và tận dụng chấm trạng thái gốc của Discord."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.0.0",
         "date": "2026-08-28",
-        "type": "major",  # 'major' | 'minor' | 'bugfix'
+        "type": "major",
         "title": "Đại Tu Kiến Trúc Hybrid Engine & Nâng Cấp Toàn Diện",
-        "summary": "Phiên bản nâng cấp lớn 2.0 với hệ thống Auto-Embed 9 MXH tinh gọn, Tarot AI đa tầng, AI Summary 2500 tin, Web Dashboard Real-time & Dynamic Presence.",
+        "summary": "Nâng cấp lớn 2.0 với hệ thống Auto-Embed 9 MXH tinh gọn, Tarot AI Deep Reasoning, Tóm tắt 2500 tin, Web Dashboard Real-time, Dynamic Presence & Tự động dọn dẹp Database.",
         "changes": [
             {
-                "category": "👑 Auto-Embed 9 Nền Tảng",
+                "category": "👑 Auto-Embed 9 Nền Tảng Tinh Gọn",
                 "items": [
                     "Bổ sung hỗ trợ đầy đủ 9 mạng xã hội: Facebook, TikTok, Instagram, Twitter/X, Reddit, Threads, Pixiv, Bluesky, Twitch.",
                     "Cơ chế Suppress Embed gốc: Giữ nguyên 100% tin nhắn & tệp đính kèm, bảo toàn tính năng highlight vàng khi reply.",
-                    "Subtext Jump Link: Dòng chú thích siêu nhỏ `-# ↩️ [Trả lời Tên](link) • 🔗 [Xem bài viết](url)`, nhấp vào cuộn ngay về tin gốc mà không bị lặp chữ.",
+                    "Subtext Jump Link: Dòng chú thích siêu nhỏ `-# ↩️ [Trả lời Tên](link) • 🔗 [Xem bài viết](url)`, nhấp vào cuộn ngay về tin gốc mà không bị lặp chữ hay double ping.",
                     "Tự động xóa Embed đồng bộ khi người dùng xóa tin nhắn gốc chứa link.",
-                    "Force Spoiler & Tự động nhận diện từ khóa nhạy cảm (nsfw, 18+, spoiler, nhạy cảm...) để che mờ khung embed."
+                    "Force Spoiler & Tự động nhận diện từ khóa nhạy cảm (nsfw, 18+, spoiler, nhạy cảm...) để che mờ khung embed.",
+                    "Làm sạch tên người dùng (Sanitize display name), sửa lỗi vỡ format Markdown Link khi tên chứa ký tự đặc biệt hoặc khoảng trắng."
                 ]
             },
             {
                 "category": "🔮 Tarot AI Deep Reasoning 2.0",
                 "items": [
-                    "9 kiểu trải bài chuyên sâu từ 1 lá đến 10 lá Celtic Cross.",
-                    "3 AI Reader tính cách độc đáo (Orion, Celeste, Jester) + Chế độ ngẫu nhiên.",
-                    "Canvas Renderer kết xuất hình ảnh 78 lá Rider-Waite độ phân giải cao.",
-                    "Cơ chế Cosmic Energy Seed (1h) đảm bảo tính nhất quán tâm linh.",
-                    "Nút tương tác sau quẻ bài: Hỏi Thêm Ý Nghĩa (Modal AI) & Nút Đánh Giá (👍/👎)."
+                    "9 kiểu trải bài chuyên sâu từ 1 lá đến 10 lá Celtic Cross, Horseshoe, Two Paths, Mind-Body-Spirit.",
+                    "3 Reader AI tính cách độc đáo (Orion, Celeste, Jester) + Chế độ Reader ngẫu nhiên.",
+                    "Canvas Renderer kết xuất hình ảnh 78 lá Rider-Waite độ nét cao.",
+                    "Cơ chế Cosmic Energy Seed (1h) đảm bảo tính nhất quán tâm linh và chống spam đổi quẻ.",
+                    "Nút tương tác sau quẻ bài: Hỏi Thêm Ý Nghĩa (Modal AI) & Nút Đánh Giá Hài Lòng (👍/👎)."
                 ]
             },
             {
@@ -48,7 +81,7 @@ CHANGELOG: List[Dict[str, Any]] = [
                 "items": [
                     "Sử dụng Gemini Flash AI quét sâu tới 2500 tin nhắn với tốc độ cao.",
                     "Tự động lọc spam/lệnh bot, trích xuất Action Items (kèm người phụ trách) & Top thành viên tích cực.",
-                    "Hỗ trợ quét theo số giờ, ngày cụ thể, khung giờ hoặc message anchor."
+                    "Hỗ trợ lọc theo số giờ, ngày cụ thể, khung giờ, message anchor link và gửi kết quả về DM riêng."
                 ]
             },
             {
@@ -56,57 +89,118 @@ CHANGELOG: List[Dict[str, Any]] = [
                 "items": [
                     "Trang Quản trị Web trực quan với Live Console Streaming & Live Activity Logger.",
                     "Unified Database Adapter: Tự động kết nối Turso LibSQL Cloud và fallback an toàn sang Local SQLite.",
-                    "Cơ chế Auto-Pruning tự động dọn dẹp log cũ, chống tràn và tiết kiệm 95% quota ghi DB.",
-                    "Hệ thống Dynamic Presence & Status: Cập nhật trạng thái bot linh hoạt qua Web & Discord."
+                    "Cơ chế Auto-Pruning tự động dọn dẹp log cũ, chống tràn và tiết kiệm 95% quota ghi DB (giữ 2000 console logs, 5000 activities, 90 ngày tarot).",
+                    "Hệ thống Dynamic Presence & Status: Cập nhật trạng thái bot linh hoạt qua Web & Discord Slash Command."
+                ]
+            }
+        ]
+    },
+    {
+        "version": "1.2.5",
+        "date": "2026-08-27",
+        "type": "bugfix",
+        "title": "Tối Ưu Hoá Turso DB, Lưu Bền Hoạt Động & Quản Trị Server",
+        "summary": "Tích hợp Turso LibSQL Cloud, lưu trữ bền vững bot activities & console logs, và hoàn thiện hệ thống phân quyền máy chủ.",
+        "changes": [
+            {
+                "category": "☁️ Cloud Database & Activity Persistence",
+                "items": [
+                    "Tích hợp Turso LibSQL Cloud Database kết nối an toàn qua HTTPS/WSS.",
+                    "Lưu trữ bền vững danh sách tương tác người dùng (bot_activities) và console logs vào Cloud DB.",
+                    "Tối ưu hóa vòng đời kết nối async DB Client chống rò rỉ kết nối trên Event Loop."
+                ]
+            },
+            {
+                "category": "🛡️ Quản Trị Máy Chủ (Guild Management)",
+                "items": [
+                    "Bổ sung hệ thống tạm ngừng / mở lại quyền sử dụng bot cho từng Server (Guild Suspension) kèm lý do chi tiết.",
+                    "In-memory Cache cho Guild Configs giúp phản hồi tức thì với độ trễ 0ms."
+                ]
+            },
+            {
+                "category": "🔮 Tarot AI Enhancements",
+                "items": [
+                    "Bổ sung Mood Tags, Summary Headlines và tính năng xuất dữ liệu đánh giá quẻ bài (Rating Export JSON/CSV)."
                 ]
             }
         ]
     },
     {
         "version": "1.2.0",
-        "date": "2026-08-15",
+        "date": "2026-08-25",
         "type": "minor",
-        "title": "Nâng Cấp Hệ Thống Tarot AI & Canvas Rendering",
-        "summary": "Tích hợp công nghệ ghép ảnh trải bài trực quan và đa dạng hóa tính cách Reader.",
+        "title": "Kiến Trúc Modular Cogs, Ra Mắt Tarot Engine 78 Lá & Multi-Tier Embed Pipeline",
+        "summary": "Tái cấu trúc mã nguồn sang hệ thống Modular Discord Cogs, ra mắt tính năng bốc bài Tarot Canvas 78 lá và pipeline link preview đa tầng.",
         "changes": [
             {
-                "category": "🔮 Tarot Engine",
+                "category": "🔮 Khởi Tạo Tarot Engine 78 Lá",
                 "items": [
-                    "Tích hợp thư viện Pillow render hình ảnh trải bài Canvas 78 lá Rider-Waite.",
-                    "Bổ sung 3 Reader AI với giọng văn riêng biệt (Orion, Celeste, Jester).",
-                    "Thêm tính năng lật từng lá bài tương tác trực tiếp trên Discord."
+                    "Xây dựng bộ bài 78 lá Tarot Rider-Waite hoàn chỉnh.",
+                    "Tích hợp thư viện Pillow render hình ảnh trải bài Canvas trực quan độ phân giải cao.",
+                    "Ra mắt 3 phong cách Reader AI: Orion (Logic), Celeste (Thấu cảm), Jester (Trào phúng).",
+                    "Giao diện lật từng lá bài tương tác trực tiếp với hiệu ứng lật mặt sau (Card-flip view)."
+                ]
+            },
+            {
+                "category": "👑 Pipeline Xử Lý Link Đa Tầng (Embed Multi-Tier)",
+                "items": [
+                    "Pipeline xử lý URL tự động: API Fetcher ➔ Proxy Chain ➔ yt-dlp Fallback.",
+                    "Hỗ trợ trích xuất và hiển thị nội dung bình luận của người dùng đi kèm link.",
+                    "Bổ sung bộ nhớ đệm Cooldown Cache cho các tên miền proxy gặp sự cố."
+                ]
+            },
+            {
+                "category": "📁 Kiến Trúc Modular Cogs & Web Dashboard",
+                "items": [
+                    "Tái cấu trúc mã nguồn sang các thư mục tính năng độc lập (features/tarot, features/embed, features/summary).",
+                    "Hỗ trợ Hybrid Command (Slash Command `/` & Prefix Command `$m`).",
+                    "Ra mắt phiên bản đầu tiên của Web Admin Dashboard."
                 ]
             }
         ]
     },
     {
         "version": "1.1.0",
-        "date": "2026-08-01",
+        "date": "2026-08-04",
         "type": "minor",
-        "title": "Tích Hợp Tóm Tắt Kênh Chat AI (Gemini Flash)",
-        "summary": "Ra mắt tính năng tóm tắt thông minh cuộc trò chuyện cho Discord server.",
+        "title": "Tự Động Embed MXH Cơ Bản & Chuyển Sang Gemini Flash Lite",
+        "summary": "Bổ sung tính năng hiển thị video/ảnh mạng xã hội tự động và tối ưu hóa mô hình AI sang Gemini Flash Lite.",
         "changes": [
             {
-                "category": "📝 Summary Engine",
+                "category": "👑 Auto-Embed Cơ Bản",
                 "items": [
-                    "Tích hợp Google Gemini AI đọc và đúc kết nội dung tin nhắn.",
-                    "Hỗ trợ phân loại chủ đề và xuất ra định dạng ngắn gọn / chi tiết."
+                    "Nhận diện liên kết mạng xã hội (Facebook, TikTok, Instagram) và nhúng video tự động.",
+                    "Bộ lọc từ khóa nội dung nhạy cảm (NSFW Filter) sơ bộ."
+                ]
+            },
+            {
+                "category": "⚡ Nâng Cấp Mô Hình AI",
+                "items": [
+                    "Chuyển đổi mô hình AI tóm tắt sang Google Gemini Flash Lite giúp tăng tốc độ phản hồi."
                 ]
             }
         ]
     },
     {
         "version": "1.0.0",
-        "date": "2026-07-20",
+        "date": "2026-06-13",
         "type": "major",
-        "title": "Khởi Tạo Dự Án MikeDaBot",
-        "summary": "Khởi tạo nền móng đầu tiên cho bot Discord đa nhiệm và hệ thống quản trị Web.",
+        "title": "Khởi Tạo Dự Án MikeDaBot, Tóm Tắt Kênh Chat AI & Deploy Gunicorn",
+        "summary": "Bản phát hành đầu tiên thiết lập nền tảng Discord Bot đa luồng, thuật toán MapReduce tóm tắt tin nhắn và triển khai Gunicorn Render.",
         "changes": [
             {
-                "category": "🚀 Khởi Tạo",
+                "category": "🚀 Nền Tảng & Triển Khai",
                 "items": [
-                    "Xây dựng kiến trúc Hybrid (Discord bot + Flask Web Server chạy song song).",
-                    "Thiết lập hệ thống lệnh Prefix `$m` cơ bản và kết nối Discord Gateway."
+                    "Xây dựng kiến trúc Hybrid chạy song song Discord Bot Gateway và Flask Web Server.",
+                    "Thiết lập Gunicorn Single-Worker Threading giải quyết triệt để lỗi 502 Bad Gateway trên Render."
+                ]
+            },
+            {
+                "category": "📝 AI Summary Engine (MapReduce)",
+                "items": [
+                    "Thuật toán MapReduce tóm tắt song song hỗ trợ quét sâu tới 2500 tin nhắn.",
+                    "Anti-hallucination guardrails với Temperature=0.1 đảm bảo tính xác thực cao.",
+                    "Lệnh tự kiểm thử `/test_tomtat` và báo cáo kiểm thử tự động."
                 ]
             }
         ]

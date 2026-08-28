@@ -5,15 +5,18 @@ import aiosqlite
 import config as app_config
 
 try:
-    from features.embed.constants import DEFAULT_CONFIG, PROXY_DOMAINS
+    from core.constants import DEFAULT_CONFIG, PROXY_DOMAINS
 except ImportError:
-    DEFAULT_CONFIG = {
-        "platforms_enabled": {},
-        "nsfw_mode": "spoiler",
-        "auto_embed_enabled": True,
-        "suppress_original_embed": True,
-    }
-    PROXY_DOMAINS = {}
+    try:
+        from features.embed.constants import DEFAULT_CONFIG, PROXY_DOMAINS
+    except ImportError:
+        DEFAULT_CONFIG = {
+            "platforms_enabled": {},
+            "nsfw_mode": "spoiler",
+            "auto_embed_enabled": True,
+            "suppress_original_embed": True,
+        }
+        PROXY_DOMAINS = {}
 
 
 class ConfigManager:

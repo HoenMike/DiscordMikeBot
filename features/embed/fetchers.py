@@ -365,13 +365,22 @@ async def fetch_pixiv(session: aiohttp.ClientSession, url: str, match) -> PostDa
 
 async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
     try:
-        username = match.group(1) if len(match.groups()) >= 1 else "threads_user"
-        post_id = match.group(2) if len(match.groups()) >= 2 else ""
-        original_url = f"https://www.threads.net/@{username}/post/{post_id}" if post_id else url
+        groups = match.groups()
+        if len(groups) >= 2 and groups[0] and groups[1]:
+            username = groups[0]
+            post_id = groups[1]
+            original_url = f"https://www.threads.net/@{username}/post/{post_id}"
+        elif len(groups) >= 1 and groups[0]:
+            username = "threads_user"
+            post_id = groups[0]
+            original_url = f"https://www.threads.net/t/{post_id}"
+        else:
+            username = "threads_user"
+            original_url = url
 
         oembed_url = f"https://www.threads.net/oembed/?url={quote(original_url, safe='')}"
 
-        async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+        async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
             if resp.status != 200:
                 return None
             data = await resp.json(content_type=None)
@@ -384,8 +393,8 @@ async def fetch_threads(session: aiohttp.ClientSession, url: str, match) -> Post
 
         return PostData(
             platform="threads",
-            author=data.get("author_name", f"@{username}"),
-            author_url=f"https://www.threads.net/@{username}",
+            author=data.get("author_name", f"@{username}" if username != "threads_user" else "Threads User"),
+            author_url=f"https://www.threads.net/@{username}" if username != "threads_user" else original_url,
             text=data.get("title"),
             media_urls=media_urls,
             media_type=media_type,
