@@ -115,11 +115,43 @@ def _build_tarot_prompt(
     2. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Khởi đầu mới bùng nổ', 'Rối bời & Do dự', 'Thăng hoa & Tự tin', 'Thận trọng & Phòng thủ'...).
     3. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
     4. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.
-    5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, tôn trọng đúng ý nghĩa biểu tượng của lá bài.
+    5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt.
     6. `advice`: Lời khuyên hành động thực tế, thông thái và khích lệ người hỏi.
-    7. `full_reading`: Toàn bộ bài giải hoàn chỉnh được format đẹp bằng Markdown, chia rõ các mục 🎯 KẾT LUẬN, 🃏 Ý NGHĨA CÁC LÁ BÀI, 💡 LỜI KHUYÊN & ĐỊNH HƯỚNG.
+    7. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown, BẮT BUỘC phân tách các mục rõ ràng bằng 2 dấu xuống dòng (\\n\\n):
+       🎯 **KẾT LUẬN**
+       (Nội dung kết luận)
+
+       🃏 **Ý NGHĨA CÁC LÁ BÀI**
+       • **[Tên lá bài 1]**: (Phân tích)
+       • **[Tên lá bài 2]**: (Phân tích)
+
+       💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG**
+       (Nội dung lời khuyên)
     """.strip()
     return prompt
+
+
+def _clean_and_format_tarot_markdown(text: str) -> str:
+    """Chuẩn hóa cấu trúc Markdown bài giải Tarot, tách đoạn rõ ràng và xuống hàng các mục."""
+    if not text:
+        return ""
+
+    t = text.strip()
+
+    # 1. Chèn \n\n trước các tiêu đề icon chính (🎯, 🃏, 💡, 🔮, ⚡, 📖, 🎭, 💖, ✨)
+    t = re.sub(
+        r"(?<!^)\s*([🎯🃏💡🔮⚡📖🎭💖✨])\s*(\*{0,2})([A-ZĐÀ-Ỹa-zđà-ỹ\s&/—\-]+?)(\*{0,2})(?::|\n)",
+        r"\n\n\1 **\3**\n",
+        t
+    )
+
+    # 2. Chuẩn hóa xuống dòng cho các gạch đầu dòng (•, -, *)
+    t = re.sub(r"(?<!^)(?<!\n)\s*([•\-])\s*", r"\n• ", t)
+
+    # 3. Gom bớt các dòng trống liên tiếp (> 2 dòng thành 2 dòng)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+
+    return t.strip()
 
 
 def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
@@ -222,45 +254,50 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
         else:
             raw_full = str(raw_full).strip()
 
-        if len(raw_full) > 50:
+        # Tái tạo bài đọc có cấu trúc từ các trường thành phần
+        conc = parsed_dict.get("conclusion", "")
+        if isinstance(conc, list):
+            conc = "\n".join(str(c) for c in conc)
+        conc = str(conc).strip()
+
+        cards_an = parsed_dict.get("cards_analysis", "")
+        if isinstance(cards_an, list):
+            formatted_cards = []
+            for item in cards_an:
+                if isinstance(item, dict):
+                    c_name = item.get("card_name", item.get("name", ""))
+                    c_meaning = item.get("meaning", item.get("analysis", ""))
+                    formatted_cards.append(f"• **{c_name}**: {c_meaning}" if c_name else f"• {c_meaning}")
+                else:
+                    formatted_cards.append(f"• {item}")
+            cards_an = "\n".join(formatted_cards)
+        cards_an = str(cards_an).strip()
+
+        adv = parsed_dict.get("advice", "")
+        if isinstance(adv, list):
+            adv = "\n".join(str(a) for a in adv)
+        adv = str(adv).strip()
+
+        if conc and cards_an:
+            # Tái tạo đầy đủ bài đọc chuẩn Markdown với các mục phân tách đẹp mắt
+            parts = [
+                f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}",
+                f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}"
+            ]
+            if adv:
+                parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
+            full_reading = "\n\n".join(parts)
+        elif len(raw_full) > 50:
             full_reading = raw_full
         else:
-            # Tái tạo bài đọc có cấu trúc từ các trường thành phần
-            conc = parsed_dict.get("conclusion", "")
-            if isinstance(conc, list):
-                conc = "\n".join(str(c) for c in conc)
-            conc = str(conc).strip()
-
-            cards_an = parsed_dict.get("cards_analysis", "")
-            if isinstance(cards_an, list):
-                formatted_cards = []
-                for item in cards_an:
-                    if isinstance(item, dict):
-                        c_name = item.get("card_name", item.get("name", ""))
-                        c_meaning = item.get("meaning", item.get("analysis", ""))
-                        formatted_cards.append(f"• **{c_name}**: {c_meaning}" if c_name else f"• {c_meaning}")
-                    else:
-                        formatted_cards.append(f"• {item}")
-                cards_an = "\n".join(formatted_cards)
-            cards_an = str(cards_an).strip()
-
-            adv = parsed_dict.get("advice", "")
-            if isinstance(adv, list):
-                adv = "\n".join(str(a) for a in adv)
-            adv = str(adv).strip()
-
             parts = []
             if conc:
-                parts.append(f"🎯 **KẾT LUẬN & ĐỊNH HƯỚNG:**\n{conc}")
+                parts.append(f"🎯 **KẾT LUẬN:**\n{conc}")
             if cards_an:
                 parts.append(f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}")
             if adv:
-                parts.append(f"💡 **LỜI KHUYÊN HÀNH ĐỘNG:**\n{adv}")
-
-            if parts:
-                full_reading = "\n\n".join(parts)
-            else:
-                full_reading = raw_full or text
+                parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
+            full_reading = "\n\n".join(parts) if parts else (raw_full or text)
     else:
         # Nếu hoàn toàn không phát hiện cấu trúc JSON -> coi như phản hồi Markdown thông thường
         cleaned = text
@@ -283,6 +320,9 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
         full_reading = re.sub(r'\s*\}\s*$', '', full_reading)
         full_reading = re.sub(r'"[a-zA-Z_]+":\s*"', '', full_reading)
         full_reading = full_reading.replace('",', '\n\n').replace('\\n', '\n').strip()
+
+    # Bước 7: Chuẩn hóa Markdown, đảm bảo xuống dòng các mục 🎯, 🃏, 💡 và gạch đầu dòng
+    full_reading = _clean_and_format_tarot_markdown(full_reading)
 
     return full_reading, topic_tag, mood_tag, summary_headline
 
