@@ -111,6 +111,9 @@ class ActivityLogger:
         if self._flush_task is None or self._flush_task.done():
             self._flush_task = asyncio.create_task(self._console_log_flush_loop())
 
+        # 4. Tự động dọn dẹp các bản ghi cũ
+        await self.prune_old_records()
+
         self._db_initialized = True
         print(f"📊 [ActivityLogger] Đã nạp {len(self._activities)} tương tác & {len(c_rows)} console logs từ DB bền vững.", flush=True)
 
@@ -198,11 +201,35 @@ class ActivityLogger:
         """Đưa console log vào hàng đợi lưu bền vững ngầm."""
         self._pending_console_logs.append(log_line)
 
+    async def prune_old_records(self):
+        """Tự động dọn dẹp các log và hoạt động cũ để giữ dung lượng DB luôn gọn gàng và không bao giờ vượt limit."""
+        try:
+            from core.db import db_client
+            # Giữ tối đa 2,000 dòng console log gần nhất
+            await db_client.execute("""
+                DELETE FROM console_logs 
+                WHERE id NOT IN (SELECT id FROM console_logs ORDER BY id DESC LIMIT 2000)
+            """)
+            # Giữ tối đa 5,000 bot activities gần nhất
+            await db_client.execute("""
+                DELETE FROM bot_activities 
+                WHERE id NOT IN (SELECT id FROM bot_activities ORDER BY id DESC LIMIT 5000)
+            """)
+            await db_client.commit()
+        except Exception as e:
+            print(f"⚠️ [ActivityLogger] Lỗi dọn dẹp DB tự động: {e}", flush=True)
+
     async def _console_log_flush_loop(self):
         """Task chạy ngầm định kỳ gom batch console logs và lưu vào Database mỗi 3 giây."""
+        prune_ticks = 0
         while True:
             try:
                 await asyncio.sleep(3.0)
+                prune_ticks += 1
+                if prune_ticks >= 300:  # Tự động dọn dẹp DB mỗi ~15 phút
+                    prune_ticks = 0
+                    await self.prune_old_records()
+
                 if not self._pending_console_logs:
                     continue
 

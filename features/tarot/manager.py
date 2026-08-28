@@ -99,6 +99,12 @@ class TarotManager:
         except Exception:
             pass
 
+        # Tự động dọn dẹp các quẻ bài quá cũ (> 90 ngày) để tối ưu hóa lưu trữ DB
+        try:
+            await db.execute("DELETE FROM tarot_history WHERE created_at < datetime('now', '-90 days')")
+        except Exception:
+            pass
+
         await db.commit()
         print("[TarotManager] Đã khởi tạo cơ sở dữ liệu Tarot thành công.", flush=True)
 

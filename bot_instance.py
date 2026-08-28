@@ -138,20 +138,20 @@ bot = SummaryBot()
 
 def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
     embed = discord.Embed(
-        title="🤖 HƯỚNG DẪN SỬ DỤNG MIKEBOT (TỔNG QUAN)",
+        title="🤖 HƯỚNG DẪN SỬ DỤNG MIKEBOT (TỔNG QUAN & TÍNH NĂNG MỚI)",
         description=(
-            "Chào mừng bạn đến với **MikeBot**! Bạn có thể sử dụng tất cả tính năng qua "
-            "**Slash Command** (`/`) hoặc **Prefix Command** (`$m`).\n\n"
-            "💡 *Hãy sử dụng menu thả xuống bên dưới để xem hướng dẫn chi tiết từng tính năng!*"
+            "Chào mừng bạn đến với **MikeDaBot**! Trợ lý Discord thông minh tích hợp AI đa nhiệm, "
+            "hỗ trợ cả **Slash Command** (`/`) lẫn **Prefix Command** (`$m`, `$M`).\n\n"
+            "💡 *Hãy sử dụng menu thả xuống bên dưới để tra cứu chi tiết từng tính năng & cơ chế QoL!*"
         ),
         color=0x7851A9
     )
     embed.add_field(
         name="🔮 1. BỐC BÀI TAROT (AI CHIÊM TINH)",
         value=(
-            "• Rút bài 78 lá Rider-Waite với hình ảnh Canvas trực quan.\n"
-            "• Luận giải bằng AI đa tầng với 3 tính cách Reader độc đáo.\n"
-            "• Hạt nhân năng lượng vũ trụ theo khung giờ (1 tiếng/khung).\n"
+            "• Rút bài 78 lá Rider-Waite với hình ảnh Canvas trực quan độ phân giải cao.\n"
+            "• Luận giải bằng AI đa tầng với 3 tính cách Reader độc đáo (`Orion`, `Celeste`, `Jester`).\n"
+            "• Hạt nhân năng lượng vũ trụ theo khung giờ (1 tiếng/khung) & Nút đánh giá phản hồi.\n"
             "👉 **Lệnh:** `/tarot`, `$m tarot` | **Xem chi tiết:** Chọn mục `🔮 Tarot` bên dưới."
         ),
         inline=False
@@ -159,22 +159,23 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
     embed.add_field(
         name="📝 2. TÓM TẮT CUỘC TRÒ CHUYỆN (AI SUMMARY)",
         value=(
-            "• Tóm tắt thông minh nội dung kênh chat bằng Gemini Flash AI.\n"
-            "• Tùy chỉnh số giờ quét, số lượng tin nhắn và từ khóa trọng tâm.\n"
+            "• Đọc và đúc kết nội dung kênh chat bằng Gemini Flash AI tốc độ cao.\n"
+            "• Quét sâu tới 2500 tin nhắn, tự động trích xuất chủ đề, việc cần làm (Action Items) & Top thành viên.\n"
             "👉 **Lệnh:** `/tomtat`, `$m tomtat` | **Xem chi tiết:** Chọn mục `📝 Tóm tắt` bên dưới."
         ),
         inline=False
     )
     embed.add_field(
-        name="👑 3. TỰ ĐỘNG FIX EMBED LIÊN KẾT",
+        name="👑 3. TỰ ĐỘNG FIX EMBED MẠNG XÃ HỘI (SIÊU GỌN GÀNG)",
         value=(
-            "• Tự động hiển thị video/ảnh cho TikTok, Instagram, Twitter/X, Reddit, Threads.\n"
-            "👉 **Lệnh quản trị:** `/autoembed`, `/embedconfig`"
+            "• Tự động hiển thị video/ảnh mượt mà cho **9 nền tảng**: Facebook, TikTok, Instagram, Twitter/X, Reddit, Threads, Pixiv, Bluesky, Twitch.\n"
+            "• **Cơ chế QoL mới**: Bảo toàn tin nhắn & ảnh gốc 100%, Subtext trả lời siêu gọn, tự động xóa khi tin gốc bị xóa, tự động nhận diện NSFW / Spoiler.\n"
+            "👉 **Lệnh quản trị:** `/autoembed`, `/nsfwmode`, `/embedconfig`, `/embedplatform`"
         ),
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -182,10 +183,10 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
 
 def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
     embed = discord.Embed(
-        title="🔮 HƯỚNG DẪN CHI TIẾT TÍNH NĂNG BỐC BÀI TAROT",
+        title="🔮 HƯỚNG DẪN CHI TIẾT TÍNH NĂNG BỐC BÀI TAROT (AI)",
         description=(
             "Hệ thống Tarot tích hợp trí tuệ nhân tạo (AI Deep Reasoning) kết hợp công nghệ "
-            "kết xuất hình ảnh trải bài sống động và cơ chế hạt nhân năng lượng theo khung giờ."
+            "kết xuất hình ảnh trải bài sống động, cơ chế hạt nhân năng lượng và tương tác hỏi thêm AI."
         ),
         color=0x9B59B6
     )
@@ -207,38 +208,40 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
     embed.add_field(
         name="🎭 3 NGƯỜI GIẢI BÀI (AI READERS)",
         value=(
-            "• **⚖️ Orion**: Trưởng thành, ôn hòa, điềm đạm và sâu sắc.\n"
-            "• **🌸 Celeste**: Dịu dàng, ấm áp, thấu cảm và vỗ về tâm hồn.\n"
+            "• **⚖️ Orion**: Trưởng thành, ôn hòa, điềm đạm, phân tích logic và thực tế.\n"
+            "• **🌸 Celeste**: Dịu dàng, ấm áp, thấu cảm và vỗ về cảm xúc tâm hồn.\n"
             "• **🃏 Jester**: Tinh quái, trào phúng, hài hước châm biếm và 'bẻ lái' bất ngờ.\n"
-            "• **🎲 Ngẫu Nhiên**: Tự động chọn 1 trong 3 Reader ngẫu nhiên."
+            "• **🎲 Ngẫu Nhiên**: Tự động chọn ngẫu nhiên 1 trong 3 Reader."
         ),
         inline=False
     )
     embed.add_field(
-        name="💡 CÚ PHÁP SỬ DỤNG",
+        name="💡 DANH SÁCH LỆNH TAROT ĐẦY ĐỦ",
         value=(
-            "**1. Mở Bảng Chọn Trực Quan:**\n"
-            "• `/tarot` hoặc `$m tarot` *(Chọn kiểu bài & nhập câu hỏi trực tiếp trên menu)*\n\n"
-            "**2. Bốc Nhanh Qua Lệnh:**\n"
-            "• `/tarot spread:Yes / No question:Có nên chuyển việc?`\n"
-            "• `$m tarot yes_no Tôi có nên đầu tư vào dự án này không?`\n"
-            "• `$m tarot daily` *(Rút bài năng lượng ngày)*\n\n"
-            "**3. Xem Lịch Sử Bốc Bài:**\n"
-            "• `/tarot_history` hoặc `$m tarot history`"
+            "• `/tarot` hoặc `$m tarot` : Mở bảng chọn kiểu bài & Reader trực quan\n"
+            "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `$m tarot yes_no Có nên đổi việc?`\n"
+            "• `/tarot_history` hoặc `$m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
+            "• `/tarot_recommend [question]` hoặc `$m tarot recommend [câu hỏi]` : AI gợi ý kiểu trải bài phù hợp nhất\n"
+            "• `/tarot_memory [on/off]` hoặc `$m tarot memory [on/off]` : Bật / tắt trí nhớ ngữ cảnh bạn cũ\n"
+            "• `/tarot_forget` hoặc `$m tarot forget` : Xóa sạch toàn bộ lịch sử bốc bài khỏi hệ thống\n"
+            "• `/tarot_weekly_setup [channel]` : Cài đặt kênh nhận bài tuần vào sáng Thứ Hai (Admin)"
         ),
         inline=False
     )
     embed.add_field(
-        name="🌌 QUY TẮC NĂNG LƯỢNG VŨ TRỤ & COOLDOWN",
+        name="🌌 CÁC TÍNH NĂNG & CƠ CHẾ QOL NỔI BẬT",
         value=(
-            "• **Hạt Nhân Năng Lượng (Cosmic Seed)**: Nếu bạn hỏi cùng 1 câu hỏi trong vòng **1 tiếng**, "
-            "vũ trụ sẽ giữ nguyên các lá bài rút ra để đảm bảo tính nhất quán (tránh vừa nói Có xong lại nói Không).\n"
-            "• **Cooldown**: **30 giây** giữa 2 lần bốc bài liên tiếp để giữ không gian tĩnh tâm."
+            "• **Hạt Nhân Năng Lượng (Cosmic Seed)**: Khi hỏi cùng một câu hỏi trong vòng **1 tiếng**, "
+            "vũ trụ sẽ giữ nguyên các lá bài rút ra để đảm bảo tính nhất quán (tránh vừa Có vừa Không).\n"
+            "• **Nút Hỏi Thêm Ý Nghĩa (❓)**: Mở modal cho phép đặt thêm câu hỏi đào sâu hoặc xin thêm lời khuyên chi tiết cho quẻ bài vừa bốc.\n"
+            "• **Nút Đánh Giá (👍 Hữu ích / 👎 Chưa chuẩn)**: Góp ý phản hồi chất lượng luận giải của AI.\n"
+            "• **Trí Nhớ Bạn Cũ (Memory)**: AI có khả năng liên kết nhẹ nhàng ngữ cảnh từ các quẻ bài trước.\n"
+            "• **Cooldown An Toàn**: **30 giây** giữa 2 lần bốc bài liên tiếp để giữ không gian tĩnh tâm."
         ),
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Tarot Engine",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Tarot Engine v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -249,25 +252,29 @@ def build_summary_help_embed(user: Union[discord.User, discord.Member]) -> disco
         title="📝 HƯỚNG DẪN TÍNH NĂNG TÓM TẮT CUỘC TRÒ CHUYỆN (AI)",
         description=(
             "Sử dụng Google Gemini AI để đọc và đúc kết nội dung tin nhắn trong kênh chat thành "
-            "bản tóm tắt súc tích, phân loại chủ đề rõ ràng và trích xuất danh sách hành động cần làm."
+            "bản tóm tắt súc tích, phân loại chủ đề rõ ràng, thống kê người nói nhiều nhất và trích xuất danh sách hành động (Action Items)."
         ),
         color=0x3498DB
     )
     embed.add_field(
         name="⚙️ CÚ PHÁP SỬ DỤNG",
         value=(
-            "• **Slash Command**: `/tomtat [hours] [limit] [type] [focus]`\n"
-            "• **Prefix Command**: `$m tomtat [hours] [limit] [type] [focus]`"
+            "• **Slash Command**: `/tomtat [hours] [limit] [summary_type] [focus] [date] [from_time] [to_time] [message_link] [send_to_dm] [channel]`\n"
+            "• **Prefix Command**: `$m tomtat [hours] [limit] [summary_type] [focus]`\n"
+            "• **Lệnh tắt / bí danh**: `$m tt`, `$m summary`"
         ),
         inline=False
     )
     embed.add_field(
         name="📊 CÁC THAM SỐ TÙY CHỌN",
         value=(
-            "• `hours` *(Mặc định: 2.0h)*: Khoảng thời gian quét tin nhắn ngược về trước.\n"
-            "• `limit` *(Mặc định: 150 tin, tối đa: 2500 tin)*: Giới hạn số tin nhắn quét.\n"
-            "• `type`: Kiểu tóm tắt (`short` - Ngắn gọn, `detailed` - Chi tiết, `bullet` - Gạch đầu dòng).\n"
-            "• `focus`: Từ khóa trọng tâm cần đào sâu (Ví dụ: `bug`, `game`, `họp`, `deadline`)."
+            "• `hours` *(Mặc định: 2.0h)*: Khoảng thời gian quét tin nhắn ngược về trước (Ví dụ: `0.5`, `3`, `24`).\n"
+            "• `limit` *(Mặc định: 150 tin, tối đa: 2500 tin)*: Giới hạn số lượng tin nhắn quét.\n"
+            "• `summary_type`: `short` (Tóm tắt ngắn gọn - mặc định) hoặc `long` (Tóm tắt dài & Timeline chi tiết).\n"
+            "• `focus`: Từ khóa / chủ đề cần tập trung phân tích sâu (Ví dụ: `bug`, `game`, `họp`, `deadline`, `kèo`).\n"
+            "• `date` & `from_time` / `to_time`: Quét theo ngày & khung giờ cụ thể (Ví dụ: `19/05/2024` từ `00:00` đến `04:00`).\n"
+            "• `message_link`: Link tin nhắn Discord hoặc Message ID làm mốc bắt đầu quét.\n"
+            "• `send_to_dm`: Gửi kết quả riêng vào DM thay vì kênh chung (gõ thêm `dm` hoặc `rieng` trong lệnh prefix)."
         ),
         inline=False
     )
@@ -275,13 +282,23 @@ def build_summary_help_embed(user: Union[discord.User, discord.Member]) -> disco
         name="💡 VÍ DỤ MẪU",
         value=(
             "• `$m tomtat` : Tóm tắt nhanh 2 tiếng gần nhất (150 tin nhắn)\n"
-            "• `$m tomtat 5 300 detailed bug` : Quét 5 tiếng (300 tin), chi tiết, tập trung vào `bug`\n"
-            "• `/tomtat hours:24.0 limit:500 type:detailed`"
+            "• `$m tomtat 5 300 long bug` : Quét 5 tiếng (300 tin), chi tiết timeline, tập trung vào `bug`\n"
+            "• `$m tomtat 100 dm` : Quét 100 tin gần nhất và gửi kết quả vào tin nhắn riêng DM\n"
+            "• `/tomtat hours:24.0 limit:500 summary_type:Tóm tắt dài & Timeline chi tiết focus:deadline`"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🎯 CÁC ĐIỂM CẢI TIẾN THÔNG MINH (QOL)",
+        value=(
+            "• Tự động lọc bỏ các tin nhắn spam, tin nhắn lệnh của bot khác để bản tóm tắt không bị rác.\n"
+            "• Tự động đếm và vinh danh Top thành viên đóng góp nhiều nhất trong cuộc trò chuyện.\n"
+            "• Nhận diện công việc / lời hẹn cần thực hiện (Action Items) kèm tên người phụ trách."
         ),
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Summary Engine",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Summary Engine v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -289,36 +306,50 @@ def build_summary_help_embed(user: Union[discord.User, discord.Member]) -> disco
 
 def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
     embed = discord.Embed(
-        title="👑 HƯỚNG DẪN TÍNH NĂNG FIX EMBED LIÊN KẾT",
+        title="👑 HƯỚNG DẪN TỰ ĐỘNG FIX EMBED & PREVIEW MẠNG XÃ HỘI",
         description=(
-            "Tự động phát hiện và chuyển đổi các liên kết mạng xã hội sang dịch vụ fix embed "
-            "để Discord hiển thị video và ảnh thumbnail mượt mà nhất."
+            "Tự động phát hiện các liên kết mạng xã hội bị lỗi hoặc không có video trên Discord và thay thế "
+            "bằng bản xem trước siêu sắc nét, mượt mà mà vẫn giữ trọn vẹn bố cục kênh chat."
         ),
         color=0x2ECC71
     )
     embed.add_field(
-        name="🌐 CÁC NỀN TẢNG ĐƯỢC HỖ TRỢ",
+        name="🌐 9 NỀN TẢNG ĐƯỢC HỖ TRỢ TỰ ĐỘNG",
         value=(
-            "• **TikTok**: Chuyển sang `tnktok.com` để xem video trực tiếp\n"
-            "• **Instagram**: Chuyển Reels & Post sang `ddinstagram.com`\n"
-            "• **Twitter / X**: Chuyển sang `fixupx.com` / `fxtwitter.com`\n"
-            "• **Reddit**: Chuyển sang `rxddit.com`\n"
-            "• **Threads**: Chuyển sang `fixthreads.net`"
+            "• **Facebook**: Reels, Watch, Video, Post (`facebed.seria.moe`)\n"
+            "• **Instagram**: Reels, Video, Ảnh đơn, Carousel nhiều ảnh (`ddinstagram.com`, `vxinstagram.com`)\n"
+            "• **TikTok**: Video trực tiếp, Photo Slide (`vxtiktok.com`, `tnktok.com`)\n"
+            "• **Twitter / X**: Video, Ảnh HD, Bài viết dài (`fxtwitter.com`, `fixupx.com`)\n"
+            "• **Reddit**: Video có âm thanh, GIF, Bài viết (`rxddit.com`, `fxreddit.seria.moe`)\n"
+            "• **Threads**: Video, Ảnh bài viết (`fixthreads.net`)\n"
+            "• **Pixiv**: Tranh minh họa, Manga nhiều trang (`phixiv.net`)\n"
+            "• **Bluesky & Twitch**: Bài viết Bluesky & Clip ngắn Twitch"
         ),
         inline=False
     )
     embed.add_field(
-        name="🛠️ LỆNH CẤU HÌNH (QUẢN TRỊ VIÊN)",
+        name="✨ CÁC CƠ CHẾ QOL & TRẢI NGHIỆM ĐỘC QUYỀN",
         value=(
-            "• `/autoembed [enabled]` : Bật / tắt tính năng auto fix link trên máy chủ / kênh\n"
-            "• `/nsfwmode [mode]` : Cấu hình xử lý link nhạy cảm (`allow`, `warn`, `block`)\n"
-            "• `/embedplatform [platform] [enabled]` : Bật / tắt hỗ trợ cho từng nền tảng\n"
-            "• `/embedconfig` : Xem bảng cấu hình embed hiện tại của máy chủ"
+            "• 🛡️ **Bảo toàn tin nhắn & ảnh gốc (Suppress Mode)**: Bot không xóa tin nhắn của bạn, giữ nguyên 100% ảnh/tệp đính kèm. Khi người khác reply tin nhắn của bạn, Discord vẫn **tự động tô vàng dòng chat (Yellow Highlight)** và gửi thông báo native.\n"
+            "• 🏷️ **Subtext Jump Link siêu gọn**: Hiển thị dòng chú thích nhỏ `↩️ Trả lời [Tên](link)` ngay trên Embed, nhấp vào là cuộn ngay về tin gốc, không bị lặp chữ hay double ping.\n"
+            "• 🗑️ **Tự động xóa Embed đồng bộ**: Khi bạn xóa tin nhắn gốc chứa link, Bot sẽ **tự động dọn sạch Embed tương ứng** (không để lại rác trong chat).\n"
+            "• 🔞 **Force Spoiler & Nhận diện NSFW**: Tự động che mờ khi bọc trong `||link||` hoặc khi tin nhắn có từ khóa (`nsfw`, `18+`, `r18`, `spoiler`, `nhạy cảm`...)."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🛠️ LỆNH CẤU HÌNH CHO QUẢN TRỊ VIÊN",
+        value=(
+            "• `/autoembed [enabled] [channel]` : Bật / tắt tính năng auto fix link cho server hoặc từng kênh riêng\n"
+            "• `/nsfwmode [mode] [channel]` : Cấu hình xử lý link 18+ (`spoiler` - che mờ, `block` - chặn, `allow` - hiện thẳng)\n"
+            "• `/embedplatform [platform] [enabled]` : Bật / tắt hỗ trợ cho từng nền tảng mạng xã hội\n"
+            "• `/embedproxy [platform] [domain]` : Tùy chỉnh danh sách Proxy domain ưu tiên\n"
+            "• `/embedconfig` : Xem bảng tổng hợp cấu hình Embed hiện tại của máy chủ"
         ),
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot AutoEmbed",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot AutoEmbed v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
