@@ -5,6 +5,7 @@ import signal
 import traceback
 from threading import Thread, Lock
 
+import config
 from bot_instance import bot
 from web import app
 from core.presence_manager import presence_manager

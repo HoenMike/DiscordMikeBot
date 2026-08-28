@@ -45,46 +45,69 @@ def append_to_error_file(timestamp_full: str, line: str):
         pass
 
 
+import threading
+
+
 class LogStreamRedirector:
+    _lock = threading.RLock()
+
     def __init__(self, original_stream, is_stderr: bool = False):
         self.original_stream = original_stream
         self.is_stderr = is_stderr
+        self._in_write = False
 
     def write(self, data):
-        self.original_stream.write(data)
-        self.original_stream.flush()
-        
-        clean_data = data.strip()
-        if clean_data:
-            for line in clean_data.split('\n'):
-                stripped_line = line.strip()
-                if stripped_line:
-                    # Lọc bỏ thông báo ping UptimeRobot / Trình duyệt nếu có
-                    if "Web server nhận được ping từ UptimeRobot" in stripped_line:
-                        continue
+        with self._lock:
+            try:
+                self.original_stream.write(data)
+            except Exception:
+                pass
+            try:
+                self.original_stream.flush()
+            except Exception:
+                pass
+            
+            if self._in_write:
+                return
+            self._in_write = True
+            try:
+                clean_data = data.strip()
+                if clean_data:
+                    for line in clean_data.split('\n'):
+                        stripped_line = line.strip()
+                        if stripped_line:
+                            # Lọc bỏ thông báo ping UptimeRobot / Trình duyệt nếu có
+                            if "Web server nhận được ping từ UptimeRobot" in stripped_line:
+                                continue
 
-                    vn_tz = timezone(timedelta(hours=7))
-                    now_vn = datetime.now(vn_tz)
-                    timestamp_short = now_vn.strftime('%H:%M:%S')
-                    timestamp_full = now_vn.strftime('%Y-%m-%d %H:%M:%S')
+                            vn_tz = timezone(timedelta(hours=7))
+                            now_vn = datetime.now(vn_tz)
+                            timestamp_short = now_vn.strftime('%H:%M:%S')
+                            timestamp_full = now_vn.strftime('%Y-%m-%d %H:%M:%S')
 
-                    formatted_line = f"[{timestamp_short}] {stripped_line}"
-                    # Lưu vào RAM buffer phục vụ live Dashboard
-                    log_buffer.append(formatted_line)
+                            formatted_line = f"[{timestamp_short}] {stripped_line}"
+                            # Lưu vào RAM buffer phục vụ live Dashboard
+                            log_buffer.append(formatted_line)
 
-                    # Lưu bền vững vào Database
-                    try:
-                        from core.activity_logger import activity_logger
-                        activity_logger.log_console(formatted_line)
-                    except Exception:
-                        pass
+                            # Lưu bền vững vào Database
+                            try:
+                                from core.activity_logger import activity_logger
+                                activity_logger.log_console(formatted_line)
+                            except Exception:
+                                pass
 
-                    # Nếu là Error Log, lưu bền vững vào file logs/error.log
-                    if is_error_log(stripped_line, self.is_stderr):
-                        append_to_error_file(timestamp_full, stripped_line)
+                            # Nếu là Error Log, lưu bền vững vào file logs/error.log
+                            if is_error_log(stripped_line, self.is_stderr):
+                                append_to_error_file(timestamp_full, stripped_line)
+            finally:
+                self._in_write = False
 
     def flush(self):
-        self.original_stream.flush()
+        with self._lock:
+            try:
+                self.original_stream.flush()
+            except Exception:
+                pass
 
     def reconfigure(self, *args, **kwargs):
         if hasattr(self.original_stream, 'reconfigure'):

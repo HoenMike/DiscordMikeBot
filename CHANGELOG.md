@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.3] - 2026-08-28 — *Thread Safety & Config Import Fix*
+
+### Fixed
+- **Config Import in app.py**: Bổ sung `import config` vào `app.py` phục vụ tiến trình khởi chạy `bot.run(config.DISCORD_TOKEN)`.
+- **Thread-Safe Logging Reentrancy**: Sử dụng `threading.RLock()` và cờ reentrancy guard cho `LogStreamRedirector` trong `config.py` chống lỗi `RuntimeError: reentrant call inside BufferedWriter` trên Python 3.14 Render.
+
+---
+
 ## [2.4.2] - 2026-08-28 — *WSGI Stability & Flask Imports*
 
 ### Fixed

@@ -10,12 +10,28 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.2"
+CURRENT_VERSION = "2.4.3"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & WSGI Stability"
+CODENAME = "Hybrid Engine & Thread Safety"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.3",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Khắc Phục Import Config & Thread-Safe Logging Reentrancy",
+        "summary": "Sửa lỗi thiếu import config trong app.py và bảo vệ luồng ghi log stdout/stderr chống xung đột Reentrant BufferedWriter trên Python 3.14 Render.",
+        "changes": [
+            {
+                "category": "🛠️ Sửa Lỗi Worker Thread & Logger (HotFix)",
+                "items": [
+                    "Bổ sung import config vào app.py phục vụ khởi chạy bot.run(config.DISCORD_TOKEN).",
+                    "Sử dụng threading.RLock() và cờ reentrancy guard cho LogStreamRedirector chống lỗi RuntimeError: reentrant call inside BufferedWriter."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.2",
         "date": "2026-08-28",
