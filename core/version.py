@@ -10,12 +10,30 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.6"
+CURRENT_VERSION = "2.4.7"
 RELEASE_DATE = "2026-08-28"
-CODENAME = "Hybrid Engine & Dot Prefix Migration"
+CODENAME = "Gunicorn Worker Lifecycle & Port Binding Fix"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.7",
+        "date": "2026-08-28",
+        "type": "bugfix",
+        "title": "Khắc Phục Vòng Đời Gunicorn Worker & Quét Cổng HTTP Render",
+        "summary": "Khắc phục triệt để lỗi trang web không truy cập được (No open HTTP ports detected) bằng cách chuyển luồng Discord Bot vào Gunicorn Worker qua post_fork hook và gỡ bỏ việc ghi đè Signal Handlers.",
+        "changes": [
+            {
+                "category": "🛠️ Ổn Định Gunicorn & WSGI Worker",
+                "items": [
+                    "Sử dụng hook post_fork trong gunicorn.conf.py để kích hoạt Discord Bot thread ngay sau khi Worker process được fork.",
+                    "Xóa bỏ eager ensure_bot_started() ở top-level module import của app.py, ngăn bot chạy sai trong Master process.",
+                    "Gỡ bỏ việc ghi đè signal.SIGTERM / SIGINT ở cấp độ module, tránh làm Gunicorn Master process bị exit(0) đột ngột.",
+                    "Bổ sung 2 endpoint công khai /healthz và /ping (HTTP 200) phục vụ Render Port Scanner & Uptime Monitors."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.6",
         "date": "2026-08-28",

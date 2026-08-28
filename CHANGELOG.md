@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.7] - 2026-08-28 — *Gunicorn Worker Lifecycle & Port Binding Fix*
+
+### Fixed
+- **Gunicorn Post-Fork Bot Startup**: Chuyển tiến trình khởi chạy Discord Bot thread vào hook `post_fork` trong `gunicorn.conf.py`, đảm bảo Bot và Flask cùng nằm trong 1 Worker process memory và giải quyết triệt để vấn đề mất luồng Bot Gateway sau khi Master fork.
+- **Gunicorn Signal Safety**: Gỡ bỏ việc đăng ký đè `signal.SIGTERM` / `signal.SIGINT` ở cấp độ module import trong `app.py`, ngăn chặn tình trạng Gunicorn Master bị thoát đột ngột (`sys.exit(0)`) làm đóng cổng HTTP và gây lỗi `No open HTTP ports detected on 0.0.0.0` trên Render.
+- **Public Health Check Endpoints**: Thêm 2 route công khai `/healthz` và `/ping` trả về HTTP 200 nhanh chóng mà không cần session đăng nhập, hỗ trợ Render Port Scanner và các dịch vụ keep-alive ping.
+
+---
+
 ## [2.4.6] - 2026-08-28 — *Dot Prefix Migration (.m)*
 
 ### Changed

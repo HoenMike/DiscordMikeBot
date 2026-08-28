@@ -46,10 +46,6 @@ def ensure_bot_started():
                 bot_thread.start()
 
 
-# Tự động kích hoạt bot ngay khi Gunicorn import module app.py
-ensure_bot_started()
-
-
 @app.before_request
 def start_bot_on_first_request():
     """Safety net: Kích hoạt bot nếu vì lý do nào đó luồng chưa chạy."""
@@ -112,16 +108,12 @@ def handle_sigterm(signum, frame):
     sys.exit(0)
 
 
-signal.signal(signal.SIGTERM, handle_sigterm)
-signal.signal(signal.SIGINT, handle_sigterm)
-
-
 if __name__ == "__main__":
-    if not bot_started:
-        bot_started = True
-        print("🚀 [Local Mode] Khởi chạy Discord Bot ngay lập tức...", flush=True)
-        bot_thread = Thread(target=run_discord_bot, daemon=True)
-        bot_thread.start()
+    # Đăng ký signal handler khi chạy trực tiếp standalone process
+    signal.signal(signal.SIGTERM, handle_sigterm)
+    signal.signal(signal.SIGINT, handle_sigterm)
+
+    ensure_bot_started()
 
     port = int(os.environ.get("PORT", 8080))
     print(f"ℹ️ Khởi chạy Flask Server trên cổng {port}...", flush=True)

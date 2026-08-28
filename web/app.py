@@ -41,6 +41,27 @@ def login_required(f):
 
 
 # ==========================================
+# 0. SYSTEM HEALTH CHECK ROUTES (PUBLIC)
+# ==========================================
+@app.route('/healthz', methods=['GET'])
+@app.route('/ping', methods=['GET'])
+def health_check():
+    """Endpoint kiểm tra sức khỏe hệ thống (không yêu cầu login) phục vụ Render Port Scanner & Uptime Monitors."""
+    bot_ready = False
+    try:
+        bot_ready = bot.is_ready()
+    except Exception:
+        bot_ready = False
+
+    return jsonify({
+        "status": "ok",
+        "bot_online": bot_ready,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": CURRENT_VERSION
+    }), 200
+
+
+# ==========================================
 # 1. AUTHENTICATION ROUTES
 # ==========================================
 @app.route('/login', methods=['GET'])
