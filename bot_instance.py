@@ -335,7 +335,7 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
         value=(
             "• **Facebook**: Reels, Watch, Video, Post (`facebed.seria.moe`)\n"
             "• **Instagram**: Reels, Video, Ảnh đơn, Carousel nhiều ảnh (`ddinstagram.com`, `vxinstagram.com`)\n"
-            "• **TikTok**: Video trực tiếp, Photo Slide (`vxtiktok.com`, `tnktok.com`)\n"
+            "• **TikTok**: Video trực tiếp, Photo Slide (`tiktxk.com`, `kktiktok.com`)\n"
             "• **Twitter / X**: Video, Ảnh HD, Bài viết dài (`fxtwitter.com`, `fixupx.com`)\n"
             "• **Reddit**: Video có âm thanh, GIF, Bài viết (`rxddit.com`, `fxreddit.seria.moe`)\n"
             "• **Threads**: Video, Ảnh bài viết, Share link (`vxthreads.com`, `fixthreads.seria.moe`)\n"

@@ -34,6 +34,24 @@ _NSFW_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Regex phát hiện trang báo lỗi, ngừng hoạt động hoặc bị gỡ bỏ theo yêu cầu pháp lý
+_DEAD_OR_ERROR_PATTERN = re.compile(
+    r'(?:'
+    r'due to a legal request'
+    r'|this service is no longer available'
+    r'|service (?:is )?(?:temporarily )?unavailable'
+    r'|service has been discontinued'
+    r'|has been shut down'
+    r'|cease and desist'
+    r'|domain seized'
+    r'|page not found'
+    r'|404 not found'
+    r'|video not found'
+    r'|post not found'
+    r')',
+    re.IGNORECASE,
+)
+
 # Kích thước tối đa đọc từ response (256KB) để đảm bảo không bỏ sót thẻ meta
 _MAX_READ_BYTES = 262144
 
@@ -125,9 +143,6 @@ async def validate_via_api(
                 if "fxtwitter" in proxy_domain:
                     tweet = data.get("tweet", {})
                     is_nsfw = bool(tweet.get("possibly_sensitive") or tweet.get("nsfw"))
-                elif "vxtiktok" in proxy_domain:
-                    video_data = data.get("data", {})
-                    is_nsfw = bool(video_data.get("is_nsfw"))
 
                 return True, is_nsfw
 
@@ -174,8 +189,20 @@ async def validate_via_og_metadata(
                 )
                 return False, False
 
+            content_type = resp.headers.get("Content-Type", "").lower()
+            if any(ct in content_type for ct in ["video/", "image/", "audio/"]):
+                return True, False
+
             content = await resp.content.read(_MAX_READ_BYTES)
             html_text = content.decode("utf-8", errors="ignore")
+
+            # Kiểm tra nếu trang chứa thông báo gỡ bỏ / ngừng dịch vụ
+            if _DEAD_OR_ERROR_PATTERN.search(html_text):
+                print(
+                    f"[ProxyValidator] Proxy trả về thông báo lỗi/ngừng dịch vụ: {proxy_url}",
+                    flush=True,
+                )
+                return False, False
 
             if _OG_META_PATTERN.search(html_text):
                 is_nsfw = bool(_NSFW_PATTERN.search(html_text))

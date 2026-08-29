@@ -92,7 +92,7 @@ PLATFORMS = {
         "icon_url": "https://sf-tb-sg.ibytedtos.com/obj/eden-sg/uhtyvueh7nulogpoguhm/tiktok-icon2.png",
         "footer_text": "TikTok",
         "button_label": "Xem trên TikTok",
-        "api_base": "https://api.vxtiktok.com",
+        "api_base": "https://www.tikwm.com",
         "patterns": [
             re.compile(r"https?://(?:www\.)?tiktok\.com/@[\w.]+/video/(\d+)\S*"),
             re.compile(r"https?://(?:vm|vt)\.tiktok\.com/([\w]+)\S*"),
@@ -187,7 +187,7 @@ PLATFORMS = {
 PROXY_DOMAINS = {
     "twitter": ["fxtwitter.com", "vxtwitter.com", "fixupx.com"],
     "pixiv": ["phixiv.net"],
-    "tiktok": ["vxtiktok.com", "tnktok.com"],
+    "tiktok": ["tiktxk.com", "kktiktok.com"],
     "reddit": ["rxddit.com", "fxreddit.seria.moe", "vxreddit.com"],
     "instagram": ["fxig.seria.moe", "kkinstagram.com", "ig.seria.moe"],
     "facebook": ["facebed.com", "facebed.seria.moe"],
@@ -220,10 +220,6 @@ PROXY_API_ENDPOINTS = {
     "fxtwitter.com": {
         "template": "https://api.fxtwitter.com/{path}",
         "media_check": "tweet.media",
-    },
-    "vxtiktok.com": {
-        "template": "https://api.vxtiktok.com/api/v1/fetch?url={url}",
-        "media_check": "data",
     },
 }
 

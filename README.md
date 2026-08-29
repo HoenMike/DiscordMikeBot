@@ -26,7 +26,7 @@ Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và t�
 |----------------|--------------------------------|---------------------------------------|---------------------------------------|
 | Twitter / X    | `api.fxtwitter.com`            | `fxtwitter`, `vxtwitter`, `fixupx`    | Nội dung, ảnh, video, tương tác      |
 | Reddit         | Reddit JSON API                | `rxddit`, `fxreddit`, `vxreddit`      | Tiêu đề, nội dung, ảnh, gallery       |
-| TikTok         | `api.vxtiktok.com`             | `vxtiktok`, `tnktok`, `kktiktok`      | Mô tả, thumbnail, lượt tương tác     |
+| TikTok         | `tikwm.com`                    | `tiktxk`, `kktiktok`                  | Mô tả, thumbnail, video trực tiếp, lượt tương tác |
 | Instagram      | `api.ddinstagram.com`          | `ddinstagram`, `eeinstagram`, `oginstagram` | Nội dung, ảnh/video             |
 | Facebook       | Facebook oEmbed                | `facebed`, `fxfb`                     | Tiêu đề, tác giả                     |
 | Bluesky        | `public.api.bsky.app`          | `bskx.app`, `fxbsky.app`              | Nội dung, ảnh, tương tác              |

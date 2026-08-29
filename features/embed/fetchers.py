@@ -146,9 +146,10 @@ async def fetch_reddit(session: aiohttp.ClientSession, url: str, match) -> PostD
 
 async def fetch_tiktok(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
     try:
-        api_url = f"https://api.vxtiktok.com/api/v1/fetch?url={quote(url, safe='')}"
+        api_url = f"https://www.tikwm.com/api/?url={quote(url, safe='')}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
-        async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+        async with session.get(api_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
             if resp.status != 200:
                 return None
             content_type = resp.headers.get("Content-Type", "").lower()
@@ -156,35 +157,38 @@ async def fetch_tiktok(session: aiohttp.ClientSession, url: str, match) -> PostD
                 return None
             data = await resp.json(content_type=None)
 
-        video_data = data.get("data", {})
-        if not video_data:
+        if data.get("code") != 0 or not data.get("data"):
+            return None
+
+        video_data = data["data"]
+        images = video_data.get("images")
+
+        # Nếu là photo slide / album ảnh -> Trả về gallery PostData để bot tạo Discord gallery embed
+        if images and isinstance(images, list) and len(images) > 0:
+            media_urls = images
+            media_type = "gallery" if len(images) > 1 else "image"
+        else:
+            # Đối với video đơn lẻ: Trả về None để nhường cho Tier 1 (Proxy URL: tiktxk / kktiktok)
+            # Giúp Discord tự động nhúng video player tương tác trực tiếp có âm thanh
             return None
 
         author_info = video_data.get("author", {})
-        stats = video_data.get("statistics", {})
-
-        media_urls = []
-        cover = video_data.get("cover")
-        dynamic_cover = video_data.get("dynamicCover")
-        if dynamic_cover:
-            media_urls.append(dynamic_cover)
-        elif cover:
-            media_urls.append(cover)
 
         return PostData(
             platform="tiktok",
-            author=author_info.get("nickname", author_info.get("uniqueId", "Unknown")),
-            author_url=f"https://www.tiktok.com/@{author_info.get('uniqueId', '')}",
-            author_avatar=author_info.get("avatarThumb"),
-            text=video_data.get("title") or video_data.get("desc"),
+            author=author_info.get("nickname") or author_info.get("unique_id", "TikTok User"),
+            author_url=f"https://www.tiktok.com/@{author_info.get('unique_id', '')}",
+            author_avatar=author_info.get("avatar"),
+            text=video_data.get("title"),
             media_urls=media_urls,
-            media_type="video",
+            media_type=media_type,
+            thumbnail_url=video_data.get("cover"),
             is_nsfw=False,
-            likes=stats.get("diggCount") or stats.get("likeCount"),
-            comments=stats.get("commentCount"),
-            retweets=stats.get("shareCount"),
+            likes=video_data.get("digg_count"),
+            comments=video_data.get("comment_count"),
+            retweets=video_data.get("share_count"),
             url=url,
-            timestamp=video_data.get("createTime"),
+            timestamp=str(video_data.get("create_time")) if video_data.get("create_time") else None,
         )
     except (aiohttp.ContentTypeError, ValueError):
         return None
