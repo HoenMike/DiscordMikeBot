@@ -44,10 +44,12 @@ def _parse_domain_list(raw: str) -> list[str]:
 
 
 def _clean_markdown_label(text: str) -> str:
-    """Loại bỏ ký tự đặc biệt ([ ] ( ) \\n) và khoảng trắng thừa để tránh vỡ Discord Markdown link."""
-    cleaned = re.sub(r"[\[\]\(\)\n\r\t]+", " ", str(text or ""))
+    """Làm sạch tên người dùng và escape markdown để hiển thị an toàn trên Discord."""
+    cleaned = re.sub(r"[\u200b-\u200f\ufeff\u2060\u180e\n\r\t]+", " ", str(text or ""))
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned or "Người dùng"
+    if not cleaned:
+        return "Người dùng"
+    return discord.utils.escape_markdown(cleaned)
 
 
 class EmbedCog(commands.Cog):
@@ -315,7 +317,7 @@ class EmbedCog(commands.Cog):
                 file = await self._create_spoiler_file(post_data.media_urls[0])
 
             author_name = _clean_markdown_label(message.author.display_name)
-            header_text = f"-# ↩️ [Trả lời {author_name}]({message.jump_url})"
+            header_text = f"-# ↩️ [Trả lời]({message.jump_url}) **{author_name}**"
 
             return await self._send_embed_preview(
                 message=message,
@@ -362,7 +364,7 @@ class EmbedCog(commands.Cog):
             # Tạo header Subtext xám siêu nhỏ: Vừa dẫn link nhảy về tin nhắn gốc, vừa chứa link proxy
             # Khi là spoiler/NSFW: Chỉ bọc spoiler phần link embed, giữ nguyên dòng trả lời luôn hiển thị rõ ràng
             author_name = _clean_markdown_label(message.author.display_name)
-            author_jump = f"[Trả lời {author_name}]({message.jump_url})"
+            author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
 
             if is_effective_nsfw:
                 if nsfw_mode == "block":
@@ -446,7 +448,7 @@ class EmbedCog(commands.Cog):
                     print(f"[EmbedCog] Không thể tải video fallback {url}: {dl_err}", flush=True)
 
             author_name = _clean_markdown_label(message.author.display_name)
-            header_text = f"-# ↩️ [Trả lời {author_name}]({message.jump_url})"
+            header_text = f"-# ↩️ [Trả lời]({message.jump_url}) **{author_name}**"
 
             return await self._send_embed_preview(
                 message=message,

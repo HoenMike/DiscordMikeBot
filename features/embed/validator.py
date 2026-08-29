@@ -18,8 +18,7 @@ _VALIDATION_SEMAPHORE = asyncio.Semaphore(3)
 # Regex phát hiện OpenGraph / Twitter Card meta tags trong HTML
 _OG_META_PATTERN = re.compile(
     r'<meta\s+[^>]*(?:'
-    r'property\s*=\s*["\']og:(?:image|video)["\']'
-    r'|name\s*=\s*["\']twitter:(?:card|image|player)["\']'
+    r'(?:property|name)\s*=\s*["\']?(?:og:(?:image|video|title|description)|twitter:(?:card|image|player|title|description))'
     r')[^>]*>',
     re.IGNORECASE | re.DOTALL,
 )
@@ -35,15 +34,15 @@ _NSFW_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Kích thước tối đa đọc từ response (64KB) để đảm bảo không bỏ sót thẻ meta
-_MAX_READ_BYTES = 65536
+# Kích thước tối đa đọc từ response (256KB) để đảm bảo không bỏ sót thẻ meta
+_MAX_READ_BYTES = 262144
 
-# Timeout cho mỗi request xác thực đơn lẻ
-_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=12)
+# Timeout cho mỗi request xác thực đơn lẻ (15 giây)
+_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=15)
 
-# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 30 giây)
+# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 15 giây)
 _FAILED_DOMAINS_CACHE: dict[str, float] = {}
-_FAILED_DOMAIN_TTL = 30.0  # 30 giây
+_FAILED_DOMAIN_TTL = 15.0  # 15 giây
 
 
 def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> str | None:
