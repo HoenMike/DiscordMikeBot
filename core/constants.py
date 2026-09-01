@@ -185,11 +185,11 @@ PLATFORMS = {
 # Proxy Fallback Registry
 # ---------------------------------------------------------------------------
 PROXY_DOMAINS = {
-    "twitter": ["fxtwitter.com", "vxtwitter.com", "fixupx.com"],
+    "twitter": ["fxtwitter.com", "vxtwitter.com", "fixupx.com", "fixvx.com"],
     "pixiv": ["phixiv.net"],
-    "tiktok": ["tiktxk.com", "kktiktok.com"],
-    "reddit": ["rxddit.com", "fxreddit.seria.moe", "vxreddit.com"],
-    "instagram": ["fxig.seria.moe", "kkinstagram.com", "ig.seria.moe"],
+    "tiktok": ["kktiktok.com", "tnktok.com", "tiktxk.com"],
+    "reddit": ["rxddit.com", "vxreddit.com", "fxreddit.seria.moe"],
+    "instagram": ["kkinstagram.com", "eeinstagram.com", "fxig.seria.moe"],
     "facebook": ["facebed.com", "facebed.seria.moe"],
     "bluesky": ["fxbsky.app", "bskx.app"],
     "twitch": ["fxtwitch.seria.moe"],

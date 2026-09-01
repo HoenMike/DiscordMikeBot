@@ -13,7 +13,7 @@ from features.embed.constants import (
 )
 
 # Giới hạn số lượng request xác thực đồng thời để tránh rate-limit
-_VALIDATION_SEMAPHORE = asyncio.Semaphore(3)
+_VALIDATION_SEMAPHORE = asyncio.Semaphore(5)
 
 # Regex phát hiện OpenGraph / Twitter Card meta tags trong HTML
 _OG_META_PATTERN = re.compile(
@@ -34,7 +34,7 @@ _NSFW_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Regex phát hiện trang báo lỗi, ngừng hoạt động hoặc bị gỡ bỏ theo yêu cầu pháp lý
+# Regex phát hiện trang báo lỗi, ngừng hoạt động, bị chặn API hoặc không tìm thấy bài viết
 _DEAD_OR_ERROR_PATTERN = re.compile(
     r'(?:'
     r'due to a legal request'
@@ -48,19 +48,84 @@ _DEAD_OR_ERROR_PATTERN = re.compile(
     r'|404 not found'
     r'|video not found'
     r'|post not found'
+    r'|content not found'
+    r'|media not found'
+    r'|user not found'
+    r'|could not be found'
+    r'|blocked the request'
+    r'|actively preventing this service'
+    r'|upstream request failed'
+    r'|rate limit'
+    r'|too many requests'
+    r'|challenge_required'
+    r'|login_required'
+    r'|log in to continue'
+    r'|log in to view'
+    r'|account is private'
+    r'|this post is private'
+    r'|this reel is unavailable'
+    r'|this content isn\'t available'
+    r'|post unavailable'
+    r'|media unavailable'
+    r'|failed to fetch'
+    r'|failed to load'
+    r'|failed to extract'
+    r'|could not fetch'
+    r'|something went wrong'
+    r'|an error occurred'
+    r'|unable to fetch'
+    r'|error fetching'
+    r'|cannot retrieve'
+    r'|bad gateway'
+    r'|gateway timeout'
+    r'|502 bad gateway'
+    r'|504 gateway time-out'
+    r'|503 service unavailable'
     r')',
     re.IGNORECASE,
 )
 
+# Tên/tiêu đề mặc định rỗng của các dịch vụ proxy hoặc nền tảng gốc
+_GENERIC_SERVICE_NAMES = {
+    "instagram", "facebook", "tiktok", "twitter", "x", "reddit",
+    "threads", "bluesky", "twitch", "pixiv", "facebed", "rxddit",
+    "fix instagram embeds", "vxthreads", "fxig", "fxtwitter",
+    "vxtwitter", "fixupx", "kktiktok", "tiktxk", "vxreddit", "fxreddit",
+}
+
+# Các thuộc tính meta media OpenGraph / Twitter Card
+_MEDIA_META_KEYS = [
+    "og:video", "og:video:url", "og:video:secure_url",
+    "twitter:player", "twitter:player:stream",
+    "og:image", "og:image:url", "og:image:secure_url",
+    "twitter:image", "twitter:image:src",
+]
+
 # Kích thước tối đa đọc từ response (256KB) để đảm bảo không bỏ sót thẻ meta
 _MAX_READ_BYTES = 262144
 
-# Timeout cho mỗi request xác thực đơn lẻ (15 giây)
-_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=15)
+# Timeout cho mỗi request xác thực đơn lẻ (4.5s tổng, 2.0s kết nối để khớp với timeout unfurl của Discord)
+_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=4.5, connect=2.0)
 
-# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 15 giây)
+# Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 30 giây)
 _FAILED_DOMAINS_CACHE: dict[str, float] = {}
-_FAILED_DOMAIN_TTL = 15.0  # 15 giây
+_FAILED_DOMAIN_TTL = 30.0  # 30 giây
+
+
+def _extract_meta_tags(html: str) -> dict[str, str]:
+    """Trích xuất tất cả các thẻ meta (property/name -> content) từ HTML."""
+    tags = {}
+    for meta_match in re.finditer(r'<meta\s+([^>]+)>', html, re.IGNORECASE):
+        attrs_str = meta_match.group(1)
+        prop_match = re.search(r'(?:property|name)\s*=\s*["\']?([^"\'\s>]+)', attrs_str, re.IGNORECASE)
+        content_match = re.search(r'content\s*=\s*["\']([^"\']*)["\']', attrs_str, re.IGNORECASE)
+        if not content_match:
+            content_match = re.search(r'content\s*=\s*([^\s>]+)', attrs_str, re.IGNORECASE)
+        if prop_match and content_match:
+            prop_name = prop_match.group(1).strip().lower()
+            content_val = content_match.group(1).strip()
+            tags[prop_name] = content_val
+    return tags
 
 
 def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> str | None:
@@ -169,11 +234,14 @@ async def validate_via_api(
 async def validate_via_og_metadata(
     session: aiohttp.ClientSession,
     proxy_url: str,
+    platform_key: str = "",
 ) -> tuple[bool, bool]:
     """Xác thực proxy URL bằng cách kiểm tra OpenGraph/Twitter Card metadata. Trả về (is_valid, is_nsfw)."""
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,video/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
         }
         async with session.get(
             proxy_url,
@@ -189,6 +257,18 @@ async def validate_via_og_metadata(
                 )
                 return False, False
 
+            # Kiểm tra nếu proxy bị chuyển hướng ngược về trang đăng nhập của nền tảng gốc
+            final_url_str = str(resp.url).lower()
+            if any(login_path in final_url_str for login_path in [
+                "/login", "/accounts/login", "/checkpoint", "/challenge",
+                "facebook.com/login", "instagram.com/accounts/login"
+            ]):
+                print(
+                    f"[ProxyValidator] Proxy bị chuyển hướng tới trang đăng nhập: {resp.url}",
+                    flush=True,
+                )
+                return False, False
+
             content_type = resp.headers.get("Content-Type", "").lower()
             if any(ct in content_type for ct in ["video/", "image/", "audio/"]):
                 return True, False
@@ -196,7 +276,7 @@ async def validate_via_og_metadata(
             content = await resp.content.read(_MAX_READ_BYTES)
             html_text = content.decode("utf-8", errors="ignore")
 
-            # Kiểm tra nếu trang chứa thông báo gỡ bỏ / ngừng dịch vụ
+            # Kiểm tra nếu trang chứa thông báo gỡ bỏ / ngừng dịch vụ / chặn truy cập
             if _DEAD_OR_ERROR_PATTERN.search(html_text):
                 print(
                     f"[ProxyValidator] Proxy trả về thông báo lỗi/ngừng dịch vụ: {proxy_url}",
@@ -204,19 +284,84 @@ async def validate_via_og_metadata(
                 )
                 return False, False
 
-            if _OG_META_PATTERN.search(html_text):
-                is_nsfw = bool(_NSFW_PATTERN.search(html_text))
+            # Trích xuất toàn bộ thẻ meta property/name -> content
+            meta_tags = _extract_meta_tags(html_text)
+
+            # 1. Kiểm tra sự tồn tại của media thực tế (ảnh, video, audio, player)
+            has_media = False
+            video_url_to_verify = None
+            for mk in _MEDIA_META_KEYS:
+                val = meta_tags.get(mk)
+                if val:
+                    val_lower = val.lower()
+                    if val_lower not in ("", "#") and not val_lower.endswith(("/favicon.ico", "/favicon.png", "logo.png")):
+                        has_media = True
+                        if mk in ("og:video", "og:video:url", "og:video:secure_url", "twitter:player:stream"):
+                            video_url_to_verify = val
+                        break
+
+            # Nếu có link video stream, kiểm tra nhanh xem endpoint video có bị 403 Forbidden / 404 không
+            if has_media and video_url_to_verify:
+                if not video_url_to_verify.startswith(("http://", "https://")):
+                    parsed_proxy = urlparse(proxy_url)
+                    video_url_to_verify = f"{parsed_proxy.scheme}://{parsed_proxy.netloc}{video_url_to_verify if video_url_to_verify.startswith('/') else '/' + video_url_to_verify}"
+                try:
+                    async with session.get(
+                        video_url_to_verify,
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=2.0),
+                        allow_redirects=True,
+                    ) as v_resp:
+                        if v_resp.status in (401, 403, 404, 410, 500, 502, 503, 504):
+                            print(
+                                f"[ProxyValidator] Video stream endpoint trả về lỗi HTTP {v_resp.status}: {video_url_to_verify}",
+                                flush=True,
+                            )
+                            has_media = False
+                except Exception as v_err:
+                    print(
+                        f"[ProxyValidator] Không thể kết nối tới video stream: {video_url_to_verify} ({v_err})",
+                        flush=True,
+                    )
+
+            is_nsfw = bool(_NSFW_PATTERN.search(html_text))
+            if has_media:
+                return True, is_nsfw
+
+            # Với các nền tảng video/hình ảnh bắt buộc (TikTok, Pixiv, Twitch), nếu không có media thì coi như thất bại
+            if platform_key in ("tiktok", "pixiv", "twitch"):
+                print(
+                    f"[ProxyValidator] Không tìm thấy media hợp lệ cho nền tảng video {platform_key}: {proxy_url}",
+                    flush=True,
+                )
+                return False, False
+
+            # 2. Kiểm tra nội dung text phong phú (cho bài viết text-only như Reddit/Threads/Twitter/Bluesky)
+            desc = meta_tags.get("og:description") or meta_tags.get("twitter:description") or ""
+            title = meta_tags.get("og:title") or meta_tags.get("twitter:title") or ""
+            combined_text = f"{title} {desc}".strip()
+
+            # Lọc bỏ nếu nội dung chỉ chứa emoji/số liệu tương tác (VD: "❤️ 76.4k 💬 497") hoặc tên dịch vụ
+            cleaned_text = re.sub(r'[\d\s.,kmbKMB❤️💬🔁👍🔥\-_/|]+', '', combined_text)
+            if len(cleaned_text) < 4:
+                print(
+                    f"[ProxyValidator] Nội dung text không đủ chi tiết/chỉ chứa số liệu: {proxy_url}",
+                    flush=True,
+                )
+                return False, False
+
+            if combined_text.lower() not in _GENERIC_SERVICE_NAMES and not _DEAD_OR_ERROR_PATTERN.search(combined_text):
                 return True, is_nsfw
 
             print(
-                f"[ProxyValidator] Không tìm thấy OG metadata: {proxy_url}",
+                f"[ProxyValidator] Không tìm thấy media hoặc nội dung OG hợp lệ: {proxy_url}",
                 flush=True,
             )
             return False, False
 
     except asyncio.TimeoutError:
         print(
-            f"[ProxyValidator] Hết thời gian chờ: {proxy_url}",
+            f"[ProxyValidator] Hết thời gian chờ ({_VALIDATE_TIMEOUT.total}s): {proxy_url}",
             flush=True,
         )
         return False, False
@@ -294,7 +439,7 @@ async def find_valid_proxy(
                     )
                     return proxy_url, is_nsfw
 
-            is_valid, is_nsfw = await validate_via_og_metadata(session, proxy_url)
+            is_valid, is_nsfw = await validate_via_og_metadata(session, proxy_url, platform_key=platform_key)
 
         if is_valid:
             print(
