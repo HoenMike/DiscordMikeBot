@@ -60,8 +60,9 @@ class EmbedCog(commands.Cog):
         self.config_manager = getattr(bot, "config_manager", None)
         self.nsfw_filter = NSFWFilter()
         self.session: aiohttp.ClientSession | None = None
-        # Cache liên kết message_id gốc của user -> (channel_id, bot_embed_message_id)
+        # Cache liên kết 2 chiều giữa tin nhắn gốc của user và bản xem trước của bot
         self._origin_to_preview_map = BoundedDict(max_size=3000)
+        self._preview_to_origin_map = BoundedDict(max_size=3000)
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession(
@@ -183,10 +184,39 @@ class EmbedCog(commands.Cog):
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         """Tự động xóa Embed Preview nếu người dùng xóa tin nhắn gốc chứa link."""
         target = self._origin_to_preview_map.pop(payload.message_id, None)
+        if target:
+            channel_id, preview_msg_id = target
+            self._preview_to_origin_map.pop(preview_msg_id, None)
+            try:
+                channel = self.bot.get_channel(channel_id)
+                if channel is None:
+                    try:
+                        channel = await self.bot.fetch_channel(channel_id)
+                    except Exception:
+                        channel = None
+
+                if channel:
+                    partial_msg = channel.get_partial_message(preview_msg_id)
+                    await partial_msg.delete()
+                    print(f"[EmbedCog] 🗑️ Đã tự động xóa Embed Preview (ID: {preview_msg_id}) do tin nhắn gốc bị xóa.", flush=True)
+            except (discord.NotFound, discord.Forbidden):
+                pass
+            except Exception as e:
+                print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
+        else:
+            self._preview_to_origin_map.pop(payload.message_id, None)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        """Khi có người thả tương tác vào Embed Preview của bot, bot tự động thả emote y chang vào tin nhắn gốc của người dùng."""
+        if not self.bot.user or payload.user_id == self.bot.user.id:
+            return
+
+        target = self._preview_to_origin_map.get(payload.message_id)
         if not target:
             return
 
-        channel_id, preview_msg_id = target
+        channel_id, orig_msg_id = target
         try:
             channel = self.bot.get_channel(channel_id)
             if channel is None:
@@ -195,14 +225,44 @@ class EmbedCog(commands.Cog):
                 except Exception:
                     channel = None
 
-            if channel:
-                partial_msg = channel.get_partial_message(preview_msg_id)
-                await partial_msg.delete()
-                print(f"[EmbedCog] 🗑️ Đã tự động xóa Embed Preview (ID: {preview_msg_id}) do tin nhắn gốc bị xóa.", flush=True)
-        except (discord.NotFound, discord.Forbidden):
+            if not channel:
+                return
+
+            partial_msg = channel.get_partial_message(orig_msg_id)
+            await partial_msg.add_reaction(payload.emoji)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
             pass
         except Exception as e:
-            print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
+            print(f"[EmbedCog] Lỗi khi đồng bộ reaction sang tin nhắn gốc: {e}", flush=True)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
+        """Khi người dùng gỡ tương tác khỏi Embed Preview, bot gỡ emote tương ứng trên tin nhắn gốc."""
+        if not self.bot.user or payload.user_id == self.bot.user.id:
+            return
+
+        target = self._preview_to_origin_map.get(payload.message_id)
+        if not target:
+            return
+
+        channel_id, orig_msg_id = target
+        try:
+            channel = self.bot.get_channel(channel_id)
+            if channel is None:
+                try:
+                    channel = await self.bot.fetch_channel(channel_id)
+                except Exception:
+                    channel = None
+
+            if not channel:
+                return
+
+            partial_msg = channel.get_partial_message(orig_msg_id)
+            await partial_msg.remove_reaction(payload.emoji, self.bot.user)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            pass
+        except Exception as e:
+            print(f"[EmbedCog] Lỗi khi gỡ reaction đồng bộ trên tin nhắn gốc: {e}", flush=True)
 
     async def _send_embed_preview(
         self,
@@ -222,8 +282,9 @@ class EmbedCog(commands.Cog):
 
         try:
             sent_msg = await message.channel.send(**kwargs)
-            # Lưu liên kết giữa tin nhắn gốc và bản xem trước để tự động xóa khi tin gốc bị xóa
+            # Lưu liên kết 2 chiều giữa tin nhắn gốc và bản xem trước
             self._origin_to_preview_map[message.id] = (message.channel.id, sent_msg.id)
+            self._preview_to_origin_map[sent_msg.id] = (message.channel.id, message.id)
             return True
         except discord.HTTPException as e:
             print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
