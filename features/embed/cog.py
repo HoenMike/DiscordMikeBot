@@ -422,8 +422,8 @@ class EmbedCog(commands.Cog):
             is_effective_nsfw = is_proxy_nsfw and not is_nsfw_channel
             nsfw_mode = config.get("nsfw_mode", "spoiler")
 
-            # Tạo header Subtext xám siêu nhỏ: Vừa dẫn link nhảy về tin nhắn gốc, vừa chứa link proxy
-            # Khi là spoiler/NSFW: Chỉ bọc spoiler phần link embed, giữ nguyên dòng trả lời luôn hiển thị rõ ràng
+            # Tạo header Subtext xám siêu nhỏ: Vừa dẫn link nhảy về tin nhắn gốc, vừa chứa link proxy để Discord crawl embed
+            # Khi là spoiler/NSFW: Bọc spoiler link proxy (||proxy_url||) để Discord che mờ embed, giữ nguyên dòng trả lời luôn hiển thị rõ ràng
             author_name = _clean_markdown_label(message.author.display_name)
             author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
 
@@ -439,16 +439,16 @@ class EmbedCog(commands.Cog):
                         pass
                     return True
                 elif nsfw_mode == "spoiler":
-                    wrapped_proxy_url = f"-# ↩️ {author_jump} • ||🔗 [Xem bài viết]({proxy_url})||"
+                    wrapped_proxy_url = f"-# ↩️ {author_jump} • ||{proxy_url}||"
                 else:  # allow
                     if is_spoiler:
-                        wrapped_proxy_url = f"-# ↩️ {author_jump} • ||🔗 [Xem bài viết]({proxy_url})||"
+                        wrapped_proxy_url = f"-# ↩️ {author_jump} • ||{proxy_url}||"
                     else:
-                        wrapped_proxy_url = f"-# ↩️ {author_jump} • 🔗 [Xem bài viết]({proxy_url})"
+                        wrapped_proxy_url = f"-# ↩️ {author_jump} • {proxy_url}"
             elif is_spoiler:
-                wrapped_proxy_url = f"-# ↩️ {author_jump} • ||🔗 [Xem bài viết]({proxy_url})||"
+                wrapped_proxy_url = f"-# ↩️ {author_jump} • ||{proxy_url}||"
             else:
-                wrapped_proxy_url = f"-# ↩️ {author_jump} • 🔗 [Xem bài viết]({proxy_url})"
+                wrapped_proxy_url = f"-# ↩️ {author_jump} • {proxy_url}"
 
             return await self._send_embed_preview(
                 message=message,
