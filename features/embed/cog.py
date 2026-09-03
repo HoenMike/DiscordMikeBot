@@ -67,13 +67,18 @@ class EmbedCog(commands.Cog):
         self._deleted_message_ids = BoundedDict(max_size=5000)
         # Quản lý các task đang xử lý dở dang cho từng tin nhắn gốc
         self._in_flight_tasks: dict[int, asyncio.Task] = {}
+        self._scan_task: asyncio.Task | None = None
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession(
             headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)"}
         )
+        # Khởi động tác vụ quét ngầm các embed trước đó để phát hiện embed mồ côi
+        self._scan_task = asyncio.create_task(self._initial_orphan_scan())
 
     async def cog_unload(self):
+        if self._scan_task and not self._scan_task.done():
+            self._scan_task.cancel()
         if self.session and not self.session.closed:
             await self.session.close()
 
@@ -210,6 +215,26 @@ class EmbedCog(commands.Cog):
         if task and not task.done():
             task.cancel()
             print(f"[EmbedCog] 🛑 Đã hủy xử lý embed cho tin nhắn gốc (ID: {payload.message_id}) vì vừa bị xóa.", flush=True)
+            try:
+                from core.activity_logger import activity_logger
+                channel = self.bot.get_channel(payload.channel_id)
+                guild = channel.guild if channel and hasattr(channel, "guild") else None
+                activity_logger.log(
+                    action_type="embed",
+                    action_name="Embed: Hủy tạo bản xem trước (Tin nhắn gốc bị xóa)",
+                    user_id=self.bot.user.id if self.bot.user else 0,
+                    user_name="System",
+                    guild_name=guild.name if guild else "Unknown Guild",
+                    guild_id=guild.id if guild else payload.guild_id,
+                    channel_name=getattr(channel, "name", "Unknown Channel"),
+                    channel_id=payload.channel_id,
+                    prompt=f"Original Message ID: {payload.message_id}",
+                    response="Đã hủy tiến trình tải/xử lý embed vì người dùng đã xóa tin nhắn gốc trước khi bot kịp phản hồi.",
+                    status="warning",
+                    details={"origin_message_id": payload.message_id}
+                )
+            except Exception as log_err:
+                print(f"[EmbedCog] Lỗi ghi activity logger khi hủy task: {log_err}", flush=True)
 
         # 2. Xóa bản xem trước nếu đã được gửi ra kênh chat
         target = self._origin_to_preview_map.pop(payload.message_id, None)
@@ -227,7 +252,26 @@ class EmbedCog(commands.Cog):
                 if channel:
                     partial_msg = channel.get_partial_message(preview_msg_id)
                     await partial_msg.delete()
-                    print(f"[EmbedCog] 🗑️ Đã tự động xóa Embed Preview (ID: {preview_msg_id}) do tin nhắn gốc bị xóa.", flush=True)
+                    print(f"[EmbedCog] 🗑️ Đã tự động xóa Embed Preview (ID: {preview_msg_id}) do tin nhắn gốc (ID: {payload.message_id}) bị xóa.", flush=True)
+                    try:
+                        from core.activity_logger import activity_logger
+                        guild = channel.guild if hasattr(channel, "guild") else None
+                        activity_logger.log(
+                            action_type="embed",
+                            action_name="Embed: Đã xóa bản xem trước",
+                            user_id=self.bot.user.id if self.bot.user else 0,
+                            user_name="System",
+                            guild_name=guild.name if guild else "Unknown Guild",
+                            guild_id=guild.id if guild else payload.guild_id,
+                            channel_name=getattr(channel, "name", "Unknown Channel"),
+                            channel_id=channel_id,
+                            prompt=f"Preview ID: {preview_msg_id}",
+                            response=f"Đã tự động xóa embed preview do người dùng xóa tin nhắn gốc (ID: {payload.message_id}).",
+                            status="info",
+                            details={"origin_message_id": payload.message_id, "preview_message_id": preview_msg_id}
+                        )
+                    except Exception as log_err:
+                        print(f"[EmbedCog] Lỗi ghi activity logger khi xóa embed: {log_err}", flush=True)
             except (discord.NotFound, discord.Forbidden):
                 pass
             except Exception as e:
@@ -332,7 +376,25 @@ class EmbedCog(commands.Cog):
             if message.id in self._deleted_message_ids:
                 try:
                     await sent_msg.delete()
-                    print(f"[EmbedCog] Đã thu hồi bản xem trước vừa gửi vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
+                    print(f"[EmbedCog] 🗑️ Đã thu hồi bản xem trước vừa gửi vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
+                    try:
+                        from core.activity_logger import activity_logger
+                        activity_logger.log(
+                            action_type="embed",
+                            action_name="Embed: Thu hồi bản xem trước",
+                            user_id=message.author.id,
+                            user_name=message.author.display_name,
+                            guild_name=message.guild.name if message.guild else "Direct Message",
+                            guild_id=message.guild.id if message.guild else None,
+                            channel_name=getattr(message.channel, "name", "Unknown Channel"),
+                            channel_id=message.channel.id,
+                            prompt=f"Preview ID: {sent_msg.id}",
+                            response=f"Đã thu hồi bản xem trước vừa gửi vì tin nhắn gốc ({message.id}) đã bị người dùng xóa.",
+                            status="warning",
+                            details={"origin_message_id": message.id, "preview_message_id": sent_msg.id}
+                        )
+                    except Exception as log_err:
+                        print(f"[EmbedCog] Lỗi ghi activity logger khi thu hồi embed: {log_err}", flush=True)
                 except Exception:
                     pass
                 return None
@@ -631,6 +693,95 @@ class EmbedCog(commands.Cog):
                 return discord.File(fp=io.BytesIO(image_data), filename=f"SPOILER_nsfw_media.{ext}", spoiler=True)
         except Exception:
             return None
+
+    async def _initial_orphan_scan(self):
+        """Quét các tin nhắn embed gần đây của bot trên các kênh text sau khi khởi động.
+        1. Xóa các embed mồ côi nếu tin nhắn gốc đã bị xóa trong lúc bot offline/redeploy.
+        2. Nạp lại ánh xạ _origin_to_preview_map để tiếp tục lắng nghe sự kiện xóa cho các embed trước đó."""
+        try:
+            await self.bot.wait_until_ready()
+            # Đợi một chút để Gateway và các Cog khác ổn định
+            await asyncio.sleep(4.0)
+            print("[EmbedCog] 🔍 Bắt đầu quét các bản xem trước embed trước đó để phát hiện embed mồ côi...", flush=True)
+
+            scanned_channels = 0
+            cleaned_count = 0
+            restored_count = 0
+
+            for guild in self.bot.guilds:
+                for channel in guild.text_channels:
+                    perms = channel.permissions_for(guild.me)
+                    if not (perms.read_messages and perms.read_message_history):
+                        continue
+
+                    scanned_channels += 1
+                    try:
+                        async for msg in channel.history(limit=50):
+                            if not self.bot.user or msg.author.id != self.bot.user.id:
+                                continue
+
+                            # Nhận diện embed do bot tạo ra thông qua header jump_url
+                            if not msg.content or "-# [Trả lời]" not in msg.content:
+                                continue
+
+                            match = re.search(r"discord\.com/channels/\d+/\d+/(\d+)", msg.content)
+                            if not match:
+                                continue
+
+                            orig_id = int(match.group(1))
+
+                            # Kiểm tra xem tin nhắn gốc còn tồn tại trên Discord không
+                            try:
+                                await channel.fetch_message(orig_id)
+                                # Tin nhắn gốc vẫn còn -> Khôi phục vào bộ nhớ cache để tiếp tục đồng bộ
+                                self._origin_to_preview_map[orig_id] = (channel.id, msg.id)
+                                self._preview_to_origin_map[msg.id] = (channel.id, orig_id)
+                                restored_count += 1
+                            except discord.NotFound:
+                                # Tin nhắn gốc đã bị xóa mất trước đó -> Dọn dẹp ngay embed mồ côi
+                                try:
+                                    await msg.delete()
+                                    cleaned_count += 1
+                                    print(
+                                        f"[EmbedCog] 🧹 Đã dọn dẹp Embed mồ côi (ID: {msg.id}) trong #{channel.name} "
+                                        f"do tin nhắn gốc ({orig_id}) không còn tồn tại.",
+                                        flush=True,
+                                    )
+                                    try:
+                                        from core.activity_logger import activity_logger
+                                        activity_logger.log(
+                                            action_type="embed",
+                                            action_name="Embed: Dọn dẹp embed mồ côi (Startup Scan)",
+                                            user_id=self.bot.user.id,
+                                            user_name=self.bot.user.name,
+                                            guild_name=guild.name,
+                                            guild_id=guild.id,
+                                            channel_name=channel.name,
+                                            channel_id=channel.id,
+                                            prompt=f"Preview ID: {msg.id}",
+                                            response=f"Đã tự động xóa embed mồ côi vì tin nhắn gốc ({orig_id}) đã bị xóa trước đó.",
+                                            status="info",
+                                            details={"origin_message_id": orig_id, "preview_message_id": msg.id},
+                                        )
+                                    except Exception as log_err:
+                                        print(f"[EmbedCog] Lỗi ghi activity logger: {log_err}", flush=True)
+                                except Exception as del_err:
+                                    print(f"[EmbedCog] Lỗi xóa embed mồ côi {msg.id}: {del_err}", flush=True)
+                            except Exception:
+                                pass
+
+                    except Exception:
+                        pass
+                    # Nghỉ nhỏ giữa các kênh để không làm nghẽn Discord API
+                    await asyncio.sleep(0.15)
+
+            print(
+                f"[EmbedCog] ✅ Hoàn tất quét embed: Đã kiểm tra {scanned_channels} kênh, "
+                f"dọn dẹp {cleaned_count} embed mồ côi, khôi phục theo dõi {restored_count} embed.",
+                flush=True,
+            )
+        except Exception as e:
+            print(f"[EmbedCog] Lỗi trong quá trình quét embed ban đầu: {e}", flush=True)
 
 
 class EmbedConfigCog(commands.Cog):

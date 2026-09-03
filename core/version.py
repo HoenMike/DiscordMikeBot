@@ -10,12 +10,35 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.14"
+CURRENT_VERSION = "2.4.15"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "In-Flight Message Deletion Cancellation & Zero Orphan Embeds"
+CODENAME = "Startup Embed Orphan Scan & Realtime Deletion Logging"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.15",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Quét Tự Động Dọn Dẹp Embed Mồ Côi Khi Khởi Động & Ghi Log Trực Tiếp Lên Dashboard",
+        "summary": "Tự động quét các tin nhắn embed trước đó khi bot khởi động để dọn sạch các embed mồ côi (nếu tin nhắn gốc bị xóa lúc bot offline) đồng thời khôi phục bộ nhớ theo dõi, và đồng bộ mọi sự kiện xóa/hủy embed lên Live Dashboard & Console.",
+        "changes": [
+            {
+                "category": "🧹 Quét Embed Mồ Côi Khi Khởi Động (Startup Orphan Scanner)",
+                "items": [
+                    "Tự động rà soát lịch sử tin nhắn bot trên các kênh text sau khi khởi động.",
+                    "Nếu tin nhắn gốc đã bị xóa mất từ trước (lúc bot offline/redeploy), bot tự động xóa sạch embed mồ côi tương ứng.",
+                    "Nếu tin nhắn gốc còn tồn tại, bot nạp lại ánh xạ theo dõi 2 chiều vào cache để tiếp tục đồng bộ xóa trong tương lai."
+                ]
+            },
+            {
+                "category": "📊 Đồng Bộ Sự Kiện Xóa Vào Live Dashboard & Console",
+                "items": [
+                    "Cập nhật mọi hành động hủy task in-flight, thu hồi bản xem trước, và xóa embed vào ActivityLogger (Web Dashboard) và Console logs trong thời gian thực."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.14",
         "date": "2026-09-03",

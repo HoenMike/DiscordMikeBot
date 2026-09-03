@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.15] - 2026-09-03 — *Startup Embed Orphan Scan & Realtime Deletion Logging*
+
+### Added
+- **Quét Dọn Embed Mồ Côi Khi Khởi Động (Startup Orphan Scanner)**: Tự động rà soát lịch sử tin nhắn bot trên các kênh chat sau khi khởi động. Xóa sạch các embed mồ côi nếu tin nhắn gốc đã bị xóa mất từ trước (trong lúc bot tắt hoặc redeploy), đồng thời khôi phục bộ nhớ cache theo dõi cho các embed còn hoạt động.
+- **Ghi Nhận Sự Kiện Xóa Vào Live Dashboard & Console**: Toàn bộ sự kiện hủy tác vụ in-flight, thu hồi bản xem trước, và xóa embed tự động đều được ghi nhận chi tiết vào ActivityLogger (Web Dashboard) và Console logs thời gian thực.
+
+---
+
 ## [2.4.14] - 2026-09-03 — *In-Flight Message Deletion Cancellation & Zero Orphan Embeds*
 
 ### Fixed
