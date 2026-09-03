@@ -88,7 +88,18 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
     media_urls = []
     media_type = "text"
 
-    if media_url:
+    # Thu thập tất cả các định dạng video có cả hình lẫn tiếng (progressive MP4)
+    formats = info.get("formats", [])
+    candidates = []
+    for f in formats:
+        if f.get("vcodec") != "none" and f.get("acodec") != "none" and f.get("url"):
+            candidates.append(f["url"])
+
+    if candidates:
+        # Giữ toàn bộ candidate URLs (từ chất lượng cao đến thấp) để tải định dạng phù hợp <= 25MB
+        media_urls.extend(candidates)
+        media_type = "video"
+    elif media_url:
         media_urls.append(media_url)
         media_type = "video"
     elif best_thumb:

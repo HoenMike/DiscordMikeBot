@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.11] - 2026-09-03 — *Multi-candidate Video Downloader & Proxy Fallback Hint*
+
+### Added
+- **Trình Phát Video Native & Tự Động Thử Định Dạng (Multi-Candidate)**: Hệ thống tự động quét tất cả các định dạng video MP4 (progressive HD/SD) từ `yt-dlp`. Nếu định dạng HD vượt quá giới hạn tải lên của Discord (> 25MB), hệ thống tự động thử định dạng tiếp theo (như SD 7.74MB $\le$ 25MB) để đảm bảo luôn đính kèm được video phát trực tiếp có âm thanh, không bị rơi về ảnh tĩnh.
+- **Thông Báo Fallback Trực Quan**: Khi xảy ra fallback do Facebed/Proxy gặp sự cố, bot tự động đính kèm thông báo rõ ràng trên header: `⚠️ Facebed lỗi, đã tự động fallback` và footer embed `Facebook • Fallback từ facebed`.
+
+---
+
 ## [2.4.10] - 2026-09-03 — *Active Discord Unfurl Verification & Facebook yt-dlp & Lifecycle Presence*
 
 ### Added

@@ -10,12 +10,35 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.10"
+CURRENT_VERSION = "2.4.11"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "Active Discord Unfurl Verification & Facebook yt-dlp & Lifecycle Presence"
+CODENAME = "Multi-candidate Video Downloader & Proxy Fallback Hint"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.11",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Tự Động Chọn Định Dạng Video Phù Hợp (<=25MB) & Bổ Sung Thông Báo Fallback",
+        "summary": "Tự động thử các định dạng video ứng viên (HD, SD) để đảm bảo file video <= 25MB luôn được tải và phát native có tiếng trên Discord, đồng thời bổ sung thông báo rõ ràng khi xảy ra fallback từ Facebed/Proxy.",
+        "changes": [
+            {
+                "category": "🎬 Trình Phát Video Native & Tự Động Thử Định Dạng (Multi-Candidate)",
+                "items": [
+                    "Khắc phục tình trạng chỉ hiện ảnh thumbnail khi video HD vượt quá giới hạn 25MB: Hệ thống tự động quét tất cả các định dạng video MP4 (progressive HD/SD) và chọn phiên bản phù hợp (<= 25MB) để đính kèm.",
+                    "Đảm bảo 100% video Facebook và các nền tảng khác luôn có video player phát trực tiếp kèm âm thanh trong Discord chat."
+                ]
+            },
+            {
+                "category": "🔔 Thông Báo Fallback Trực Quan",
+                "items": [
+                    "Bổ sung ghi chú thông báo trên header subtext: '-# [Trả lời] Mike • ⚠️ Facebed lỗi, đã tự động fallback' giúp người dùng hiểu rõ lý do kích hoạt chế độ trích xuất trực tiếp.",
+                    "Đồng bộ ghi chú footer: 'Facebook • Fallback từ facebed'."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.10",
         "date": "2026-09-03",

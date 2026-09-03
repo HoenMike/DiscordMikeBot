@@ -290,24 +290,33 @@ class EmbedCog(commands.Cog):
             print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
             return None
 
-    async def _download_video_file(self, video_url: str, platform_key: str) -> discord.File | None:
-        """Tải file video nếu kích thước <= 25MB để Discord phát native trực tiếp."""
-        if not video_url or not self.session:
+    async def _download_video_file(self, video_urls: list[str] | str, platform_key: str) -> discord.File | None:
+        """Tải file video nếu kích thước <= 25MB để Discord phát native trực tiếp.
+        Nếu video có nhiều định dạng ứng viên (HD, SD), tự động thử lần lượt cho đến khi tìm được định dạng <= 25MB."""
+        if isinstance(video_urls, str):
+            video_urls = [video_urls]
+        if not video_urls or not self.session:
             return None
-        try:
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            async with self.session.get(video_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                if resp.status == 200:
-                    content_len = resp.headers.get("Content-Length")
-                    if not content_len or int(content_len) <= 25 * 1024 * 1024:
+
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        for v_url in video_urls:
+            try:
+                async with self.session.get(v_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status == 200:
+                        content_len = resp.headers.get("Content-Length")
+                        if content_len and int(content_len) > 25 * 1024 * 1024:
+                            print(f"[EmbedCog] Video ({int(content_len)/1024/1024:.2f}MB) vượt quá 25MB, đang thử định dạng tiếp theo...", flush=True)
+                            continue
+
                         video_data = await resp.read()
                         if len(video_data) <= 25 * 1024 * 1024:
+                            print(f"[EmbedCog] Đã tải thành công video {platform_key} ({len(video_data)/1024/1024:.2f}MB) để đính kèm trực tiếp.", flush=True)
                             return discord.File(
                                 fp=io.BytesIO(video_data),
                                 filename=f"{platform_key}_video.mp4",
                             )
-        except Exception as dl_err:
-            print(f"[EmbedCog] Không thể tải file video {platform_key}: {dl_err}", flush=True)
+            except Exception as dl_err:
+                print(f"[EmbedCog] Không thể tải ứng viên video {platform_key}: {dl_err}", flush=True)
         return None
 
     async def _verify_discord_unfurl(self, sent_msg: discord.Message, timeout: float = 2.5) -> bool:
@@ -422,7 +431,7 @@ class EmbedCog(commands.Cog):
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
             elif post_data.media_type == "video" and post_data.media_urls:
-                file = await self._download_video_file(post_data.media_urls[0], platform_key)
+                file = await self._download_video_file(post_data.media_urls, platform_key)
 
             author_name = _clean_markdown_label(message.author.display_name)
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
@@ -557,9 +566,10 @@ class EmbedCog(commands.Cog):
             if not single_embed:
                 return False
 
+            proxy_name = "Facebed" if platform_key == "facebook" else "Proxy"
             if single_embed.footer and single_embed.footer.text:
                 single_embed.set_footer(
-                    text=f"{single_embed.footer.text} (yt-dlp fallback)",
+                    text=f"{single_embed.footer.text} • Fallback từ {proxy_name.lower()}",
                     icon_url=single_embed.footer.icon_url,
                 )
 
@@ -567,10 +577,11 @@ class EmbedCog(commands.Cog):
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
             elif post_data.media_type == "video" and post_data.media_urls:
-                file = await self._download_video_file(post_data.media_urls[0], platform_key)
+                file = await self._download_video_file(post_data.media_urls, platform_key)
 
             author_name = _clean_markdown_label(message.author.display_name)
-            header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
+            fallback_hint = f" • ⚠️ *{proxy_name} lỗi, đã tự động fallback*"
+            header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**{fallback_hint}"
 
             sent_msg = await self._send_embed_preview(
                 message=message,
