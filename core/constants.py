@@ -187,7 +187,7 @@ PLATFORMS = {
 PROXY_DOMAINS = {
     "twitter": ["fxtwitter.com", "fixupx.com", "vxtwitter.com", "fixvx.com"],
     "pixiv": ["phixiv.net"],
-    "tiktok": ["tiktxk.com", "tfxktok.com", "tnktok.com"],
+    "tiktok": ["tnktok.com", "tfxktok.com"],
     "reddit": ["vxreddit.com", "fxreddit.seria.moe", "rxddit.com"],
     "instagram": ["eeinstagram.com", "vxinstagram.com", "fxig.seria.moe"],
     "facebook": ["facebed.com", "facebed.seria.moe"],

@@ -81,6 +81,8 @@ _DEAD_OR_ERROR_PATTERN = re.compile(
     r'|502 bad gateway'
     r'|504 gateway time-out'
     r'|503 service unavailable'
+    r'|tiktxk'
+    r'|cannot read properties of undefined'
     r')',
     re.IGNORECASE,
 )
@@ -228,14 +230,19 @@ async def validate_via_api(
             f"[ProxyValidator] API hết thời gian chờ: {api_url}",
             flush=True,
         )
+        return False, False
+    except aiohttp.ClientConnectorError as e:
+        print(
+            f"[ProxyValidator] API không kết nối được (lỗi mạng/DNS): {api_url} - {e}",
+            flush=True,
+        )
         _mark_domain_failed(proxy_domain)
         return False, False
     except aiohttp.ClientError as e:
         print(
-            f"[ProxyValidator] API không phản hồi: {api_url} - {e}",
+            f"[ProxyValidator] API lỗi client: {api_url} - {e}",
             flush=True,
         )
-        _mark_domain_failed(proxy_domain)
         return False, False
     except ValueError as e:
         print(
@@ -354,14 +361,19 @@ async def validate_via_og_metadata(
             f"[ProxyValidator] Hết thời gian chờ ({_VALIDATE_TIMEOUT.total}s): {proxy_url}",
             flush=True,
         )
+        return False, False
+    except aiohttp.ClientConnectorError as e:
+        print(
+            f"[ProxyValidator] Proxy không kết nối được (lỗi mạng/DNS): {proxy_url} - {e}",
+            flush=True,
+        )
         _mark_domain_failed(proxy_domain)
         return False, False
     except aiohttp.ClientError as e:
         print(
-            f"[ProxyValidator] Proxy không kết nối được: {proxy_url} - {e}",
+            f"[ProxyValidator] Proxy lỗi client: {proxy_url} - {e}",
             flush=True,
         )
-        _mark_domain_failed(proxy_domain)
         return False, False
     except Exception as e:
         print(
