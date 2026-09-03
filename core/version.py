@@ -10,12 +10,44 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.9"
+CURRENT_VERSION = "2.4.10"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "TikTok Embed Stream Fix & Domain Cache Hardening"
+CODENAME = "Active Discord Unfurl Verification & Facebook yt-dlp & Lifecycle Presence"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.10",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Cơ Chế Giám Sát Unfurl Discord, Trích Xuất Facebook Native & Chuẩn Hóa Vòng Đời Presence",
+        "summary": "Bổ sung cơ chế Active Unfurl Verification tự động phát hiện và xóa tin nhắn proxy rỗng khi Discord bị 403 CDN để kích hoạt Fallback yt-dlp, trích xuất Facebook trực tiếp qua yt-dlp ở Tier 0, và chuẩn hóa trạng thái Presence cố định kèm cảnh báo lỗi Gateway tự động.",
+        "changes": [
+            {
+                "category": "👑 Cơ Chế Giám Sát Unfurl Discord (Active Unfurl Verification)",
+                "items": [
+                    "Tự động lắng nghe sự kiện Gateway message_edit sau khi gửi link proxy: Nếu sau 2.5s Discord âm thầm hủy embed (do CDN 403 hoặc lỗi phân giải), bot tự động xóa tin nhắn rỗng và lập tức kích hoạt Fallback Tier 2 (yt-dlp).",
+                    "Không bao giờ để lại tin nhắn rác hoặc link trống trong khung chat khi các proxy bên thứ ba bị chập chờn."
+                ]
+            },
+            {
+                "category": "⚡ Nâng Cấp Toàn Diện Facebook Embed",
+                "items": [
+                    "Tích hợp yt-dlp trực tiếp vào Tier 0 (fetch_facebook): Lấy trọn vẹn Tiêu đề, Tác giả, Thumbnail gốc Facebook (không bị 403) và tải đính kèm file video MP4 (<= 25MB) để phát native có tiếng chỉ trong ~3.5s.",
+                    "Chuẩn hóa đường dẫn Facebook: Tự động chuyển đổi các link dạng /share/v/ sang /share/r/ theo chuẩn tối ưu của các bot lớn.",
+                    "Cập nhật Proxy Validator: Yêu cầu bắt buộc phải có thẻ ảnh poster (og:image) đối với video proxy Facebook, từ chối các proxy cụt media như facebed."
+                ]
+            },
+            {
+                "category": "🎭 Chuẩn Hóa Trạng Thái Presence & Vòng Đời Bot",
+                "items": [
+                    "Loại bỏ danh sách xoay tua các slash command không cần thiết (/tarot, /tomtat), chuẩn hóa trạng thái cố định: Live v2.4.10 | .m help.",
+                    "Tự động chuyển sang Updating (Cam 🟡) trước khi tắt / redeploy trên Render/Gunicorn.",
+                    "Hệ thống Watchdog chạy nền: Tự động nhảy sang Error (Đỏ 🔴 / DND) khi độ trễ Gateway > 5s hoặc mất kết nối, và tự động khôi phục Xanh 🟢 khi ổn định."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.9",
         "date": "2026-09-03",

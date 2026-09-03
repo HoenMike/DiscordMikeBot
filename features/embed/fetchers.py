@@ -202,9 +202,13 @@ async def fetch_instagram(session: aiohttp.ClientSession, url: str, match) -> Po
 
 
 async def fetch_facebook(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    # Facebook unauthenticated oEmbed endpoint không còn hỗ trợ và luôn chuyển hướng sang trang login HTML.
-    # Trả về None để hệ thống tự động fallback sang Tier 1 (Proxy facebed) hoặc Tier 2 (yt-dlp).
-    return None
+    # Trích xuất Facebook Post/Reels/Video trực tiếp qua yt-dlp để có đầy đủ metadata và video stream
+    try:
+        from features.embed.fallback import extract_media_ytdlp
+        return await extract_media_ytdlp(url, "facebook")
+    except Exception as e:
+        print(f"[Fetcher/Facebook] Lỗi khi trích xuất dữ liệu {url}: {e}", flush=True)
+        return None
 
 
 async def fetch_bluesky(session: aiohttp.ClientSession, url: str, match) -> PostData | None:

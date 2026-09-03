@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.10] - 2026-09-03 — *Active Discord Unfurl Verification & Facebook yt-dlp & Lifecycle Presence*
+
+### Added
+- **Cơ Chế Giám Sát Unfurl Discord (Active Unfurl Verification)**: Tự động bắt sự kiện `message_edit` từ Discord Gateway sau khi gửi proxy URL. Nếu sau 2.5s Discord âm thầm hủy embed (do lỗi CDN 403 hoặc thiếu thẻ OpenGraph), bot tự động xóa tin nhắn rỗng và kích hoạt Fallback Tier 2 (yt-dlp) ngay lập tức, ngăn ngừa hoàn toàn tình trạng để lại link trống trong chat.
+- **Tích hợp yt-dlp trực tiếp vào Facebook (Tier 0)**: Trích xuất trực tiếp bài viết/reels Facebook qua `yt-dlp` chỉ trong ~3.5s với đầy đủ Tiêu đề, Tác giả, Thumbnail gốc Facebook (không bao giờ bị 403) và tải đính kèm file video MP4 (<= 25MB) để Discord phát native có tiếng.
+- **Hệ thống Watchdog & Trạng Thái Vòng Đời Bot (Lifecycle Presence)**:
+  - Loại bỏ các lệnh slash xoay tua rườm rà, cố định trạng thái: `Live v2.4.10 | .m help`.
+  - Tự động chuyển sang `Updating...` (Cam 🟡) trước khi tắt tiến trình trên Render/Gunicorn.
+  - Tự động nhảy sang `Error` (Đỏ 🔴 / DND) khi độ trễ Gateway > 5.0s hoặc mất kết nối, và tự động hồi phục Xanh 🟢 khi bình thường.
+
+### Fixed
+- **Chuẩn hóa đường dẫn Facebook**: Tự động chuyển đổi `/share/v/` sang `/share/r/` để tăng độ tương thích với các bộ giải mã mạng xã hội.
+- **Bộ lọc Proxy khuyết tật**: Cập nhật `validator.py` bắt buộc phải có ảnh poster (`og:image`) đối với video proxy Facebook, loại bỏ các proxy chỉ có `og:video` trỏ về CDN bị chặn như `facebed.com`.
+
+---
+
 ## [2.4.9] - 2026-09-03 — *TikTok Embed Stream Fix & Domain Cache Hardening*
 
 ### Fixed

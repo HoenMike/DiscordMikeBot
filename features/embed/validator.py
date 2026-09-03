@@ -148,6 +148,9 @@ def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> 
             if platform_key == "threads" and "vxthreads" in proxy_domain:
                 # vxthreads.com xử lý đường dẫn dạng /t/ hoặc /@user/post/ tốt nhất
                 res_url = re.sub(r"/share/(?:post/)?", "/t/", res_url)
+            elif platform_key == "facebook":
+                # Đối với Facebook: Chuẩn hóa /share/v/ sang /share/r/ để tương thích tối đa với các proxy Facebook
+                res_url = re.sub(r"/share/v/", "/share/r/", res_url)
             return res_url
 
     return None
@@ -313,13 +316,28 @@ async def validate_via_og_metadata(
 
             # 1. Kiểm tra sự tồn tại của media thực tế (ảnh, video, audio, player)
             has_media = False
+            has_image = False
+            has_video = False
             for mk in _MEDIA_META_KEYS:
                 val = meta_tags.get(mk)
                 if val:
                     val_lower = val.lower()
                     if val_lower not in ("", "#") and not val_lower.endswith(("/favicon.ico", "/favicon.png", "logo.png")):
                         has_media = True
-                        break
+                        if any(ik in mk for ik in ["image", "thumbnail"]):
+                            has_image = True
+                        if any(vk in mk for vk in ["video", "player"]):
+                            has_video = True
+
+            # Đối với Facebook: Proxy bắt buộc phải có ảnh poster (og:image / twitter:image).
+            # Nếu chỉ có og:video trỏ về CDN Facebook (thường xuyên bị 403) mà thiếu hoàn toàn og:image,
+            # Discord sẽ âm thầm hủy embed (silent drop). Ta từ chối proxy này để hệ thống fallback sang yt-dlp.
+            if platform_key == "facebook" and has_video and not has_image:
+                print(
+                    f"[ProxyValidator] Proxy Facebook thiếu ảnh preview (og:image): {proxy_url}",
+                    flush=True,
+                )
+                return False, False
 
             is_nsfw = bool(_NSFW_PATTERN.search(html_text))
             if has_media:

@@ -270,7 +270,7 @@ class EmbedCog(commands.Cog):
         content: str | None = None,
         embeds: list[discord.Embed] | None = None,
         file: discord.File | None = None,
-    ) -> bool:
+    ) -> discord.Message | None:
         """Gửi bản xem trước trực tiếp vào kênh chat (không dùng native reply để tránh thanh quote lặp text)."""
         kwargs = {}
         if content:
@@ -285,10 +285,55 @@ class EmbedCog(commands.Cog):
             # Lưu liên kết 2 chiều giữa tin nhắn gốc và bản xem trước
             self._origin_to_preview_map[message.id] = (message.channel.id, sent_msg.id)
             self._preview_to_origin_map[sent_msg.id] = (message.channel.id, message.id)
-            return True
+            return sent_msg
         except discord.HTTPException as e:
             print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
-            return False
+            return None
+
+    async def _download_video_file(self, video_url: str, platform_key: str) -> discord.File | None:
+        """Tải file video nếu kích thước <= 25MB để Discord phát native trực tiếp."""
+        if not video_url or not self.session:
+            return None
+        try:
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            async with self.session.get(video_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status == 200:
+                    content_len = resp.headers.get("Content-Length")
+                    if not content_len or int(content_len) <= 25 * 1024 * 1024:
+                        video_data = await resp.read()
+                        if len(video_data) <= 25 * 1024 * 1024:
+                            return discord.File(
+                                fp=io.BytesIO(video_data),
+                                filename=f"{platform_key}_video.mp4",
+                            )
+        except Exception as dl_err:
+            print(f"[EmbedCog] Không thể tải file video {platform_key}: {dl_err}", flush=True)
+        return None
+
+    async def _verify_discord_unfurl(self, sent_msg: discord.Message, timeout: float = 2.5) -> bool:
+        """Chờ và xác thực xem Discord có thực sự bung embed thành công cho link proxy không."""
+        try:
+            # 1. Nếu tin nhắn đã có embed ngay khi gửi
+            if sent_msg.embeds:
+                return True
+
+            # 2. Đợi event message_edit từ Discord Gateway khi Discord crawler hoàn tất
+            def check_edit(before, after):
+                return after.id == sent_msg.id and len(after.embeds) > 0
+
+            try:
+                await self.bot.wait_for("message_edit", check=check_edit, timeout=timeout)
+                return True
+            except asyncio.TimeoutError:
+                # 3. Fetch lại tin nhắn một lần nữa đề phòng WebSocket event bị trễ hoặc bỏ lỡ
+                try:
+                    refetched = await sent_msg.channel.fetch_message(sent_msg.id)
+                    return len(refetched.embeds) > 0
+                except Exception:
+                    return False
+        except Exception as e:
+            print(f"[EmbedCog] Lỗi khi xác thực unfurl của Discord: {e}", flush=True)
+            return True
 
     async def _process_url_with_fallback(
         self,
@@ -376,16 +421,19 @@ class EmbedCog(commands.Cog):
             file = None
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
+            elif post_data.media_type == "video" and post_data.media_urls:
+                file = await self._download_video_file(post_data.media_urls[0], platform_key)
 
             author_name = _clean_markdown_label(message.author.display_name)
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
-            return await self._send_embed_preview(
+            sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
                 embeds=embeds,
                 file=file,
             )
+            return bool(sent_msg)
         except Exception as e:
             print(f"[EmbedCog] Tier 0 (API) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
@@ -450,10 +498,33 @@ class EmbedCog(commands.Cog):
             else:
                 wrapped_proxy_url = f"-# {author_jump} • [Xem bài viết gốc]({proxy_url})"
 
-            return await self._send_embed_preview(
+            sent_msg = await self._send_embed_preview(
                 message=message,
                 content=wrapped_proxy_url,
             )
+            if not sent_msg:
+                return False
+
+            # Active Unfurl Verification:
+            # Chờ và xác nhận xem Discord có thực sự bung embed không.
+            # Nếu sau 2.5s tin nhắn vẫn rỗng (do proxy bị CDN 403, thiếu ảnh poster, etc.):
+            # Tự động xóa tin nhắn rỗng này và trả về False để kích hoạt Fallback Tier 2 (yt-dlp)!
+            is_unfurled = await self._verify_discord_unfurl(sent_msg, timeout=2.5)
+            if not is_unfurled:
+                print(
+                    f"[EmbedCog] Discord không bung embed cho proxy {proxy_url}. "
+                    "Đang tự động xóa tin nhắn rỗng và kích hoạt Fallback Tier 2 (yt-dlp)...",
+                    flush=True,
+                )
+                try:
+                    await sent_msg.delete()
+                    self._origin_to_preview_map.pop(message.id, None)
+                    self._preview_to_origin_map.pop(sent_msg.id, None)
+                except Exception:
+                    pass
+                return False
+
+            return True
         except Exception as e:
             print(f"[EmbedCog] Tier 1 (Proxy) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
@@ -495,32 +566,19 @@ class EmbedCog(commands.Cog):
             file = None
             if filter_result.should_spoiler_media and post_data.media_urls:
                 file = await self._create_spoiler_file(post_data.media_urls[0])
-            elif post_data.media_type == "video" and post_data.media_urls and self.session:
-                video_url = post_data.media_urls[0]
-                try:
-                    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-                    async with self.session.get(video_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                        if resp.status == 200:
-                            content_len = resp.headers.get("Content-Length")
-                            if not content_len or int(content_len) <= 25 * 1024 * 1024:
-                                video_data = await resp.read()
-                                if len(video_data) <= 25 * 1024 * 1024:
-                                    file = discord.File(
-                                        fp=io.BytesIO(video_data),
-                                        filename=f"{platform_key}_video.mp4",
-                                    )
-                except Exception as dl_err:
-                    print(f"[EmbedCog] Không thể tải video fallback {url}: {dl_err}", flush=True)
+            elif post_data.media_type == "video" and post_data.media_urls:
+                file = await self._download_video_file(post_data.media_urls[0], platform_key)
 
             author_name = _clean_markdown_label(message.author.display_name)
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
-            return await self._send_embed_preview(
+            sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
                 embeds=[single_embed],
                 file=file,
             )
+            return bool(sent_msg)
         except Exception as e:
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
