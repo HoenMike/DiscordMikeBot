@@ -318,32 +318,6 @@ class EmbedCog(commands.Cog):
             except Exception as dl_err:
                 print(f"[EmbedCog] Không thể tải ứng viên video {platform_key}: {dl_err}", flush=True)
         return None
-
-    async def _verify_discord_unfurl(self, sent_msg: discord.Message, timeout: float = 2.5) -> bool:
-        """Chờ và xác thực xem Discord có thực sự bung embed thành công cho link proxy không."""
-        try:
-            # 1. Nếu tin nhắn đã có embed ngay khi gửi
-            if sent_msg.embeds:
-                return True
-
-            # 2. Đợi event message_edit từ Discord Gateway khi Discord crawler hoàn tất
-            def check_edit(before, after):
-                return after.id == sent_msg.id and len(after.embeds) > 0
-
-            try:
-                await self.bot.wait_for("message_edit", check=check_edit, timeout=timeout)
-                return True
-            except asyncio.TimeoutError:
-                # 3. Fetch lại tin nhắn một lần nữa đề phòng WebSocket event bị trễ hoặc bỏ lỡ
-                try:
-                    refetched = await sent_msg.channel.fetch_message(sent_msg.id)
-                    return len(refetched.embeds) > 0
-                except Exception:
-                    return False
-        except Exception as e:
-            print(f"[EmbedCog] Lỗi khi xác thực unfurl của Discord: {e}", flush=True)
-            return True
-
     async def _process_url_with_fallback(
         self,
         message: discord.Message,
@@ -511,29 +485,7 @@ class EmbedCog(commands.Cog):
                 message=message,
                 content=wrapped_proxy_url,
             )
-            if not sent_msg:
-                return False
-
-            # Active Unfurl Verification:
-            # Chờ và xác nhận xem Discord có thực sự bung embed không.
-            # Nếu sau 2.5s tin nhắn vẫn rỗng (do proxy bị CDN 403, thiếu ảnh poster, etc.):
-            # Tự động xóa tin nhắn rỗng này và trả về False để kích hoạt Fallback Tier 2 (yt-dlp)!
-            is_unfurled = await self._verify_discord_unfurl(sent_msg, timeout=2.5)
-            if not is_unfurled:
-                print(
-                    f"[EmbedCog] Discord không bung embed cho proxy {proxy_url}. "
-                    "Đang tự động xóa tin nhắn rỗng và kích hoạt Fallback Tier 2 (yt-dlp)...",
-                    flush=True,
-                )
-                try:
-                    await sent_msg.delete()
-                    self._origin_to_preview_map.pop(message.id, None)
-                    self._preview_to_origin_map.pop(sent_msg.id, None)
-                except Exception:
-                    pass
-                return False
-
-            return True
+            return bool(sent_msg)
         except Exception as e:
             print(f"[EmbedCog] Tier 1 (Proxy) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False

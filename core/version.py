@@ -10,12 +10,29 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.12"
+CURRENT_VERSION = "2.4.13"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "Canonical Facebook Watch Proxy Format & Clean Embed Layout"
+CODENAME = "Native Facebed Preservation & Zero False Fallback"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.13",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Bảo Toàn Embed Facebed Native & Loại Bỏ Xóa Tin Nhắn Sớm (Zero False Fallback)",
+        "summary": "Loại bỏ hoàn toàn bộ đếm thời gian 2.5s tự xóa tin nhắn proxy (vốn là nguyên nhân xóa mất embed của Facebed ngay khi Discord vừa render), giữ nguyên tin nhắn proxy để Discord bung embed mượt mà tương tự RePlay.",
+        "changes": [
+            {
+                "category": "⚡ Khắc Phục Triệt Để Lỗi Xóa Mất Embed Facebed",
+                "items": [
+                    "Gỡ bỏ cơ chế tự động xóa tin nhắn sau 2.5s (nguyên nhân khiến bot xóa mất embed Facebed đang tải dở của người dùng rồi nhảy fallback thừa).",
+                    "Giữ nguyên tin nhắn chứa link Facebed để Discord tự nhiên crawl và hiển thị video player native chuẩn xác 100% giống như bot RePlay.",
+                    "Chỉ kích hoạt Tier 2 (yt-dlp) khi proxy thực sự bị lỗi mạng hoặc sập server từ đầu."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.12",
         "date": "2026-09-03",

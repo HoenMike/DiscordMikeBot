@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.13] - 2026-09-03 — *Native Facebed Preservation & Zero False Fallback*
+
+### Fixed
+- **Bảo toàn Embed Facebed & Loại bỏ tự xóa tin nhắn sớm**: Gỡ bỏ hoàn toàn bộ đếm 2.5s tự xóa tin nhắn (nguyên nhân khiến bot xóa mất embed Facebed của người dùng ngay khi Discord vừa tải xong và nhảy fallback thừa).
+- **Trải nghiệm Embed tự nhiên**: Giữ nguyên tin nhắn chứa link proxy để Discord tự nhiên crawl và hiển thị video player native chuẩn xác 100% giống như bot RePlay.
+
+---
+
 ## [2.4.12] - 2026-09-03 — *Canonical Facebook Watch Proxy Format & Clean Embed Layout*
 
 ### Changed
