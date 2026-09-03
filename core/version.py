@@ -10,12 +10,35 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.11"
+CURRENT_VERSION = "2.4.12"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "Multi-candidate Video Downloader & Proxy Fallback Hint"
+CODENAME = "Canonical Facebook Watch Proxy Format & Clean Embed Layout"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.12",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Chuẩn Hóa Đường Dẫn Facebook watch?v= Tối Ưu Cho Facebed & Làm Sạch Giao Diện Embed",
+        "summary": "Chuẩn hóa link Facebook sang định dạng canonical /watch?v=ID (tương tự bot RePlay), dỡ bỏ điều kiện chặn nhầm proxy facebed.com, và tự động ẩn ảnh thumbnail tĩnh khi video MP4 đã được đính kèm để tránh lặp hình ảnh.",
+        "changes": [
+            {
+                "category": "⚡ Chuẩn Hóa Proxy Facebook (Đồng Bộ Chuẩn RePlay)",
+                "items": [
+                    "Tự động chuyển đổi các link /reel/ID, /videos/ID, watch/?v=ID sang https://facebed.com/watch?v=ID để Discord và Facebed nhận diện chuẩn xác 100%.",
+                    "Dỡ bỏ kiểm tra has_image quá nghiêm ngặt trên proxy Facebook, cho phép facebed.com hoạt động bình thường như các bot lớn.",
+                    "Giữ nguyên cơ chế Active Unfurl Verification: Nếu Discord bung được embed facebed thì hiển thị native mượt mà; chỉ kích hoạt fallback khi proxy thực sự không render được."
+                ]
+            },
+            {
+                "category": "🎨 Tinh Gọn Giao Diện Embed",
+                "items": [
+                    "Khắc phục lỗi lặp 2 lần hình ảnh: Tự động ẩn ảnh thumbnail tĩnh trong embed khi file video MP4 đã được đính kèm (Discord tự tạo video player native có hình nền)."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.11",
         "date": "2026-09-03",

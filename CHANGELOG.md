@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.12] - 2026-09-03 — *Canonical Facebook Watch Proxy Format & Clean Embed Layout*
+
+### Changed
+- **Chuẩn Hóa Đường Dẫn Facebook watch?v= (Chuẩn RePlay)**: Tự động chuyển đổi các đường dẫn Facebook Reels (`/reel/ID`), Videos (`/videos/ID`) và Watch sang `https://facebed.com/watch?v=ID` để Facebed và Discord xử lý bung video player tối ưu nhất.
+- **Dỡ bỏ kiểm tra has_image quá nghiêm ngặt**: Cho phép `facebed.com` hoạt động bình thường, không bị đánh trượt nhầm sang yt-dlp khi proxy vẫn hoạt động tốt trên Discord.
+- **Tinh gọn giao diện Embed**: Tự động ẩn ảnh thumbnail tĩnh trong embed khi file video MP4 đã được đính kèm, loại bỏ hoàn toàn tình trạng lặp 2 lần hình ảnh trong cùng một tin nhắn.
+
+---
+
 ## [2.4.11] - 2026-09-03 — *Multi-candidate Video Downloader & Proxy Fallback Hint*
 
 ### Added

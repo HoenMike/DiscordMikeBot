@@ -579,6 +579,11 @@ class EmbedCog(commands.Cog):
             elif post_data.media_type == "video" and post_data.media_urls:
                 file = await self._download_video_file(post_data.media_urls, platform_key)
 
+            # Nếu đã đính kèm file video MP4 (Discord tự hiển thị video player native),
+            # xóa ảnh thumbnail tĩnh khỏi embed để tránh bị lặp 2 lần hình ảnh trong giao diện chat
+            if file is not None:
+                single_embed.set_image(url=None)
+
             author_name = _clean_markdown_label(message.author.display_name)
             fallback_hint = f" • ⚠️ *{proxy_name} lỗi, đã tự động fallback*"
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**{fallback_hint}"
