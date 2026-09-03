@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.14] - 2026-09-03 — *In-Flight Message Deletion Cancellation & Zero Orphan Embeds*
+
+### Fixed
+- **Hủy tác vụ và chặn gửi embed khi tin nhắn gốc bị xóa sớm**: Giải quyết dứt điểm tình trạng race condition khi người dùng xóa tin nhắn gốc trong lúc bot đang tải video hoặc gọi API chưa kịp rep. Hệ thống lập tức hủy `Task`, ngừng việc tải/gửi embed preview và tuyệt đối không để lại embed mồ côi trên kênh chat.
+- **Hỗ trợ xóa hàng loạt (Bulk Delete)**: Bổ sung `on_raw_bulk_message_delete` để tự động dọn sạch các embed xem trước khi kênh chat bị purge.
+
+---
+
 ## [2.4.13] - 2026-09-03 — *Native Facebed Preservation & Zero False Fallback*
 
 ### Fixed

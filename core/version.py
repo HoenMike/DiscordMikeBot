@@ -10,12 +10,29 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.13"
+CURRENT_VERSION = "2.4.14"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "Native Facebed Preservation & Zero False Fallback"
+CODENAME = "In-Flight Message Deletion Cancellation & Zero Orphan Embeds"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.14",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Xử Lý Triệt Để Trường Hợp User Xóa Tin Nhắn Trong Lúc Bot Chưa Kịp Trả Lời (Zero Orphan Embeds)",
+        "summary": "Tự động hủy tác vụ đang xử lý (download/crawl) và chặn gửi embed preview nếu tin nhắn gốc bị người dùng xóa trước khi bot kịp rep, đồng thời bổ sung hỗ trợ xóa hàng loạt (bulk purge).",
+        "changes": [
+            {
+                "category": "🛡️ Đồng Bộ Vòng Đời Tin Nhắn & Hủy Tác Vụ Đang Xử Lý (In-Flight Cancellation)",
+                "items": [
+                    "Khắc phục hoàn toàn race condition: Nếu người dùng xóa tin nhắn gốc trong lúc bot đang tải video hoặc gọi API, bot lập tức hủy bỏ tác vụ (Task.cancel()), giải phóng tài nguyên và tuyệt đối không gửi embed mồ côi ra kênh chat.",
+                    "Kiểm tra guard kép trong _send_embed_preview trước và ngay sau khi gửi để thu hồi ngay lập tức nếu sự kiện xóa xảy ra đồng thời.",
+                    "Bổ sung listener on_raw_bulk_message_delete để tự động dọn sạch các embed tương ứng khi tin nhắn bị xóa hàng loạt (purge)."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.13",
         "date": "2026-09-03",

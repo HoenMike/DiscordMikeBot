@@ -63,6 +63,10 @@ class EmbedCog(commands.Cog):
         # Cache liên kết 2 chiều giữa tin nhắn gốc của user và bản xem trước của bot
         self._origin_to_preview_map = BoundedDict(max_size=3000)
         self._preview_to_origin_map = BoundedDict(max_size=3000)
+        # Bounded cache lưu danh sách ID các tin nhắn gốc đã bị người dùng xóa
+        self._deleted_message_ids = BoundedDict(max_size=5000)
+        # Quản lý các task đang xử lý dở dang cho từng tin nhắn gốc
+        self._in_flight_tasks: dict[int, asyncio.Task] = {}
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession(
@@ -119,70 +123,95 @@ class EmbedCog(commands.Cog):
         any_success = False
         platforms_enabled = config.get("platforms_enabled", {})
 
-        for platform_key, url, match, is_spoiler in detected[:MAX_LINKS_PER_MESSAGE]:
-            if not platforms_enabled.get(platform_key, True):
-                continue
+        curr_task = asyncio.current_task()
+        if curr_task:
+            self._in_flight_tasks[message.id] = curr_task
 
-            t_embed_start = time.monotonic()
-            success = await self._process_url_with_fallback(
-                message, platform_key, url, match, config,
-                is_spoiler=is_spoiler
-            )
-            elapsed_ms = round((time.monotonic() - t_embed_start) * 1000, 1)
+        try:
+            for platform_key, url, match, is_spoiler in detected[:MAX_LINKS_PER_MESSAGE]:
+                # Nếu tin nhắn gốc đã bị xóa trong lúc đang duyệt hàng đợi URL, dừng ngay lập tức
+                if message.id in self._deleted_message_ids:
+                    print(f"[EmbedCog] Hủy xử lý URL vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
+                    break
 
-            # Ghi nhận hoạt động vào Live Activity Logger
-            try:
-                from core.activity_logger import activity_logger
-                platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
-                user_avatar = message.author.display_avatar.url if message.author.display_avatar else None
-                activity_logger.log(
-                    action_type="embed",
-                    action_name=f"Embed: {platform_name}",
-                    user_id=message.author.id,
-                    user_name=message.author.display_name,
-                    user_avatar=user_avatar,
-                    guild_name=message.guild.name if message.guild else "Direct Message",
-                    guild_id=message.guild.id if message.guild else None,
-                    channel_name=getattr(message.channel, 'name', 'Unknown'),
-                    channel_id=message.channel.id,
-                    prompt=url,
-                    response=f"Tạo bản xem trước {platform_name} thành công" if success else f"Không thể tạo bản xem trước {platform_name}",
-                    status="success" if success else "error",
-                    duration_ms=elapsed_ms,
-                    details={
-                        "platform": platform_key,
-                        "url": url,
-                        "is_spoiler": is_spoiler
-                    }
+                if not platforms_enabled.get(platform_key, True):
+                    continue
+
+                t_embed_start = time.monotonic()
+                success = await self._process_url_with_fallback(
+                    message, platform_key, url, match, config,
+                    is_spoiler=is_spoiler
                 )
-            except Exception as act_err:
-                print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Embed: {act_err}", flush=True)
+                elapsed_ms = round((time.monotonic() - t_embed_start) * 1000, 1)
 
-            if success:
-                any_success = True
-            else:
-                platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
+                # Ghi nhận hoạt động vào Live Activity Logger
                 try:
-                    await message.reply(
-                        f"⚠️ Không thể tạo bản xem trước cho liên kết **{platform_name}** này "
-                        f"(nội dung có thể ở chế độ riêng tư, nhóm kín hoặc yêu cầu đăng nhập).",
-                        mention_author=False,
-                        delete_after=15,
+                    from core.activity_logger import activity_logger
+                    platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
+                    user_avatar = message.author.display_avatar.url if message.author.display_avatar else None
+                    activity_logger.log(
+                        action_type="embed",
+                        action_name=f"Embed: {platform_name}",
+                        user_id=message.author.id,
+                        user_name=message.author.display_name,
+                        user_avatar=user_avatar,
+                        guild_name=message.guild.name if message.guild else "Direct Message",
+                        guild_id=message.guild.id if message.guild else None,
+                        channel_name=getattr(message.channel, 'name', 'Unknown'),
+                        channel_id=message.channel.id,
+                        prompt=url,
+                        response=f"Tạo bản xem trước {platform_name} thành công" if success else f"Không thể tạo bản xem trước {platform_name}",
+                        status="success" if success else "error",
+                        duration_ms=elapsed_ms,
+                        details={
+                            "platform": platform_key,
+                            "url": url,
+                            "is_spoiler": is_spoiler
+                        }
                     )
-                except Exception:
-                    pass
+                except Exception as act_err:
+                    print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Embed: {act_err}", flush=True)
+
+                if success:
+                    any_success = True
+                elif message.id not in self._deleted_message_ids:
+                    platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
+                    try:
+                        await message.reply(
+                            f"⚠️ Không thể tạo bản xem trước cho liên kết **{platform_name}** này "
+                            f"(nội dung có thể ở chế độ riêng tư, nhóm kín hoặc yêu cầu đăng nhập).",
+                            mention_author=False,
+                            delete_after=15,
+                        )
+                    except Exception:
+                        pass
+        except asyncio.CancelledError:
+            print(f"[EmbedCog] Task xử lý embed cho tin nhắn {message.id} đã bị hủy do tin nhắn gốc bị xóa.", flush=True)
+            return
+        finally:
+            self._in_flight_tasks.pop(message.id, None)
 
         # Ẩn khung embed lỗi mặc định của Discord trên tin nhắn gốc của người dùng
         # Giữ nguyên 100% tin nhắn gốc (ảnh, nội dung, danh tính) để tránh mất ảnh và hỗ trợ Reply vàng chat chuẩn Discord
         if any_success and config.get("suppress_original_embed", True):
-            try:
-                await message.edit(suppress=True)
-            except (discord.Forbidden, discord.HTTPException) as e:
-                print(f"[EmbedCog] Không thể suppress embed tin nhắn gốc: {e}", flush=True)
+            if message.id not in self._deleted_message_ids:
+                try:
+                    await message.edit(suppress=True)
+                except (discord.Forbidden, discord.HTTPException) as e:
+                    print(f"[EmbedCog] Không thể suppress embed tin nhắn gốc: {e}", flush=True)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         """Tự động xóa Embed Preview nếu người dùng xóa tin nhắn gốc chứa link."""
+        self._deleted_message_ids[payload.message_id] = True
+
+        # 1. Hủy ngay lập tức Task đang xử lý (nếu bot còn đang crawl/download video chưa kịp gửi)
+        task = self._in_flight_tasks.get(payload.message_id)
+        if task and not task.done():
+            task.cancel()
+            print(f"[EmbedCog] 🛑 Đã hủy xử lý embed cho tin nhắn gốc (ID: {payload.message_id}) vì vừa bị xóa.", flush=True)
+
+        # 2. Xóa bản xem trước nếu đã được gửi ra kênh chat
         target = self._origin_to_preview_map.pop(payload.message_id, None)
         if target:
             channel_id, preview_msg_id = target
@@ -205,6 +234,17 @@ class EmbedCog(commands.Cog):
                 print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
         else:
             self._preview_to_origin_map.pop(payload.message_id, None)
+
+    @commands.Cog.listener()
+    async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent):
+        """Xóa hàng loạt Embed Preview khi các tin nhắn gốc bị xóa hàng loạt (purge)."""
+        for msg_id in payload.message_ids:
+            fake_payload = discord.RawMessageDeleteEvent({
+                "id": msg_id,
+                "channel_id": payload.channel_id,
+                "guild_id": payload.guild_id,
+            })
+            await self.on_raw_message_delete(fake_payload)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -272,6 +312,11 @@ class EmbedCog(commands.Cog):
         file: discord.File | None = None,
     ) -> discord.Message | None:
         """Gửi bản xem trước trực tiếp vào kênh chat (không dùng native reply để tránh thanh quote lặp text)."""
+        # Nếu tin nhắn gốc đã bị xóa trong lúc bot đang tải video hoặc gọi proxy, không gửi nữa!
+        if message.id in self._deleted_message_ids:
+            print(f"[EmbedCog] Hủy gửi bản xem trước vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
+            return None
+
         kwargs = {}
         if content:
             kwargs["content"] = content
@@ -282,6 +327,16 @@ class EmbedCog(commands.Cog):
 
         try:
             sent_msg = await message.channel.send(**kwargs)
+
+            # Kiểm tra một lần nữa ngay sau khi gửi (phòng trường hợp event xóa tin nhắn xảy ra ngay lúc send)
+            if message.id in self._deleted_message_ids:
+                try:
+                    await sent_msg.delete()
+                    print(f"[EmbedCog] Đã thu hồi bản xem trước vừa gửi vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
+                except Exception:
+                    pass
+                return None
+
             # Lưu liên kết 2 chiều giữa tin nhắn gốc và bản xem trước
             self._origin_to_preview_map[message.id] = (message.channel.id, sent_msg.id)
             self._preview_to_origin_map[sent_msg.id] = (message.channel.id, message.id)
@@ -354,12 +409,23 @@ class EmbedCog(commands.Cog):
         config: dict,
         is_spoiler: bool = False,
     ) -> bool:
+        if message.id in self._deleted_message_ids:
+            return False
+
         # Tier 0: API Fetcher
         if await self._try_api_fetcher(message, platform_key, url, match, config, is_spoiler=is_spoiler):
             return True
+
+        if message.id in self._deleted_message_ids:
+            return False
+
         # Tier 1: Proxy URL Chain
         if await self._try_proxy_chain(message, platform_key, url, config, is_spoiler=is_spoiler):
             return True
+
+        if message.id in self._deleted_message_ids:
+            return False
+
         # Tier 2: yt-dlp Fallback
         if await self._try_ytdlp_fallback(message, platform_key, url, config, is_spoiler=is_spoiler):
             return True
