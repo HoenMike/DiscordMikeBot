@@ -2,11 +2,12 @@
 core/presence_manager.py - Quản lý trạng thái và hoạt động động của Bot (Dynamic Presence & Status).
 
 Hỗ trợ:
-- Chuyển đổi trạng thái linh hoạt: Online (Xanh), Idle (Cam), DND (Đỏ), Invisible (Xám).
-- Các loại hoạt động: Custom Status, Playing, Watching, Listening, Competing.
-- Chế độ xoay tua tự động (Auto-Rotating Presence).
-- Tự động thay đổi trạng thái theo vòng đời bot (Khởi động xong -> Live, Redeploy -> Idle, Maintenance -> DND).
-- Điều khiển tức thì từ Web Dashboard và Discord Slash Command.
+- Trạng thái rõ ràng: Online (Xanh), Idle (Cam / Đang cập nhật), DND (Đỏ / Lỗi / Stuck).
+- Hiển thị chuẩn hóa: "Live v{CURRENT_VERSION} | .m help" (loại bỏ xoay tua các lệnh / không cần thiết).
+- Chuyển đổi trạng thái tự động theo vòng đời:
+    + Khởi động xong: Live (Xanh 🟢)
+    + Trước khi tắt / Redeploy / Update: Updating (Cam 🟡)
+    + Khi bị kẹt / lag Gateway / lỗi kết nối: Error (Đỏ 🔴) kèm watchdog tự phục hồi khi ổn định.
 """
 
 import asyncio
@@ -34,12 +35,7 @@ ACTIVITY_TYPE_MAP = {
     "competing": discord.ActivityType.competing,
 }
 
-DEFAULT_ROTATION_ITEMS = [
-    f"Live v{CURRENT_VERSION} | .m help",
-    "🔮 /tarot - Bốc bài Tarot chiêm tinh",
-    "📝 /tomtat - Tóm tắt kênh chat thông minh",
-    "👑 AutoEmbed 9 mạng xã hội siêu gọn",
-]
+DEFAULT_PRESENCE_TEXT = f"Live v{CURRENT_VERSION} | .m help"
 
 
 class PresenceManager:
@@ -48,11 +44,14 @@ class PresenceManager:
     def __init__(self):
         self._status: str = "online"
         self._activity_type: str = "custom"
-        self._activity_text: str = f"Live v{CURRENT_VERSION} | .m help"
-        self._is_rotating: bool = True
+        self._activity_text: str = DEFAULT_PRESENCE_TEXT
+        self._is_rotating: bool = False
         self._rotation_index: int = 0
-        self._rotation_items: List[str] = list(DEFAULT_ROTATION_ITEMS)
+        self._rotation_items: List[str] = [DEFAULT_PRESENCE_TEXT]
         self._rotation_task: Optional[asyncio.Task] = None
+        self._watchdog_task: Optional[asyncio.Task] = None
+        self._is_updating: bool = False
+        self._is_auto_error: bool = False
         self._lock = threading.Lock()
         self._db_initialized: bool = False
 
@@ -81,11 +80,12 @@ class PresenceManager:
                 "activity_text": self._activity_text,
                 "is_rotating": self._is_rotating,
                 "rotation_items": list(self._rotation_items),
+                "is_updating": self._is_updating,
                 "version": CURRENT_VERSION,
             }
 
     async def init_db(self, bot: discord.Client) -> None:
-        """Tải cấu hình presence đã lưu từ Database (nếu có)."""
+        """Tải cấu hình presence đã lưu từ Database (nếu có) và chuẩn hóa dữ liệu."""
         from core.db import db_client
         try:
             await db_client.execute("""
@@ -94,7 +94,7 @@ class PresenceManager:
                     status         TEXT NOT NULL DEFAULT 'online',
                     activity_type  TEXT NOT NULL DEFAULT 'custom',
                     activity_text  TEXT NOT NULL,
-                    is_rotating    INTEGER NOT NULL DEFAULT 1,
+                    is_rotating    INTEGER NOT NULL DEFAULT 0,
                     updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
                 )
             """)
@@ -106,8 +106,15 @@ class PresenceManager:
                     with self._lock:
                         self._status = row[0] or "online"
                         self._activity_type = row[1] or "custom"
-                        self._activity_text = row[2] or f"Live v{CURRENT_VERSION} | .m help"
-                        self._is_rotating = bool(row[3])
+                        saved_text = row[2] or ""
+
+                        # Nếu trong DB là các text xoay tua cũ (chứa slash command /tarot, /tomtat) hoặc phiên bản cũ
+                        if not saved_text or any(cmd in saved_text for cmd in ["/tarot", "/tomtat", "AutoEmbed"]) or saved_text.startswith("Live v"):
+                            self._activity_text = DEFAULT_PRESENCE_TEXT
+                            self._is_rotating = False
+                        else:
+                            self._activity_text = saved_text
+                            self._is_rotating = bool(row[3])
         except Exception as e:
             print(f"⚠️ [PresenceManager] Lỗi nạp cấu hình Presence: {e}", flush=True)
 
@@ -118,7 +125,7 @@ class PresenceManager:
             activity_type=self._activity_type,
             text=self._activity_text,
             is_rotating=self._is_rotating,
-            save_db=False
+            save_db=True
         )
 
     def _build_activity(self, activity_type: str, text: str) -> Optional[discord.BaseActivity]:
@@ -151,11 +158,11 @@ class PresenceManager:
     ) -> bool:
         """Áp dụng trạng thái mới lên Discord Bot và lưu cấu hình."""
         status_clean = status.lower()
-        
+
         with self._lock:
             self._status = status_clean
             self._activity_type = activity_type.lower()
-            self._activity_text = text or f"Live v{CURRENT_VERSION} | .m help"
+            self._activity_text = text or DEFAULT_PRESENCE_TEXT
             self._is_rotating = is_rotating
 
         # Dừng vòng lặp xoay tua cũ nếu đang chạy
@@ -167,7 +174,6 @@ class PresenceManager:
             asyncio.create_task(self._save_to_db())
 
         if not bot.is_ready():
-            # Nếu bot chưa kết nối xong, tự động đợi kết nối rồi áp dụng
             asyncio.create_task(self._wait_and_apply(bot))
             return True
 
@@ -197,14 +203,14 @@ class PresenceManager:
             else:
                 act = self._build_activity(self._activity_type, self._activity_text)
                 await bot.change_presence(status=discord_status, activity=act)
-                print(f"✨ [PresenceManager] Đã cập nhật trạng thái: [{self._status.upper()}] ({self._activity_type}) - {self._activity_text}", flush=True)
+                print(f"✨ [PresenceManager] Trạng thái Discord: [{self._status.upper()}] {self._activity_text}", flush=True)
             return True
         except Exception as e:
             print(f"❌ [PresenceManager] Lỗi khi đổi trạng thái bot: {e}", flush=True)
             return False
 
     async def _rotation_loop(self, bot: discord.Client):
-        """Vòng lặp tự động thay đổi trạng thái định kỳ mỗi 45 giây."""
+        """Vòng lặp xoay tua trạng thái nếu được bật (mỗi 45 giây)."""
         while True:
             try:
                 if not self._is_rotating:
@@ -225,22 +231,35 @@ class PresenceManager:
                 print(f"⚠️ [PresenceManager] Lỗi trong vòng lặp rotation: {e}", flush=True)
                 await asyncio.sleep(15.0)
 
-    async def set_redeploying(self, bot: discord.Client):
-        """Đặt trạng thái bot đang redeploy / cập nhật phiên bản."""
+    async def set_updating(self, bot: discord.Client, reason: str = ""):
+        """Đặt trạng thái bot sang Đang Cập Nhật / Redeploy trước khi tắt máy (Idle - Vàng/Cam 🟡)."""
+        self._is_updating = True
         if self._rotation_task and not self._rotation_task.done():
             self._rotation_task.cancel()
             self._rotation_task = None
 
+        text = reason or f"Đang cập nhật... | v{CURRENT_VERSION}"
+        with self._lock:
+            self._status = "idle"
+            self._activity_type = "custom"
+            self._activity_text = text
+            self._is_rotating = False
+
         if bot.is_ready():
             try:
-                act = discord.CustomActivity(name="Custom Status", state="Đang redeploy / cập nhật phiên bản mới...")
+                act = discord.CustomActivity(name="Custom Status", state=text)
                 await bot.change_presence(status=discord.Status.idle, activity=act)
-                print("🔄 [PresenceManager] Đã chuyển trạng thái sang REDEPLOYING (Idle).", flush=True)
-            except Exception:
-                pass
+                print(f"🔄 [PresenceManager] Đã chuyển trạng thái sang UPDATING (Idle 🟡): {text}", flush=True)
+                await asyncio.sleep(1.5)
+            except Exception as e:
+                print(f"⚠️ [PresenceManager] Lỗi khi chuyển trạng thái updating: {e}", flush=True)
 
-    async def set_maintenance(self, bot: discord.Client, reason: str = "Đang bảo trì / fix bug đợi sửa..."):
-        """Đặt trạng thái bot đang bảo trì sang DND để người dùng vẫn xem được lý do."""
+    async def set_redeploying(self, bot: discord.Client):
+        """Alias cho set_updating phục vụ graceful shutdown."""
+        await self.set_updating(bot)
+
+    async def set_maintenance(self, bot: discord.Client, reason: str = "Đang bảo trì / fix bug..."):
+        """Đặt trạng thái bot đang bảo trì sang DND (Đỏ 🔴)."""
         await self.apply_presence(
             bot=bot,
             status="dnd",
@@ -250,27 +269,86 @@ class PresenceManager:
             save_db=True
         )
 
-    async def set_error(self, bot: discord.Client, reason: str = "Đang gặp lỗi kỹ thuật / fix bug đợi xíu..."):
-        """Đặt trạng thái bot khi gặp lỗi sang DND (tuyệt đối không để offline)."""
-        await self.apply_presence(
-            bot=bot,
-            status="dnd",
-            activity_type="custom",
-            text=reason,
-            is_rotating=False,
-            save_db=True
-        )
+    async def set_error(self, bot: discord.Client, reason: str = "Đang gặp sự cố kỹ thuật...", auto_recover: bool = False):
+        """Đặt trạng thái bot khi gặp lỗi hoặc bị kẹt/treo sang DND (Đỏ 🔴) để Admin thấy."""
+        self._is_auto_error = auto_recover
+        with self._lock:
+            self._status = "dnd"
+            self._activity_type = "custom"
+            self._activity_text = reason
+            self._is_rotating = False
+
+        if bot.is_ready():
+            try:
+                act = discord.CustomActivity(name="Custom Status", state=reason)
+                await bot.change_presence(status=discord.Status.dnd, activity=act)
+                print(f"🛑 [PresenceManager] Đã chuyển trạng thái sang ERROR (DND - Đỏ 🔴): {reason}", flush=True)
+            except Exception as e:
+                print(f"⚠️ [PresenceManager] Lỗi khi đổi trạng thái error: {e}", flush=True)
+
+        if not auto_recover:
+            asyncio.create_task(self._save_to_db())
 
     async def set_live(self, bot: discord.Client):
-        """Khôi phục trạng thái bot hoạt động bình thường (Live)."""
+        """Khôi phục trạng thái bot hoạt động bình thường (Online - Xanh 🟢)."""
+        self._is_updating = False
+        self._is_auto_error = False
         await self.apply_presence(
             bot=bot,
             status="online",
             activity_type="custom",
-            text=f"Live v{CURRENT_VERSION} | .m help",
-            is_rotating=True,
+            text=DEFAULT_PRESENCE_TEXT,
+            is_rotating=False,
             save_db=True
         )
+
+    async def start_watchdog(self, bot: discord.Client) -> None:
+        """Kích hoạt tác vụ giám sát sức khỏe kết nối (Watchdog) để tự động phát hiện stuck/lỗi."""
+        if self._watchdog_task and not self._watchdog_task.done():
+            return
+        self._watchdog_task = asyncio.create_task(self._watchdog_loop(bot))
+        print("🛡️ [PresenceManager] Đã kích hoạt Watchdog giám sát sức khỏe kết nối.", flush=True)
+
+    async def _watchdog_loop(self, bot: discord.Client):
+        """Vòng lặp định kỳ (mỗi 20 giây) kiểm tra latency và kết nối Gateway để tự động chuyển đỏ nếu stuck."""
+        consecutive_lag_count = 0
+        while True:
+            try:
+                await asyncio.sleep(20.0)
+
+                # Bỏ qua nếu đang trong quá trình update/shutdown có chủ đích
+                if self._is_updating:
+                    continue
+
+                if not bot.is_ready():
+                    consecutive_lag_count += 1
+                    if consecutive_lag_count >= 2 and self._status != "dnd":
+                        print("⚠️ [Watchdog] Bot mất kết nối Gateway! Chuyển trạng thái sang DND (Đỏ 🔴).", flush=True)
+                        await self.set_error(bot, f"Mất kết nối Discord | v{CURRENT_VERSION}", auto_recover=True)
+                    continue
+
+                # Kiểm tra độ trễ Gateway WebSocket
+                latency = bot.latency
+                import math
+                if math.isnan(latency) or math.isinf(latency) or latency > 5.0:
+                    consecutive_lag_count += 1
+                    if consecutive_lag_count >= 2 and self._status != "dnd":
+                        print(f"⚠️ [Watchdog] Gateway lag/stuck ({latency:.1f}s)! Chuyển sang DND (Đỏ 🔴).", flush=True)
+                        await self.set_error(bot, f"Lag Gateway ({latency:.1f}s) | .m help", auto_recover=True)
+                else:
+                    # Kết nối hoàn toàn bình thường
+                    if consecutive_lag_count > 0:
+                        consecutive_lag_count = 0
+                        # Nếu trước đó bị watchdog đánh dấu lỗi tự động, tự động phục hồi về Live (Xanh)
+                        if self._is_auto_error and self._status == "dnd":
+                            print("✨ [Watchdog] Kết nối đã ổn định trở lại! Tự động khôi phục Live (Xanh 🟢).", flush=True)
+                            await self.set_live(bot)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"⚠️ [Watchdog] Lỗi vòng lặp giám sát: {e}", flush=True)
+                await asyncio.sleep(10.0)
 
     async def _save_to_db(self):
         """Lưu cấu hình presence vào Database."""

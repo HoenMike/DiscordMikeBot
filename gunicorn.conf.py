@@ -28,7 +28,13 @@ def post_fork(server, worker):
     - Giúp Web Dashboard truy cập trực tiếp trạng thái live của Bot (bot.is_ready, guilds, latency).
     """
     server.log.info("🚀 [Gunicorn Worker %s] Đang khởi động Discord Bot worker thread...", worker.pid)
-    from app import ensure_bot_started
+    import signal
+    from app import ensure_bot_started, handle_sigterm
+    try:
+        signal.signal(signal.SIGTERM, handle_sigterm)
+        signal.signal(signal.SIGINT, handle_sigterm)
+    except Exception as sig_err:
+        server.log.warning("⚠️ Không thể đăng ký signal handler trong worker: %s", sig_err)
     ensure_bot_started()
 
 

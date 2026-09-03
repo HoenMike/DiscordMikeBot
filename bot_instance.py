@@ -38,32 +38,47 @@ class SummaryBot(commands.Bot):
         self.config_manager = ConfigManager()
 
     async def setup_hook(self):
-        await self.config_manager.init_db()
-        await activity_logger.init_db()
-
-        for ext in FEATURE_EXTENSIONS:
-            try:
-                await self.load_extension(ext)
-                print(f"✅ Đã tải thành công extension: {ext}", flush=True)
-            except Exception as cog_error:
-                print(f"⚠️ Bỏ qua extension '{ext}' do không khả dụng hoặc lỗi: {cog_error}", flush=True)
-                traceback.print_exc(file=sys.stdout)
-
-        print("🔄 Đang đồng bộ hóa Slash Commands...", flush=True)
         try:
-            synced = await self.tree.sync()
-            print(f"🎉 Đã đồng bộ hóa {len(synced)} Slash Commands toàn cầu thành công!", flush=True)
-        except Exception as sync_error:
-            print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
-            traceback.print_exc(file=sys.stdout)
+            await self.config_manager.init_db()
+            await activity_logger.init_db()
+
+            for ext in FEATURE_EXTENSIONS:
+                try:
+                    await self.load_extension(ext)
+                    print(f"✅ Đã tải thành công extension: {ext}", flush=True)
+                except Exception as cog_error:
+                    print(f"⚠️ Bỏ qua extension '{ext}' do không khả dụng hoặc lỗi: {cog_error}", flush=True)
+                    traceback.print_exc(file=sys.stdout)
+
+            print("🔄 Đang đồng bộ hóa Slash Commands...", flush=True)
+            try:
+                synced = await self.tree.sync()
+                print(f"🎉 Đã đồng bộ hóa {len(synced)} Slash Commands toàn cầu thành công!", flush=True)
+            except Exception as sync_error:
+                print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
+                traceback.print_exc(file=sys.stdout)
+        except Exception as setup_err:
+            print(f"❌ [Setup Hook Crash] {setup_err}", flush=True)
+            try:
+                from core.presence_manager import presence_manager
+                await presence_manager.set_error(self, f"Lỗi khởi động: {str(setup_err)[:30]}")
+            except Exception:
+                pass
+            raise
 
     async def on_ready(self):
         print(f"🎉 Bot Discord đã kết nối thành công: {self.user} (ID: {self.user.id})", flush=True)
         try:
             from core.presence_manager import presence_manager
             await presence_manager.init_db(self)
+            await presence_manager.set_live(self)
+            await presence_manager.start_watchdog(self)
         except Exception as e:
             print(f"⚠️ [Presence] Lỗi khởi tạo presence on_ready: {e}", flush=True)
+
+    async def on_error(self, event_method: str, *args, **kwargs):
+        print(f"❌ [Bot Event Error] Lỗi nghiêm trọng tại event '{event_method}'", flush=True)
+        traceback.print_exc(file=sys.stdout)
 
         # Kiểm tra trạng thái tạm ngừng của máy chủ trước khi xử lý Slash Command
         async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
@@ -619,7 +634,7 @@ async def setstatus_slash(
     act_type = activity_type.value if activity_type else "custom"
     is_rot = rotating if rotating is not None else False
     status_val = status.value
-    status_text = text or f"Live | .m help"
+    status_text = text or f"Live v{CURRENT_VERSION} | .m help"
 
     success = await presence_manager.apply_presence(
         bot=bot,
@@ -651,7 +666,7 @@ async def setstatus_cmd(ctx: commands.Context, status_arg: str = "online", *, te
         status_val = "online"
         text_arg = f"{status_arg} {text_arg}".strip()
 
-    status_text = text_arg or "Live | .m help"
+    status_text = text_arg or f"Live v{CURRENT_VERSION} | .m help"
     success = await presence_manager.apply_presence(
         bot=bot,
         status=status_val,
