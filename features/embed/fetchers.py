@@ -24,18 +24,18 @@ async def fetch_twitter(session: aiohttp.ClientSession, url: str, match) -> Post
         media_type = "text"
         media_obj = tweet.get("media", {})
         if media_obj:
+            videos = media_obj.get("videos", [])
+            if videos:
+                # Đối với video trên Twitter/X: Trả về None để nhường cho Tier 1 (Proxy: fxtwitter / fixupx)
+                # Giúp Discord tự động nhúng native video player tương tác trực tiếp có âm thanh
+                return None
+
             photos = media_obj.get("photos", [])
             for photo in photos:
                 if photo.get("url"):
                     media_urls.append(photo["url"])
 
-            videos = media_obj.get("videos", [])
-            if videos:
-                for video in videos:
-                    if video.get("thumbnail_url"):
-                        media_urls.append(video["thumbnail_url"])
-                media_type = "video"
-            elif len(media_urls) > 1:
+            if len(media_urls) > 1:
                 media_type = "gallery"
             elif len(media_urls) == 1:
                 media_type = "image"

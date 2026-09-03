@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.8] - 2026-09-03 — *Embed Link Polish & Smart Fallback Optimization*
+
+### Changed
+- **Subtext Jump Link Clean up**: Bọc toàn bộ link proxy vào dạng markdown `[Xem bài viết gốc](url)`, hoàn toàn loại bỏ việc để lộ raw link dài/xấu ra giao diện chat.
+- **Loại bỏ Reply Icon**: Lược bỏ icon `↩️` trước chữ Trả lời, định dạng đồng bộ siêu gọn: `-# [Trả lời](jump_url) **Tên** • [Xem bài viết gốc](url)`.
+
+### Fixed
+- **Loại bỏ kiểm tra Video Stream CDN gây lỗi 403**: Gỡ bỏ request GET trực tiếp tới CDN video trong `validator.py` (nguyên nhân chính khiến Facebook Reels trả về 403 và bị fallback thừa sang yt-dlp).
+- **Cập nhật danh sách Proxy Domains**: Loại bỏ proxy chết (`kktiktok.com`, `kkinstagram.com`), ưu tiên các proxy hoạt động nhanh và ổn định (`tiktxk.com`, `tfxktok.com`, `vxreddit.com`, `fixthreads.seria.moe`).
+- **Sửa API fxtwitter.com**: Cập nhật kiểm tra API fxtwitter để không từ chối các tweet chỉ chứa văn bản, tránh fallback thừa sang các proxy khác.
+- **Bảo vệ Cache Domain**: Ngăn chặn tình trạng đưa nhầm domain vào danh sách blacklist 30s khi chỉ gặp lỗi 404 hoặc bài viết riêng tư.
+- **Tối ưu Fallback Tier 2 (yt-dlp)**: Chỉ fallback sang yt-dlp cho các nền tảng video, giảm timeout từ 30s xuống 15s để xử lý nhanh chóng.
+
+---
+
 ## [2.4.7] - 2026-08-28 — *Gunicorn Worker Lifecycle & Port Binding Fix*
 
 ### Fixed

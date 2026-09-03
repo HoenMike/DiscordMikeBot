@@ -12,7 +12,7 @@ _YTDLP_OPTS = {
     "noplaylist": True,
 }
 
-_YTDLP_TIMEOUT = 30
+_YTDLP_TIMEOUT = 15
 
 
 def _extract_sync(url: str) -> dict | None:

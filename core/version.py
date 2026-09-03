@@ -10,12 +10,39 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.7"
-RELEASE_DATE = "2026-08-28"
-CODENAME = "Gunicorn Worker Lifecycle & Port Binding Fix"
+CURRENT_VERSION = "2.4.8"
+RELEASE_DATE = "2026-09-03"
+CODENAME = "Embed Link Polish & Smart Fallback Optimization"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.8",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Làm Gọn Subtext Embed & Tối Ưu Hóa Proxy Fallback",
+        "summary": "Ẩn link proxy trực tiếp vào hyperlink [Xem bài viết gốc], lược bỏ icon reply ↩️ ở subtext, loại bỏ kiểm tra video stream CDN gây lỗi 403, cập nhật danh sách proxy hoạt động ổn định và ngăn ngừa fallback thừa sang yt-dlp.",
+        "changes": [
+            {
+                "category": "🎨 Giao Diện & Trải Nghiệm Embed",
+                "items": [
+                    "Làm gọn subtext: Chuyển link raw proxy thành link markdown '[Xem bài viết gốc](url)', không để lộ link proxy ra chat.",
+                    "Lược bỏ icon reply ↩️, giữ nguyên dòng định dạng subtext siêu nhỏ: -# [Trả lời](jump_url) **Tên** • [Xem bài viết gốc](url).",
+                    "Đồng bộ xóa icon reply ↩️ ở cả Tier 0 (API), Tier 1 (Proxy) và Tier 2 (yt-dlp)."
+                ]
+            },
+            {
+                "category": "⚡ Tối Ưu Hóa Proxy & Fallback",
+                "items": [
+                    "Khắc phục lỗi kiểm tra video stream: Gỡ bỏ HTTP GET trực tiếp tới video CDN URL trong validator (nguyên nhân gây HTTP 403 trên Facebook CDN và kích hoạt fallback thừa sang yt-dlp).",
+                    "Cập nhật Proxy Domains: Bỏ proxy chết (kktiktok, kkinstagram), ưu tiên các proxy nhanh và ổn định (tiktxk, tfxktok, vxreddit, fixthreads).",
+                    "Sửa API fxtwitter: Cho phép API fxtwitter chấp nhận cả tweet dạng văn bản lẫn media mà không bị từ chối.",
+                    "Bảo vệ cache domain: Không đưa domain proxy vào blacklist cooldown khi gặp lỗi bài viết 404 hoặc riêng tư.",
+                    "Giới hạn yt-dlp Tier 2: Chỉ fallback yt-dlp cho các nền tảng video, giảm timeout từ 30s xuống 15s để tránh treo luồng."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.7",
         "date": "2026-08-28",

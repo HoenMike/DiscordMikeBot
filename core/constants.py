@@ -185,15 +185,15 @@ PLATFORMS = {
 # Proxy Fallback Registry
 # ---------------------------------------------------------------------------
 PROXY_DOMAINS = {
-    "twitter": ["fxtwitter.com", "vxtwitter.com", "fixupx.com", "fixvx.com"],
+    "twitter": ["fxtwitter.com", "fixupx.com", "vxtwitter.com", "fixvx.com"],
     "pixiv": ["phixiv.net"],
-    "tiktok": ["kktiktok.com", "tnktok.com", "tiktxk.com"],
-    "reddit": ["rxddit.com", "vxreddit.com", "fxreddit.seria.moe"],
-    "instagram": ["kkinstagram.com", "eeinstagram.com", "fxig.seria.moe"],
+    "tiktok": ["tiktxk.com", "tfxktok.com", "tnktok.com"],
+    "reddit": ["vxreddit.com", "fxreddit.seria.moe", "rxddit.com"],
+    "instagram": ["eeinstagram.com", "vxinstagram.com", "fxig.seria.moe"],
     "facebook": ["facebed.com", "facebed.seria.moe"],
     "bluesky": ["fxbsky.app", "bskx.app"],
     "twitch": ["fxtwitch.seria.moe"],
-    "threads": ["vxthreads.com", "fixthreads.seria.moe"],
+    "threads": ["fixthreads.seria.moe", "vxthreads.com"],
 }
 
 
@@ -219,7 +219,7 @@ PLATFORM_ORIGINAL_DOMAINS = {
 PROXY_API_ENDPOINTS = {
     "fxtwitter.com": {
         "template": "https://api.fxtwitter.com/{path}",
-        "media_check": "tweet.media",
+        "media_check": "tweet",
     },
 }
 

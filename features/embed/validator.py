@@ -104,12 +104,18 @@ _MEDIA_META_KEYS = [
 # Kích thước tối đa đọc từ response (256KB) để đảm bảo không bỏ sót thẻ meta
 _MAX_READ_BYTES = 262144
 
-# Timeout cho mỗi request xác thực đơn lẻ (4.5s tổng, 2.0s kết nối để khớp với timeout unfurl của Discord)
-_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=4.5, connect=2.0)
+# Timeout cho mỗi request xác thực đơn lẻ (3.5s tổng, 1.5s kết nối để fail-fast khi gặp proxy treo)
+_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=3.5, connect=1.5)
 
 # Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 30 giây)
 _FAILED_DOMAINS_CACHE: dict[str, float] = {}
 _FAILED_DOMAIN_TTL = 30.0  # 30 giây
+
+
+def _mark_domain_failed(domain: str) -> None:
+    """Đánh dấu domain tạm thời bị lỗi server/mạng để cooldown."""
+    if domain:
+        _FAILED_DOMAINS_CACHE[domain] = time.monotonic() + _FAILED_DOMAIN_TTL
 
 
 def _extract_meta_tags(html: str) -> dict[str, str]:
@@ -222,10 +228,18 @@ async def validate_via_api(
             f"[ProxyValidator] API hết thời gian chờ: {api_url}",
             flush=True,
         )
+        _mark_domain_failed(proxy_domain)
         return False, False
-    except (aiohttp.ClientError, ValueError) as e:
+    except aiohttp.ClientError as e:
         print(
             f"[ProxyValidator] API không phản hồi: {api_url} - {e}",
+            flush=True,
+        )
+        _mark_domain_failed(proxy_domain)
+        return False, False
+    except ValueError as e:
+        print(
+            f"[ProxyValidator] API dữ liệu JSON lỗi: {api_url} - {e}",
             flush=True,
         )
         return False, False
@@ -235,6 +249,7 @@ async def validate_via_og_metadata(
     session: aiohttp.ClientSession,
     proxy_url: str,
     platform_key: str = "",
+    proxy_domain: str = "",
 ) -> tuple[bool, bool]:
     """Xác thực proxy URL bằng cách kiểm tra OpenGraph/Twitter Card metadata. Trả về (is_valid, is_nsfw)."""
     try:
@@ -255,6 +270,8 @@ async def validate_via_og_metadata(
                     f"[ProxyValidator] Proxy trả về HTTP {resp.status}: {proxy_url}",
                     flush=True,
                 )
+                if resp.status in (500, 502, 503, 504):
+                    _mark_domain_failed(proxy_domain)
                 return False, False
 
             # Kiểm tra nếu proxy bị chuyển hướng ngược về trang đăng nhập của nền tảng gốc
@@ -289,40 +306,13 @@ async def validate_via_og_metadata(
 
             # 1. Kiểm tra sự tồn tại của media thực tế (ảnh, video, audio, player)
             has_media = False
-            video_url_to_verify = None
             for mk in _MEDIA_META_KEYS:
                 val = meta_tags.get(mk)
                 if val:
                     val_lower = val.lower()
                     if val_lower not in ("", "#") and not val_lower.endswith(("/favicon.ico", "/favicon.png", "logo.png")):
                         has_media = True
-                        if mk in ("og:video", "og:video:url", "og:video:secure_url", "twitter:player:stream"):
-                            video_url_to_verify = val
                         break
-
-            # Nếu có link video stream, kiểm tra nhanh xem endpoint video có bị 403 Forbidden / 404 không
-            if has_media and video_url_to_verify:
-                if not video_url_to_verify.startswith(("http://", "https://")):
-                    parsed_proxy = urlparse(proxy_url)
-                    video_url_to_verify = f"{parsed_proxy.scheme}://{parsed_proxy.netloc}{video_url_to_verify if video_url_to_verify.startswith('/') else '/' + video_url_to_verify}"
-                try:
-                    async with session.get(
-                        video_url_to_verify,
-                        headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=2.0),
-                        allow_redirects=True,
-                    ) as v_resp:
-                        if v_resp.status in (401, 403, 404, 410, 500, 502, 503, 504):
-                            print(
-                                f"[ProxyValidator] Video stream endpoint trả về lỗi HTTP {v_resp.status}: {video_url_to_verify}",
-                                flush=True,
-                            )
-                            has_media = False
-                except Exception as v_err:
-                    print(
-                        f"[ProxyValidator] Không thể kết nối tới video stream: {video_url_to_verify} ({v_err})",
-                        flush=True,
-                    )
 
             is_nsfw = bool(_NSFW_PATTERN.search(html_text))
             if has_media:
@@ -364,12 +354,14 @@ async def validate_via_og_metadata(
             f"[ProxyValidator] Hết thời gian chờ ({_VALIDATE_TIMEOUT.total}s): {proxy_url}",
             flush=True,
         )
+        _mark_domain_failed(proxy_domain)
         return False, False
     except aiohttp.ClientError as e:
         print(
             f"[ProxyValidator] Proxy không kết nối được: {proxy_url} - {e}",
             flush=True,
         )
+        _mark_domain_failed(proxy_domain)
         return False, False
     except Exception as e:
         print(
@@ -439,7 +431,9 @@ async def find_valid_proxy(
                     )
                     return proxy_url, is_nsfw
 
-            is_valid, is_nsfw = await validate_via_og_metadata(session, proxy_url, platform_key=platform_key)
+            is_valid, is_nsfw = await validate_via_og_metadata(
+                session, proxy_url, platform_key=platform_key, proxy_domain=domain
+            )
 
         if is_valid:
             print(
@@ -449,9 +443,8 @@ async def find_valid_proxy(
             )
             return proxy_url, is_nsfw
 
-        _FAILED_DOMAINS_CACHE[domain] = time.monotonic() + _FAILED_DOMAIN_TTL
         print(
-            f"[ProxyValidator] Proxy thất bại: {domain} (nền tảng: {platform_key})",
+            f"[ProxyValidator] Proxy không thỏa mãn điều kiện bài viết: {domain} (nền tảng: {platform_key})",
             flush=True,
         )
 

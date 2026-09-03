@@ -348,7 +348,7 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
         name="✨ CÁC CƠ CHẾ QOL & TRẢI NGHIỆM ĐỘC QUYỀN",
         value=(
             "• 🛡️ **Bảo toàn tin nhắn & ảnh gốc (Suppress Mode)**: Bot không xóa tin nhắn của bạn, giữ nguyên 100% ảnh/tệp đính kèm. Khi người khác reply tin nhắn của bạn, Discord vẫn **tự động tô vàng dòng chat (Yellow Highlight)** và gửi thông báo native.\n"
-            "• 🏷️ **Subtext Jump Link siêu gọn**: Hiển thị dòng chú thích nhỏ `↩️ Trả lời [Tên](link)` ngay trên Embed, nhấp vào là cuộn ngay về tin gốc, không bị lặp chữ hay double ping.\n"
+            "• 🏷️ **Subtext Jump Link siêu gọn**: Hiển thị dòng chú thích nhỏ `Trả lời [Tên](link) • [Xem bài viết gốc](url)` ngay trên Embed, nhấp vào là cuộn ngay về tin gốc, không bị lộ link hay double ping.\n"
             "• 🗑️ **Tự động xóa Embed đồng bộ**: Khi bạn xóa tin nhắn gốc chứa link, Bot sẽ **tự động dọn sạch Embed tương ứng** (không để lại rác trong chat).\n"
             "• 🔞 **Force Spoiler & Nhận diện NSFW**: Tự động che mờ khi bọc trong `||link||` hoặc khi tin nhắn có từ khóa (`nsfw`, `18+`, `r18`, `spoiler`, `nhạy cảm`...)."
         ),

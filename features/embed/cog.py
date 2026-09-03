@@ -378,7 +378,7 @@ class EmbedCog(commands.Cog):
                 file = await self._create_spoiler_file(post_data.media_urls[0])
 
             author_name = _clean_markdown_label(message.author.display_name)
-            header_text = f"-# ↩️ [Trả lời]({message.jump_url}) **{author_name}**"
+            header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
             return await self._send_embed_preview(
                 message=message,
@@ -423,7 +423,7 @@ class EmbedCog(commands.Cog):
             nsfw_mode = config.get("nsfw_mode", "spoiler")
 
             # Tạo header Subtext xám siêu nhỏ: Vừa dẫn link nhảy về tin nhắn gốc, vừa chứa link proxy để Discord crawl embed
-            # Khi là spoiler/NSFW: Bọc spoiler link proxy (||proxy_url||) để Discord che mờ embed, giữ nguyên dòng trả lời luôn hiển thị rõ ràng
+            # Khi là spoiler/NSFW: Bọc spoiler link proxy (||[Xem bài viết gốc](proxy_url)||) để Discord che mờ embed, giữ nguyên dòng trả lời luôn hiển thị rõ ràng
             author_name = _clean_markdown_label(message.author.display_name)
             author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
 
@@ -439,16 +439,16 @@ class EmbedCog(commands.Cog):
                         pass
                     return True
                 elif nsfw_mode == "spoiler":
-                    wrapped_proxy_url = f"-# ↩️ {author_jump} • ||{proxy_url}||"
+                    wrapped_proxy_url = f"-# {author_jump} • ||[Xem bài viết gốc]({proxy_url})||"
                 else:  # allow
                     if is_spoiler:
-                        wrapped_proxy_url = f"-# ↩️ {author_jump} • ||{proxy_url}||"
+                        wrapped_proxy_url = f"-# {author_jump} • ||[Xem bài viết gốc]({proxy_url})||"
                     else:
-                        wrapped_proxy_url = f"-# ↩️ {author_jump} • {proxy_url}"
+                        wrapped_proxy_url = f"-# {author_jump} • [Xem bài viết gốc]({proxy_url})"
             elif is_spoiler:
-                wrapped_proxy_url = f"-# ↩️ {author_jump} • ||{proxy_url}||"
+                wrapped_proxy_url = f"-# {author_jump} • ||[Xem bài viết gốc]({proxy_url})||"
             else:
-                wrapped_proxy_url = f"-# ↩️ {author_jump} • {proxy_url}"
+                wrapped_proxy_url = f"-# {author_jump} • [Xem bài viết gốc]({proxy_url})"
 
             return await self._send_embed_preview(
                 message=message,
@@ -466,6 +466,10 @@ class EmbedCog(commands.Cog):
         config: dict,
         is_spoiler: bool = False,
     ) -> bool:
+        # Chỉ kích hoạt fallback yt-dlp cho các nền tảng video được hỗ trợ
+        if platform_key not in ("twitter", "tiktok", "instagram", "facebook", "reddit", "twitch"):
+            return False
+
         try:
             post_data = await extract_media_ytdlp(url, platform_key)
             if post_data is None:
@@ -509,7 +513,7 @@ class EmbedCog(commands.Cog):
                     print(f"[EmbedCog] Không thể tải video fallback {url}: {dl_err}", flush=True)
 
             author_name = _clean_markdown_label(message.author.display_name)
-            header_text = f"-# ↩️ [Trả lời]({message.jump_url}) **{author_name}**"
+            header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
             return await self._send_embed_preview(
                 message=message,
