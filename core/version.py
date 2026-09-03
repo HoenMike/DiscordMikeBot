@@ -10,12 +10,30 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.8"
+CURRENT_VERSION = "2.4.9"
 RELEASE_DATE = "2026-09-03"
-CODENAME = "Embed Link Polish & Smart Fallback Optimization"
+CODENAME = "TikTok Embed Stream Fix & Domain Cache Hardening"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.4.9",
+        "date": "2026-09-03",
+        "type": "bugfix",
+        "title": "Khắc Phục Stream Video TikTok & Bảo Vệ Cache Cooldown Domain",
+        "summary": "Gỡ bỏ proxy tiktxk.com bị lỗi Akamai 403 (Image failed to load), ưu tiên tnktok.com (fxTikTok chính thức), đồng thời tinh chỉnh cache domain không kích hoạt cooldown khi timeout trên bài viết đơn lẻ.",
+        "changes": [
+            {
+                "category": "⚡ Tối Ưu Hóa Proxy TikTok & Cache",
+                "items": [
+                    "Loại bỏ hoàn toàn tiktxk.com khỏi danh sách proxy do dịch vụ đã ngừng duy trì và trả về endpoint video bị lỗi 403 Forbidden.",
+                    "Ưu tiên tnktok.com (fxTikTok) và tfxktok.com cho toàn bộ link TikTok để đảm bảo video player native hoạt động 100%.",
+                    "Thêm chữ ký nhận diện lỗi tiktxk vào bộ lọc validator để tự động loại bỏ proxy hỏng.",
+                    "Bảo vệ cache cooldown: Chỉ cách ly domain khi gặp lỗi máy chủ (502/503) hoặc mất kết nối mạng, tránh ngộ độc cache khi timeout bài viết đơn lẻ."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.8",
         "date": "2026-09-03",

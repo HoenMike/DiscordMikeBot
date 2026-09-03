@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.9] - 2026-09-03 — *TikTok Embed Stream Fix & Domain Cache Hardening*
+
+### Fixed
+- **Khắc phục lỗi "Image failed to load" trên TikTok**: Loại bỏ hoàn toàn proxy `tiktxk.com` (do Akamai 403 trên endpoint video của dự án đã bị bỏ hoang), chuyển sang ưu tiên `tnktok.com` (fxTikTok chính thức) và `tfxktok.com` để hiển thị video player native chuẩn xác 100%.
+- **Thêm chữ ký nhận diện lỗi tiktxk**: Tự động bỏ qua các proxy sinh mã lỗi JSON `cannot read properties of undefined` hoặc giao diện `tiktxk`.
+- **Bảo vệ Cache Cooldown Domain**: Chỉ đưa domain vào thời gian nghỉ cooldown khi gặp lỗi kết nối mạng thực sự (`ClientConnectorError`, DNS) hoặc mã máy chủ 502/503, tránh ngộ độc cache khi timeout trên một bài viết đơn lẻ.
+
+---
+
 ## [2.4.8] - 2026-09-03 — *Embed Link Polish & Smart Fallback Optimization*
 
 ### Changed

@@ -7,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 from core.config_manager import ConfigManager
 from core.activity_logger import activity_logger
+from core.version import CURRENT_VERSION
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -192,7 +193,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v2.4.6",
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v{CURRENT_VERSION}",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
