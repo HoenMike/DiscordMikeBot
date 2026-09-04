@@ -370,6 +370,7 @@ class TarotLauncherView(discord.ui.View):
         if actual_reader == "random" or not actual_reader or actual_reader not in READER_STYLES:
             actual_reader = random.choice(["neutral", "healer", "chaos"])
 
+        bot_user = interaction.client.user if interaction and interaction.client else None
         ai_task = asyncio.create_task(
             generate_tarot_reading(
                 spread_key=self.selected_spread,
@@ -378,7 +379,11 @@ class TarotLauncherView(discord.ui.View):
                 context=self.context,
                 reader_style=actual_reader,
                 user_name=self.author_name,
-                recent_context=recent_ctx
+                recent_context=recent_ctx,
+                user_id=self.author_id,
+                guild=interaction.guild if interaction else None,
+                bot_id=bot_user.id if bot_user else None,
+                bot_name=bot_user.display_name if bot_user else "MikeDaBot"
             )
         )
 
@@ -609,13 +614,18 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
         await interaction.response.defer(ephemeral=False)
         question_text = self.followup_input.value.strip()
 
+        bot_user = interaction.client.user if interaction and interaction.client else None
         answer = await generate_followup_answer(
             drawn_cards=self.drawn_cards,
             original_question=self.original_question,
             original_reading=self.original_reading,
             user_followup_question=question_text,
             reader_style=self.reader_style,
-            user_name=self.user_name
+            user_name=self.user_name,
+            user_id=interaction.user.id if interaction and interaction.user else None,
+            guild=interaction.guild if interaction else None,
+            bot_id=bot_user.id if bot_user else None,
+            bot_name=bot_user.display_name if bot_user else "MikeDaBot"
         )
 
         embed = discord.Embed(

@@ -237,7 +237,9 @@ class TarotCog(commands.Cog):
                 fatigue_card_ids=fatigue_card_ids
             )
 
-            # 2. Zero-Latency Pre-fetch (kèm Trí nhớ bạn cũ)
+            # 2. Zero-Latency Pre-fetch (kèm Trí nhớ bạn cũ & Nhận thức đối tượng @mention)
+            bot_user = self.bot.user or (interaction.client.user if interaction and interaction.client else None)
+            guild_obj = interaction.guild if interaction else (ctx.guild if ctx else None)
             ai_task = asyncio.create_task(
                 generate_tarot_reading(
                     spread_key=spread_key,
@@ -246,7 +248,11 @@ class TarotCog(commands.Cog):
                     context=clean_context if clean_context else None,
                     reader_style=reader_key,
                     user_name=user.display_name,
-                    recent_context=recent_ctx
+                    recent_context=recent_ctx,
+                    user_id=user.id,
+                    guild=guild_obj,
+                    bot_id=bot_user.id if bot_user else None,
+                    bot_name=bot_user.display_name if bot_user else "MikeDaBot"
                 )
             )
 

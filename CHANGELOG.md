@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.2] - 2026-09-04 — *Tarot Mention Context & Entity Awareness & Grey-Zone Banter Flexibility*
+
+### Added
+- **Nhận Diện Thực Thể & Chuẩn Hóa Tag/Mention (`extract_question_mentions_context`)**:
+  - Tự động nhận diện và phân giải Discord raw mentions `<@123...>` thành `@DisplayName` để Gemini AI hiểu mượt mà.
+  - Phân biệt rõ ràng 3 thực thể độc lập: Người yêu cầu bốc bài (`user_name`), Chính Bot (`bot_name`), và Thành viên khác trong server (`@Member`).
+- **Khối Bối Cảnh Đối Tượng Được Tag Trong AI Prompt**:
+  - Chèn bảng phân tích đối tượng và vai trò vào khối `THÔNG TIN QUẺ BÀI`, thông báo cho Reader biết chính xác người hỏi đang hướng sự chú ý đến ai trong cộng đồng.
+- **Nới Lỏng Quy Chuẩn Vùng Xám & Đùa Vui (Không Quá Strict)**:
+  - Bổ sung ngoại lệ vào Nguyên tắc 4: Các câu hỏi trêu đùa, khen ngợi, hỏi vui về bạn bè trong server (ví dụ: *"@Mike có siêu cấp đẹp gái không?"*, *"@A dạo này có giàu không?"*) luôn được xem là hợp lệ (`is_valid: true`), không bị từ chối khắt khe.
+  - Chỉ từ chối khi thực sự có hành vi soi mói đời tư độc hại, bới móc bí mật cá nhân nhạy cảm giữa các bên thứ ba.
+- **Định Hướng Luận Giải Đúng Đối Tượng (Nguyên Tắc 7)**:
+  - Bổ sung Nguyên tắc 7 vào Prompt: Hướng dẫn AI giải mã năng lượng lá bài về thần thái, vẻ đẹp, phong cách của người được tag mà không nhầm lẫn với Bot.
+  - Đưa ra lời nhắn nhủ, đối đáp dí dỏm kết nối giữa người hỏi và người bạn được tag theo đúng Persona.
+- **Tích Hợp Toàn Diện Mọi Luồng Trải Bài**:
+  - Đồng bộ truyền context qua Slash/Prefix flow (`cog.py`), Interactive Launcher View, và Modal hỏi đáp đào sâu bổ sung (`tarot_view.py`).
+
+---
+
 ## [2.5.1] - 2026-09-04 — *Tarot Direct Focus & Grounded Symbolism & Yes/No Sync*
 
 ### Changed

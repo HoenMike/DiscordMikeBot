@@ -60,6 +60,128 @@ def _format_cards_context(drawn_cards: List[DrawnCard]) -> str:
     return "\n".join(lines)
 
 
+def extract_question_mentions_context(
+    question: Optional[str],
+    user_name: str,
+    user_id: Optional[int] = None,
+    guild: Optional[Any] = None,
+    bot_id: Optional[int] = None,
+    bot_name: str = "MikeDaBot"
+) -> Tuple[str, str]:
+    """
+    Trích xuất và phân tích đối tượng được tag/nhắc đến trong câu hỏi Tarot:
+    - Nhận diện các tag Discord dạng <@123456789> hoặc <@!123456789>.
+    - Nhận diện các tag văn bản dạng @Name.
+    - Phân biệt rõ:
+      1. Người yêu cầu bốc bài (user_name / user_id)
+      2. Chính Bot (bot_id / bot_name)
+      3. Người thứ hai / Thành viên khác trong server (@Member).
+    - Chuẩn hóa câu hỏi: Thay thế <@123456789> thành @DisplayName để Gemini hiểu trực quan.
+    - Trả về Tuple: (normalized_question, mentions_context_text)
+    """
+    if not question:
+        return "", ""
+
+    clean_q = question
+    raw_mentions = re.findall(r"<@!?(\d+)>", question)
+    entities = []
+    seen_ids = set()
+
+    # 1. Giải mã các mention Discord nguyên bản <@12345...>
+    for uid_str in raw_mentions:
+        uid = int(uid_str)
+        if uid in seen_ids:
+            continue
+        seen_ids.add(uid)
+        pattern = rf"<@!?{uid}>"
+
+        if bot_id and uid == bot_id:
+            tag_name = f"@{bot_name}"
+            entities.append({"type": "bot", "name": tag_name, "id": uid, "desc": "Chính Bạn (Tarot Bot / Reader)"})
+            clean_q = re.sub(pattern, tag_name, clean_q)
+        elif user_id and uid == user_id:
+            tag_name = f"@{user_name}"
+            entities.append({"type": "self", "name": tag_name, "id": uid, "desc": f"Chính người hỏi ({user_name})"})
+            clean_q = re.sub(pattern, tag_name, clean_q)
+        else:
+            m_name = None
+            is_bot = False
+            if guild and hasattr(guild, "get_member"):
+                member = guild.get_member(uid)
+                if member:
+                    m_name = member.display_name
+                    is_bot = getattr(member, "bot", False)
+            if not m_name:
+                m_name = f"ThànhViên_{uid}"
+
+            tag_name = f"@{m_name}"
+            clean_q = re.sub(pattern, tag_name, clean_q)
+            if is_bot or (bot_name and m_name.lower() == bot_name.lower()):
+                entities.append({"type": "bot", "name": tag_name, "id": uid, "desc": "Bot trong server"})
+            else:
+                entities.append({"type": "other", "name": tag_name, "id": uid, "desc": f"Thành viên khác trong server ({tag_name})"})
+
+    # 2. Giải mã các mention văn bản thường @Name
+    text_tags = re.findall(r"(?<!\w)@([\w\.\'\-]+)", clean_q)
+    for tag in text_tags:
+        t_clean = tag.strip()
+        t_lower = t_clean.lower()
+        if any(e["name"].lstrip("@").lower() == t_lower for e in entities):
+            continue
+
+        if t_lower in ["bot", "mikedabot", "mike bot", "mikesbot", "mike_bot"] or (bot_name and t_lower == bot_name.lower()):
+            entities.append({"type": "bot", "name": f"@{t_clean}", "id": bot_id, "desc": "Chính Bạn (Tarot Bot / Reader)"})
+        elif t_lower == user_name.lower() or (user_id and str(user_id) == t_clean):
+            entities.append({"type": "self", "name": f"@{t_clean}", "id": user_id, "desc": f"Chính người hỏi ({user_name})"})
+        else:
+            is_bot = False
+            m_found_name = t_clean
+            if guild and hasattr(guild, "members"):
+                for m in guild.members:
+                    if m.display_name.lower() == t_lower or m.name.lower() == t_lower:
+                        m_found_name = m.display_name
+                        is_bot = getattr(m, "bot", False) or (bot_id and m.id == bot_id)
+                        break
+            if is_bot:
+                entities.append({"type": "bot", "name": f"@{m_found_name}", "id": None, "desc": "Bot trong server"})
+            else:
+                entities.append({"type": "other", "name": f"@{m_found_name}", "id": None, "desc": f"Thành viên khác trong server (@{m_found_name})"})
+
+    if not entities:
+        return clean_q, "- Phân tích đối tượng: Người hỏi tự hỏi cho chính bản thân mình (không tag đối tượng cụ thể)."
+
+    details = []
+    other_members = []
+    has_bot = False
+
+    for e in entities:
+        if e["type"] == "bot":
+            has_bot = True
+            details.append(f"  • {e['name']}: Chính Bạn (Tarot Reader / Bot).")
+        elif e["type"] == "self":
+            details.append(f"  • {e['name']}: Chính người hỏi ({user_name}).")
+        else:
+            other_members.append(e["name"])
+            details.append(f"  • {e['name']}: Thành viên khác trong server (người thật, KHÔNG PHẢI bot).")
+
+    notes = []
+    if other_members:
+        members_str = ", ".join(other_members)
+        notes.append(
+            f"  🚨 LƯU Ý VỀ ĐỐI TƯỢNG ĐƯỢC NHẮC ĐẾN: Người hỏi (`{user_name}`) đang hỏi hoặc nhắc đến {members_str} (người thật trong server, không phải bot). "
+            f"Nếu đây là câu hỏi vui vẻ, trêu đùa, khen ngợi, hoặc tò mò vô thưởng vô phạt giữa bạn bè (vùng xám/banter), TUYỆT ĐỐI KHÔNG ĐƯỢC QUÁ STRICT MÀ TỪ CHỐI (vẫn là is_valid: true)! "
+            f"Hãy dùng năng lượng lá bài để giải mã và đưa ra lời bình luận/nhắn nhủ hóm hỉnh, ấm áp cho {members_str} và `{user_name}`."
+        )
+    if has_bot:
+        notes.append("  💡 LƯU Ý: Người hỏi có nhắc đến Bot. Hãy nhận thức rõ vai trò Reader của bạn và trả lời trực diện.")
+
+    mentions_context_str = (
+        "- Phân tích đối tượng được tag/nhắc đến trong câu hỏi:\n"
+        + "\n".join(details) + ("\n" + "\n".join(notes) if notes else "")
+    )
+    return clean_q, mentions_context_str
+
+
 def _build_tarot_prompt(
     spread_key: str,
     spread_name: str,
@@ -68,9 +190,22 @@ def _build_tarot_prompt(
     user_name: str,
     context: Optional[str] = None,
     reader_style: str = "neutral",
-    recent_context: Optional[Dict] = None
+    recent_context: Optional[Dict] = None,
+    user_id: Optional[int] = None,
+    guild: Optional[Any] = None,
+    bot_id: Optional[int] = None,
+    bot_name: str = "MikeDaBot"
 ) -> str:
-    """Xây dựng prompt AI có trí nhớ bạn cũ và yêu cầu trả JSON có cấu trúc."""
+    """Xây dựng prompt AI có trí nhớ bạn cũ, nhận thức @mentions và yêu cầu trả JSON có cấu trúc."""
+    clean_question, mentions_info = extract_question_mentions_context(
+        question=question,
+        user_name=user_name,
+        user_id=user_id,
+        guild=guild,
+        bot_id=bot_id,
+        bot_name=bot_name
+    )
+
     cards_context = _format_cards_context(drawn_cards)
     style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
     persona_prompt = style_info["persona_prompt"]
@@ -87,7 +222,7 @@ def _build_tarot_prompt(
         """.strip()
 
     ctx_str = f'\n- Bối cảnh thực tế: "{context}"' if context else ""
-    q_str = f'"{question}"' if question else "Tổng quan năng lượng ngày"
+    q_str = f'"{clean_question}"' if clean_question else "Tổng quan năng lượng ngày"
 
     yes_no_info = ""
     if spread_key == "yes_no" and drawn_cards:
@@ -104,6 +239,7 @@ def _build_tarot_prompt(
 
     THÔNG TIN QUẺ BÀI:
     - Người hỏi: `{user_name}` | Câu hỏi: {q_str}{ctx_str}
+    {mentions_info}
     - Kiểu trải bài: {spread_name} ({len(drawn_cards)} lá){yes_no_info}
     - Danh sách lá bài & Ý nghĩa biểu tượng chuẩn:
     {cards_context}
@@ -120,8 +256,13 @@ def _build_tarot_prompt(
        - TRƯỜNG HỢP HỢP LỆ:
          + Người hỏi (`{user_name}`) hỏi về bản thân mình (công việc, học tập, tình cảm, định hướng phát triển cá nhân).
          + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là một bên trong mối quan hệ/tình huống đó và đang tìm kiếm góc nhìn, lời khuyên cho chính bản thân mình (Ví dụ hợp lệ: "{user_name} và crush có tiến triển không?", "Người ấy nghĩ gì về tôi?", "Tôi có nên chủ động làm hòa với bạn ấy?", "Mối quan hệ giữa tôi và sếp/đồng nghiệp ra sao?").
-       - TRƯỜNG HỢP TUYỆT ĐỐI KHÔNG HỢP LỆ (VI PHẠM ĐẠO ĐỨC TAROT):
-         + Người yêu cầu bốc bài (`{user_name}`) KHÔNG NẰM TRONG NHỮNG NGƯỜI MUỐN NHẬN LỜI KHUYÊN / không phải người trong cuộc, mà bốc bài để hỏi thay hoặc tò mò, soi mói đời tư, bí mật, xu hướng tính dục, tình cảm giữa các bên thứ ba (Ví dụ không hợp lệ: Người hỏi A bốc bài hỏi "Bao giờ th B mới comeout nó gay và đang thích C?", "B và C có chia tay không?", "B có cắm sừng C không?", "Khi nào B trả nợ cho C?", "C có thích B không?").
+         + ĐẶC BIỆT - CÂU HỎI VÙNG XÁM / TRÊU ĐÙA / KHEN NGỢI VÔ THƯỞNG VÔ PHẠT:
+           • Nếu câu hỏi có nhắc hoặc tag người khác trong server (ví dụ: "@Mike có siêu cấp đẹp gái không?", "@A dạo này có giàu không?", "@B có hiền không?"):
+           • TUYỆT ĐỐI KHÔNG ĐƯỢC QUÁ KHẮT KHE (STRICT) MÀ TỪ CHỐI! Đây là tương tác cộng đồng vui vẻ, trêu đùa hoặc khen ngợi bạn bè, hoàn toàn hợp lệ (`is_valid: true`).
+           • Hãy nhận thức rõ người hỏi là `{user_name}` và đối tượng được nhắc đến là người bạn (@Name) trong server chứ KHÔNG PHẢI bot. Dùng năng lượng lá bài để nhận xét, tán dương hoặc trêu đùa dí dỏm về người bạn đó, gửi lời khuyên/nhắn nhủ vui vẻ cho cả hai.
+       - TRƯỜNG HỢP TUYỆT ĐỐI KHÔNG HỢP LỆ (CHỈ TỪ CHỐI KHI CÓ Ý ĐỒ XẤU / SOI MÓI ĐỜI TƯ ĐỘC HẠI):
+         + Chỉ từ chối (`is_valid: false`) khi người yêu cầu bốc bài (`{user_name}`) KHÔNG NẰM TRONG NHỮNG NGƯỜI MUỐN NHẬN LỜI KHUYÊN, mà bốc bài để soi mói đời tư, bí mật cá nhân, xu hướng tính dục riêng tư, chuyện tình cảm chia tay/cắm sừng/nợ nần giữa hai người thứ ba B và C mà `{user_name}` không phải là người trong cuộc.
+         (Ví dụ không hợp lệ: Người hỏi A bốc bài hỏi "Bao giờ th B mới comeout nó gay và đang thích C?", "B và C có chia tay không?", "B có cắm sừng C không?", "Khi nào B trả nợ cho C?").
        - HÀNH ĐỘNG KHI CÂU HỎI KHÔNG HỢP LỆ:
          + BẮT BUỘC TỪ CHỐI GIẢI QUẺ về đời tư của người thứ ba! Tuyệt đối không phán xét, không đoán bừa về tâm lý, tình cảm hay xu hướng của những người vắng mặt.
          + Bắt buộc trả `is_valid: false`.
@@ -152,9 +293,18 @@ def _build_tarot_prompt(
     6. ĐỒNG BỘ TUYỆT ĐỐI VỚI PHÁN QUYẾT YES / NO (NẾU LÀ TRẢI BÀI YES/NO):
        - Nếu kiểu trải bài là Yes / No: Phần 'conclusion' và toàn bộ bài giải BẮT BUỘC phải đồng thuận với Phán Quyết Yes / No Chính Thức được nêu ở trên.
        - Tuyệt đối KHÔNG được mâu thuẫn (Ví dụ: phán quyết chính thức là CÓ NHƯNG CẦN CÂN NHẮC thì kết luận phải giải thích tại sao là CÓ và cần cân nhắc điều gì theo lá bài; KHÔNG được tự ý phán ngược lại thành KHÔNG / NO).
+    7. PHÂN BIỆT RÕ VAI TRÒ ĐỐI TƯỢNG KHI CÓ TAG (@MENTION) TRONG CÂU HỎI:
+       - Phân biệt 3 đối tượng độc lập:
+         1) Người yêu cầu bốc bài (`{user_name}`): Người trực tiếp nhận quẻ và nghe bài giải.
+         2) Thành viên khác được tag (@Name): Người bạn trong server được người hỏi nhắc tới (KHÔNG PHẢI bot).
+         3) Chính Bạn (Tarot Bot / Reader): Người đóng vai trò đọc bài theo Persona.
+       - Khi câu hỏi tag một thành viên khác (ví dụ: `{user_name}` hỏi "@Mike có siêu cấp đẹp gái không?"):
+         + ĐỪNG nhầm lẫn @Mike với Bot! @Mike là một thành viên khác trong server được `{user_name}` nhắc tới.
+         + Trả lời trực diện theo phán quyết Yes/No (nếu có) và năng lượng lá bài: Giải nghĩa lá bài để trả lời về vẻ đẹp, thần thái, phong cách hay năng lượng của @Mike.
+         + Diễn đạt khéo léo, tự nhiên, hóm hỉnh theo Persona đã chọn, có thể gửi lời chào hoặc lời nhắn dí dỏm đến @Mike thông qua bài đọc cho `{user_name}`.
 
     🚨 YÊU CẦU ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC TRẢ JSON CHUẨN):
-    1. `is_valid`: True nếu câu hỏi hợp lệ (cho bản thân hoặc mối quan hệ mà {user_name} là người trong cuộc cần lời khuyên). False nếu câu hỏi không hợp lệ (hỏi cho người khác / soi mói đời tư người thứ ba B và C).
+    1. `is_valid`: True nếu câu hỏi hợp lệ (cho bản thân, mối quan hệ của người hỏi, hoặc câu hỏi trêu đùa/khen ngợi bạn bè lành mạnh trong server). False nếu câu hỏi không hợp lệ (soi mói đời tư, bí mật nhạy cảm giữa các bên thứ ba B và C).
     2. `topic_tag`: 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
     3. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Ranh giới đạo đức', 'Thăng hoa & Tự tin'...).
     4. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
@@ -438,16 +588,33 @@ async def generate_tarot_reading(
     context: Optional[str] = None,
     reader_style: str = "neutral",
     user_name: str = "Bạn",
-    recent_context: Optional[Dict] = None
-) -> Tuple[str, str, str, str]:
+    recent_context: Optional[Dict] = None,
+    user_id: Optional[int] = None,
+    guild: Optional[Any] = None,
+    bot_id: Optional[int] = None,
+    bot_name: str = "MikeDaBot"
+) -> Tuple[str, str, str, str, bool]:
     """
     Gọi AI phân tích quẻ bài với Concurrency Semaphore và Fallback Cascade:
     gemini-3.7-flash ➔ gemini-3.6-flash ➔ gemini-3.5-flash ➔ gemini-3.5-flash-lite ➔ gemini-3.1-flash-lite ➔ gemma-4-31b-it.
-    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline)
+    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline, is_valid)
     """
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
     spread_name = spread_info["name"]
-    prompt = _build_tarot_prompt(spread_key, spread_name, drawn_cards, question, user_name, context, reader_style, recent_context)
+    prompt = _build_tarot_prompt(
+        spread_key=spread_key,
+        spread_name=spread_name,
+        drawn_cards=drawn_cards,
+        question=question,
+        user_name=user_name,
+        context=context,
+        reader_style=reader_style,
+        recent_context=recent_context,
+        user_id=user_id,
+        guild=guild,
+        bot_id=bot_id,
+        bot_name=bot_name
+    )
 
     client = get_ai_client()
 
@@ -534,12 +701,25 @@ async def generate_followup_answer(
     original_reading: str,
     user_followup_question: str,
     reader_style: str = "neutral",
-    user_name: str = "Bạn"
+    user_name: str = "Bạn",
+    user_id: Optional[int] = None,
+    guild: Optional[Any] = None,
+    bot_id: Optional[int] = None,
+    bot_name: str = "MikeDaBot"
 ) -> str:
     """
     Trả lời câu hỏi đào sâu bổ sung của người dùng dựa trên ngữ cảnh quẻ bài vừa giải.
     Hỗ trợ tự động fallback sang các model dự phòng nếu model chính quá tải.
     """
+    clean_followup, mentions_context_str = extract_question_mentions_context(
+        question=user_followup_question,
+        user_name=user_name,
+        user_id=user_id,
+        guild=guild,
+        bot_id=bot_id,
+        bot_name=bot_name
+    )
+
     cards_context = _format_cards_context(drawn_cards)
     style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
     persona_prompt = style_info["persona_prompt"]
@@ -557,15 +737,16 @@ async def generate_followup_answer(
     {original_reading[:800]}
 
     ❓ CÂU HỎI THẮC MẮC BỔ SUNG CỦA `{user_name}`:
-    "{user_followup_question}"
+    "{clean_followup}"
+    {mentions_context_str}
 
     🚨 YÊU CẦU:
     - Trả lời ngắn gọn, trực diện, ấm áp và thấu đáo trong 1-2 đoạn văn (dưới 800 ký tự).
     - Trả lời THẲNG THẮN VÀO TRỌNG TÂM câu hỏi mới, liên kết chặt chẽ với ý nghĩa và chi tiết các lá bài đã xuất hiện. Tuyệt đối không né tránh câu hỏi, không nói chung chung sáo rỗng và không tự áp đặt văn mẫu tình cảm vào các chủ đề khác.
     - NGUYÊN TẮC ĐẠO ĐỨC & RANH GIỚI TRẢI BÀI (BẮT BUỘC TUÂN THỦ):
       + Tarot là công cụ soi chiếu nội tâm cho chính người hỏi `{user_name}`.
-      + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là người trong cuộc đang tìm kiếm lời khuyên, định hướng cho chính mình (ví dụ: "{user_name} nên cư xử thế nào với bạn ấy?").
-      + TUYỆT ĐỐI TỪ CHỐI nếu câu hỏi thắc mắc này mang tính hỏi thay, tò mò, soi mói đời tư, bí mật của người thứ ba (như hỏi chuyện giữa B và C mà `{user_name}` không liên quan).
+      + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là người trong cuộc đang tìm kiếm lời khuyên, hoặc đây là câu hỏi trêu đùa/khen ngợi bạn bè lành mạnh trong server (vùng xám/banter - KHÔNG được quá strict).
+      + CHỈ TỪ CHỐI nếu câu hỏi mang tính soi mói đời tư, bí mật độc hại của bên thứ ba mà `{user_name}` không liên quan.
       + Khi câu hỏi không hợp lệ, hãy từ chối trả lời khéo léo theo đúng Persona (Orion nghiêm nghị giữ ranh giới, Celeste dịu dàng nhắc nhở tôn trọng riêng tư, Jester cà khịa tính hóng chuyện thiên hạ) và khuyên `{user_name}` tập trung năng lượng vào bản thân.
     """.strip()
 

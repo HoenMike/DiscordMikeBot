@@ -10,12 +10,54 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.5.1"
+CURRENT_VERSION = "2.5.2"
 RELEASE_DATE = "2026-09-04"
-CODENAME = "Tarot Direct Focus & Grounded Symbolism & Yes/No Sync"
+CODENAME = "Tarot Mention Context & Entity Awareness & Grey-Zone Banter Flexibility"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.5.2",
+        "date": "2026-09-04",
+        "type": "minor",
+        "title": "Nhận Thức Đối Tượng Được Tag (@Mentions), Phân Biệt Thành Viên Server & Linh Hoạt Vùng Xám Đùa Vui",
+        "summary": "Trích xuất và chuẩn hóa tag/mention trong câu hỏi Tarot; phân biệt rõ người hỏi, bot và người thứ 2 trong server; nới lỏng quy chuẩn cho các câu hỏi trêu đùa/khen ngợi bạn bè lành mạnh (không quá strict) và hướng dẫn AI luận giải năng lượng lá bài về đúng đối tượng.",
+        "changes": [
+            {
+                "category": "🏷️ Phân Tích Thực Thể & Chuẩn Hóa Mentions (<@ID> & @Name)",
+                "items": [
+                    "Hàm extract_question_mentions_context tự động phân giải Discord raw mentions <@123...> thành @DisplayName để Gemini AI hiểu mượt mà.",
+                    "Phân biệt rõ ràng 3 thực thể độc lập: Người yêu cầu bốc bài (user_name), Chính Bot (bot_name), và Thành viên khác trong server (@Member)."
+                ]
+            },
+            {
+                "category": "🧠 Bổ Sung Khối Bối Cảnh Đối Tượng Vào Prompt AI",
+                "items": [
+                    "Chèn phân tích đối tượng và vai trò vào khối THÔNG TIN QUẺ BÀI, thông báo cho Reader biết chính xác người hỏi đang hướng sự chú ý đến ai."
+                ]
+            },
+            {
+                "category": "⚖️ Nới Lỏng Quy Chuẩn Vùng Xám & Đùa Vui (Không Quá Strict)",
+                "items": [
+                    "Bổ sung ngoại lệ vào Nguyên tắc 4: Các câu hỏi trêu đùa, khen ngợi, hỏi vui về bạn bè trong server (như '@Mike có siêu cấp đẹp gái không?') luôn được xem là hợp lệ (is_valid: true), không bị từ chối khắt khe.",
+                    "Chỉ từ chối khi thực sự có hành vi soi mói đời tư độc hại hoặc xâm phạm bí mật nhạy cảm giữa các bên thứ ba."
+                ]
+            },
+            {
+                "category": "🃏 Định Hướng Luận Giải Đúng Đối Tượng (Nguyên Tắc 7)",
+                "items": [
+                    "Bổ sung Nguyên tắc 7 vào Prompt: Hướng dẫn AI giải mã năng lượng lá bài về thần thái, vẻ đẹp, phong cách của người được tag mà không nhầm lẫn với Bot.",
+                    "Đưa ra lời nhắn nhủ, đối đáp dí dỏm kết nối giữa người hỏi và người bạn được tag theo đúng Persona."
+                ]
+            },
+            {
+                "category": "🔄 Tích Hợp Toàn Diện Mọi Luồng Trải Bài",
+                "items": [
+                    "Đồng bộ truyền context qua Slash/Prefix flow (cog.py), Interactive Launcher View, và Modal hỏi đáp đào sâu bổ sung (tarot_view.py)."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.5.1",
         "date": "2026-09-04",
