@@ -10,12 +10,43 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.5.2"
+CURRENT_VERSION = "2.5.3"
 RELEASE_DATE = "2026-09-04"
-CODENAME = "Tarot Mention Context & Entity Awareness & Grey-Zone Banter Flexibility"
+CODENAME = "Embed Reaction Desync Guard & Multi-User Notification Re-trigger"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.5.3",
+        "date": "2026-09-04",
+        "type": "bugfix",
+        "title": "Khắc Phục Lỗi Desync Gỡ Reaction & Kích Hoạt Lại Thông Báo Khi Nhiều Người Thả Trùng Emote",
+        "summary": "Tự động gỡ ra thả lại reaction trên tin nhắn gốc khi có thêm người dùng thả cùng loại emote trên Embed Preview nhằm kích hoạt lại thông báo/hiệu ứng cho chủ bài viết, bảo toàn reaction chống desync khi người khác rút emote, và bổ sung khóa đồng bộ asyncio.Lock per-message chống race condition.",
+        "changes": [
+            {
+                "category": "🔔 Kích Hoạt Lại Thông Báo Khi Thả Trùng Emote (Re-trigger)",
+                "items": [
+                    "Phát hiện trường hợp bot đã thả emote này trước đó trên tin nhắn gốc (khi có người thứ 2+ cùng thả emote đó trên Embed Preview).",
+                    "Thực hiện quy trình gỡ emote cũ của bot, nghỉ 0.3s và thả lại ngay lập tức để Discord bắn lại push notification / hiệu ứng nhảy emote cho tác giả tin nhắn gốc."
+                ]
+            },
+            {
+                "category": "🛡️ Chống Lỗi Desync Khi Người Dùng Gỡ Reaction (Desync Guard)",
+                "items": [
+                    "Trước khi gỡ reaction khỏi tin nhắn gốc, bot truy vấn trực tiếp trạng thái Embed Preview từ Discord API để kiểm tra số lượng count còn lại.",
+                    "Nếu trên Embed vẫn còn ít nhất 1 người đang thả emote đó (count > 0), bot giữ nguyên reaction trên tin nhắn gốc, tuyệt đối không gỡ nhầm.",
+                    "Chỉ gỡ emote khỏi tin nhắn gốc khi toàn bộ người dùng trên Embed đều đã rút sạch emote đó về 0."
+                ]
+            },
+            {
+                "category": "🔒 Khóa Đồng Bộ Asyncio Lock Theo Tin Nhắn (Thread-Safety)",
+                "items": [
+                    "Bổ sung BoundedDict lưu trữ asyncio.Lock độc lập theo từng message_id gốc.",
+                    "Đảm bảo các sự kiện thêm/gỡ reaction diễn ra đồng thời trong cùng 1 giây được xếp hàng xử lý tuần tự, loại bỏ hoàn toàn race condition và lỗi nghẽn API Discord."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.5.2",
         "date": "2026-09-04",

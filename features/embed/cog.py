@@ -52,6 +52,17 @@ def _clean_markdown_label(text: str) -> str:
     return discord.utils.escape_markdown(cleaned)
 
 
+def _is_matching_emoji(reaction_emoji, target_emoji: discord.PartialEmoji) -> bool:
+    """So sánh 2 emoji xem có cùng loại hay không (hỗ trợ cả Unicode Emoji và Custom Emoji)."""
+    if target_emoji.is_custom_emoji():
+        target_id = target_emoji.id
+        r_id = getattr(reaction_emoji, "id", None)
+        if r_id is not None and target_id is not None:
+            return r_id == target_id
+        return str(reaction_emoji) == str(target_emoji)
+    return str(reaction_emoji) == str(target_emoji) or getattr(reaction_emoji, "name", None) == target_emoji.name
+
+
 class EmbedCog(commands.Cog):
     """Cog xử lý tự động phát hiện, sửa lỗi và nhúng link mạng xã hội."""
 
@@ -68,6 +79,15 @@ class EmbedCog(commands.Cog):
         # Quản lý các task đang xử lý dở dang cho từng tin nhắn gốc
         self._in_flight_tasks: dict[int, asyncio.Task] = {}
         self._scan_task: asyncio.Task | None = None
+        # Lock quản lý đồng bộ reaction theo từng tin nhắn để tránh race condition khi nhiều người tương tác cùng lúc
+        self._reaction_locks = BoundedDict(max_size=1000)
+
+    def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
+        lock = self._reaction_locks.get(msg_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._reaction_locks[msg_id] = lock
+        return lock
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession(
@@ -292,7 +312,11 @@ class EmbedCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        """Khi có người thả tương tác vào Embed Preview của bot, bot tự động thả emote y chang vào tin nhắn gốc của người dùng."""
+        """Khi có người thả tương tác vào Embed Preview của bot:
+        - Nếu bot chưa thả emote này vào tin nhắn gốc: bot thả mới.
+        - Nếu bot đã thả emote này rồi (có người thứ 2+ cùng thả emote đó trên embed):
+          bot gỡ ra rồi thả lại ngay để Discord kích hoạt lại thông báo/hiệu ứng tương tác cho chủ tin nhắn gốc.
+        """
         if not self.bot.user or payload.user_id == self.bot.user.id:
             return
 
@@ -301,27 +325,62 @@ class EmbedCog(commands.Cog):
             return
 
         channel_id, orig_msg_id = target
-        try:
-            channel = self.bot.get_channel(channel_id)
-            if channel is None:
-                try:
-                    channel = await self.bot.fetch_channel(channel_id)
-                except Exception:
-                    channel = None
+        lock = self._get_reaction_lock(orig_msg_id)
+        async with lock:
+            try:
+                channel = self.bot.get_channel(channel_id)
+                if channel is None:
+                    try:
+                        channel = await self.bot.fetch_channel(channel_id)
+                    except Exception:
+                        channel = None
 
-            if not channel:
-                return
+                if not channel:
+                    return
 
-            partial_msg = channel.get_partial_message(orig_msg_id)
-            await partial_msg.add_reaction(payload.emoji)
-        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-            pass
-        except Exception as e:
-            print(f"[EmbedCog] Lỗi khi đồng bộ reaction sang tin nhắn gốc: {e}", flush=True)
+                # Tìm tin nhắn gốc từ cache hoặc fetch để kiểm tra trạng thái reaction hiện tại của bot
+                orig_msg = discord.utils.find(lambda m: m.id == orig_msg_id, self.bot.cached_messages)
+                if orig_msg is None:
+                    try:
+                        orig_msg = await channel.fetch_message(orig_msg_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        orig_msg = None
+
+                if orig_msg is None:
+                    # Fallback nếu không fetch được toàn bộ tin nhắn gốc (dùng partial message)
+                    partial_msg = channel.get_partial_message(orig_msg_id)
+                    await partial_msg.add_reaction(payload.emoji)
+                    return
+
+                # Kiểm tra bot đã thả emote này trên tin nhắn gốc chưa
+                bot_already_reacted = False
+                for r in orig_msg.reactions:
+                    if _is_matching_emoji(r.emoji, payload.emoji) and r.me:
+                        bot_already_reacted = True
+                        break
+
+                if bot_already_reacted:
+                    # Gỡ ra rồi thả lại ngay để Discord nổ lại thông báo/hiệu ứng cho chủ tin nhắn gốc
+                    try:
+                        await orig_msg.remove_reaction(payload.emoji, self.bot.user)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        pass
+                    await asyncio.sleep(0.3)
+                    await orig_msg.add_reaction(payload.emoji)
+                else:
+                    await orig_msg.add_reaction(payload.emoji)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            except Exception as e:
+                print(f"[EmbedCog] Lỗi khi đồng bộ reaction sang tin nhắn gốc: {e}", flush=True)
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
-        """Khi người dùng gỡ tương tác khỏi Embed Preview, bot gỡ emote tương ứng trên tin nhắn gốc."""
+        """Khi người dùng gỡ tương tác khỏi Embed Preview:
+        - Kiểm tra xem trên Embed Preview còn ai khác đang thả emote này không.
+        - Nếu VẪN CÒN người thả trên Embed Preview: giữ nguyên reaction của bot trên tin nhắn gốc (chống desync).
+        - Nếu KHÔNG CÒN AI thả emote này trên Embed Preview: gỡ reaction của bot khỏi tin nhắn gốc.
+        """
         if not self.bot.user or payload.user_id == self.bot.user.id:
             return
 
@@ -330,23 +389,47 @@ class EmbedCog(commands.Cog):
             return
 
         channel_id, orig_msg_id = target
-        try:
-            channel = self.bot.get_channel(channel_id)
-            if channel is None:
+        lock = self._get_reaction_lock(orig_msg_id)
+        async with lock:
+            try:
+                channel = self.bot.get_channel(channel_id)
+                if channel is None:
+                    try:
+                        channel = await self.bot.fetch_channel(channel_id)
+                    except Exception:
+                        channel = None
+
+                if not channel:
+                    return
+
+                # Lấy tin nhắn Embed Preview để kiểm tra xem còn ai khác thả emote này không
+                # Fetch trực tiếp từ API để đảm bảo số đếm (count) chính xác nhất từ server Discord
+                preview_msg = None
                 try:
-                    channel = await self.bot.fetch_channel(channel_id)
-                except Exception:
-                    channel = None
+                    preview_msg = await channel.fetch_message(payload.message_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    preview_msg = discord.utils.find(lambda m: m.id == payload.message_id, self.bot.cached_messages)
 
-            if not channel:
-                return
+                if preview_msg is not None:
+                    # Kiểm tra xem còn reaction nào của emote này với count > 0 không
+                    still_has_reaction = False
+                    for r in preview_msg.reactions:
+                        if _is_matching_emoji(r.emoji, payload.emoji):
+                            if r.count > 0:
+                                still_has_reaction = True
+                                break
 
-            partial_msg = channel.get_partial_message(orig_msg_id)
-            await partial_msg.remove_reaction(payload.emoji, self.bot.user)
-        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-            pass
-        except Exception as e:
-            print(f"[EmbedCog] Lỗi khi gỡ reaction đồng bộ trên tin nhắn gốc: {e}", flush=True)
+                    # Nếu trên Embed Preview vẫn còn ít nhất 1 người thả emote này, không gỡ reaction trên tin nhắn gốc!
+                    if still_has_reaction:
+                        return
+
+                # Nếu không còn ai thả emote này trên Embed Preview, gỡ trên tin nhắn gốc
+                partial_msg = channel.get_partial_message(orig_msg_id)
+                await partial_msg.remove_reaction(payload.emoji, self.bot.user)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            except Exception as e:
+                print(f"[EmbedCog] Lỗi khi gỡ reaction đồng bộ trên tin nhắn gốc: {e}", flush=True)
 
     async def _send_embed_preview(
         self,

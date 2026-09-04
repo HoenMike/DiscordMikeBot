@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.3] - 2026-09-04 — *Embed Reaction Desync Guard & Multi-User Notification Re-trigger*
+
+### Fixed
+- **Chống Lỗi Desync Khi Gỡ Reaction Trên Embed (`on_raw_reaction_remove`)**:
+  - Truy vấn trực tiếp trạng thái Embed Preview từ Discord API khi nhận sự kiện rút reaction.
+  - Nếu trên Embed Preview vẫn còn $\ge 1$ người thả emote đó (`count > 0`), bot bảo toàn reaction trên tin nhắn gốc, không gỡ nhầm.
+  - Chỉ gỡ reaction trên tin nhắn gốc khi tất cả người dùng trên Embed đã gỡ hết emote đó về 0.
+- **Kích Hoạt Lại Thông Báo Khi Thả Trùng Emote (`on_raw_reaction_add`)**:
+  - Khi có người thứ 2+ cùng thả một emote đã có trên Embed Preview, bot tự động gỡ reaction của mình trên tin nhắn gốc và thả lại ngay (sau $0.3\text{s}$) để Discord kích hoạt lại push notification và hiệu ứng nảy emote cho người gửi tin gốc.
+- **Khóa Đồng Bộ Per-Message (`asyncio.Lock`)**:
+  - Bổ sung `self._reaction_locks` theo từng tin nhắn gốc, đảm bảo các luồng thêm/gỡ reaction đồng thời được xử lý tuần tự, loại bỏ hoàn toàn rủi ro race condition.
+
+---
+
 ## [2.5.2] - 2026-09-04 — *Tarot Mention Context & Entity Awareness & Grey-Zone Banter Flexibility*
 
 ### Added
