@@ -10,12 +10,38 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.4.15"
-RELEASE_DATE = "2026-09-03"
-CODENAME = "Startup Embed Orphan Scan & Realtime Deletion Logging"
+CURRENT_VERSION = "2.5.0"
+RELEASE_DATE = "2026-09-04"
+CODENAME = "Tarot Ethics Boundary & Third-Party Privacy Protection"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.5.0",
+        "date": "2026-09-04",
+        "type": "minor",
+        "title": "Bổ Sung Quy Tắc Đạo Đức Tarot & Bảo Vệ Quyền Riêng Tư Của Người Thứ Ba",
+        "summary": "Thêm cơ chế kiểm tra tính hợp lệ của câu hỏi trải bài Tarot: Từ chối giải quẻ khi người hỏi bốc bài hỏi thay hoặc soi mói đời tư người thứ ba (như A hỏi chuyện của B và C mà A không liên quan), đồng thời hỗ trợ từ chối theo phong cách từng Persona và vô hiệu hóa phán quyết Yes/No.",
+        "changes": [
+            {
+                "category": "🔮 Quy Chuẩn Đạo Đức & Ranh Giới Trải Bài Tarot",
+                "items": [
+                    "Bổ sung cờ is_valid vào TarotAIResponseSchema và cập nhật nguyên tắc số 4 trong AI Prompt.",
+                    "Cho phép hỏi về người khác NẾU người hỏi là một bên trong mối quan hệ/tình huống đó và cần lời khuyên cho bản thân (ví dụ: 'Người ấy nghĩ gì về tôi?').",
+                    "Tuyệt đối từ chối giải quẻ nếu người hỏi bốc bài hỏi thay hoặc tò mò, soi mói đời tư, bí mật của bên thứ ba mà bản thân đứng ngoài (ví dụ: A hỏi chuyện tình cảm, comeout của B và C).",
+                    "Cập nhật phản hồi từ chối phù hợp theo 3 Persona: Orion (nghiêm nghị, chuẩn mực), Celeste (dịu dàng, thấu cảm), Jester (cà khịa hài hước tính hóng drama).",
+                    "Áp dụng quy tắc đạo đức tương tự cho câu hỏi đào sâu bổ sung (Follow-up Questions)."
+                ]
+            },
+            {
+                "category": "⚡ Giao Diện Người Dùng & Phán Quyết Yes / No",
+                "items": [
+                    "Tự động phát hiện câu hỏi không hợp lệ và cập nhật phán quyết Yes/No thành 🚫 KHÔNG HỢP LỆ (VI PHẠM NGUYÊN TẮC) thay vì hiển thị Có/Không sai lệch.",
+                    "Cập nhật Placeholder tại Modal nhập câu hỏi và lưu ý tại Bảng thiết lập trải bài Tarot để hướng dẫn người dùng."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.4.15",
         "date": "2026-09-03",

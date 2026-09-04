@@ -14,6 +14,7 @@ AI_SEMAPHORE = asyncio.Semaphore(3)
 
 class TarotAIResponseSchema(BaseModel):
     """Schema chuẩn hóa cho đầu ra JSON từ Gemini AI."""
+    is_valid: bool = Field(description="True nếu câu hỏi hợp lệ (cho bản thân hoặc mối quan hệ mà người hỏi là người trong cuộc cần lời khuyên). False nếu câu hỏi không hợp lệ (người hỏi không nằm trong những người muốn nhận lời khuyên mà bốc bài hỏi cho người khác / soi mói đời tư, tình cảm, bí mật của người thứ ba B và C).", default=True)
     topic_tag: str = Field(description="Phân loại chủ đề: career, love, finance, health, study, general", default="general")
     mood_tag: str = Field(description="Tag vibe/tâm trạng chủ đạo bằng tiếng Việt", default="Cân bằng & Tĩnh tại")
     summary_headline: str = Field(description="Tiêu đề vibe ngắn dưới 15 từ", default="")
@@ -109,15 +110,37 @@ def _build_tarot_prompt(
        - Celeste: vỗ về, chữa lành, dịu dàng và tìm ánh sáng hy vọng.
        - Jester: dí dỏm, tếu táo, trào phúng vui tươi nhưng mang tính xây dựng, tuyệt đối KHÔNG công kích cá nhân, KHÔNG tiêu cực hóa độc hại.
     3. Mọi lá bài ngược (Reversed) là lời nhắc nhở nhẹ nhàng để cân bằng lại năng lượng bên trong, luôn kết thúc bằng lời khuyên và động lực tích cực.
+    4. QUY TẮC ĐẠO ĐỨC & RANH GIỚI TRẢI BÀI (NGƯỜI HỎI & NGƯỜI THỨ BA - BẮT BUỘC TUÂN THỦ):
+       - BẢN CHẤT CỦA TAROT: Tarot là công cụ soi chiếu nội tâm và trao lời khuyên, định hướng hành động cho CHÍNH người đang bốc bài (`{user_name}`).
+       - TRƯỜNG HỢP HỢP LỆ:
+         + Người hỏi (`{user_name}`) hỏi về bản thân mình (công việc, học tập, tình cảm, định hướng phát triển cá nhân).
+         + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là một bên trong mối quan hệ/tình huống đó và đang tìm kiếm góc nhìn, lời khuyên cho chính bản thân mình (Ví dụ hợp lệ: "{user_name} và crush có tiến triển không?", "Người ấy nghĩ gì về tôi?", "Tôi có nên chủ động làm hòa với bạn ấy?", "Mối quan hệ giữa tôi và sếp/đồng nghiệp ra sao?").
+       - TRƯỜNG HỢP TUYỆT ĐỐI KHÔNG HỢP LỆ (VI PHẠM ĐẠO ĐỨC TAROT):
+         + Người yêu cầu bốc bài (`{user_name}`) KHÔNG NẰM TRONG NHỮNG NGƯỜI MUỐN NHẬN LỜI KHUYÊN / không phải người trong cuộc, mà bốc bài để hỏi thay hoặc tò mò, soi mói đời tư, bí mật, xu hướng tính dục, tình cảm giữa các bên thứ ba (Ví dụ không hợp lệ: Người hỏi A bốc bài hỏi "Bao giờ th B mới comeout nó gay và đang thích C?", "B và C có chia tay không?", "B có cắm sừng C không?", "Khi nào B trả nợ cho C?", "C có thích B không?").
+       - HÀNH ĐỘNG KHI CÂU HỎI KHÔNG HỢP LỆ:
+         + BẮT BUỘC TỪ CHỐI GIẢI QUẺ về đời tư của người thứ ba! Tuyệt đối không phán xét, không đoán bừa về tâm lý, tình cảm hay xu hướng của những người vắng mặt.
+         + Bắt buộc trả `is_valid: false`.
+         + Thể hiện thái độ từ chối dứt khoát nhưng chuẩn xác theo Persona của Reader:
+           • Orion: Điềm tĩnh, nghiêm nghị phân tích ranh giới đạo đức: Tarot tôn trọng sự riêng tư của mỗi cá nhân, không thể dùng bài để phán xét hay xâm phạm đời tư người khác khi họ không hiện diện và người hỏi không liên quan; nhắc nhở `{user_name}` giữ ranh giới đạo đức.
+           • Celeste: Dịu dàng, thấu cảm giải thích rằng không gian riêng tư và cảm xúc của mỗi người cần được trân trọng; từ chối giải quẻ và khuyên `{user_name}` hãy bao dung, để mọi điều diễn ra tự nhiên.
+           • Jester: Tếu táo, châm biếm hài hước tính "nhiều chuyện", làm "camera chạy bằng cơm" đi hóng hớt drama người khác; nhắc nhở Tarot có đạo đức nghề nghiệp chứ không buôn dưa lê, bảo `{user_name}` lo việc của mình trước!
+         + Quy chuẩn các trường khi từ chối:
+           • `topic_tag`: "general"
+           • `mood_tag`: "Ranh giới đạo đức"
+           • `summary_headline`: Cảnh báo từ chối do vi phạm ranh giới riêng tư của người khác
+           • `conclusion`: Tuyên bố từ chối luận giải vì câu hỏi không hợp lệ (người hỏi không nằm trong những người muốn nhận lời khuyên mà đi hỏi chuyện bên thứ ba).
+           • `cards_analysis`: Không gán ý nghĩa lá bài vào người thứ ba; giải thích lá bài như lời nhắc nhở về ranh giới cá nhân, kiềm chế tính tò mò, hoặc biểu tượng lá bài từ chối kết nối với người vắng mặt.
+           • `advice`: Khuyên `{user_name}` rút năng lượng về để tập trung vào cuộc sống, bài học và sự phát triển của bản thân mình.
 
     🚨 YÊU CẦU ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC TRẢ JSON CHUẨN):
-    1. `topic_tag`: 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
-    2. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Khởi đầu mới bùng nổ', 'Rối bời & Do dự', 'Thăng hoa & Tự tin', 'Thận trọng & Phòng thủ'...).
-    3. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
-    4. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.
-    5. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt.
-    6. `advice`: Lời khuyên hành động thực tế, thông thái và khích lệ người hỏi.
-    7. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown, BẮT BUỘC phân tách các mục rõ ràng bằng 2 dấu xuống dòng (\\n\\n):
+    1. `is_valid`: True nếu câu hỏi hợp lệ (cho bản thân hoặc mối quan hệ mà {user_name} là người trong cuộc cần lời khuyên). False nếu câu hỏi không hợp lệ (hỏi cho người khác / soi mói đời tư người thứ ba B và C).
+    2. `topic_tag`: 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
+    3. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Ranh giới đạo đức', 'Thăng hoa & Tự tin'...).
+    4. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
+    5. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích.
+    6. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt.
+    7. `advice`: Lời khuyên hành động thực tế, thông thái và khích lệ người hỏi.
+    8. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown, BẮT BUỘC phân tách các mục rõ ràng bằng 2 dấu xuống dòng (\\n\\n):
        🎯 **KẾT LUẬN & TỔNG QUAN:**
        (Nội dung kết luận)
 
@@ -194,15 +217,15 @@ def _clean_and_format_tarot_markdown(text: str) -> str:
     return t.strip()
 
 
-def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
+def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
     """
     Phân tích và trích xuất dữ liệu an toàn từ phản hồi của Gemini AI.
     Sử dụng cơ chế đa tầng (Direct JSON -> Regex Fallback -> Text Cleaning)
     đảm bảo 100% không bao giờ làm lộ mã JSON thô ra giao diện người dùng Discord.
-    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline)
+    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline, is_valid)
     """
     if not raw_text:
-        return "", "general", "Năng lượng tích cực", ""
+        return "", "general", "Năng lượng tích cực", "", True
 
     text = raw_text.strip()
 
@@ -211,6 +234,7 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
     mood_tag = "Năng lượng tích cực"
     summary_headline = ""
     full_reading = ""
+    is_valid = True
 
     # Bước 1: Trích xuất khối JSON candidate nếu có
     json_candidate = text
@@ -275,6 +299,15 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
 
     # Bước 4: Chuyển đổi dữ liệu từ parsed_dict thành bài đọc và metadata
     if parsed_dict:
+        # Xử lý is_valid
+        raw_is_valid = parsed_dict.get("is_valid", True)
+        if isinstance(raw_is_valid, bool):
+            is_valid = raw_is_valid
+        elif isinstance(raw_is_valid, str):
+            is_valid = raw_is_valid.strip().lower() not in ("false", "0", "no", "invalid", "vi_pham")
+        else:
+            is_valid = True
+
         # Xử lý topic_tag
         raw_topic = parsed_dict.get("topic_tag", "general")
         topic_tag = str(raw_topic).strip().strip('"').strip() or "general"
@@ -369,7 +402,12 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str]:
     # Bước 7: Chuẩn hóa Markdown, đảm bảo xuống dòng các mục 🎯, 🃏, 💡 và gạch đầu dòng
     full_reading = _clean_and_format_tarot_markdown(full_reading)
 
-    return full_reading, topic_tag, mood_tag, summary_headline
+    # Hậu kiểm tra nếu AI đặt tag hoặc nội dung từ chối / vi phạm đạo đức
+    check_meta = f"{topic_tag} {mood_tag} {summary_headline}".lower()
+    if any(k in check_meta for k in ["ranh giới đạo đức", "từ chối trải bài", "từ chối giải quẻ", "không hợp lệ"]):
+        is_valid = False
+
+    return full_reading, topic_tag, mood_tag, summary_headline, is_valid
 
 
 async def generate_tarot_reading(
@@ -427,11 +465,11 @@ async def generate_tarot_reading(
                     )
                     if response and response.text:
                         raw_text = response.text.strip()
-                        full_reading, topic_tag, mood_tag, summary_headline = parse_tarot_ai_response(raw_text)
+                        full_reading, topic_tag, mood_tag, summary_headline, is_valid = parse_tarot_ai_response(raw_text)
 
                         if full_reading:
-                            print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag} | Mood: {mood_tag}).", flush=True)
-                            return full_reading, topic_tag, mood_tag, summary_headline
+                            print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag} | Mood: {mood_tag} | Valid: {is_valid}).", flush=True)
+                            return full_reading, topic_tag, mood_tag, summary_headline, is_valid
 
                 except asyncio.TimeoutError:
                     print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>14s), chuyển sang model tiếp theo...", flush=True)
@@ -466,7 +504,7 @@ async def generate_tarot_reading(
     fallback_parts.append(
         "💡 **Lời khuyên tổng kết:** Hãy nhìn nhận thông điệp từ góc độ khách quan, lắng nghe trực giác và đưa ra quyết định phù hợp nhất với hành trình của bạn!"
     )
-    return "\n".join(fallback_parts), "general", "Chiêm nghiệm cổ điển", "Thông điệp chiêm tinh cổ điển từ điển Tarot"
+    return "\n".join(fallback_parts), "general", "Chiêm nghiệm cổ điển", "Thông điệp chiêm tinh cổ điển từ điển Tarot", True
 
 
 async def generate_followup_answer(
@@ -503,6 +541,11 @@ async def generate_followup_answer(
     🚨 YÊU CẦU:
     - Trả lời ngắn gọn, trực diện, ấm áp và thấu đáo trong 1-2 đoạn văn (dưới 800 ký tự).
     - Giải thích rõ sự liên kết giữa câu hỏi mới và các lá bài đã xuất hiện.
+    - NGUYÊN TẮC ĐẠO ĐỨC & RANH GIỚI TRẢI BÀI (BẮT BUỘC TUÂN THỦ):
+      + Tarot là công cụ soi chiếu nội tâm cho chính người hỏi `{user_name}`.
+      + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là người trong cuộc đang tìm kiếm lời khuyên, định hướng cho chính mình (ví dụ: "{user_name} nên cư xử thế nào với bạn ấy?").
+      + TUYỆT ĐỐI TỪ CHỐI nếu câu hỏi thắc mắc này mang tính hỏi thay, tò mò, soi mói đời tư, bí mật của người thứ ba (như hỏi chuyện giữa B và C mà `{user_name}` không liên quan).
+      + Khi câu hỏi không hợp lệ, hãy từ chối trả lời khéo léo theo đúng Persona (Orion nghiêm nghị giữ ranh giới, Celeste dịu dàng nhắc nhở tôn trọng riêng tư, Jester cà khịa tính hóng chuyện thiên hạ) và khuyên `{user_name}` tập trung năng lượng vào bản thân.
     """.strip()
 
     client = get_ai_client()

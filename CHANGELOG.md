@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.0] - 2026-09-04 — *Tarot Ethics Boundary & Third-Party Privacy Protection*
+
+### Added
+- **Quy Chuẩn Đạo Đức & Ranh Giới Trải Bài Tarot (Tarot Ethics Boundary)**:
+  - Bổ sung quy tắc kiểm tra tính hợp lệ của câu hỏi: Cho phép hỏi về người khác nếu người hỏi là người trong cuộc cần lời khuyên cho bản thân, nhưng tuyệt đối từ chối bốc bài hỏi thay hoặc soi mói đời tư/tình cảm/bí mật của người thứ ba (như trường hợp A bốc bài hỏi chuyện của B và C).
+  - Tự động phản hồi từ chối phù hợp với tính cách của 3 Persona: Orion (nghiêm nghị, chuẩn mực), Celeste (dịu dàng, thấu cảm), Jester (cà khịa tếu táo tính hóng drama).
+  - Áp dụng quy tắc đạo đức tương tự cho tính năng hỏi đáp đào sâu bổ sung (Follow-up Questions).
+- **Vô Hiệu Hóa Phán Quyết Yes / No Khi Câu Hỏi Vi Phạm**: Tự động chuyển đổi badge phán quyết Yes/No thành `🚫 KHÔNG HỢP LỆ (VI PHẠM NGUYÊN TẮC)` khi câu hỏi vi phạm đạo đức Tarot.
+- **Cập Nhật Giao Diện & Lưu Ý Người Dùng**: Bổ sung hướng dẫn và placeholder trực quan trong Modal nhập câu hỏi và Launcher UI.
+
+---
+
 ## [2.4.15] - 2026-09-03 — *Startup Embed Orphan Scan & Realtime Deletion Logging*
 
 ### Added

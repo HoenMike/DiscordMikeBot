@@ -99,7 +99,7 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
         self.question_input = discord.ui.TextInput(
             label="Câu hỏi / Chủ đề muốn xem",
             style=discord.TextStyle.paragraph,
-            placeholder="Ví dụ: Công việc tháng tới của tôi sẽ tiến triển thế nào?",
+            placeholder="Ví dụ: Công việc tháng tới của tôi ra sao? (Chỉ hỏi cho bản thân hoặc mối quan hệ bạn là người trong cuộc)",
             default=launcher_view.question or "",
             required=False,
             max_length=500
@@ -189,7 +189,8 @@ class TarotLauncherView(discord.ui.View):
             "💡 **Hướng dẫn thao tác:**",
             "1. Chọn kiểu trải bài & người giải bài từ **2 Menu thả xuống** bên dưới.",
             "2. Nhấn nút **✏️ Đặt Câu Hỏi** để nhập câu hỏi / bối cảnh cụ thể.",
-            "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để trải bài ra kênh chat!"
+            "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để trải bài ra kênh chat!",
+            "⚠️ *Lưu ý: Tarot chỉ giải quẻ cho chính bạn hoặc mối quan hệ bạn là người trong cuộc cần lời khuyên. Câu hỏi bốc bài thay/soi mói đời tư người thứ ba sẽ bị từ chối.*"
         ]
 
         embed = discord.Embed(
@@ -972,8 +973,11 @@ class TarotFlipView(discord.ui.View):
 
             # Await bài luận giải thông điệp
             ai_res = await self.ai_task
+            is_valid_question = True
             if isinstance(ai_res, tuple):
-                if len(ai_res) >= 4:
+                if len(ai_res) >= 5:
+                    ai_reading, topic_tag, mood_tag, summary_headline, is_valid_question = ai_res[0], ai_res[1], ai_res[2], ai_res[3], ai_res[4]
+                elif len(ai_res) >= 4:
                     ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], ai_res[1], ai_res[2], ai_res[3]
                 elif len(ai_res) == 2:
                     ai_reading, topic_tag = ai_res[0], ai_res[1]
@@ -982,6 +986,20 @@ class TarotFlipView(discord.ui.View):
                     ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], "general", "", ""
             else:
                 ai_reading, topic_tag, mood_tag, summary_headline = str(ai_res), "general", "", ""
+
+            # Nếu câu hỏi không hợp lệ (hỏi cho người thứ ba B và C), cập nhật Embed 1 nếu là Yes/No
+            if not is_valid_question and self.spread_key == "yes_no":
+                if embed_cards.description:
+                    lines = embed_cards.description.split("\n")
+                    new_lines = []
+                    for line in lines:
+                        if "**⚡ Phán Quyết Yes / No:**" in line:
+                            new_lines.append("**⚡ Phán Quyết Yes / No:** 🚫 **KHÔNG HỢP LỆ (VI PHẠM NGUYÊN TẮC)**")
+                        elif line.strip().startswith("> *") and any(w in line for w in ["thành công", "Năng lượng", "tiềm năng", "Rủi ro", "phụ thuộc", "bất lợi", "trở ngại"]):
+                            new_lines.append("> *Câu hỏi vi phạm quy tắc đạo đức Tarot: Không thể phán quyết Yes/No cho đời tư người thứ ba khi bạn không phải người nhận lời khuyên!*")
+                        else:
+                            new_lines.append(line)
+                    embed_cards.description = "\n".join(new_lines)
 
             act_id = None
             # Ghi nhận hoạt động vào Live Activity Logger
