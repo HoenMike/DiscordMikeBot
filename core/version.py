@@ -10,12 +10,53 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.5.3"
+CURRENT_VERSION = "2.6.0"
 RELEASE_DATE = "2026-09-04"
-CODENAME = "Embed Reaction Desync Guard & Multi-User Notification Re-trigger"
+CODENAME = "Public Guest Landing Page & Role-Based Dashboard Architecture"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.6.0",
+        "date": "2026-09-04",
+        "type": "minor",
+        "title": "Tái Cấu Trúc Toàn Diện Web Console: Ra Mắt Trang Khách Công Khai & Phân Quyền Bảng Quản Trị",
+        "summary": "Phân chia rõ ranh giới giữa Trang Khách công khai (hiển thị trạng thái realtime, thông số bot, showcase tính năng và nhật ký cập nhật Changelog đầy đủ không cần đăng nhập) và Bảng Quản Trị bảo mật cao cấp dành riêng cho Admin, kết hợp thiết kế thẩm mỹ hiện đại Dark Space & Glassmorphism.",
+        "changes": [
+            {
+                "category": "🌐 Phân Quyền Tuyến Đường & Tách Biệt Vai Trò (Role-Based Routing)",
+                "items": [
+                    "Trang Khách công khai (/): Bất kỳ ai cũng có thể truy cập mà không bị chặn đăng nhập, hiển thị thông số cơ bản và toàn bộ lịch sử Changelog.",
+                    "Trang Quản trị (/admin): Bảo vệ nghiêm ngặt bằng @login_required, tự động chuyển hướng /login?next=/admin nếu chưa có session.",
+                    "Phân tách API: Mở công khai /api/public/stats và /api/version; giữ bảo mật tuyệt đối các API quản trị (/api/stats, /api/activities, /api/guilds, /api/tarot/*)."
+                ]
+            },
+            {
+                "category": "🎨 Ra Mắt Trang Khách Hiện Đại (Public Guest Landing Page)",
+                "items": [
+                    "Thiết kế giao diện Dark Space Palette sang trọng kết hợp hiệu ứng Glassmorphism mờ viền, font Outfit & JetBrains Mono.",
+                    "Thanh điều hướng Sticky Glass Header với avatar bot, chấm trạng thái live pulse ring, liên kết cuộn mượt và nút Mời Bot / Quản trị.",
+                    "Hero Section & Live Quick Stats: 5 thẻ thông số tự động cập nhật realtime mỗi 5 giây (Status, Ping ms, Uptime, Servers, Tiền tố .m).",
+                    "Showcase 4 nhóm tính năng cốt lõi: Auto-Embed 9 MXH, Bốc bài Tarot 78 lá, Tóm tắt tin nhắn AI MapReduce và Hạ tầng Cloud 24/7."
+                ]
+            },
+            {
+                "category": "📜 Nhật Ký Cập Nhật Trực Quan Cho Cộng Đồng (Public Changelog)",
+                "items": [
+                    "Hero Release Card nổi bật phiên bản mới nhất kèm ngày phát hành, codename, tóm tắt và danh mục thay đổi có badge phân loại.",
+                    "Timeline Accordion tương tác xem lại toàn bộ 28 bản cập nhật trước đó từ v2.5.3 về đến v1.0.0 hoàn toàn công khai."
+                ]
+            },
+            {
+                "category": "🛠️ Cải Tiến Trải Nghiệm Bảng Quản Trị & Đăng Nhập",
+                "items": [
+                    "Bổ sung nút 'Xem Trang Khách' trên header Admin Dashboard để chuyển đổi nhanh giữa 2 giao diện.",
+                    "Tự động đồng bộ số hiệu phiên bản động lên header badge và tab badge thay vì chuỗi tĩnh.",
+                    "Trang đăng nhập (/login) bổ sung nút quay về Trang Khách và hỗ trợ chuyển hướng thông minh qua tham số next."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.5.3",
         "date": "2026-09-04",

@@ -34,8 +34,8 @@ def login_required(f):
             # Nếu là request API -> trả về JSON 401
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized", "authenticated": False}), 401
-            # Nếu là request trang HTML -> chuyển hướng về /login
-            return redirect(url_for("login_page"))
+            # Nếu là request trang HTML -> chuyển hướng về /login kèm tham số next
+            return redirect(url_for("login_page", next=request.path))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -66,15 +66,19 @@ def health_check():
 # ==========================================
 @app.route('/login', methods=['GET'])
 def login_page():
+    next_url = request.args.get("next", "/admin")
     if session.get("logged_in"):
-        return redirect(url_for("home"))
-    return render_template('login.html')
+        return redirect(next_url if next_url.startswith("/") else url_for("admin_dashboard"))
+    return render_template('login.html', next=next_url)
 
 
 @app.route('/api/auth/login', methods=['POST'])
 def api_login():
     data = request.get_json(silent=True) or {}
     password = data.get("password", "")
+    next_url = data.get("next", "/admin")
+    if not next_url.startswith("/"):
+        next_url = "/admin"
 
     if not password:
         return jsonify({"success": False, "error": "Vui lòng nhập mật khẩu quản trị!"}), 400
@@ -83,7 +87,7 @@ def api_login():
         session["logged_in"] = True
         session.permanent = True
         print("🔐 [Auth] Đăng nhập Admin Web Console thành công.", flush=True)
-        return jsonify({"success": True})
+        return jsonify({"success": True, "redirect": next_url})
     else:
         print("⚠️ [Auth] Phát hiện lượt đăng nhập Admin Web Console thất bại.", flush=True)
         return jsonify({"success": False, "error": "Mật khẩu quản trị không chính xác!"}), 401
@@ -93,17 +97,95 @@ def api_login():
 def api_logout():
     session.clear()
     if request.path.startswith("/api/"):
-        return jsonify({"success": True})
-    return redirect(url_for("login_page"))
+        return jsonify({"success": True, "redirect": "/"})
+    return redirect(url_for("guest_home"))
 
 
 # ==========================================
-# 2. MAIN DASHBOARD ROUTE
+# 2. GUEST & ADMIN PAGE ROUTES
 # ==========================================
 @app.route('/')
+def guest_home():
+    """Trang chủ công khai (Guest Page) - Giới thiệu bot, thông số trực tiếp và Changelog."""
+    return render_template('guest.html')
+
+
+@app.route('/admin')
 @login_required
-def home():
+def admin_dashboard():
+    """Bảng điều khiển Quản trị viên (Protected) - Yêu cầu đăng nhập."""
     return render_template('dashboard.html')
+
+
+@app.route('/home')
+def legacy_home():
+    """Chuyển hướng tương thích cho các liên kết cũ."""
+    if session.get("logged_in"):
+        return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("guest_home"))
+
+
+# ==========================================
+# 2.1 PUBLIC STATS API FOR GUEST PAGE
+# ==========================================
+@app.route('/api/public/stats', methods=['GET'])
+def api_public_stats():
+    """API công khai cung cấp thông số cơ bản phục vụ Trang Khách (không yêu cầu login)."""
+    now = datetime.now(timezone.utc)
+    uptime_delta = now - config.start_time
+
+    hours_up, remainder = divmod(int(uptime_delta.total_seconds()), 3600)
+    minutes_up, seconds_up = divmod(remainder, 60)
+    uptime_str = f"{hours_up:02d}h {minutes_up:02d}m {seconds_up:02d}s"
+
+    bot_latency = "N/A"
+    bot_latency_raw = 0
+    bot_status = "Offline"
+    guild_count = 0
+    total_users = 0
+    bot_name = "MikeDaBot"
+    bot_avatar = "https://cdn.discordapp.com/embed/avatars/0.png"
+    bot_id = ""
+    invite_url = ""
+
+    if bot.is_ready():
+        bot_status = "Online"
+        try:
+            latency = bot.latency
+            if latency is not None and not math.isnan(latency):
+                bot_latency_raw = round(latency * 1000)
+                bot_latency = f"{bot_latency_raw}ms"
+        except Exception:
+            pass
+
+        guild_count = len(bot.guilds)
+        total_users = sum(g.member_count for g in bot.guilds if g.member_count)
+        if bot.user:
+            bot_name = bot.user.name
+            bot_avatar = bot.user.display_avatar.url if bot.user.display_avatar else bot_avatar
+            bot_id = str(bot.user.id)
+            invite_url = f"https://discord.com/oauth2/authorize?client_id={bot_id}&permissions=275414838784&scope=bot%20applications.commands"
+
+    from core.version import CODENAME, RELEASE_DATE
+
+    return jsonify({
+        "bot_status": bot_status,
+        "bot_id": bot_id,
+        "bot_name": bot_name,
+        "bot_avatar": bot_avatar,
+        "invite_url": invite_url,
+        "uptime": uptime_str,
+        "uptime_seconds": int(uptime_delta.total_seconds()),
+        "latency": bot_latency,
+        "latency_raw": bot_latency_raw,
+        "guilds": guild_count,
+        "total_users": total_users,
+        "prefix": ".m",
+        "version": CURRENT_VERSION,
+        "codename": CODENAME,
+        "release_date": RELEASE_DATE,
+        "presence": presence_manager.get_info()
+    })
 
 
 # ==========================================
@@ -555,11 +637,11 @@ def api_update_presence():
 
 
 # ==========================================
-# 11. VERSION & CHANGELOG APIS
+# 11. VERSION & CHANGELOG APIS (PUBLIC)
 # ==========================================
 @app.route('/api/version', methods=['GET'])
-@login_required
 def api_version():
+    """API công khai cung cấp thông tin phiên bản và toàn bộ Changelog."""
     return jsonify({
         "info": get_version_info(),
         "changelog": get_changelog()

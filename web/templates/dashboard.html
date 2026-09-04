@@ -85,7 +85,7 @@
                         </span>
                         <button onclick="switchTab('version')" id="header-version-badge" title="Bấm để xem thông tin phiên bản & patchnotes" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30 hover:bg-brand-500/30 transition-all cursor-pointer">
                             <i data-lucide="tag" class="w-2.5 h-2.5"></i>
-                            <span id="header-version-text">v2.4.6</span>
+                            <span id="header-version-text">v2.6.0</span>
                         </button>
                     </div>
                 </div>
@@ -112,6 +112,10 @@
 
             <!-- Right: Actions & Logout -->
             <div class="flex items-center gap-2">
+                <a href="/" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700/80 transition-all active:scale-95" title="Mở trang khách công khai">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5 text-brand-400"></i>
+                    <span class="hidden sm:inline">Trang Khách</span>
+                </a>
                 <a id="header-invite-btn" href="#" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-all active:scale-95">
                     <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
                     <span>Mời Bot</span>
@@ -143,7 +147,7 @@
                 <button onclick="switchTab('version')" id="tab-btn-version" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="git-commit" class="w-3.5 h-3.5 text-brand-400"></i>
                     <span>Phiên Bản & Patchnotes</span>
-                    <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-500/20 text-brand-300 font-mono font-bold">v2.0.0</span>
+                    <span id="tab-version-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-500/20 text-brand-300 font-mono font-bold">v2.6.0</span>
                 </button>
                 <button onclick="switchTab('tarot')" id="tab-btn-tarot" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400"></i>
@@ -2082,9 +2086,9 @@
         async function handleLogout() {
             try {
                 await fetch('/api/auth/logout', { method: 'POST' });
-                window.location.href = '/login';
+                window.location.href = '/';
             } catch (err) {
-                window.location.href = '/login';
+                window.location.href = '/';
             }
         }
 
@@ -2136,6 +2140,13 @@
                 document.getElementById('header-latency').textContent = statsData.latency;
                 document.getElementById('header-guilds').textContent = statsData.guilds;
                 document.getElementById('header-ram').textContent = statsData.ram_usage;
+
+                if (statsData.version) {
+                    const hv = document.getElementById('header-version-text');
+                    if (hv) hv.textContent = 'v' + statsData.version;
+                    const tv = document.getElementById('tab-version-badge');
+                    if (tv) tv.textContent = 'v' + statsData.version;
+                }
 
                 // Overview Tab
                 document.getElementById('overview-status').innerHTML = isOnline

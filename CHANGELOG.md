@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.6.0] - 2026-09-04 — *Public Guest Landing Page & Role-Based Dashboard Architecture*
+
+### Added
+- **Trang Khách Công Khai (`/` - Public Guest Landing Page)**:
+  - Cho phép người dùng truy cập trực tiếp trang chủ mà không yêu cầu đăng nhập.
+  - Hiển thị các thông số hoạt động trực tiếp (Online/Offline, Độ trễ ms, Uptime liên tục, Số máy chủ, Tiền tố `.m` & `/slash`) tự động cập nhật mỗi 5 giây qua `/api/public/stats`.
+  - Showcase chi tiết 4 nhóm tính năng cốt lõi: Auto-Embed 9 mạng xã hội, Bốc bài Tarot chiêm tinh 78 lá, Tóm tắt tin nhắn hội thoại AI MapReduce và Hạ tầng Cloud 24/7.
+  - **Nhật Ký Cập Nhật (Public Changelog)**: Hiển thị nổi bật phiên bản hiện tại kèm phân loại tính năng và danh sách Accordion tương tác xem lại toàn bộ 28 bản cập nhật trước đó từ `v2.5.3` về đến `v1.0.0`.
+- **Phân Quyền Tuyến Đường & Tách Biệt Vai Trò (Role-Based Routing)**:
+  - Trang Quản trị chuyển sang `/admin` và được bảo vệ nghiêm ngặt bằng `@login_required`, tự động chuyển hướng `/login?next=/admin` nếu chưa đăng nhập.
+  - Phân tách API an toàn: Mở công khai `/api/public/stats` và `/api/version`; giữ bảo mật tuyệt đối cho các API quản trị (`/api/stats`, `/api/activities`, `/api/guilds`, `/api/tarot/*`).
+- **Nâng Cấp Giao Diện Bảng Quản Trị & Đăng Nhập**:
+  - Bổ sung nút "Xem Trang Khách" trên Header của Admin Dashboard.
+  - Đồng bộ số hiệu phiên bản động trên toàn bộ các badge.
+  - Trang đăng nhập (`/login`) bổ sung nút quay về Trang Khách và hỗ trợ chuyển hướng thông minh qua tham số `next`.
+
+---
+
 ## [2.5.3] - 2026-09-04 — *Embed Reaction Desync Guard & Multi-User Notification Re-trigger*
 
 ### Fixed
