@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.1] - 2026-09-04 — *Tarot Direct Focus & Grounded Symbolism & Yes/No Sync*
+
+### Changed
+- **Trực Diện & Xử Lý Câu Hỏi Meta / Thử Tài Bot (Direct Focus)**:
+  - Bổ sung Nguyên tắc 5 vào AI Prompt: Ngăn chặn hoàn toàn việc AI tự suy diễn các câu hỏi thành tâm sự tình yêu lứa đôi hay văn mẫu chữa lành sáo rỗng.
+  - Xử lý chuyên biệt cho các câu hỏi thử tài hoặc hỏi về bot (như *"Bot có biết bói tarot không?"*): Reader tự tin khẳng định vai trò, giải mã lá bài rút được theo đúng bối cảnh thử tài và gợi ý người dùng đặt câu hỏi thực tế.
+- **Biểu Tượng Bám Sát Thực Tế & Lời Khuyên Hành Động (Grounded Symbolism & Actionable Advice)**:
+  - Bắt buộc gắn hình ảnh, chi tiết lá bài vào sự việc của câu hỏi thay vì trích dẫn định nghĩa lý thuyết chung chung.
+  - Chuẩn hóa mục Advice thành các bước hành động cụ thể (Actionable Steps).
+- **Đồng Bộ Tuyệt Đối Phán Quyết Yes / No (Yes/No Verdict Sync)**:
+  - Truyền trực tiếp kết quả phán quyết chính thức (Badge & Mô tả) vào AI Prompt để bài giải luôn đồng thuận, chấm dứt hoàn toàn tình trạng mâu thuẫn "trên CÓ, dưới KHÔNG".
+- **Tinh Chỉnh Persona Readers**: Cập nhật chỉ dẫn giữ đúng trọng tâm câu hỏi cho Orion, Celeste và Jester.
+
+---
+
 ## [2.5.0] - 2026-09-04 — *Tarot Ethics Boundary & Third-Party Privacy Protection*
 
 ### Added

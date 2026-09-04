@@ -10,12 +10,48 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.5.0"
+CURRENT_VERSION = "2.5.1"
 RELEASE_DATE = "2026-09-04"
-CODENAME = "Tarot Ethics Boundary & Third-Party Privacy Protection"
+CODENAME = "Tarot Direct Focus & Grounded Symbolism & Yes/No Sync"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.5.1",
+        "date": "2026-09-04",
+        "type": "bugfix",
+        "title": "Tối Ưu Trọng Tâm Luận Giải Tarot, Bám Sát Biểu Tượng Lá Bài & Đồng Bộ Phán Quyết Yes/No",
+        "summary": "Khắc phục triệt để tình trạng trả lời lạc đề / văn mẫu chung chung khi người dùng đặt câu hỏi meta/thử tài bot; bắt buộc AI bám sát chủ đề câu hỏi, lái biểu tượng lá bài vào thực tế kèm lời khuyên hành động cụ thể, và đồng bộ tuyệt đối với phán quyết Yes/No.",
+        "changes": [
+            {
+                "category": "🎯 Trả Lời Trực Diện & Xử Lý Câu Hỏi Meta / Thử Tài Bot",
+                "items": [
+                    "Bổ sung Nguyên tắc 5 vào AI Prompt: Ngăn chặn tuyệt đối việc AI tự suy diễn mọi câu hỏi thành chuyện tình cảm lứa đôi hay văn mẫu chữa lành sáo rỗng.",
+                    "Xử lý chuyên biệt cho câu hỏi thử tài bot (như 'Bot có biết bói tarot không?'): Reader tự tin xác nhận vai trò và khả năng giải bài, giải mã lá bài rút được theo đúng ngữ cảnh thử tài và gợi ý người dùng đặt câu hỏi thực tế."
+                ]
+            },
+            {
+                "category": "🃏 Biểu Tượng Sát Thực Tế & Lời Khuyên Hành Động Cụ Thể",
+                "items": [
+                    "Bắt buộc gắn chi tiết, hình ảnh của lá bài vào sự việc của câu hỏi thay vì trích dẫn định nghĩa từ điển lý thuyết chung chung.",
+                    "Chuẩn hóa mục Advice thành các bước hành động cụ thể, thực tế (Actionable Steps) mà người hỏi có thể thực hiện ngay."
+                ]
+            },
+            {
+                "category": "⚡ Đồng Bộ Tuyệt Đối Phán Quyết Yes / No",
+                "items": [
+                    "Truyền trực tiếp kết quả phán quyết chính thức (Badge & Mô tả) vào AI Prompt.",
+                    "Ràng buộc mục Kết luận và bài giải phải đồng thuận với phán quyết, loại bỏ hoàn toàn mâu thuẫn 'trên CÓ, dưới KHÔNG'."
+                ]
+            },
+            {
+                "category": "🎭 Tinh Chỉnh Persona Readers (Orion, Celeste, Jester)",
+                "items": [
+                    "Bổ sung chỉ dẫn giữ đúng trọng tâm câu hỏi cho cả 3 Persona, đặc biệt là Celeste (dịu dàng nhưng trực diện, không biến mọi chuyện thành sầu muộn)."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.5.0",
         "date": "2026-09-04",
