@@ -10,42 +10,18 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.7.1"
+CURRENT_VERSION = "2.7.0"
 RELEASE_DATE = "2026-09-09"
-CODENAME = "Multi-Tier AI Fallback Cascade Matrix & Flash Generation Engine"
+CODENAME = "Context-Aware AI Cabin Parody Interpretation & Multi-Tier Cascade Engine"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
     {
-        "version": "2.7.1",
-        "date": "2026-09-09",
-        "type": "bugfix",
-        "title": "Nâng Cấp Chuỗi Fallback Mô Hình AI Toàn Diện (7 Mô Hình Cascade)",
-        "summary": "Tái cấu trúc và chuẩn hóa toàn bộ chuỗi mô hình dự phòng AI (Fallback Cascade) cho tất cả các tính năng Tarot, Dịch Cabin, Tóm tắt tin nhắn (Single-Pass & MapReduce) và AI QA Evaluator theo thứ tự ưu tiên tối ưu hiệu năng và độ ổn định.",
-        "changes": [
-            {
-                "category": "🤖 Chuỗi Fallback 7 Tầng Toàn Hệ Thống",
-                "items": [
-                    "Thứ tự fallback chuẩn: 3.8 flash -> 3.7 flash -> 3.6 flash -> 3.5 flash -> 3.5 flash lite -> 3.1 flash lite -> Gemma 4.",
-                    "Đưa Gemini 3.8 Flash (gemini-3.8-flash) làm mô hình mặc định cho Tarot, Cabin, Summary và QA.",
-                    "Áp dụng cơ chế bắt lỗi và fallback tự động cho Single-Pass, MapReduce Reduce và AI Evaluator."
-                ]
-            },
-            {
-                "category": "🖥️ Đồng Bộ Web Dashboard & Environment",
-                "items": [
-                    "Cập nhật hiển thị realtime các model đang hoạt động trên Web Console Overview và Cabin Engine Card.",
-                    "Đồng bộ hóa các biến môi trường và tài liệu hướng dẫn cấu hình trong .env.example."
-                ]
-            }
-        ]
-    },
-    {
         "version": "2.7.0",
         "date": "2026-09-09",
         "type": "minor",
-        "title": "Ra Mắt Tính Năng Dịch Cabin Troll AI Trực Tiếp (/cabin)",
-        "summary": "Bổ sung module Dịch Cabin thời gian thực cực kỳ hài hước: bot đóng vai phiên dịch viên cabin song song, tự động đọc ngữ cảnh 30 phút gần nhất của kênh chat để 'chuyển ngữ' câu nói của người chỉ định sang góc nhìn châm biếm, bóc trần sự thật ngầm hiểu hoặc bẻ lái bất ngờ.",
+        "title": "Ra Mắt Tính Năng Dịch Cabin Troll AI Trực Tiếp & Chuỗi Fallback 7 Tầng Toàn Hệ Thống",
+        "summary": "Bổ sung module Dịch Cabin thời gian thực cực kỳ hài hước: bot đóng vai phiên dịch viên cabin song song, tự động đọc ngữ cảnh 30 phút gần nhất của kênh chat để 'chuyển ngữ' câu nói của người chỉ định sang góc nhìn ngôi thứ nhất châm biếm, bóc trần sự thật ngầm hiểu hoặc bẻ lái bất ngờ. Đồng thời chuẩn hóa chuỗi mô hình dự phòng AI (Fallback Cascade) 7 tầng cho tất cả các tính năng Tarot, Cabin, Tóm tắt tin nhắn và QA Evaluator.",
         "changes": [
             {
                 "category": "🎙️ Tính Năng Dịch Cabin Trực Tiếp (/cabin)",
@@ -56,18 +32,36 @@ CHANGELOG: List[Dict[str, Any]] = [
                 ]
             },
             {
-                "category": "🧠 Nắm Bắt Ngữ Cảnh Hội Thoại (Context-Aware)",
+                "category": "🧠 Nắm Bắt Ngữ Cảnh Hội Thoại & Góc Nhìn Ngôi Thứ Nhất",
                 "items": [
-                    "Tự động quét tối đa 25 tin nhắn trong 30 phút gần nhất của kênh chat để Gemini 3.5 Flash Lite thấu hiểu chủ đề trò chuyện.",
-                    "Bẻ lái câu nói ăn khớp hoàn hảo với diễn biến tâm lý, câu chuyện đùa vui của các thành viên trong server."
+                    "Tự động quét tối đa 25 tin nhắn trong 30 phút gần nhất của kênh chat để AI nắm bắt chủ đề trò chuyện.",
+                    "Người phiên dịch cabin bắt buộc nói thay lời nạn nhân ở ngôi thứ nhất ('Tao/Tôi/Mình/Em'), tự thú nhận sự thật bựa/sĩ diện/lươn lẹo trúng tim đen."
                 ]
             },
             {
-                "category": "🛡️ Kiểm Soát Chống Phá Hoại & Cơ Chế Fair-play",
+                "category": "🛡️ Quản Lý Khiên Chống Cabin Độc Quyền Quản Trị & Fair-play",
                 "items": [
+                    "Giới hạn 1 người chỉ được tạo tối đa 1 phiên cabin tại một thời điểm.",
+                    "Quản lý cấp/gỡ Khiên miễn nhiễm độc quyền trên Admin Web Dashboard (/admin), loại bỏ lệnh chat công khai tránh lạm dụng.",
                     "Nút bấm 1-chạm 🛑 Dừng Cabin đính kèm thông báo giúp nạn nhân hoặc Admin giải thoát bất kỳ lúc nào.",
                     "Cooldown 8 giây per-victim và bộ lọc tin nhắn thông minh chống spam flood kênh.",
                     "Lưu trữ phiên bền vững vào Database Turso LibSQL Cloud / SQLite để bảo toàn trạng thái khi bot khởi động lại."
+                ]
+            },
+            {
+                "category": "🤖 Chuỗi Fallback 7 Tầng Toàn Hệ Thống (Fallback Cascade Matrix)",
+                "items": [
+                    "Thứ tự fallback chuẩn hóa đồng bộ cho Tarot, Cabin, Summary và QA Evaluator: 3.8 flash -> 3.7 flash -> 3.6 flash -> 3.5 flash -> 3.5 flash lite -> 3.1 flash lite -> Gemma 4.",
+                    "Đưa Gemini 3.8 Flash (gemini-3.8-flash) làm mô hình mặc định cho Tarot, Cabin, Summary và QA.",
+                    "Áp dụng cơ chế bắt lỗi và fallback tự động cho Single-Pass, MapReduce Reduce và AI Evaluator."
+                ]
+            },
+            {
+                "category": "🖥️ Nâng Cấp Web Console & Showcase Trang Khách",
+                "items": [
+                    "Tab Quản Trị Dịch Cabin mới trên Web Dashboard: Giám sát Live Sessions, dừng cưỡng chế từ xa và quản lý Khiên bảo vệ.",
+                    "Cập nhật hiển thị realtime các model đang hoạt động trên Web Console Overview và Cabin Engine Card.",
+                    "Showcase tính năng Dịch Cabin trên Public Landing Page và menu trợ giúp tương tác .m / /help."
                 ]
             }
         ]
