@@ -333,11 +333,13 @@ class CabinManager:
         self,
         guild_id: int,
         target_id: int,
-        cooldown_seconds: float = DEFAULT_CABIN_COOLDOWN_SECONDS
+        cooldown_seconds: float = DEFAULT_CABIN_COOLDOWN_SECONDS,
+        update: bool = True
     ) -> bool:
         """
-        Kiểm tra và cập nhật cooldown cho target.
-        Trả về True nếu được phép dịch, False nếu đang trong thời gian chờ (cooldown).
+        Kiểm tra xem target có đang trong thời gian chờ (cooldown) hay không.
+        Nếu update=True, tự động cập nhật thời điểm dịch gần nhất khi vượt qua cooldown.
+        Trả về True nếu được phép dịch, False nếu đang trong thời gian chờ.
         """
         key = (guild_id, target_id)
         now = time.time()
@@ -346,8 +348,13 @@ class CabinManager:
         if now - last_time < cooldown_seconds:
             return False
 
-        self._last_translated[key] = now
+        if update:
+            self._last_translated[key] = now
         return True
+
+    def update_cooldown(self, guild_id: int, target_id: int) -> None:
+        """Ghi nhận thời điểm vừa dịch thành công câu cho target."""
+        self._last_translated[(guild_id, target_id)] = time.time()
 
     def reset_cooldown(self, guild_id: int, target_id: int) -> None:
         """Reset thời gian cooldown dịch gần nhất cho nạn nhân về 0."""

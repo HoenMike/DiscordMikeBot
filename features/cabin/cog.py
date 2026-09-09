@@ -593,12 +593,15 @@ class CabinCog(commands.Cog, name="Cabin"):
                         reply_content = f"🎙️ **Dịch cabin:** {interpretation}"
                         await message.reply(reply_content, mention_author=False)
 
+                        # Cập nhật thời điểm dịch thành công để kích hoạt cooldown
+                        cabin_manager.update_cooldown(guild_id, author_id)
+
                         # Tăng biến đếm số câu đã dịch
                         await cabin_manager.increment_translated_count(guild_id, author_id)
 
                         # Ghi nhận hoạt động vào activity_logger để hiển thị trên Dashboard
                         duration_ms = round((time.time() - start_time) * 1000, 2)
-                        activity_logger.log_activity(
+                        activity_logger.log(
                             action_type="cabin",
                             action_name="Dịch Cabin AI",
                             user_id=author_id,
@@ -613,9 +616,14 @@ class CabinCog(commands.Cog, name="Cabin"):
                             status="success",
                             duration_ms=duration_ms,
                         )
+                    else:
+                        # Nếu AI không sinh được bản dịch, giải phóng cooldown để câu sau không bị nghẽn
+                        cabin_manager.reset_cooldown(guild_id, author_id)
             except discord.Forbidden:
+                cabin_manager.reset_cooldown(guild_id, author_id)
                 print(f"⚠️ [Cabin] Bot thiếu quyền gửi tin nhắn hoặc typing tại channel {message.channel.id}", flush=True)
             except Exception as err:
+                cabin_manager.reset_cooldown(guild_id, author_id)
                 print(f"❌ [Cabin] Lỗi trong quá trình dịch tin nhắn: {err}", flush=True)
                 traceback.print_exc(file=sys.stdout)
         finally:

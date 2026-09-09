@@ -166,6 +166,9 @@ class ActivityLogger:
         self._persist_activity_async(entry)
         return entry
 
+    # Bí danh để tương thích ngược
+    log_activity = log
+
     def _persist_activity_async(self, entry: dict):
         """Lưu bản ghi tương tác vào Database mà không chặn luồng chính."""
         async def _do_save():

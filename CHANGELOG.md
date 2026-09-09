@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.2] - 2026-09-09 — *Cabin AI Robustness & Victim-Centric Interpretation Fixes*
+
+### Fixed
+- **Sửa Lỗi Crash `ActivityLogger`**: Chuẩn hóa lệnh gọi sang `activity_logger.log(...)` trong `features/cabin/cog.py` và bổ sung bí danh `log_activity = log` trong `core/activity_logger.py` tránh phát sinh `AttributeError`.
+- **Triệt Tiêu Lỗi Cụt Câu Dịch Cabin (Token Exhaustion Guard)**: Nâng `max_output_tokens` từ 350 lên 1200 cho Gemini 3.7 / 3.8 Flash, ngăn chặn việc thought tokens làm cạn quota; đồng thời bổ sung bộ lọc `is_incomplete_sentence` và chặn `FinishReason.MAX_TOKENS` tự động fallback khi phát hiện câu dang dở.
+- **Tập Trung 100% Vào Câu Nói Nạn Nhân (Victim-Centric Prompt & Narrow Context)**: Thu hẹp `CONTEXT_MAX_MESSAGES` xuống 4 tin nhắn và thời gian xuống 5 phút; tái cấu trúc prompt đặt câu nói của nạn nhân làm trung tâm, triệt tiêu việc AI bị phân tâm bởi các chủ đề thảo luận cũ trong kênh chat.
+- **Tối Ưu Cooldown Thông Minh**: Cooldown 8s chỉ bắt đầu đếm sau khi câu dịch đã được gửi thành công; tự động giải phóng cooldown ngay nếu quá trình gọi AI gặp sự cố hoặc timeout để không làm trôi tin nhắn tiếp theo của người dùng.
+
+---
+
 ## [2.7.1] - 2026-09-09 — *AI Tarot Interpretation Enhancements & Cabin Takeover Engine*
 
 ### Added

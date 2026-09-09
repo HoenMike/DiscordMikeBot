@@ -10,12 +10,30 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.7.1"
+CURRENT_VERSION = "2.7.2"
 RELEASE_DATE = "2026-09-09"
-CODENAME = "AI Tarot Interpretation Enhancements & Cabin Takeover Engine"
+CODENAME = "Cabin AI Robustness & Victim-Centric Interpretation Fixes"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.7.2",
+        "date": "2026-09-09",
+        "type": "bugfix",
+        "title": "Sửa Lỗi ActivityLogger, Chống Cụt Câu Dịch Cabin & Tối Ưu Context Tập Trung Nạn Nhân",
+        "summary": "Bản vá khẩn cấp cho tính năng Dịch Cabin: Sửa lỗi AttributeError do gọi sai tên hàm ActivityLogger, mở rộng quota token từ 350 lên 1200 và bổ sung cơ chế kiểm duyệt câu dở dang chống cụt chữ; đồng thời thu hẹp ngữ cảnh lịch sử xuống 4 tin nhắn gần nhất và cấu trúc lại prompt tập trung 100% vào nội dung câu nói của nạn nhân; tối ưu cơ chế cooldown chỉ kích hoạt khi dịch thành công.",
+        "changes": [
+            {
+                "category": "🎙️ Tinh Chỉnh & Vá Lỗi Dịch Cabin AI",
+                "items": [
+                    "Sửa lỗi AttributeError: 'ActivityLogger' object has no attribute 'log_activity' bằng cách chuẩn hóa gọi activity_logger.log(...) và thêm bí danh log_activity.",
+                    "Khắc phục triệt để lỗi cụt câu: Nâng max_output_tokens từ 350 lên 1200 để các model tư duy (Gemini 3.7 / 3.8 Flash) không bị cạn token, bổ sung hàm is_incomplete_sentence và chặn FinishReason.MAX_TOKENS để tự động fallback khi câu bị cắt ngang.",
+                    "Thu hẹp ngữ cảnh & Trọng tâm nạn nhân: Giảm CONTEXT_MAX_MESSAGES từ 25 xuống 4 tin nhắn và thời gian từ 30 xuống 5 phút; tái cấu trúc prompt ưu tiên 100% vào tin nhắn nạn nhân vừa gửi, tránh bị loãng chủ đề cũ của kênh.",
+                    "Tối ưu Cooldown: Cooldown 8s chỉ kích hoạt sau khi bot đã dịch và reply thành công; tự động reset cooldown ngay nếu lượt gọi AI gặp lỗi hoặc timeout để không làm trôi tin nhắn tiếp theo của nạn nhân."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.7.1",
         "date": "2026-09-09",

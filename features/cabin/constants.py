@@ -27,8 +27,8 @@ DEFAULT_DURATION_SECONDS = 1800     # 30 phút
 MAX_DURATION_SECONDS = 10800        # 3 giờ (180 phút)
 
 DEFAULT_CABIN_COOLDOWN_SECONDS = 8.0  # Cooldown giữa 2 lần bot dịch cho cùng 1 người
-CONTEXT_HISTORY_MINUTES = 30          # Quét tin nhắn trong vòng 30 phút gần nhất
-CONTEXT_MAX_MESSAGES = 25             # Lấy tối đa 25 tin nhắn bối cảnh gần nhất
+CONTEXT_HISTORY_MINUTES = 5           # Chỉ quét tin nhắn trong vòng 5 phút gần nhất
+CONTEXT_MAX_MESSAGES = 4              # Chỉ lấy tối đa 3-4 tin nhắn gần nhất để làm tham khảo phụ
 
 CABIN_EMBED_COLOR = 0xE67E22          # Màu cam microphone trực tiếp
 
