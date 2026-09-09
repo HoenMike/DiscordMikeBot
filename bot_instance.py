@@ -16,6 +16,7 @@ FEATURE_EXTENSIONS = [
     "features.embed.cog",
     "features.summary.cog",
     "features.tarot.cog",
+    "features.cabin.cog",
 ]
 
 
@@ -199,7 +200,16 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         inline=False
     )
     embed.add_field(
-        name="⚙️ 4. HỆ THỐNG & QUẢN TRỊ (SYSTEM & STATUS)",
+        name="🎙️ 4. DỊCH CABIN TROLL AI (LIVE INTERPRETATION)",
+        value=(
+            "• 'Phiên dịch cabin' trực tiếp câu nói của một thành viên sang tầng ý nghĩa siêu bựa, châm biếm sâu cay.\n"
+            "• **Context-Aware**: Tự động quét ngữ cảnh chat 30 phút qua để bẻ lái câu nói trúng tim đen nhất!\n"
+            "👉 **Lệnh:** `/cabin @user`, `.m cabin @user` | **Xem chi tiết:** Chọn mục `🎙️ Dịch Cabin` bên dưới."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="⚙️ 5. HỆ THỐNG & QUẢN TRỊ (SYSTEM & STATUS)",
         value=(
             "• `/version` (`.m ver`): Xem phiên bản hiện tại & toàn bộ nhật ký cập nhật (Patchnotes).\n"
             "• `/setstatus`: Đổi trạng thái bot động (Online, Idle, DND, Xoay tua tính năng) dành cho Admin.\n"
@@ -388,6 +398,48 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
     return embed
 
 
+def build_cabin_help_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
+    embed = discord.Embed(
+        title="🎙️ HƯỚNG DẪN TÍNH NĂNG DỊCH CABIN TROLL AI",
+        description=(
+            "Biến bot thành một 'phiên dịch viên cabin' song song trực tiếp siêu bựa! "
+            "Mỗi khi người bị chỉ định nhắn tin, bot sẽ quét ngữ cảnh cuộc trò chuyện trong kênh (30 phút gần nhất) "
+            "rồi dùng Gemini 3.5 Flash Lite để 'phiên dịch' câu nói đó sang tầng ý nghĩa châm biếm, bóc trần sự thật ngầm hiểu hoặc bẻ lái bất ngờ."
+        ),
+        color=0xE67E22
+    )
+    embed.add_field(
+        name="⚡ CÁCH SỬ DỤNG SIÊU ĐƠN GIẢN",
+        value=(
+            "• **Slash Command:** `/cabin user:@ai_đó [thoi_gian]`\n"
+            "  - *Chưa bật cabin* ➔ **Bật ngay** (mặc định 30 phút, hỗ trợ `10m`, `1h`, `2h`, tối đa 3 giờ).\n"
+            "  - *Đang bật cabin* ➔ Tự động **Tắt ngay** giải thoát cho nạn nhân!\n"
+            "• **Dừng Nhanh Chóng:** `/cabinstop` hoặc `.m cabinstop` (tự động nhận diện dừng phiên của bạn)\n"
+            "• **Prefix Command:** `.m cabin @ai_đó [thời_gian]` (Toggle thông minh tương tự)\n"
+            "• **Nút bấm dừng 1-chạm:** Bấm nút **🛑 Dừng Cabin** trên tin nhắn bot để dừng bất kỳ lúc nào\n"
+            "• **Xem danh sách đang chạy:** `.m cabinlist` hoặc `.m cabin list`"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🎯 ĐIỂM NỔI BẬT & CƠ CHẾ FAIR-PLAY",
+        value=(
+            "• **🛡️ Khiên Chống Cabin**: Được quản lý và cấp quyền độc quyền từ Admin Web Dashboard để bảo vệ thành viên khỏi bị troll.\n"
+            "• **Giới Hạn 1 Người 1 Phiên**: Mỗi người chỉ được tạo tối đa 1 phiên cabin cùng lúc trong server.\n"
+            "• **Context-Aware (30 phút gần nhất)**: Tự động hiểu chủ đề mọi người đang tán gẫu để đá xoáy cực chuẩn xác.\n"
+            "• **Nút Bấm Dừng 1-Chạm**: Nạn nhân, người bật hoặc Quản trị viên đều có thể bấm nút để thoát buồng cabin bất kỳ lúc nào.\n"
+            "• **Anti-Spam Cooldown**: Cách nhau tối thiểu 8 giây giữa 2 lần dịch để tránh flood kênh chat.\n"
+            "• **Tự Động Hết Hạn**: Session tự động dọn dẹp và kết thúc khi hết thời lượng đã định."
+        ),
+        inline=False
+    )
+    embed.set_footer(
+        text=f"Yêu cầu bởi {user.display_name} • MikeBot Cabin Engine v1.0",
+        icon_url=user.display_avatar.url if user.display_avatar else None
+    )
+    return embed
+
+
 class HelpView(discord.ui.View):
     """View điều hướng tương tác giữa các trang hướng dẫn của MikeBot."""
 
@@ -427,6 +479,12 @@ class HelpView(discord.ui.View):
                     description="Hướng dẫn và cấu hình tự động sửa link MXH",
                     default=(self.current_tab == "embed")
                 ),
+                discord.SelectOption(
+                    label="🎙️ Dịch Cabin Troll AI",
+                    value="cabin",
+                    description="Hướng dẫn chế độ phiên dịch trực tiếp bẻ lái câu nói",
+                    default=(self.current_tab == "cabin")
+                ),
             ],
             row=0
         )
@@ -450,6 +508,8 @@ class HelpView(discord.ui.View):
             return build_summary_help_embed(user)
         elif self.current_tab == "embed":
             return build_embed_help_embed(user)
+        elif self.current_tab == "cabin":
+            return build_cabin_help_embed(user)
         else:
             return build_overview_embed(user)
 

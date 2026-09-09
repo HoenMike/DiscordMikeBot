@@ -153,7 +153,10 @@ try:
         DEFAULT_GEMINI_SUMMARY_MODEL,
         DEFAULT_GEMINI_QA_MODEL,
         DEFAULT_GEMINI_TAROT_MODEL,
+        DEFAULT_GEMINI_CABIN_MODEL,
+        DEFAULT_AI_FALLBACK_MODELS,
         DEFAULT_TAROT_FALLBACK_MODELS,
+        DEFAULT_CABIN_FALLBACK_MODELS,
         DEFAULT_SUMMARY_TEMPERATURE,
         DEFAULT_QA_TEMPERATURE,
         DEFAULT_TAROT_TEMPERATURE,
@@ -167,13 +170,16 @@ try:
     )
 except ImportError:
     DEFAULT_GEMINI_DATA_MODEL = "gemini-3.1-flash-lite"
-    DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.5-flash-lite"
-    DEFAULT_GEMINI_QA_MODEL = "gemini-3.5-flash-lite"
-    DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.7-flash"
-    DEFAULT_TAROT_FALLBACK_MODELS = [
-        "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+    DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.8-flash"
+    DEFAULT_GEMINI_QA_MODEL = "gemini-3.8-flash"
+    DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.8-flash"
+    DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.8-flash"
+    DEFAULT_AI_FALLBACK_MODELS = [
+        "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
         "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemma-4-31b-it"
     ]
+    DEFAULT_TAROT_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
+    DEFAULT_CABIN_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
     DEFAULT_SUMMARY_TEMPERATURE = 0.1
     DEFAULT_QA_TEMPERATURE = 0.3
     DEFAULT_TAROT_TEMPERATURE = 0.7
@@ -197,10 +203,28 @@ GEMINI_QA_MODEL = os.getenv("GEMINI_QA_MODEL", DEFAULT_GEMINI_QA_MODEL)
 # Model chuyên sâu dùng cho bốc và luận giải Tarot AI (Thinking / Deep Reasoning)
 GEMINI_TAROT_MODEL = os.getenv("GEMINI_TAROT_MODEL", DEFAULT_GEMINI_TAROT_MODEL)
 
+# Model chuyên dùng cho Dịch Cabin AI trực tiếp
+GEMINI_CABIN_MODEL = os.getenv("GEMINI_CABIN_MODEL", DEFAULT_GEMINI_CABIN_MODEL)
+
 # Danh sách chuỗi Fallback mô hình dự phòng khi gặp quá tải (503 / 429 Quota Exceeded)
 TAROT_FALLBACK_MODELS = [
     GEMINI_TAROT_MODEL,
     *[m for m in DEFAULT_TAROT_FALLBACK_MODELS if m != GEMINI_TAROT_MODEL]
+]
+
+CABIN_FALLBACK_MODELS = [
+    GEMINI_CABIN_MODEL,
+    *[m for m in DEFAULT_CABIN_FALLBACK_MODELS if m != GEMINI_CABIN_MODEL]
+]
+
+SUMMARY_FALLBACK_MODELS = [
+    GEMINI_SUMMARY_MODEL,
+    *[m for m in DEFAULT_AI_FALLBACK_MODELS if m != GEMINI_SUMMARY_MODEL]
+]
+
+QA_FALLBACK_MODELS = [
+    GEMINI_QA_MODEL,
+    *[m for m in DEFAULT_AI_FALLBACK_MODELS if m != GEMINI_QA_MODEL]
 ]
 
 # Tham số Generation

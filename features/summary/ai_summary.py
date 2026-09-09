@@ -1,4 +1,5 @@
 import asyncio
+from typing import List, Optional
 from google.genai import types
 import config
 from core.ai import get_ai_client
@@ -12,6 +13,61 @@ SUMMARY_CONFIG = types.GenerateContentConfig(
 QA_CONFIG = types.GenerateContentConfig(
     temperature=config.QA_TEMPERATURE,
 )
+
+
+async def _generate_with_fallback(
+    prompt: str,
+    gen_config: types.GenerateContentConfig,
+    primary_model: str,
+    fallback_models: Optional[List[str]] = None,
+    task_label: str = "AI Summary",
+    timeout_sec: float = 35.0,
+) -> str:
+    """
+    Thực hiện gọi Gemini API với chuỗi fallback models tự động theo thứ tự:
+    3.8 flash -> 3.7 flash -> 3.6 flash -> 3.5 flash -> 3.5 flash lite -> 3.1 flash lite -> Gemma 4
+    """
+    if fallback_models is None:
+        fallback_models = getattr(config, "SUMMARY_FALLBACK_MODELS", getattr(config, "DEFAULT_AI_FALLBACK_MODELS", [
+            "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
+            "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemma-4-31b-it"
+        ]))
+
+    models_to_try = [primary_model] + [m for m in fallback_models if m != primary_model]
+    seen = set()
+    ordered_models = []
+    for m in models_to_try:
+        if m and m not in seen:
+            seen.add(m)
+            ordered_models.append(m)
+
+    client = get_ai_client()
+    last_error = None
+
+    for model_name in ordered_models:
+        try:
+            print(f"🤖 [{task_label}] Gọi model '{model_name}'...", flush=True)
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.models.generate_content,
+                    model=model_name,
+                    contents=prompt,
+                    config=gen_config,
+                ),
+                timeout=timeout_sec
+            )
+            if response and response.text:
+                return response.text
+        except asyncio.TimeoutError:
+            print(f"⏱️ [{task_label}] Model '{model_name}' quá thời gian ({timeout_sec}s), chuyển model dự phòng...", flush=True)
+            last_error = TimeoutError(f"Model {model_name} timed out after {timeout_sec}s")
+        except Exception as e:
+            err_str = str(e)
+            print(f"⚠️ [{task_label}] Model '{model_name}' gặp lỗi ({type(e).__name__}: {err_str[:120]}), chuyển model dự phòng tiếp theo...", flush=True)
+            last_error = e
+
+    print(f"❌ [{task_label}] Tất cả model trong chuỗi fallback đều thất bại! Lỗi cuối: {last_error}", flush=True)
+    raise last_error or RuntimeError(f"Tất cả model fallback của {task_label} đều thất bại")
 
 
 async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instruction):
@@ -53,17 +109,19 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     """
     print(f"🧠 [MapReduce] Đang phân tích phân đoạn {chunk_index + 1}/{total_chunks} ({len(chunk_messages)} tin nhắn)...", flush=True)
     try:
-        response = await asyncio.to_thread(
-            get_ai_client().models.generate_content,
-            model=config.GEMINI_DATA_MODEL,
-            contents=prompt,
-            config=SUMMARY_CONFIG,
+        data_model = getattr(config, "GEMINI_DATA_MODEL", "gemini-3.1-flash-lite")
+        text = await _generate_with_fallback(
+            prompt=prompt,
+            gen_config=SUMMARY_CONFIG,
+            primary_model=data_model,
+            task_label=f"MapReduce Chunk {chunk_index + 1}/{total_chunks}",
+            timeout_sec=25.0,
         )
         print(f"✅ [MapReduce] Hoàn thành phân đoạn {chunk_index + 1}/{total_chunks}.", flush=True)
-        return response.text
+        return text
     except Exception as e:
         print(f"❌ [MapReduce] Lỗi ở phân đoạn {chunk_index + 1}: {e}", flush=True)
-        return f"[Lỗi: Không thể phân tích phân đoạn {chunk_index + 1} do lỗi hệ thống API]"
+        return f"[Lỗi: Không thể phân tích phân đoạn {chunk_index + 1} do lỗi hệ thống API: {e}]"
 
 
 async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
@@ -176,13 +234,16 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             \"\"\"
             """
 
-        response = await asyncio.to_thread(
-            get_ai_client().models.generate_content,
-            model=config.GEMINI_SUMMARY_MODEL,
-            contents=prompt,
-            config=SUMMARY_CONFIG,
+        summary_model = getattr(config, "GEMINI_SUMMARY_MODEL", "gemini-3.8-flash")
+        fallback_models = getattr(config, "SUMMARY_FALLBACK_MODELS", None)
+        return await _generate_with_fallback(
+            prompt=prompt,
+            gen_config=SUMMARY_CONFIG,
+            primary_model=summary_model,
+            fallback_models=fallback_models,
+            task_label="Single-Pass Summary",
+            timeout_sec=45.0,
         )
-        return response.text
 
     else:
         # Bắt đầu MapReduce
@@ -271,14 +332,18 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
             {intermediate_summaries}
             \"\"\"
             """
-        response = await asyncio.to_thread(
-            get_ai_client().models.generate_content,
-            model=config.GEMINI_SUMMARY_MODEL,
-            contents=reduce_prompt,
-            config=SUMMARY_CONFIG,
+        summary_model = getattr(config, "GEMINI_SUMMARY_MODEL", "gemini-3.8-flash")
+        fallback_models = getattr(config, "SUMMARY_FALLBACK_MODELS", None)
+        reduce_res = await _generate_with_fallback(
+            prompt=reduce_prompt,
+            gen_config=SUMMARY_CONFIG,
+            primary_model=summary_model,
+            fallback_models=fallback_models,
+            task_label="MapReduce Reduce",
+            timeout_sec=45.0,
         )
         print("✅ [MapReduce] Pha Reduce hoàn tất thành công.", flush=True)
-        return response.text
+        return reduce_res
 
 
 MOCK_CHAT_HISTORY = [
@@ -348,13 +413,16 @@ async def evaluate_summary(raw_history_text, generated_summary, summary_type, cl
     """
 
     try:
-        response = await asyncio.to_thread(
-            get_ai_client().models.generate_content,
-            model=config.GEMINI_QA_MODEL,
-            contents=eval_prompt,
-            config=QA_CONFIG,
+        qa_model = getattr(config, "GEMINI_QA_MODEL", "gemini-3.8-flash")
+        fallback_models = getattr(config, "QA_FALLBACK_MODELS", None)
+        return await _generate_with_fallback(
+            prompt=eval_prompt,
+            gen_config=QA_CONFIG,
+            primary_model=qa_model,
+            fallback_models=fallback_models,
+            task_label="AI QA Evaluator",
+            timeout_sec=30.0,
         )
-        return response.text
     except Exception as e:
         print(f"❌ [AI Critique] Lỗi khi đánh giá bản tóm tắt: {e}", flush=True)
         return f"### 📊 BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TÓM TẮT\n- **Điểm số**: N/A\n- **Lỗi hệ thống**: Không thể đánh giá do lỗi gọi API: {e}"

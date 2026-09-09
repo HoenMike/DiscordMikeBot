@@ -14,6 +14,7 @@ DEFAULT_COLOR_SUCCESS = 0x2ECC71
 DEFAULT_COLOR_WARNING = 0xF1C40F
 DEFAULT_COLOR_ERROR = 0xE74C3C
 DEFAULT_COLOR_TAROT = 0x9B59B6
+DEFAULT_COLOR_CABIN = 0xE67E22
 
 # Database Pruning Limits
 MAX_CONSOLE_LOGS_LIMIT = 2000
@@ -24,11 +25,13 @@ TAROT_HISTORY_RETENTION_DAYS = 90
 # Cấu hình Mô hình AI (Centralized AI Models & Generations)
 # ---------------------------------------------------------------------------
 DEFAULT_GEMINI_DATA_MODEL = "gemini-3.1-flash-lite"
-DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.5-flash-lite"
-DEFAULT_GEMINI_QA_MODEL = "gemini-3.5-flash-lite"
-DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.7-flash"
+DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_QA_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.8-flash"
 
-DEFAULT_TAROT_FALLBACK_MODELS = [
+DEFAULT_AI_FALLBACK_MODELS = [
+    "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
@@ -36,6 +39,8 @@ DEFAULT_TAROT_FALLBACK_MODELS = [
     "gemini-3.1-flash-lite",
     "gemma-4-31b-it",
 ]
+DEFAULT_TAROT_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
+DEFAULT_CABIN_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
 
 DEFAULT_SUMMARY_TEMPERATURE = 0.1
 DEFAULT_QA_TEMPERATURE = 0.3

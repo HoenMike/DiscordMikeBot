@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.1] - 2026-09-09 — *Multi-Tier AI Fallback Cascade Matrix & Flash Generation Engine*
+
+### Changed
+- **Chuỗi Fallback 7 Tầng Toàn Diện Cho Toàn Bộ Hệ Thống**:
+  - Chuẩn hóa thứ tự fallback ưu tiên áp dụng đồng bộ cho Tarot, Dịch Cabin, Tóm tắt tin nhắn (Single-Pass & MapReduce) và AI QA Evaluator:
+    1. `gemini-3.8-flash` (Ưu tiên 1 - Tối ưu nhất)
+    2. `gemini-3.7-flash` (Ưu tiên 2)
+    3. `gemini-3.6-flash` (Ưu tiên 3)
+    4. `gemini-3.5-flash` (Ưu tiên 4)
+    5. `gemini-3.5-flash-lite` (Ưu tiên 5)
+    6. `gemini-3.1-flash-lite` (Ưu tiên 6)
+    7. `gemma-4-31b-it` (Ưu tiên 7 - Fallback cuối cùng)
+- **Cập Nhật Mô Hình Mặc Định**:
+  - Chuyển mô hình mặc định của Tarot, Cabin, Tóm tắt tin nhắn và QA Evaluator sang `gemini-3.8-flash`.
+- **Tăng Cường Độ Bền Bỉ Cho AI Summary**:
+  - Bổ sung wrapper `_generate_with_fallback` cho cả Single-Pass và MapReduce Reduce, tự động chuyển model tiếp theo khi gặp timeout hoặc lỗi quota 429/503.
+- **Đồng Bộ Web Dashboard & Biến Môi Trường**:
+  - Giao diện Admin Console Overview và thẻ Engine Cabin tự động hiển thị model hiện hành và hỗ trợ cập nhật động qua API `/api/stats`.
+  - Cập nhật tài liệu cấu hình mẫu `.env.example`.
+
+---
+
+## [2.7.0] - 2026-09-09 — *Context-Aware AI Cabin Live Parody Interpretation Engine*
+
+### Added
+- **Tính Năng Dịch Cabin Troll AI Trực Tiếp (`/cabin`)**:
+  - Khi một thành viên được chỉ định gửi tin nhắn trong kênh chat, bot sẽ đóng vai "phiên dịch viên cabin" song song, tự động đọc tin nhắn và reply phiên dịch sang tầng ý nghĩa châm biếm, bóc trần sự thật ngầm hiểu hoặc bẻ lái siêu hài hước.
+  - **Slash Command duy nhất**: `/cabin @user [thoi_gian]` tích hợp cơ chế **Toggle thông minh** (nếu chưa bật thì bật, nếu đang bật thì gõ lại lệnh sẽ tự động tắt giải thoát cho nạn nhân).
+  - **Lệnh Prefix linh hoạt**: `.m cabin @user [thời_gian]`, `.m cabinstop @user`, `.m cabinlist`.
+  - Định dạng hiển thị trực diện: `🎙️ Dịch cabin: <nội dung bẻ lái>` không chứa các mào đầu dài dòng.
+- **Nắm Bắt Ngữ Cảnh Hội Thoại 30 Phút (Context-Aware Intelligence)**:
+  - Tự động quét tối đa 25 tin nhắn trong 30 phút gần nhất của kênh chat để Gemini 3.5 Flash Lite nắm bắt chủ đề mọi người đang bàn tán (chơi game, than ế, đi ăn, code, drama...).
+  - Bản dịch cabin được liên kết trực tiếp với ngữ cảnh để tạo ra những pha "đá xoáy" trúng tim đen và cực kỳ đắt giá.
+- **Cơ Chế Chống Phá Hoại & Kiểm Soát Công Bằng (Fair-play Controls)**:
+  - **Giới Hạn 1 Người 1 Phiên**: Mỗi người chỉ được mở tối đa 1 phiên cabin tại một thời điểm; muốn troll người khác phải dừng hoặc chờ phiên cũ kết thúc.
+  - **🛡️ Khiên Chống Cabin Độc Quyền Quản Trị (Admin Dashboard Immunity)**: Không cung cấp lệnh chat công khai để tránh lạm dụng làm mất vui. Quản trị viên quản lý cấp/gỡ khiên bảo vệ cho các thành viên đặc biệt trực tiếp từ Admin Web Console.
+  - **Tab Quản Trị Dịch Cabin Mới Trên Web Dashboard**: Theo dõi các phiên cabin đang chạy trực tiếp (Live Sessions), dừng cưỡng chế từ xa và quản lý danh sách Khiên miễn nhiễm theo Server.
+  - **Nút Bấm Dừng 1-Chạm (`🛑 Dừng Cabin`) & Lệnh Dừng Nhanh (`/cabinstop`)**: Cho phép nạn nhân, người bật hoặc Quản trị viên dừng phiên tức thì.
+  - **Cooldown Anti-Spam (8 giây)**: Giới hạn tần suất phản hồi khi cùng một nạn nhân spam liên tục, bảo vệ tài nguyên API và không làm flood kênh chat.
+  - **Lưu Trữ Bền Vững (Database Persistence)**: Quản lý các phiên cabin qua bảng `cabin_sessions` và khiên qua `cabin_shields` trong Turso LibSQL Cloud / Local SQLite, tự động dọn dẹp khi hết hạn.
+  - **Showcase Trang Khách & Trợ Giúp**: Bổ sung thẻ giới thiệu tính năng trên Public Landing Page và menu trợ giúp tương tác `.m` / `/help`.
+
+---
+
 ## [2.6.0] - 2026-09-04 — *Public Guest Landing Page & Role-Based Dashboard Architecture*
 
 ### Added

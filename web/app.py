@@ -13,6 +13,7 @@ from bot_instance import bot
 from core.activity_logger import activity_logger
 from core.presence_manager import presence_manager
 from core.version import CURRENT_VERSION, get_version_info, get_changelog
+from features.cabin.manager import cabin_manager
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 app.secret_key = config.FLASK_SECRET_KEY
@@ -267,9 +268,14 @@ def api_stats():
         "models": {
             "summary": config.GEMINI_SUMMARY_MODEL,
             "tarot": config.GEMINI_TAROT_MODEL,
-            "data": config.GEMINI_DATA_MODEL
+            "data": config.GEMINI_DATA_MODEL,
+            "cabin": config.GEMINI_CABIN_MODEL
         },
         "activity_counts": activities_overview["counts"],
+        "cabin_stats": {
+            "active_sessions": len(cabin_manager._sessions),
+            "active_shields": len(cabin_manager._shields)
+        },
         "logs": list(config.log_buffer)
     })
 
@@ -601,6 +607,182 @@ def api_tarot_ratings_export():
             return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# 8. DỊCH CABIN & KHIÊN CHỐNG CABIN APIS
+# ==========================================
+@app.route('/api/cabin/shields', methods=['GET'])
+@login_required
+def api_cabin_shields():
+    from features.cabin.manager import cabin_manager
+    try:
+        raw_shields = run_coroutine_safe(cabin_manager.list_all_shields())
+        enriched = []
+        for s in raw_shields:
+            uid = s["user_id"]
+            gid = s["guild_id"]
+            user_name = s.get("user_name") or f"User {uid}"
+            avatar_url = ""
+            guild_name = f"Server {gid}"
+
+            if bot.is_ready():
+                g = bot.get_guild(gid)
+                if g:
+                    guild_name = g.name
+                    member = g.get_member(uid)
+                    if member:
+                        user_name = member.display_name
+                        avatar_url = member.display_avatar.url if member.display_avatar else ""
+
+                if not avatar_url:
+                    u = bot.get_user(uid)
+                    if u:
+                        user_name = user_name or u.display_name
+                        avatar_url = u.display_avatar.url if u.display_avatar else ""
+
+            if not avatar_url:
+                avatar_url = f"https://ui-avatars.com/api/?name={user_name}&background=3b82f6&color=fff"
+
+            created_at_str = ""
+            if s.get("created_at"):
+                try:
+                    dt = datetime.fromtimestamp(s["created_at"], timezone.utc)
+                    created_at_str = dt.strftime("%d/%m/%Y %H:%M")
+                except Exception:
+                    created_at_str = str(s["created_at"])
+
+            enriched.append({
+                "guild_id": str(gid),
+                "guild_name": guild_name,
+                "user_id": str(uid),
+                "user_name": user_name,
+                "avatar_url": avatar_url,
+                "created_at": created_at_str,
+                "created_at_raw": s.get("created_at", 0)
+            })
+
+        return jsonify({"total": len(enriched), "shields": enriched})
+    except Exception as e:
+        return jsonify({"total": 0, "shields": [], "error": str(e)}), 500
+
+
+@app.route('/api/cabin/shields/toggle', methods=['POST'])
+@login_required
+def api_cabin_shields_toggle():
+    from features.cabin.manager import cabin_manager
+    data = request.get_json(silent=True) or {}
+    try:
+        guild_id = int(data.get("guild_id", 0))
+        user_id = int(data.get("user_id", 0))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "ID máy chủ hoặc ID người dùng không hợp lệ!"}), 400
+
+    if not guild_id or not user_id:
+        return jsonify({"success": False, "error": "Vui lòng nhập đầy đủ Guild ID và User ID!"}), 400
+
+    user_name = data.get("user_name", "").strip()
+    enable = data.get("enable")
+
+    if bot.is_ready() and not user_name:
+        u = bot.get_user(user_id)
+        if u:
+            user_name = u.display_name
+
+    try:
+        is_shielded = run_coroutine_safe(
+            cabin_manager.toggle_shield(
+                guild_id=guild_id,
+                user_id=user_id,
+                user_name=user_name or f"User {user_id}",
+                enable=enable
+            )
+        )
+        action_str = "kích hoạt" if is_shielded else "gỡ bỏ"
+        print(f"🛡️ [Admin Console] Đã {action_str} Khiên Chống Cabin cho user {user_id} tại guild {guild_id}.", flush=True)
+        return jsonify({"success": True, "is_shielded": is_shielded})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/cabin/sessions', methods=['GET'])
+@login_required
+def api_cabin_sessions():
+    from features.cabin.manager import cabin_manager
+    from features.cabin.constants import format_duration
+    try:
+        sessions = cabin_manager.list_all_sessions()
+        result = []
+        for s in sessions:
+            g_name = f"Server {s.guild_id}"
+            c_name = f"Channel {s.channel_id}"
+            target_avatar = ""
+            creator_avatar = ""
+
+            if bot.is_ready():
+                g = bot.get_guild(s.guild_id)
+                if g:
+                    g_name = g.name
+                    ch = g.get_channel(s.channel_id)
+                    if ch:
+                        c_name = f"#{ch.name}"
+                    t_member = g.get_member(s.target_id)
+                    if t_member and t_member.display_avatar:
+                        target_avatar = t_member.display_avatar.url
+                    c_member = g.get_member(s.creator_id)
+                    if c_member and c_member.display_avatar:
+                        creator_avatar = c_member.display_avatar.url
+
+            if not target_avatar:
+                target_avatar = f"https://ui-avatars.com/api/?name={s.target_name}&background=f97316&color=fff"
+            if not creator_avatar:
+                creator_avatar = f"https://ui-avatars.com/api/?name={s.creator_name}&background=8b5cf6&color=fff"
+
+            rem_sec = s.remaining_seconds
+            rem_str = format_duration(rem_sec)
+
+            result.append({
+                "guild_id": str(s.guild_id),
+                "guild_name": g_name,
+                "channel_id": str(s.channel_id),
+                "channel_name": c_name,
+                "target_id": str(s.target_id),
+                "target_name": s.target_name,
+                "target_avatar": target_avatar,
+                "creator_id": str(s.creator_id),
+                "creator_name": s.creator_name,
+                "creator_avatar": creator_avatar,
+                "remaining_seconds": rem_sec,
+                "remaining_str": rem_str,
+                "translated_count": s.translated_count,
+                "created_at": s.created_at,
+                "expires_at": s.expires_at,
+            })
+        return jsonify({"total": len(result), "sessions": result})
+    except Exception as e:
+        return jsonify({"total": 0, "sessions": [], "error": str(e)}), 500
+
+
+@app.route('/api/cabin/sessions/stop', methods=['POST'])
+@login_required
+def api_cabin_sessions_stop():
+    from features.cabin.manager import cabin_manager
+    data = request.get_json(silent=True) or {}
+    try:
+        guild_id = int(data.get("guild_id", 0))
+        target_id = int(data.get("target_id", 0))
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "ID không hợp lệ!"}), 400
+
+    if not guild_id or not target_id:
+        return jsonify({"success": False, "error": "Thiếu guild_id hoặc target_id!"}), 400
+
+    try:
+        stopped = run_coroutine_safe(cabin_manager.stop_session(guild_id, target_id))
+        print(f"🛑 [Admin Console] Đã dừng phiên Dịch Cabin của user {target_id} tại guild {guild_id}.", flush=True)
+        return jsonify({"success": True, "stopped": stopped})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ==========================================

@@ -596,7 +596,7 @@ async def generate_tarot_reading(
 ) -> Tuple[str, str, str, str, bool]:
     """
     Gọi AI phân tích quẻ bài với Concurrency Semaphore và Fallback Cascade:
-    gemini-3.7-flash ➔ gemini-3.6-flash ➔ gemini-3.5-flash ➔ gemini-3.5-flash-lite ➔ gemini-3.1-flash-lite ➔ gemma-4-31b-it.
+    gemini-3.8-flash ➔ gemini-3.7-flash ➔ gemini-3.6-flash ➔ gemini-3.5-flash ➔ gemini-3.5-flash-lite ➔ gemini-3.1-flash-lite ➔ gemma-4-31b-it.
     Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline, is_valid)
     """
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
@@ -620,6 +620,8 @@ async def generate_tarot_reading(
 
     models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
         config.GEMINI_TAROT_MODEL,
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
         "gemini-3.5-flash-lite",
@@ -754,6 +756,8 @@ async def generate_followup_answer(
 
     models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
         config.GEMINI_TAROT_MODEL,
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
         "gemini-3.5-flash-lite",
