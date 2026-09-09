@@ -85,17 +85,8 @@ class DatabaseClient:
     def is_cloud(self) -> bool:
         return self._is_cloud
 
-    async def connect(self) -> None:
-        """Khởi tạo kết nối đến Cloud hoặc Local DB."""
-        current_loop = asyncio.get_running_loop()
-        
-        # Nếu đã kết nối rồi và cùng event loop, tái sử dụng kết nối hiện tại
-        if self._is_cloud and self._turso_client is not None and self._loop == current_loop:
-            return
-        if not self._is_cloud and self._local_db is not None and self._loop == current_loop:
-            return
-
-        # Đóng an toàn client cũ nếu có trước khi tạo mới
+    async def reset(self) -> None:
+        """Đóng và xoá mọi kết nối cũ (dùng khi chuyển event loop, ví dụ bot thread restart)."""
         if self._turso_client is not None:
             try:
                 res = self._turso_client.close()
@@ -104,13 +95,49 @@ class DatabaseClient:
             except (Exception, BaseException):
                 pass
             self._turso_client = None
-
         if self._local_db is not None:
             try:
                 await self._local_db.close()
             except (Exception, BaseException):
                 pass
             self._local_db = None
+        self._is_cloud = False
+        self._loop = None
+
+    async def connect(self) -> None:
+        """Khởi tạo kết nối đến Cloud hoặc Local DB."""
+        current_loop = asyncio.get_running_loop()
+
+        # Nếu đã kết nối trên đúng event loop, tái sử dụng kết nối hiện tại
+        if self._is_cloud and self._turso_client is not None and self._loop is current_loop:
+            return
+        if not self._is_cloud and self._local_db is not None and self._loop is current_loop:
+            return
+
+        # Loop đã thay đổi (bot chạy trong thread mới) → đóng sạch client cũ KHÔNG await để tránh cross-loop error
+        if self._loop is not None and self._loop is not current_loop:
+            # Không thể await trên loop cũ từ loop mới → chỉ huỷ reference
+            self._turso_client = None
+            self._local_db = None
+            self._is_cloud = False
+            self._loop = None
+        else:
+            # Cùng loop hoặc chưa có loop → đóng an toàn
+            if self._turso_client is not None:
+                try:
+                    res = self._turso_client.close()
+                    if asyncio.iscoroutine(res):
+                        await res
+                except (Exception, BaseException):
+                    pass
+                self._turso_client = None
+
+            if self._local_db is not None:
+                try:
+                    await self._local_db.close()
+                except (Exception, BaseException):
+                    pass
+                self._local_db = None
 
         # 1. Thử kết nối Turso Cloud nếu có token cấu hình
         if HAS_LIBSQL and config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL:
@@ -153,7 +180,13 @@ class DatabaseClient:
     async def _execute_internal(self, sql: str, params: Union[Tuple, List, dict, None] = None) -> CursorWrapper:
         """Thực thi một câu lệnh SQL nội bộ và trả về CursorWrapper tương thích."""
         current_loop = asyncio.get_running_loop()
-        if (self._is_cloud and (self._turso_client is None or self._loop != current_loop)) or (not self._is_cloud and (self._local_db is None or getattr(self._local_db, '_loop', None) != current_loop)):
+        # Kết nối lại nếu chưa có client hoặc đang dùng loop khác
+        needs_reconnect = (
+            self._turso_client is None and self._local_db is None
+        ) or (
+            self._loop is not None and self._loop is not current_loop
+        )
+        if needs_reconnect:
             await self.connect()
 
         # Thực thi trên Turso Cloud

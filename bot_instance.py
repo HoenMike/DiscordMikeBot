@@ -40,6 +40,11 @@ class SummaryBot(commands.Bot):
 
     async def setup_hook(self):
         try:
+            # Khởi tạo DB connection trên đúng Discord bot event loop TRƯỚC khi load bất kỳ extension nào.
+            # Tránh lỗi "Future attached to a different loop" khi bot chạy trong thread riêng với Flask.
+            from core.db import db_client
+            await db_client.connect()
+
             await self.config_manager.init_db()
             await activity_logger.init_db()
 
