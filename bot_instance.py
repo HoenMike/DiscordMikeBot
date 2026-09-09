@@ -43,18 +43,36 @@ class SummaryBot(commands.Bot):
             await self.config_manager.init_db()
             await activity_logger.init_db()
 
+            failed_extensions = []
             for ext in FEATURE_EXTENSIONS:
                 try:
                     await self.load_extension(ext)
+                    # Đếm số app_commands đã được nạp từ cog này
+                    cog_name = ext.split(".")[-2]  # e.g., "tarot", "cabin"
+                    loaded_cog = None
+                    for cog in self.cogs.values():
+                        if cog.__module__ == ext:
+                            loaded_cog = cog
+                            break
+                    cmd_count = len([c for c in self.tree.get_commands() if True]) if loaded_cog else "?"
                     print(f"✅ Đã tải thành công extension: {ext}", flush=True)
                 except Exception as cog_error:
+                    failed_extensions.append(ext)
                     print(f"⚠️ Bỏ qua extension '{ext}' do không khả dụng hoặc lỗi: {cog_error}", flush=True)
                     traceback.print_exc(file=sys.stdout)
+
+            if failed_extensions:
+                print(f"⚠️ [setup_hook] {len(failed_extensions)} extension(s) FAIL: {failed_extensions}", flush=True)
+
+            # Log danh sách tất cả slash commands trước khi sync để dễ debug
+            pending_cmds = self.tree.get_commands()
+            print(f"📋 [setup_hook] {len(pending_cmds)} slash commands sẽ được sync: {[c.name for c in pending_cmds]}", flush=True)
 
             print("🔄 Đang đồng bộ hóa Slash Commands...", flush=True)
             try:
                 synced = await self.tree.sync()
                 print(f"🎉 Đã đồng bộ hóa {len(synced)} Slash Commands toàn cầu thành công!", flush=True)
+                print(f"📋 [setup_hook] Danh sách đã sync: {[c.name for c in synced]}", flush=True)
             except Exception as sync_error:
                 print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
                 traceback.print_exc(file=sys.stdout)
