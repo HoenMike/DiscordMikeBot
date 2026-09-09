@@ -351,10 +351,10 @@ def api_guilds():
 
 
 def run_coroutine_safe(coro):
-    """Chạy an toàn một coroutine bất kể bot đang chạy trong event loop hay bot đang offline."""
+    """Chạy an toàn một coroutine trên event loop của Discord bot hoặc fallback sang event loop mới nếu bot đang dừng."""
     loop = None
     try:
-        if bot.is_ready():
+        if hasattr(bot, "loop") and bot.loop and bot.loop.is_running():
             loop = bot.loop
     except Exception:
         loop = None
@@ -362,7 +362,16 @@ def run_coroutine_safe(coro):
     if loop and loop.is_running():
         return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout=15)
     else:
-        return asyncio.run(coro)
+        async def _run_and_cleanup():
+            try:
+                return await coro
+            finally:
+                try:
+                    from core.db import db_client
+                    await db_client.close()
+                except Exception:
+                    pass
+        return asyncio.run(_run_and_cleanup())
 
 
 @app.route('/api/guilds/suspend', methods=['POST'])

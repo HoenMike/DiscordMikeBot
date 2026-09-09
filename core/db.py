@@ -72,139 +72,184 @@ class AsyncQueryContext:
         pass
 
 
+import threading
+
+
+class _LoopConnection:
+    """Đại diện cho kết nối DB độc lập trên một asyncio event loop cụ thể."""
+    def __init__(self, loop: asyncio.AbstractEventLoop):
+        self.loop = loop
+        self.turso_client: Optional[Any] = None
+        self.local_db: Optional[aiosqlite.Connection] = None
+        self.is_cloud: bool = False
+        self.connected: bool = False
+        self.lock = asyncio.Lock()
+        self.logged: bool = False
+
+    async def close(self) -> None:
+        """Đóng an toàn các kết nối thuộc loop này."""
+        if self.turso_client is not None:
+            try:
+                res = self.turso_client.close()
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception:
+                pass
+            self.turso_client = None
+
+        if self.local_db is not None:
+            try:
+                await self.local_db.close()
+            except Exception:
+                pass
+            self.local_db = None
+
+        self.connected = False
+        self.is_cloud = False
+
+
 class DatabaseClient:
-    """Client cơ sở dữ liệu Async đa nền tảng (Turso Cloud LibSQL / Local SQLite)."""
+    """
+    Client cơ sở dữ liệu Async đa nền tảng (Turso Cloud LibSQL / Local SQLite).
+    Hỗ trợ đa luồng (Multi-threading) và đa Event Loop an toàn tuyệt đối:
+    Mỗi event loop (Discord Bot loop và Flask request temporary loops) 
+    sở hữu kết nối riêng biệt, ngăn chặn triệt để xung đột tài nguyên hoặc 'Future attached to different loop'.
+    """
 
     def __init__(self):
-        self._turso_client: Optional[Any] = None
-        self._local_db: Optional[aiosqlite.Connection] = None
-        self._is_cloud: bool = False
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._connections: Dict[asyncio.AbstractEventLoop, _LoopConnection] = {}
+        self._thread_lock = threading.Lock()
+
+    def _get_connection(self) -> _LoopConnection:
+        """Lấy hoặc tạo kết nối riêng cho event loop đang chạy hiện tại."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            raise RuntimeError("DatabaseClient chỉ có thể được gọi từ bên trong một running asyncio event loop.")
+
+        with self._thread_lock:
+            # Dọn dẹp các loop cũ đã bị đóng để tránh rò rỉ bộ nhớ
+            closed_loops = [l for l in self._connections if l.is_closed()]
+            for cl in closed_loops:
+                self._connections.pop(cl, None)
+
+            if loop not in self._connections:
+                self._connections[loop] = _LoopConnection(loop)
+            return self._connections[loop]
 
     @property
     def is_cloud(self) -> bool:
-        return self._is_cloud
+        try:
+            conn = self._get_connection()
+            return conn.is_cloud
+        except Exception:
+            return False
 
     async def reset(self) -> None:
-        """Đóng và xoá mọi kết nối cũ (dùng khi chuyển event loop, ví dụ bot thread restart)."""
-        if self._turso_client is not None:
-            try:
-                res = self._turso_client.close()
-                if asyncio.iscoroutine(res):
-                    await res
-            except (Exception, BaseException):
-                pass
-            self._turso_client = None
-        if self._local_db is not None:
-            try:
-                await self._local_db.close()
-            except (Exception, BaseException):
-                pass
-            self._local_db = None
-        self._is_cloud = False
-        self._loop = None
+        """Đóng kết nối của event loop hiện tại."""
+        conn = self._get_connection()
+        async with conn.lock:
+            await conn.close()
+
+    async def _connect_conn(self, conn: _LoopConnection, force: bool = False) -> None:
+        """Kết nối nội bộ cho một _LoopConnection cụ thể."""
+        async with conn.lock:
+            if conn.connected and not force:
+                return
+
+            # Đóng kết nối cũ nếu force reconnect
+            await conn.close()
+
+            # 1. Thử kết nối Turso Cloud nếu có token cấu hình
+            if HAS_LIBSQL and config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL:
+                client = None
+                try:
+                    url = config.TURSO_DATABASE_URL
+                    if url.startswith("libsql://"):
+                        url = "https://" + url[len("libsql://"):]
+
+                    client = libsql_client.create_client(
+                        url=url,
+                        auth_token=config.TURSO_AUTH_TOKEN
+                    )
+                    await client.execute("SELECT 1")
+                    conn.turso_client = client
+                    conn.is_cloud = True
+                    conn.connected = True
+                    if not conn.logged:
+                        conn.logged = True
+                        print(f"☁️ [Database] Đã kết nối thành công tới Turso Cloud LibSQL ({config.TURSO_DATABASE_URL})!", flush=True)
+                    return
+                except Exception as e:
+                    print(f"⚠️ [Database] Không thể kết nối Turso Cloud ({e}). Đang tự động chuyển sang Local SQLite...", flush=True)
+                    if client is not None:
+                        try:
+                            res = client.close()
+                            if asyncio.iscoroutine(res):
+                                await res
+                        except Exception:
+                            pass
+                    conn.turso_client = None
+                    conn.is_cloud = False
+
+            # 2. Fallback sang Local aiosqlite
+            conn.local_db = await aiosqlite.connect(str(config.DB_PATH))
+            await conn.local_db.execute("PRAGMA journal_mode=WAL")
+            await conn.local_db.execute("PRAGMA synchronous=NORMAL")
+            conn.is_cloud = False
+            conn.connected = True
+            if not conn.logged:
+                conn.logged = True
+                print(f"💾 [Database] Đang sử dụng Local SQLite: {config.DB_PATH}", flush=True)
 
     async def connect(self) -> None:
-        """Khởi tạo kết nối đến Cloud hoặc Local DB."""
-        current_loop = asyncio.get_running_loop()
-
-        # Nếu đã kết nối trên đúng event loop, tái sử dụng kết nối hiện tại
-        if self._is_cloud and self._turso_client is not None and self._loop is current_loop:
-            return
-        if not self._is_cloud and self._local_db is not None and self._loop is current_loop:
-            return
-
-        # Loop đã thay đổi (bot chạy trong thread mới) → đóng sạch client cũ KHÔNG await để tránh cross-loop error
-        if self._loop is not None and self._loop is not current_loop:
-            # Không thể await trên loop cũ từ loop mới → chỉ huỷ reference
-            self._turso_client = None
-            self._local_db = None
-            self._is_cloud = False
-            self._loop = None
-        else:
-            # Cùng loop hoặc chưa có loop → đóng an toàn
-            if self._turso_client is not None:
-                try:
-                    res = self._turso_client.close()
-                    if asyncio.iscoroutine(res):
-                        await res
-                except (Exception, BaseException):
-                    pass
-                self._turso_client = None
-
-            if self._local_db is not None:
-                try:
-                    await self._local_db.close()
-                except (Exception, BaseException):
-                    pass
-                self._local_db = None
-
-        # 1. Thử kết nối Turso Cloud nếu có token cấu hình
-        if HAS_LIBSQL and config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL:
-            try:
-                # Chuyển đổi giao thức libsql:// sang https:// nếu cần cho HTTP client
-                url = config.TURSO_DATABASE_URL
-                if url.startswith("libsql://"):
-                    url = "https://" + url[len("libsql://"):]
-
-                self._turso_client = libsql_client.create_client(
-                    url=url,
-                    auth_token=config.TURSO_AUTH_TOKEN
-                )
-                # Thử ping trực tiếp 1 query để xác thực kết nối
-                await self._turso_client.execute("SELECT 1")
-                self._is_cloud = True
-                self._loop = current_loop
-                print(f"☁️ [Database] Đã kết nối thành công tới Turso Cloud LibSQL ({config.TURSO_DATABASE_URL})!", flush=True)
-                return
-            except (Exception, BaseException) as e:
-                print(f"⚠️ [Database] Không thể kết nối Turso Cloud ({e}). Đang tự động chuyển sang Local SQLite...", flush=True)
-                if self._turso_client is not None:
-                    try:
-                        res = self._turso_client.close()
-                        if asyncio.iscoroutine(res):
-                            await res
-                    except (Exception, BaseException):
-                        pass
-                self._turso_client = None
-                self._is_cloud = False
-
-        # 2. Fallback sang Local aiosqlite
-        self._local_db = await aiosqlite.connect(str(config.DB_PATH))
-        await self._local_db.execute("PRAGMA journal_mode=WAL")
-        await self._local_db.execute("PRAGMA synchronous=NORMAL")
-        self._is_cloud = False
-        self._loop = current_loop
-        print(f"💾 [Database] Đang sử dụng Local SQLite: {config.DB_PATH}", flush=True)
+        """Khởi tạo kết nối đến Cloud hoặc Local DB cho loop hiện tại."""
+        conn = self._get_connection()
+        await self._connect_conn(conn)
 
     async def _execute_internal(self, sql: str, params: Union[Tuple, List, dict, None] = None) -> CursorWrapper:
-        """Thực thi một câu lệnh SQL nội bộ và trả về CursorWrapper tương thích."""
-        current_loop = asyncio.get_running_loop()
-        # Kết nối lại nếu chưa có client hoặc đang dùng loop khác
-        needs_reconnect = (
-            self._turso_client is None and self._local_db is None
-        ) or (
-            self._loop is not None and self._loop is not current_loop
-        )
-        if needs_reconnect:
-            await self.connect()
+        """Thực thi câu lệnh SQL trên kết nối của loop hiện tại."""
+        conn = self._get_connection()
+        if not conn.connected:
+            await self._connect_conn(conn)
 
-        # Thực thi trên Turso Cloud
-        if self._is_cloud and self._turso_client:
+        # 1. Thực thi trên Turso Cloud
+        if conn.is_cloud and conn.turso_client is not None:
             args = list(params) if isinstance(params, (tuple, list)) else (params or [])
-            rs = await self._turso_client.execute(sql, args)
-            return CursorWrapper(
-                rows=rs.rows,
-                last_insert_id=getattr(rs, 'last_insert_rowid', None),
-                rows_affected=getattr(rs, 'rows_affected', 0)
-            )
+            try:
+                rs = await conn.turso_client.execute(sql, args)
+                return CursorWrapper(
+                    rows=rs.rows,
+                    last_insert_id=getattr(rs, 'last_insert_rowid', None),
+                    rows_affected=getattr(rs, 'rows_affected', 0)
+                )
+            except Exception as e:
+                err_msg = str(e).lower()
+                # Tự động reconnect nếu connection bị drop hoặc session bị đóng
+                if any(kw in err_msg for kw in ["closed", "session", "cannot reuse", "connection", "503"]):
+                    print(f"⚠️ [Database] Lỗi kết nối Turso ({e}), đang tự động kết nối lại...", flush=True)
+                    await self._connect_conn(conn, force=True)
+                    if conn.is_cloud and conn.turso_client is not None:
+                        rs = await conn.turso_client.execute(sql, args)
+                        return CursorWrapper(
+                            rows=rs.rows,
+                            last_insert_id=getattr(rs, 'last_insert_rowid', None),
+                            rows_affected=getattr(rs, 'rows_affected', 0)
+                        )
+                raise
 
-        # Thực thi trên Local SQLite
-        cursor = await self._local_db.execute(sql, params or ())
-        rows = await cursor.fetchall()
-        last_id = cursor.lastrowid
-        row_cnt = cursor.rowcount
-        return CursorWrapper(rows=rows, last_insert_id=last_id, rows_affected=row_cnt)
+        # 2. Thực thi trên Local SQLite
+        if conn.local_db is None:
+            await self._connect_conn(conn, force=True)
+
+        if conn.local_db is not None:
+            cursor = await conn.local_db.execute(sql, params or ())
+            rows = await cursor.fetchall()
+            last_id = cursor.lastrowid
+            row_cnt = cursor.rowcount
+            return CursorWrapper(rows=rows, last_insert_id=last_id, rows_affected=row_cnt)
+
+        raise RuntimeError("Không có kết nối Database hợp lệ để thực thi truy vấn.")
 
     def execute(self, sql: str, params: Union[Tuple, List, dict, None] = None) -> AsyncQueryContext:
         """Thực thi một câu lệnh SQL và trả về AsyncQueryContext (hỗ trợ cả `await db.execute()` và `async with db.execute()`)."""
@@ -217,27 +262,17 @@ class DatabaseClient:
 
     async def commit(self) -> None:
         """Commit transaction (aiosqlite) - Turso tự động commit mỗi statement."""
-        if not self._is_cloud and self._local_db:
-            await self._local_db.commit()
+        conn = self._get_connection()
+        if not conn.is_cloud and conn.local_db:
+            await conn.local_db.commit()
 
     async def close(self) -> None:
-        """Đóng kết nối."""
-        if self._turso_client:
-            try:
-                res = self._turso_client.close()
-                if asyncio.iscoroutine(res):
-                    await res
-            except (Exception, BaseException):
-                pass
-            self._turso_client = None
-
-        if self._local_db:
-            try:
-                await self._local_db.close()
-            except (Exception, BaseException):
-                pass
-            self._local_db = None
+        """Đóng kết nối của loop hiện tại."""
+        conn = self._get_connection()
+        async with conn.lock:
+            await conn.close()
 
 
 # Singleton instance dùng chung
 db_client = DatabaseClient()
+
