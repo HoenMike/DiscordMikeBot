@@ -4,7 +4,7 @@ features/cabin/ai.py - Tích hợp gọi Gemini AI cho tính năng Dịch Cabin 
 
 import asyncio
 import re
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from google.genai import types
 import config
 from core.ai import get_ai_client
@@ -175,3 +175,90 @@ async def generate_cabin_interpretation(
         # Nếu tất cả các model đều gặp lỗi, trả về fallback hài hước
         print(f"❌ [Cabin AI] Toàn bộ model Gemini đều thất bại: {last_error}", flush=True)
         return "Tai nghe của phiên dịch viên vừa nổ do câu nói quá ảo diệu, không thể phiên dịch nổi!"
+
+
+async def generate_cabin_interpretation_batch(
+    target_name: str,
+    messages: List[str],
+    context_messages: List[Tuple[str, str]],
+) -> Optional[str]:
+    """
+    Sinh một bản dịch cabin tổng hợp cho nhiều tin nhắn liên tiếp của cùng 1 nạn nhân.
+    Gộp tất cả tin nhắn trong batch thành một prompt duy nhất để gọi AI 1 lần,
+    giúp giảm số lần gọi API (tránh RPM) khi nạn nhân chat dồn dập.
+
+    :param target_name: Tên hiển thị của người bị cabin
+    :param messages: Danh sách tin nhắn liên tiếp của nạn nhân trong batch window
+    :param context_messages: Danh sách các tin nhắn gần đây [(author_name, content), ...]
+    :return: Câu phiên dịch cabin ngắn gọn, hài hước ở góc nhìn ngôi thứ nhất
+    """
+    if not messages:
+        return None
+
+    # Nếu chỉ có 1 tin nhắn → delegate về hàm gốc như bình thường
+    if len(messages) == 1:
+        return await generate_cabin_interpretation(
+            target_name=target_name,
+            target_message=messages[0],
+            context_messages=context_messages,
+        )
+
+    # Xây dựng đoạn bối cảnh phụ
+    context_str = ""
+    if context_messages:
+        recent_ctx = context_messages[-4:]
+        lines = [f"- {author}: {content}" for author, content in recent_ctx]
+        context_str = "(Bối cảnh vài câu trò chuyện gần nhất trong kênh chỉ dùng để tham khảo phụ:\n" + "\n".join(lines) + ")\n\n"
+
+    # Gộp nhiều tin nhắn thành một block để phiên dịch tổng hợp
+    messages_block = "\n".join(f"{i+1}. \"{msg}\"" for i, msg in enumerate(messages))
+    count = len(messages)
+
+    user_prompt = (
+        f"🎯 NẠN NHÂN [{target_name}] VỪA GỬI {count} TIN NHẮN LIÊN TIẾP CẦN PHIÊN DỊCH CABIN TỔNG HỢP:\n"
+        f"{messages_block}\n\n"
+        f"{context_str}"
+        f"👉 Hãy phiên dịch cabin TỔNG HỢP toàn bộ {count} câu trên của [{target_name}] thành 1-2 câu ngắn gọn, "
+        f"nói ở ngôi thứ nhất (tự thú nhận sự thật bựa/sĩ diện/lươn lẹo đằng sau đúng những gì {target_name} vừa nói), "
+        f"xưng 'Tao' hoặc 'Tôi/Mình', TUYỆT ĐỐI KHÔNG bỏ lửng câu:"
+    )
+
+    async with CABIN_SEMAPHORE:
+        last_error = None
+        for model_name in CABIN_FALLBACK_MODELS:
+            try:
+                client = get_ai_client()
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        client.models.generate_content,
+                        model=model_name,
+                        contents=user_prompt,
+                        config=CABIN_CONFIG,
+                    ),
+                    timeout=7.0
+                )
+
+                cand = response.candidates[0] if (response and response.candidates) else None
+                if cand and getattr(cand, "finish_reason", None) == types.FinishReason.MAX_TOKENS:
+                    print(f"⚠️ [Cabin AI Batch] Model '{model_name}' bị cắt ngang (MAX_TOKENS), thử fallback...", flush=True)
+                    continue
+
+                raw_text = response.text or ""
+                cleaned = _clean_cabin_output(raw_text)
+
+                if is_incomplete_sentence(cleaned):
+                    print(f"⚠️ [Cabin AI Batch] Model '{model_name}' sinh câu chưa hoàn chỉnh ('{cleaned[:40]}...'), thử fallback...", flush=True)
+                    continue
+
+                if cleaned:
+                    print(f"✅ [Cabin AI Batch] Model '{model_name}' đã tổng hợp {count} tin nhắn thành công!", flush=True)
+                    return cleaned
+            except asyncio.TimeoutError:
+                print(f"⏱️ [Cabin AI Batch] Model '{model_name}' quá thời gian 7s, chuyển sang model dự phòng...", flush=True)
+                last_error = "Timeout 7s"
+            except Exception as e:
+                print(f"⚠️ [Cabin AI Batch] Model '{model_name}' gặp lỗi: {e}, thử fallback...", flush=True)
+                last_error = e
+
+        print(f"❌ [Cabin AI Batch] Toàn bộ model Gemini đều thất bại: {last_error}", flush=True)
+        return None

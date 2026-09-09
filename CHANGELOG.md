@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.3] - 2026-09-09 — *Cabin Debounce Batch Engine - Anti-RPM Message Aggregation*
+
+### Changed
+- **Debounce Batch Engine cho Dịch Cabin (Anti-RPM)**: Thay thế cơ chế xử lý tức thời từng tin nhắn (`in-flight guard`) bằng hệ thống buffer + debounce 3 giây. Khi nạn nhân gửi nhiều tin liên tiếp, bot gom tất cả vào một batch rồi chỉ gọi AI **1 lần duy nhất** với prompt tổng hợp thay vì N lần - giảm đáng kể số lần gọi API và chống rate limit RPM.
+- **`generate_cabin_interpretation_batch()`**: Hàm AI mới trong `features/cabin/ai.py` nhận `List[str]` các tin nhắn, nếu chỉ có 1 tin thì tự động delegate về hàm đơn lẻ (zero overhead), nếu nhiều tin thì sinh prompt tổng hợp với yêu cầu dịch thống nhất tất cả câu nói trong batch.
+- **Cooldown Check-Only Guard**: Cooldown được check (không lock) ngay khi nhận tin, chỉ lock thật sự ngay trước khi gọi AI để tránh double-lock khi nhiều tin được buffer trong cùng debounce window.
+- **Reply vào tin nhắn cuối cùng trong batch**: Bot luôn reply vào tin nhắn mới nhất của nạn nhân, không phải tin nhắn đầu tiên trigger.
+- **Context filter batch-aware**: Tự động loại bỏ tất cả nội dung các tin trong batch khỏi context window để AI không bị lặp lại chính nội dung cần dịch khi xây dựng bối cảnh.
+- **Cog cleanup an toàn**: `cog_unload` tự động hủy tất cả debounce tasks đang pending để tránh task leak khi bot reload/restart.
+
+---
+
 ## [2.7.2] - 2026-09-09 — *Cabin AI Robustness & Victim-Centric Interpretation Fixes*
 
 ### Fixed

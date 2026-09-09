@@ -10,12 +10,38 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.7.2"
+CURRENT_VERSION = "2.7.3"
 RELEASE_DATE = "2026-09-09"
-CODENAME = "Cabin AI Robustness & Victim-Centric Interpretation Fixes"
+CODENAME = "Cabin Debounce Batch Engine - Anti-RPM Message Aggregation"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.7.3",
+        "date": "2026-09-09",
+        "type": "bugfix",
+        "title": "Debounce Batch Engine cho Dịch Cabin - Gom Tin Nhắn Chống RPM",
+        "summary": "Tối ưu hóa hạ tầng Dịch Cabin: thay thế cơ chế xử lý tức thời từng tin nhắn bằng Debounce Batch Engine - tự động chờ 3 giây để gom các tin nhắn liên tiếp của nạn nhân lại, rồi gọi AI 1 lần duy nhất với prompt tổng hợp. Kết quả: giảm đáng kể số lần gọi API (chống Rate Limit RPM), câu dịch coherent hơn khi nạn nhân nhắn nhiều tin liên tiếp, và reply luôn vào tin nhắn cuối cùng trong batch.",
+        "changes": [
+            {
+                "category": "🚀 Cabin Debounce Batch Engine (Anti-RPM)",
+                "items": [
+                    "Thay thế cơ chế in-flight guard (block ngay) bằng debounce buffer: mỗi tin nhắn của nạn nhân được đẩy vào buffer, tạo asyncio.Task delay 3s.",
+                    "Nếu nạn nhân gửi thêm tin trong 3s, task cũ bị hủy và task mới được tạo với toàn bộ tin nhắn đã gom - tránh N lần gọi API cho N tin nhắn liên tiếp.",
+                    "Sau 3s debounce, gọi generate_cabin_interpretation_batch() với tất cả texts trong batch, AI tổng hợp thành 1-2 câu dịch coherent rồi reply vào tin nhắn cuối cùng.",
+                    "Tự động fallback về generate_cabin_interpretation() đơn lẻ khi chỉ có 1 tin nhắn trong batch (zero overhead cho trường hợp thông thường).",
+                    "Cooldown check-only khi nhận tin (update=False), chỉ lock cooldown thật sự ngay trước khi gọi AI để tránh double-lock khi nhiều tin được buffer."
+                ]
+            },
+            {
+                "category": "🧹 Dọn Dẹp & Tối Ưu Cog",
+                "items": [
+                    "Thêm cog_unload cleanup: tự động hủy tất cả debounce tasks đang pending khi unload cog, tránh task leak.",
+                    "Context filter thông minh: loại bỏ tất cả tin nhắn trong batch khỏi context window để AI không bị lặp lại chính nội dung cần dịch.",
+                ]
+            }
+        ]
+    },
     {
         "version": "2.7.2",
         "date": "2026-09-09",
