@@ -18,8 +18,11 @@ class TarotAIResponseSchema(BaseModel):
     topic_tag: str = Field(description="Phân loại chủ đề: career, love, finance, health, study, general", default="general")
     mood_tag: str = Field(description="Tag vibe/tâm trạng chủ đạo bằng tiếng Việt", default="Cân bằng & Tĩnh tại")
     summary_headline: str = Field(description="Tiêu đề vibe ngắn dưới 15 từ", default="")
-    conclusion: str = Field(description="Kết luận trực diện, đúc kết xu hướng trong 1-2 câu", default="")
-    cards_analysis: str = Field(description="Phân tích súc tích từng lá bài trong ngữ cảnh", default="")
+    conclusion: str = Field(description="Kết luận trực diện, đúc kết xu hướng rõ ràng không lấp lửng trong 1-2 câu", default="")
+    cards_analysis: str = Field(description="Phân tích chi tiết từng lá bài trong ngữ cảnh câu hỏi", default="")
+    story_synthesis: str = Field(description="Dòng chảy câu chuyện xâu chuỗi toàn bộ quẻ bài (bắt buộc cho Celtic Cross và trải bài nhiều lá)", default="")
+    decision_matrix: str = Field(description="Tiêu chí chốt hạ rõ ràng (khi nào chọn Có/Làm, khi nào chọn Không/Bỏ, cách chốt tức thì - bắt buộc cho Yes/No và Choices)", default="")
+    final_outcome: str = Field(description="Cái kết cuối cùng và đích đến dứt khoát của vấn đề (bắt buộc cho Celtic Cross và trải bài tiến trình)", default="")
     advice: str = Field(description="Lời khuyên hành động thực tế và thông điệp khích lệ", default="")
     full_reading: str = Field(description="Toàn bộ bài giải hoàn chỉnh bằng Markdown, chia rõ các mục", default="")
 
@@ -229,11 +232,76 @@ def _build_tarot_prompt(
         badge, verdict_desc, _ = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
         yes_no_info = f"\n- Phán Quyết Yes / No Chính Thức Của Quẻ Bài: [{badge}] ({verdict_desc})"
 
+    # Chỉ dẫn văn phong nữ tính đặc thù cho Celeste
+    celeste_feminine_guidance = ""
+    if reader_style == "healer":
+        celeste_feminine_guidance = f"""
+    🌸 CHỈ DẪN BẮT BUỘC DÀNH RIÊNG CHO CELESTE (NGƯỜI PHỤ NỮ DỊU DÀNG, NỮ TÍNH & THẤU CẢM):
+    - Trò chuyện với `{user_name}` bằng tâm thế của một người phụ nữ vô cùng đằm thắm, dịu dàng, ấm áp và chở che.
+    - Xưng hô thân thương và đong đầy tình cảm ('bạn thương', 'người bạn của mình', 'mình cảm nhận được rằng...', 'hãy thả lỏng trái tim nhé...').
+    - Lồng ghép những hình ảnh ẩn dụ giàu chất thơ và tính nữ (ánh trăng dịu mát vỗ về bóng đêm, tách trà thơm sau cơn mưa rào, sự nhẫn nại của hạt mầm trong lòng đất, đóa hoa kiên cường nở muộn...).
+    - TUYỆT ĐỐI KHÔNG dùng giọng văn trung tính, cộc lốc, khô khan như báo cáo kỹ thuật!
+    - Dù dịu dàng vỗ về, Celeste KHÔNG BAO GIỜ nói nước đôi hay lấp lửng: cô ấy mang sự thông tuệ của một người phụ nữ sâu sắc, nhẹ nhàng nhưng dứt khoát cầm tay chỉ lối và trao cho `{user_name}` tiêu chí chọn lựa sáng suốt nhất.
+        """.strip()
+
+    # Chỉ dẫn chuyên sâu cho từng kiểu trải bài
+    spread_special_instructions = ""
+    if spread_key == "yes_no":
+        spread_special_instructions = f"""
+    ⚡ CHỈ DẪN BẮT BUỘC CHO TRẢI BÀI YES / NO (ĐỊNH HƯỚNG RẼ NHÁNH: NẾU A THÌ VẬY, NẾU B THÌ VẬY):
+    - Ngay cả khi lá bài mang tính phân vân / do dự (như 2 Kiếm, 7 Cốc, The Hanged Man, 2 Xu...), TUYỆT ĐỐI TRÁNH buông câu 'tùy bạn tự quyết' mà thiếu định hướng cụ thể!
+    - Trong mục `decision_matrix` và bài đọc Markdown, BẮT BUỘC phân tích rõ ràng 2 nhánh quyết định:
+      👉 **Nếu bạn chọn CÓ / LÀM (Hướng A):** Phân tích rõ điều kiện thuận lợi, hành động cần làm ngay, và cái giá/sự nỗ lực cần chuẩn bị sẵn sàng.
+      👉 **Nếu bạn chọn KHÔNG / BỎ (Hướng B):** Phân tích rõ dấu hiệu cảnh báo, cách dừng lại dứt khoát và sự giải tỏa/bình yên nhận lại để không còn cắn rứt.
+      🎯 **Quy tắc chốt hạ dứt khoát (10 giây / 1 phút):** Tiêu chí tự vấn then chốt để `{user_name}` tự tin chốt nhánh đi phù hợp nhất với hoàn cảnh của mình.
+        """.strip()
+    elif spread_key == "celtic":
+        spread_special_instructions = f"""
+    🏆 CHỈ DẪN BẮT BUỘC CHO TRẢI BÀI CELTIC CROSS (10 LÁ - BỨC TRANH TOÀN CẢNH & DÒNG CHẢY CÂU CHUYỆN):
+    - Trải bài Celtic Cross là trải bài kinh điển 10 lá, TUYỆT ĐỐI KHÔNG được giải qua loa hay chỉ tóm tắt 1 câu ngắn!
+    - BẮT BUỘC có đầy đủ 5 mục lớn:
+      1. 🎯 **KẾT LUẬN & TỔNG QUAN:** Đúc kết bức tranh toàn cảnh ngắn gọn, sắc bén và có chiều sâu.
+      2. 🃏 **Ý NGHĨA CHI TIẾT 10 LÁ BÀI:** Phân tích từng lá theo đúng vị trí của nó (Lá 1: Bản chất thực tại, Lá 2: Trở ngại/Thách thức, Lá 3: Căn nguyên quá khứ, Lá 4: Quá khứ gần, Lá 5: Mục tiêu/Ý thức, Lá 6: Tương lai gần, Lá 7: Tâm thế bản thân, Lá 8: Môi trường ngoại cảnh, Lá 9: Hy vọng & Nỗi sợ, Lá 10: Kết quả cuối cùng).
+      3. 📖 **DÒNG CHẢY CÂU CHUYỆN (SỰ KẾT NỐI TOÀN BỘ 10 LÁ):** (Trường `story_synthesis`):
+         Xâu chuỗi 10 lá thành một câu chuyện cuộc đời liền mạch, sống động:
+         + Trục thực tại & Thách thức (Lá 1 + 2) đối thoại thế nào với cội nguồn và quá khứ gần (Lá 3 + 4)?
+         + Mục tiêu lý trí (Lá 5) và tương lai gần (Lá 6) đang hướng người hỏi về đâu?
+         + Sự giằng co giữa tâm thế/nỗi sợ bên trong (Lá 7 + 9) với sức ép ngoại cảnh (Lá 8) tạo nên áp lực gì?
+      4. 🏆 **CÁI KẾT CUỐI CÙNG & ĐÍCH ĐẾN:** (Trường `final_outcome`):
+         Kết lại CỰC KỲ RÕ RÀNG, DỨT KHOÁT, KHÔNG MẬP MỜ! Dựa trên Lá 10 và toàn bộ hành trình để khẳng định: Tình huống sẽ đi về đâu? Cái kết thành bại ra sao? Bước ngoặt lớn nhất cần đón nhận là gì?
+      5. 💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG CHIẾN LƯỢC:** Lời khuyên hành động thực tế, thông thái.
+        """.strip()
+    elif spread_key in ("choices", "two_paths"):
+        spread_special_instructions = f"""
+    ⚖️ CHỈ DẪN BẮT BUỘC CHO TRẢI BÀI SO SÁNH LỰA CHỌN (CHOICES / TWO PATHS):
+    - BẮT BUỘC so sánh đối đầu trực diện trong mục `decision_matrix` và bài đọc:
+      + Nếu chọn Phương án A: Được gì, mất gì, con đường sẽ ra sao?
+      + Nếu chọn Phương án B: Được gì, mất gì, con đường sẽ ra sao?
+      + Lựa chọn cuối cùng là ở bạn, nhưng chỉ rõ phương án nào tối ưu hơn dựa trên năng lượng lá bài để bạn dễ dàng cân nhắc!
+        """.strip()
+    elif spread_key == "daily":
+        spread_special_instructions = f"""
+    ⭐ CHỈ DẪN BẮT BUỘC CHO TRẢI BÀI NGÀY (DAILY - CHỐNG NHÀM CHÁN & LẤP LỬNG):
+    - Không chỉ nói chung chung 'hôm nay bạn hãy bình tĩnh/vui vẻ'.
+    - BẮT BUỘC chỉ rõ trong bài đọc Markdown:
+      ⭐ **Điểm sáng năng lượng hôm nay:** Cơ hội hoặc vận may cụ thể nhất trong ngày.
+      ⚠️ **Cạm bẫy cần tránh:** 1 hành vi / cảm xúc dễ gây hỏng việc (bốc đồng, trì hoãn, chi tiêu, tranh cãi...).
+      ⚡ **Hành động vàng:** 1 việc nên làm ngay hôm nay để ngày trôi qua trọn vẹn nhất.
+        """.strip()
+    elif spread_key == "ppf":
+        spread_special_instructions = f"""
+    📖 CHỈ DẪN BẮT BUỘC CHO TRẢI BÀI QUÁ KHỨ - HIỆN TẠI - TƯƠNG LAI (PPF):
+    - Trong mục `story_synthesis` và bài đọc, BẮT BUỘC làm rõ mối quan hệ nhân quả: Hành động/bài học trong Quá khứ đã định hình Hiện tại thế nào, và nếu giữ nguyên quán tính này thì Tương lai sẽ dẫn đến đâu.
+    - Đưa ra điểm tựa hành động đòn bẩy ở Hiện tại để bẻ lái tương lai sang hướng tốt đẹp nhất.
+        """.strip()
+
     prompt = f"""
     Bạn là Tarot Reader chuyên nghiệp và am tường triết lý 78 lá bài Tarot Rider-Waite.
     Hãy đọc quẻ bài cho `{user_name}` dựa trên đúng ý nghĩa biểu tượng của các lá bài được rút.
 
     {persona_prompt}
+
+    {celeste_feminine_guidance}
 
     {memory_prompt}
 
@@ -244,83 +312,79 @@ def _build_tarot_prompt(
     - Danh sách lá bài & Ý nghĩa biểu tượng chuẩn:
     {cards_context}
 
+    {spread_special_instructions}
+
     🚨 NGUYÊN TẮC GIẢI BÀI BẮT BUỘC (QUAN TRỌNG):
-    1. ĐÚNG BẢN CHẤT Ý NGHĨA TAROT: Cả 3 Persona (Orion, Celeste, Jester) đều phải giải đúng ý nghĩa nguyên bản của lá bài (ví dụ: The Empress Ngược là tắc nghẽn sáng tạo, thiếu chăm sóc bản thân, phụ thuộc cảm xúc; KHÔNG PHẢI lười biếng hay xúc phạm người hỏi).
-    2. SỰ KHÁC BIỆT CHỈ Ở PHONG CÁCH DIỄN ĐẠT:
-       - Orion: phân tích điềm tĩnh, triết lý, thực tế và sâu sắc.
-       - Celeste: vỗ về, chữa lành, dịu dàng và tìm ánh sáng hy vọng.
-       - Jester: dí dỏm, tếu táo, trào phúng vui tươi nhưng mang tính xây dựng, tuyệt đối KHÔNG công kích cá nhân, KHÔNG tiêu cực hóa độc hại.
-    3. Mọi lá bài ngược (Reversed) là lời nhắc nhở nhẹ nhàng để cân bằng lại năng lượng bên trong, luôn kết thúc bằng lời khuyên và động lực tích cực.
+    1. ĐÚNG BẢN CHẤT Ý NGHĨA TAROT: Cả 3 Persona (Orion, Celeste, Jester) đều phải giải đúng ý nghĩa nguyên bản của lá bài.
+    2. SỰ KHÁC BIỆT Ở PHONG CÁCH DIỄN ĐẠT:
+       - Orion: phân tích điềm tĩnh, triết lý, thực tế, dứt khoát và sâu sắc.
+       - Celeste: ngọt ngào, dịu dàng, ấm áp, đậm chất nữ tính, chở che nhưng thông tuệ chỉ lối sáng tỏ.
+       - Jester: dí dỏm, tếu táo, trào phúng vui tươi, bóc trần sự thật ngầm hiểu sắc bén và thực tế.
+    3. ĐỊNH HƯỚNG RẼ NHÁNH RÕ RÀNG ("NẾU LÀ A THÌ NÊN VẬY, CÒN B THÌ NÊN VẬY, LỰA CHỌN LÀ Ở BẠN"):
+       - Khi gặp tình huống phân vân / do dự / lưỡng lự (như lá 2 Kiếm, 7 Cốc, The Hanged Man, 2 Xu, hoặc trải Yes/No, Choices):
+         + TUYỆT ĐỐI TRÁNH buông câu ba phải lười biếng kiểu 'tùy bạn tự quyết' mà không phân tích cụ thể từng con đường.
+         + Thay vào đó, BẮT BUỘC cung cấp BẢN ĐỒ ĐỊNH HƯỚNG 2 CHIỀU:
+           • Nếu chọn Hướng A (hoặc bối cảnh A diễn ra): Nên hành động ra sao, đón nhận điều gì, cần chuẩn bị tinh thần cho thách thức nào?
+           • Nếu chọn Hướng B (hoặc bối cảnh B diễn ra): Nên xử lý thế nào, đâu là sự bình yên/giải thoát nhận lại, và cần chú ý điều gì?
+         + ĐÚC KẾT: Quyền lựa chọn cuối cùng luôn thuộc về `{user_name}`, nhưng bài giải phải vẽ rõ lộ trình cho từng ngã rẽ để người hỏi dù chọn hướng nào cũng có chiến lược vững vàng!
     4. QUY TẮC ĐẠO ĐỨC & RANH GIỚI TRẢI BÀI (NGƯỜI HỎI & NGƯỜI THỨ BA - BẮT BUỘC TUÂN THỦ):
        - BẢN CHẤT CỦA TAROT: Tarot là công cụ soi chiếu nội tâm và trao lời khuyên, định hướng hành động cho CHÍNH người đang bốc bài (`{user_name}`).
        - TRƯỜNG HỢP HỢP LỆ:
          + Người hỏi (`{user_name}`) hỏi về bản thân mình (công việc, học tập, tình cảm, định hướng phát triển cá nhân).
-         + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là một bên trong mối quan hệ/tình huống đó và đang tìm kiếm góc nhìn, lời khuyên cho chính bản thân mình (Ví dụ hợp lệ: "{user_name} và crush có tiến triển không?", "Người ấy nghĩ gì về tôi?", "Tôi có nên chủ động làm hòa với bạn ấy?", "Mối quan hệ giữa tôi và sếp/đồng nghiệp ra sao?").
-         + ĐẶC BIỆT - CÂU HỎI VÙNG XÁM / TRÊU ĐÙA / KHEN NGỢI VÔ THƯỞNG VÔ PHẠT:
-           • Nếu câu hỏi có nhắc hoặc tag người khác trong server (ví dụ: "@Mike có siêu cấp đẹp gái không?", "@A dạo này có giàu không?", "@B có hiền không?"):
-           • TUYỆT ĐỐI KHÔNG ĐƯỢC QUÁ KHẮT KHE (STRICT) MÀ TỪ CHỐI! Đây là tương tác cộng đồng vui vẻ, trêu đùa hoặc khen ngợi bạn bè, hoàn toàn hợp lệ (`is_valid: true`).
-           • Hãy nhận thức rõ người hỏi là `{user_name}` và đối tượng được nhắc đến là người bạn (@Name) trong server chứ KHÔNG PHẢI bot. Dùng năng lượng lá bài để nhận xét, tán dương hoặc trêu đùa dí dỏm về người bạn đó, gửi lời khuyên/nhắn nhủ vui vẻ cho cả hai.
+         + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là một bên trong mối quan hệ/tình huống đó và đang tìm kiếm góc nhìn, lời khuyên cho chính bản thân mình.
+         + CÂU HỎI VÙNG XÁM / TRÊU ĐÙA / KHEN NGỢI BẠN BÈ: Hoàn toàn hợp lệ (`is_valid: true`). Dùng năng lượng lá bài để nhận xét, tán dương hoặc trêu đùa dí dỏm về người bạn đó.
        - TRƯỜNG HỢP TUYỆT ĐỐI KHÔNG HỢP LỆ (CHỈ TỪ CHỐI KHI CÓ Ý ĐỒ XẤU / SOI MÓI ĐỜI TƯ ĐỘC HẠI):
          + Chỉ từ chối (`is_valid: false`) khi người yêu cầu bốc bài (`{user_name}`) KHÔNG NẰM TRONG NHỮNG NGƯỜI MUỐN NHẬN LỜI KHUYÊN, mà bốc bài để soi mói đời tư, bí mật cá nhân, xu hướng tính dục riêng tư, chuyện tình cảm chia tay/cắm sừng/nợ nần giữa hai người thứ ba B và C mà `{user_name}` không phải là người trong cuộc.
-         (Ví dụ không hợp lệ: Người hỏi A bốc bài hỏi "Bao giờ th B mới comeout nó gay và đang thích C?", "B và C có chia tay không?", "B có cắm sừng C không?", "Khi nào B trả nợ cho C?").
-       - HÀNH ĐỘNG KHI CÂU HỎI KHÔNG HỢP LỆ:
-         + BẮT BUỘC TỪ CHỐI GIẢI QUẺ về đời tư của người thứ ba! Tuyệt đối không phán xét, không đoán bừa về tâm lý, tình cảm hay xu hướng của những người vắng mặt.
-         + Bắt buộc trả `is_valid: false`.
-         + Thể hiện thái độ từ chối dứt khoát nhưng chuẩn xác theo Persona của Reader:
-           • Orion: Điềm tĩnh, nghiêm nghị phân tích ranh giới đạo đức: Tarot tôn trọng sự riêng tư của mỗi cá nhân, không thể dùng bài để phán xét hay xâm phạm đời tư người khác khi họ không hiện diện và người hỏi không liên quan; nhắc nhở `{user_name}` giữ ranh giới đạo đức.
-           • Celeste: Dịu dàng, thấu cảm giải thích rằng không gian riêng tư và cảm xúc của mỗi người cần được trân trọng; từ chối giải quẻ và khuyên `{user_name}` hãy bao dung, để mọi điều diễn ra tự nhiên.
-           • Jester: Tếu táo, châm biếm hài hước tính "nhiều chuyện", làm "camera chạy bằng cơm" đi hóng hớt drama người khác; nhắc nhở Tarot có đạo đức nghề nghiệp chứ không buôn dưa lê, bảo `{user_name}` lo việc của mình trước!
-         + Quy chuẩn các trường khi từ chối:
-           • `topic_tag`: "general"
-           • `mood_tag`: "Ranh giới đạo đức"
-           • `summary_headline`: Cảnh báo từ chối do vi phạm ranh giới riêng tư của người khác
-           • `conclusion`: Tuyên bố từ chối luận giải vì câu hỏi không hợp lệ (người hỏi không nằm trong những người muốn nhận lời khuyên mà đi hỏi chuyện bên thứ ba).
-           • `cards_analysis`: Không gán ý nghĩa lá bài vào người thứ ba; giải thích lá bài như lời nhắc nhở về ranh giới cá nhân, kiềm chế tính tò mò, hoặc biểu tượng lá bài từ chối kết nối với người vắng mặt.
-           • `advice`: Khuyên `{user_name}` rút năng lượng về để tập trung vào cuộc sống, bài học và sự phát triển của bản thân mình.
-    5. TRẢ LỜI ĐÚNG TRỌNG TÂM & LÁI THEO LÁ BÀI (TUYỆT ĐỐI KHÔNG NÓI CHUNG CHUNG / KHÔNG LẠC ĐỀ):
-       - BÁM SÁT CHỦ ĐỀ CÂU HỎI: Người hỏi hỏi về điều gì thì tập trung giải mã đúng điều đó (công việc, học tập, tài chính, hay tình cảm). Tuyệt đối KHÔNG tự suy diễn mọi câu hỏi thành chuyện tình cảm lứa đôi hay áp đặt văn mẫu chữa lành sáo rỗng.
-       - XỬ LÝ CÂU HỎI META / HỎI VỀ CHÍNH BOT / THỬ TÀI / TROLL (Ví dụ: "Bot có biết bói tarot không?", "Bot là ai?", "Đọc bài chuẩn không?"):
-         + Bạn BẮT BUỘC nhận thức rõ mình là Tarot Reader (theo đúng Persona).
-         + TRẢ LỜI TRỰC DIỆN: Tự tin và duyên dáng xác nhận năng lực giải mã biểu tượng Tarot của bạn.
-         + LÁI LÁ BÀI VÀO TÌNH HUỐNG THỬ TÀI: Giải thích ý nghĩa lá bài rút được trong chính hoàn cảnh người hỏi đang thử tài/thắc mắc về bạn (Ví dụ với lá 8 Gậy Ngược: "Năng lượng lá bài chỉ sự vội vã/tắc nghẽn tín hiệu do câu hỏi thử tài ăn liền; Tarot không phải trò bói mò chớp nhoáng mà cần sự tĩnh tâm...").
-         + ĐƯA RA LỜI MỜI THỰC TẾ: Mời người hỏi đặt một câu hỏi thực sự về cuộc sống, công việc, định hướng tương lai hoặc tình duyên của họ để cùng chiêm nghiệm chiều sâu của các lá bài.
-       - LÁI CÂU TRẢ LỜI THEO BIỂU TƯỢNG LÁ BÀI (GROUNDED SYMBOLISM):
-         + Không chỉ liệt kê từ khóa lý thuyết chung chung ("sự chậm lại", "cân bằng", "nghỉ ngơi").
-         + Bắt buộc gắn hình ảnh, hành động của lá bài với sự việc cụ thể trong câu hỏi: Biểu tượng này phản ánh điều gì đang xảy ra? Chướng ngại vật cụ thể là gì? Xu hướng tiếp theo diễn tiến ra sao?
-       - LỜI KHUYÊN MANG TÍNH HÀNH ĐỘNG CỤ THỂ (ACTIONABLE ADVICE):
-         + Lời khuyên không được dừng lại ở những câu sáo rỗng ("hãy lắng nghe vũ trụ", "hãy kiên nhẫn", "hãy mở lòng").
-         + Phải đưa ra 1-2 hành động cụ thể, thực tế mà người hỏi có thể làm ngay trong hoàn cảnh của họ.
+       - HÀNH ĐỘNG KHI CÂU HỎI KHÔNG HỢP LỆ: BẮT BUỘC từ chối khéo léo theo Persona (`is_valid: false`), khuyên `{user_name}` tập trung năng lượng vào cuộc sống và bài học của chính mình.
+    5. TRẢ LỜI ĐÚNG TRỌNG TÂM & LÁI THEO LÁ BÀI:
+       - Người hỏi hỏi về điều gì thì tập trung giải mã đúng điều đó (công việc, học tập, tài chính, hay tình cảm). Tuyệt đối KHÔNG tự suy diễn mọi câu hỏi thành chuyện tình cảm lứa đôi.
+       - Gắn hình ảnh, hành động của lá bài với sự việc cụ thể trong câu hỏi.
+       - Lời khuyên phải mang tính hành động cụ thể (Actionable Advice), không sáo rỗng.
     6. ĐỒNG BỘ TUYỆT ĐỐI VỚI PHÁN QUYẾT YES / NO (NẾU LÀ TRẢI BÀI YES/NO):
-       - Nếu kiểu trải bài là Yes / No: Phần 'conclusion' và toàn bộ bài giải BẮT BUỘC phải đồng thuận với Phán Quyết Yes / No Chính Thức được nêu ở trên.
-       - Tuyệt đối KHÔNG được mâu thuẫn (Ví dụ: phán quyết chính thức là CÓ NHƯNG CẦN CÂN NHẮC thì kết luận phải giải thích tại sao là CÓ và cần cân nhắc điều gì theo lá bài; KHÔNG được tự ý phán ngược lại thành KHÔNG / NO).
+       - Phán quyết Yes/No và toàn bộ bài giải BẮT BUỘC phải đồng thuận với Phán Quyết Yes / No Chính Thức được nêu ở trên.
     7. PHÂN BIỆT RÕ VAI TRÒ ĐỐI TƯỢNG KHI CÓ TAG (@MENTION) TRONG CÂU HỎI:
-       - Phân biệt 3 đối tượng độc lập:
-         1) Người yêu cầu bốc bài (`{user_name}`): Người trực tiếp nhận quẻ và nghe bài giải.
-         2) Thành viên khác được tag (@Name): Người bạn trong server được người hỏi nhắc tới (KHÔNG PHẢI bot).
-         3) Chính Bạn (Tarot Bot / Reader): Người đóng vai trò đọc bài theo Persona.
-       - Khi câu hỏi tag một thành viên khác (ví dụ: `{user_name}` hỏi "@Mike có siêu cấp đẹp gái không?"):
-         + ĐỪNG nhầm lẫn @Mike với Bot! @Mike là một thành viên khác trong server được `{user_name}` nhắc tới.
-         + Trả lời trực diện theo phán quyết Yes/No (nếu có) và năng lượng lá bài: Giải nghĩa lá bài để trả lời về vẻ đẹp, thần thái, phong cách hay năng lượng của @Mike.
-         + Diễn đạt khéo léo, tự nhiên, hóm hỉnh theo Persona đã chọn, có thể gửi lời chào hoặc lời nhắn dí dỏm đến @Mike thông qua bài đọc cho `{user_name}`.
+       - Phân biệt 3 đối tượng độc lập: Người bốc bài (`{user_name}`), Thành viên khác được tag (@Name), và Chính Bạn (Tarot Reader).
 
     🚨 YÊU CẦU ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC TRẢ JSON CHUẨN):
-    1. `is_valid`: True nếu câu hỏi hợp lệ (cho bản thân, mối quan hệ của người hỏi, hoặc câu hỏi trêu đùa/khen ngợi bạn bè lành mạnh trong server). False nếu câu hỏi không hợp lệ (soi mói đời tư, bí mật nhạy cảm giữa các bên thứ ba B và C).
-    2. `topic_tag`: 1 trong các tag `career` (công việc), `love` (tình cảm), `finance` (tài chính), `health` (sức khỏe), `study` (học tập), hoặc `general` (tổng quan).
-    3. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Áp lực & Quá tải', 'Chữa lành & Tĩnh lặng', 'Ranh giới đạo đức', 'Thăng hoa & Tự tin'...).
-    4. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi của quẻ.
-    5. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích. Trả lời thẳng vào trọng tâm câu hỏi của {user_name}, đồng bộ với phán quyết Yes/No (nếu có).
-    6. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt. Liên kết biểu tượng lá bài với sự việc cụ thể của câu hỏi, tuyệt đối không chép định nghĩa lý thuyết chung chung.
-    7. `advice`: Lời khuyên hành động thực tế (Actionable Steps), thông thái và khích lệ người hỏi.
-    8. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown, BẮT BUỘC phân tách các mục rõ ràng bằng 2 dấu xuống dòng (\\n\\n):
-       🎯 **KẾT LUẬN & TỔNG QUAN:**
-       (Nội dung kết luận trực diện, đúng trọng tâm)
-
-       🃏 **Ý NGHĨA CÁC LÁ BÀI:**
-       • **[Tên lá bài 1]**: (Phân tích gắn liền với sự việc câu hỏi)
-       • **[Tên lá bài 2]**: (Phân tích gắn liền với sự việc câu hỏi)
-
-       💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
-       (Hành động cụ thể, thực tế)
+    1. `is_valid`: True nếu hợp lệ, False nếu câu hỏi soi mói đời tư người thứ ba độc hại.
+    2. `topic_tag`: 1 trong các tag `career`, `love`, `finance`, `health`, `study`, `general`.
+    3. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo.
+    4. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi.
+    5. `conclusion`: Câu kết luận trực diện, đúc kết xu hướng rõ ràng không lấp lửng trong 1-2 câu.
+    6. `cards_analysis`: Phân tích chi tiết từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt.
+    7. `story_synthesis`: Dòng chảy câu chuyện xâu chuỗi toàn bộ quẻ bài (bắt buộc cho Celtic Cross và trải bài nhiều lá).
+    8. `decision_matrix`: Tiêu chí chốt hạ rõ ràng (khi nào chọn Có/Làm, khi nào chọn Không/Bỏ, cách chốt tức thì - bắt buộc cho Yes/No và Choices).
+    9. `final_outcome`: Cái kết cuối cùng và đích đến dứt khoát của vấn đề (bắt buộc cho Celtic Cross và trải bài tiến trình).
+    10. `advice`: Lời khuyên hành động thực tế, thông thái và khích lệ người hỏi.
+    11. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown, BẮT BUỘC phân tách các mục rõ ràng bằng 2 dấu xuống dòng (\\n\\n) theo đúng cấu trúc của kiểu trải bài:
+       - Với Celtic Cross:
+         🎯 **KẾT LUẬN & TỔNG QUAN:**
+         🃏 **Ý NGHĨA CHI TIẾT 10 LÁ BÀI:**
+         📖 **DÒNG CHẢY CÂU CHUYỆN (SỰ KẾT NỐI TOÀN BỘ TRẢI BÀI):**
+         🏆 **CÁI KẾT CUỐI CÙNG & ĐÍCH ĐẾN:**
+         💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
+       - Với Yes / No:
+         🎯 **KẾT LUẬN & TỔNG QUAN:**
+         🃏 **Ý NGHĨA CÁC LÁ BÀI:**
+         ⚡ **TIÊU CHÍ CHỐT HẠ (KHI NÀO NÊN CHỌN CÁI NÀO):**
+         💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
+       - Với Choices / Two Paths:
+         🎯 **KẾT LUẬN & TỔNG QUAN:**
+         🃏 **Ý NGHĨA CÁC LÁ BÀI:**
+         ⚖️ **SO SÁNH TRỰC DIỆN & TIÊU CHÍ CHỐT HẠ:**
+         💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
+       - Với Daily:
+         🎯 **KẾT LUẬN & TỔNG QUAN:**
+         🃏 **Ý NGHĨA LÁ BÀI:**
+         ⭐ **ĐIỂM SÁNG NĂNG LƯỢNG HÔM NAY:**
+         ⚠️ **CẠM BẪY CẦN TRÁNH TRONG NGÀY:**
+         ⚡ **HÀNH ĐỘNG VÀNG ĐỂ TỐI ƯU MỘT NGÀY:**
+         💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
+       - Với các trải bài khác (PPF, MBS, Horseshoe, Single):
+         🎯 **KẾT LUẬN & TỔNG QUAN:**
+         🃏 **Ý NGHĨA CÁC LÁ BÀI:**
+         📖 **DÒNG CHẢY CÂU CHUYỆN (TIẾN TRÌNH CHIÊM NGHIỆM):**
+         💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
     """.strip()
     return prompt
 
@@ -329,7 +393,7 @@ def _clean_and_format_tarot_markdown(text: str) -> str:
     """
     Chuẩn hóa cấu trúc Markdown bài giải Tarot:
     - Loại bỏ ký tự thừa hoặc tag in đậm bị treo (dangling **).
-    - Chuẩn hóa các đề mục icon chính (🎯, 🃏, 💡, 🔮, ⚡, 📖, 🎭, 💖, ✨).
+    - Chuẩn hóa các đề mục icon chính (🎯, 🃏, 💡, 🔮, ⚡, 📖, 🎭, 💖, ✨, 🏆, ⚖️, ⭐, ⚠️).
     - Giữ nguyên các dấu gạch nối giữa dòng (' - Ngược', 'A - B') và chỉ chuyển đổi gạch đầu dòng.
     """
     if not text:
@@ -343,7 +407,7 @@ def _clean_and_format_tarot_markdown(text: str) -> str:
     # 2. Xóa các dòng rác chỉ chứa dấu sao hoặc dấu cách
     t = re.sub(r"^\s*\*+\s*$", "", t, flags=re.MULTILINE)
 
-    icons = "🎯🃏💡🔮⚡📖🎭💖✨"
+    icons = "🎯🃏💡🔮⚡📖🎭💖✨🏆⚖️⭐⚠️"
 
     # 3a. Chèn 2 dòng trống trước các icon chính nếu chúng bị dính liền vào câu trước
     t = re.sub(rf"(?<!\A)(?<!\n)\s*([{icons}])", r"\n\n\1", t)
@@ -437,6 +501,9 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
             "summary_headline",
             "conclusion",
             "cards_analysis",
+            "story_synthesis",
+            "decision_matrix",
+            "final_outcome",
             "advice",
             "full_reading"
         ]
@@ -517,6 +584,21 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
             cards_an = "\n".join(formatted_cards)
         cards_an = str(cards_an).strip()
 
+        story_syn = parsed_dict.get("story_synthesis", "")
+        if isinstance(story_syn, list):
+            story_syn = "\n".join(str(s) for s in story_syn)
+        story_syn = str(story_syn).strip()
+
+        dec_mat = parsed_dict.get("decision_matrix", "")
+        if isinstance(dec_mat, list):
+            dec_mat = "\n".join(str(d) for d in dec_mat)
+        dec_mat = str(dec_mat).strip()
+
+        fin_out = parsed_dict.get("final_outcome", "")
+        if isinstance(fin_out, list):
+            fin_out = "\n".join(str(f) for f in fin_out)
+        fin_out = str(fin_out).strip()
+
         adv = parsed_dict.get("advice", "")
         if isinstance(adv, list):
             adv = "\n".join(str(a) for a in adv)
@@ -524,29 +606,38 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
 
         # Dọn dẹp nếu Gemini vô tình chèn header vào trong các trường con
         conc = re.sub(r"^(?:🎯|[#*_\s])*\s*(?:KẾT LUẬN|TỔNG QUAN)[^:\n]*[:\n]*", "", conc, flags=re.IGNORECASE).strip()
-        cards_an = re.sub(r"^(?:🃏|[#*_\s])*\s*(?:Ý NGHĨA CÁC LÁ BÀI|Ý NGHĨA)[^:\n]*[:\n]*", "", cards_an, flags=re.IGNORECASE).strip()
+        cards_an = re.sub(r"^(?:🃏|[#*_\s])*\s*(?:Ý NGHĨA CÁC LÁ BÀI|Ý NGHĨA CHI TIẾT|Ý NGHĨA)[^:\n]*[:\n]*", "", cards_an, flags=re.IGNORECASE).strip()
+        story_syn = re.sub(r"^(?:📖|[#*_\s])*\s*(?:DÒNG CHẢY CÂU CHUYỆN|CÂU CHUYỆN|KẾT NỐI TOÀN BỘ TRẢI BÀI)[^:\n]*[:\n]*", "", story_syn, flags=re.IGNORECASE).strip()
+        dec_mat = re.sub(r"^(?:⚡|⚖️|[#*_\s])*\s*(?:TIÊU CHÍ CHỐT HẠ|CHỐT HẠ|SO SÁNH TRỰC DIỆN)[^:\n]*[:\n]*", "", dec_mat, flags=re.IGNORECASE).strip()
+        fin_out = re.sub(r"^(?:🏆|[#*_\s])*\s*(?:CÁI KẾT CUỐI CÙNG|ĐÍCH ĐẾN|KẾT QUẢ CUỐI CÙNG)[^:\n]*[:\n]*", "", fin_out, flags=re.IGNORECASE).strip()
         adv = re.sub(r"^(?:💡|[#*_\s])*\s*(?:LỜI KHUYÊN & ĐỊNH HƯỚNG|LỜI KHUYÊN|ĐỊNH HƯỚNG)[^:\n]*[:\n]*", "", adv, flags=re.IGNORECASE).strip()
 
-        if conc and cards_an:
-            # Tái tạo đầy đủ bài đọc chuẩn Markdown với các mục phân tách đẹp mắt
-            parts = [
-                f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}",
-                f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}"
-            ]
-            if adv:
-                parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
-            full_reading = "\n\n".join(parts)
+        # Tái tạo đầy đủ bài đọc chuẩn Markdown với các mục phân tách đẹp mắt
+        parts = []
+        if conc:
+            parts.append(f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}")
+        if cards_an:
+            parts.append(f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}")
+        if story_syn:
+            parts.append(f"📖 **DÒNG CHẢY CÂU CHUYỆN (SỰ KẾT NỐI TOÀN BỘ TRẢI BÀI):**\n{story_syn}")
+        if dec_mat:
+            parts.append(f"⚡ **TIÊU CHÍ CHỐT HẠ (KHI NÀO NÊN CHỌN CÁI NÀO):**\n{dec_mat}")
+        if fin_out:
+            parts.append(f"🏆 **CÁI KẾT CUỐI CÙNG & ĐÍCH ĐẾN:**\n{fin_out}")
+        if adv:
+            parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
+
+        assembled = "\n\n".join(parts)
+        # Nếu raw_full chứa các mục chi tiết và dài hơn hoặc tương đương, ưu tiên raw_full nếu không bị thiếu
+        has_rich_sections = any(header in raw_full for header in ["DÒNG CHẢY CÂU CHUYỆN", "TIÊU CHÍ CHỐT HẠ", "CÁI KẾT CUỐI CÙNG", "ĐIỂM SÁNG NĂNG LƯỢNG", "SO SÁNH TRỰC DIỆN"])
+        if has_rich_sections and len(raw_full) >= len(assembled):
+            full_reading = raw_full
+        elif parts:
+            full_reading = assembled
         elif len(raw_full) > 50:
             full_reading = raw_full
         else:
-            parts = []
-            if conc:
-                parts.append(f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}")
-            if cards_an:
-                parts.append(f"🃏 **Ý NGHĨA CÁC LÁ BÀI:**\n{cards_an}")
-            if adv:
-                parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
-            full_reading = "\n\n".join(parts) if parts else (raw_full or text)
+            full_reading = text
     else:
         # Nếu hoàn toàn không phát hiện cấu trúc JSON -> coi như phản hồi Markdown thông thường
         cleaned = text
@@ -570,7 +661,7 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
         full_reading = re.sub(r'"[a-zA-Z_]+":\s*"', '', full_reading)
         full_reading = full_reading.replace('",', '\n\n').replace('\\n', '\n').strip()
 
-    # Bước 7: Chuẩn hóa Markdown, đảm bảo xuống dòng các mục 🎯, 🃏, 💡 và gạch đầu dòng
+    # Bước 7: Chuẩn hóa Markdown, đảm bảo xuống dòng các mục icon và gạch đầu dòng
     full_reading = _clean_and_format_tarot_markdown(full_reading)
 
     # Hậu kiểm tra nếu AI đặt tag hoặc nội dung từ chối / vi phạm đạo đức
@@ -579,6 +670,7 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
         is_valid = False
 
     return full_reading, topic_tag, mood_tag, summary_headline, is_valid
+
 
 
 async def generate_tarot_reading(
@@ -636,6 +728,9 @@ async def generate_tarot_reading(
             seen.add(m)
             ordered_models.append(m)
 
+    card_count = len(drawn_cards)
+    timeout_duration = 26.0 if card_count >= 5 else 16.0
+
     async with AI_SEMAPHORE:
         for model_name in ordered_models:
             # Thử với cấu hình chuẩn có schema, nếu model không hỗ trợ thì fallback cấu hình cơ bản
@@ -651,7 +746,7 @@ async def generate_tarot_reading(
                             contents=prompt,
                             config=gen_config,
                         ),
-                        timeout=14.0
+                        timeout=timeout_duration
                     )
                     if response and response.text:
                         raw_text = response.text.strip()
@@ -662,7 +757,7 @@ async def generate_tarot_reading(
                             return full_reading, topic_tag, mood_tag, summary_headline, is_valid
 
                 except asyncio.TimeoutError:
-                    print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>14s), chuyển sang model tiếp theo...", flush=True)
+                    print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>{timeout_duration}s), chuyển sang model tiếp theo...", flush=True)
                     break  # Chuyển ngay sang model tiếp theo trong cascade
                 except Exception as e:
                     err_str = str(e)

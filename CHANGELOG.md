@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.1] - 2026-09-09 — *AI Tarot Interpretation Enhancements & Cabin Takeover Engine*
+
+### Added
+- **Cơ Chế Đè Quyền Dịch Cabin & Reset Cooldown (Cabin Takeover)**:
+  - Cho phép người dùng khác (C) đè quyền phiên cabin của người trước (A) trên cùng một nạn nhân (B).
+  - Tự động gỡ phiên của A ra (giải phóng slot cho A có thể troll người khác) và chuyển nạn nhân B sang danh nghĩa đang bị C troll (tính vào quota 1 phiên của C).
+  - Reset bộ đếm thời gian chờ dịch của nạn nhân B về 0 ngay lập tức để người mới C có thể troll ngay tin nhắn đầu tiên mà không bị delay.
+  - Phản hồi Embed thông báo trực quan: `🎙️ ĐÃ ĐÈ QUYỀN DỊCH CABIN!` với thông tin người nắm quyền mới và thời gian hết hạn mới.
+- **Tiêu Chí Chốt Hạ 2 Chiều Cho Trải Bài Yes/No (`⚡ TIÊU CHÍ CHỐT HẠ`)**:
+  - Tích hợp điều kiện cụ thể: Khi nào nên chọn CÓ/LÀM vs. Khi nào nên chọn KHÔNG/BỎ.
+  - Quy tắc tự vấn 1 phút giúp người hỏi tự đối diện nội tâm để ra quyết định dứt khoát.
+- **Tái Cấu Trúc Trải Bài Celtic Cross 10 Lá Toàn Diện**:
+  - Luận giải sâu sắc (>4.000 ký tự) với 5 phần lớn có cấu trúc rõ ràng.
+  - Mục `📖 DÒNG CHẢY CÂU CHUYỆN`: Kết nối các trục lá bài (Bản ngã & Thử thách, Nền tảng quá khứ, Ý thức & Tiềm thức, Môi trường & Kỳ vọng) thành một chuỗi diễn biến nhân quả liền mạch thay vì liệt kê rời rạc.
+  - Mục `🏆 CÁI KẾT CUỐI CÙNG & ĐÍCH ĐẾN`: Đưa ra kết luận rõ ràng, sắc bén về kết cục và đích đến nếu giữ nguyên tiến trình hiện tại.
+
+### Changed
+- **Nâng Cấp Persona Reader Celeste (Healer) Đậm Chất Nữ Tính & Thấu Cảm**:
+  - Điều chỉnh tính cách Celeste: Xưng hô dịu dàng, thân thương (*"bạn thương", "người bạn của mình"*), giọng văn nữ tính, đằm thắm, giàu ẩn dụ thơ mộng xoa dịu tâm hồn nhưng vẫn thông tuệ và chỉ lối sáng rõ.
+- **Triệt Tiêu Câu Trả Lời Ba Phải / Lấp Lửng Trong Luận Giải Tarot**:
+  - Cập nhật nguyên tắc diễn giải: Thay vì buông câu lười biếng *"tùy bạn tự quyết"*, bot luôn vẽ ra bản đồ rẽ nhánh định hướng 2 chiều: nếu chọn Hướng A thì chuẩn bị gì và hành động ra sao; nếu chọn Hướng B thì xử lý thế nào và đón nhận kết quả ra sao. Quyền quyết định luôn ở người hỏi nhưng luôn có lộ trình vững vàng.
+- **Dynamic Timeout Cho Trải Bài Lớn**:
+  - Tự động tăng thời gian chờ AI lên 26 giây cho các trải bài lớn (từ 5 lá trở lên) để AI hoàn thành trọn vẹn bài phân tích sâu mà không bị ngắt quãng.
+
+---
+
 ## [2.7.0] - 2026-09-09 — *Context-Aware AI Cabin Parody Interpretation & Multi-Tier Cascade Engine*
 
 ### Added

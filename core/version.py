@@ -10,12 +10,41 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.7.0"
+CURRENT_VERSION = "2.7.1"
 RELEASE_DATE = "2026-09-09"
-CODENAME = "Context-Aware AI Cabin Parody Interpretation & Multi-Tier Cascade Engine"
+CODENAME = "AI Tarot Interpretation Enhancements & Cabin Takeover Engine"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.7.1",
+        "date": "2026-09-09",
+        "type": "bugfix",
+        "title": "Nâng Cấp Diễn Giải Tarot (Nữ Tính Hóa Celeste, Rẽ Nhánh Quyết Định, Celtic Cross 10 Lá) & Đè Quyền Dịch Cabin",
+        "summary": "Nâng cấp chất lượng luận giải Tarot: tinh chỉnh Persona Celeste đong đầy nữ tính, dịu dàng, thấu cảm; triển khai cơ chế rẽ nhánh quyết định ('Nếu là A thì vầy, nếu là B thì vầy, lựa chọn là ở bạn') triệt tiêu câu trả lời lấp lửng; nâng cấp trải bài Yes/No với tiêu chí chốt hạ 2 chiều và trải bài Celtic Cross 10 lá với dòng chảy câu chuyện sâu sắc kèm cái kết dứt khoát. Đồng thời bổ sung cơ chế đè quyền phiên dịch cabin (takeover) và tự động reset cooldown.",
+        "changes": [
+            {
+                "category": "🔮 Nâng Cấp Toàn Diện Cơ Chế Diễn Giải Tarot",
+                "items": [
+                    "Tinh chỉnh Persona Celeste (healer): Xưng hô thân thương ('bạn thương', 'người bạn của mình'), giọng văn nữ tính, đằm thắm, giàu hình ảnh thơ mộng xoa dịu tâm hồn nhưng thông tuệ chỉ lối sáng tỏ.",
+                    "Triệt tiêu câu trả lời ba phải: Thay vì buông câu lười biếng 'tùy bạn tự quyết', bot vẽ ra bản đồ rẽ nhánh định hướng 2 chiều: nếu chọn Hướng A thì hành động ra sao và chuẩn bị tinh thần cho điều gì; nếu chọn Hướng B thì xử lý thế nào và nhận lại sự bình yên ra sao. Quyền lựa chọn cuối cùng luôn ở người hỏi nhưng với lộ trình vững vàng.",
+                    "Trải bài Yes/No: Tích hợp mục ⚡ TIÊU CHÍ CHỐT HẠ phân tích điều kiện chọn CÓ/LÀM vs KHÔNG/BỎ kèm quy tắc tự vấn 1 phút dứt khoát.",
+                    "Trải bài Celtic Cross (10 lá): Tái cấu trúc thành 5 phần lớn (>4.000 ký tự) gồm 📖 DÒNG CHẢY CÂU CHUYỆN kết nối các trục lá bài và 🏆 CÁI KẾT CUỐI CÙNG & ĐÍCH ĐẾN minh bạch, dứt khoát.",
+                    "Trải bài Choices / Two Paths: So sánh đối đầu trực diện cái giá và thành quả giữa 2 phương án.",
+                    "Dynamic Timeout: Tự động tăng thời gian chờ lên 26 giây cho các trải bài lớn (>= 5 lá) giúp AI hoàn thành bài giải sâu sắc."
+                ]
+            },
+            {
+                "category": "🔄 Cơ Chế Đè Quyền Dịch Cabin & Reset Cooldown",
+                "items": [
+                    "Cho phép người thứ ba (C) đè quyền phiên cabin của người trước (A) trên cùng nạn nhân (B).",
+                    "Tự động gỡ phiên của A ra (giải phóng slot cho A) và chuyển nạn nhân sang danh nghĩa đang bị C troll (tính vào hạn ngạch của C).",
+                    "Reset bộ đếm thời gian chờ dịch của nạn nhân B về 0 ngay lập tức để người mới C có thể troll ngay tin nhắn đầu tiên.",
+                    "Phản hồi thông báo Embed đè quyền trực quan (🎙️ ĐÃ ĐÈ QUYỀN DỊCH CABIN!)."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.7.0",
         "date": "2026-09-09",
