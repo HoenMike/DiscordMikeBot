@@ -10,12 +10,39 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.7.3"
+CURRENT_VERSION = "2.7.4"
 RELEASE_DATE = "2026-09-09"
-CODENAME = "Cabin Debounce Batch Engine - Anti-RPM Message Aggregation"
+CODENAME = "Bot Init Safety Lock & Cabin Commands Restoration"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.7.4",
+        "date": "2026-09-09",
+        "type": "bugfix",
+        "title": "Khôi Phục Lệnh Cabin & Khóa An Toàn Khởi Tạo Bot (Command Sync Safety Lock)",
+        "summary": "Khắc phục triệt để lỗi mất lệnh /cabin và các lệnh Tarot trước đó: khôi phục 100% các Slash Commands và Prefix Commands của Dịch Cabin; thiết lập cơ chế Khóa An Toàn (Safety Lock) tự động hủy tree.sync() nếu có extension bị lỗi hoặc thiếu lệnh cốt lõi nhằm ngăn Discord xóa sạch lệnh; bổ sung cơ chế thử lại (retry) khi nạp extension và lệnh quản trị /sync (.m sync) để đồng bộ tức thì cho từng máy chủ.",
+        "changes": [
+            {
+                "category": "🎙️ Khôi Phục Toàn Bộ Lệnh Cabin",
+                "items": [
+                    "Khôi phục đầy đủ Slash Commands: /cabin (bật/tắt toggle, khiên bảo vệ, đè quyền) và /cabinstop (dừng nhanh phiên cabin).",
+                    "Khôi phục Prefix Commands: .m cabin, .m cabin stop, .m cabin list, .m cabinstop, .m cabinlist.",
+                    "Tích hợp trơn tru toàn bộ các lệnh với Debounce Batch Engine và sửa định dạng phản hồi micro chuẩn 🎙️ Dịch cabin:.",
+                    "Khởi động task cleanup an toàn trong cog_load() và bắt lỗi Client not initialised trong before_loop."
+                ]
+            },
+            {
+                "category": "🛡️ Nâng Cấp Hệ Thống Khởi Tạo Bot (Bot Init & Sync Safety Lock)",
+                "items": [
+                    "Thiết lập EXPECTED_CORE_SLASH_COMMANDS bảo vệ các lệnh quan trọng: help, mhelp, version, setstatus, tomtat, autoembed, tarot, cabin, cabinstop.",
+                    "Safety Lock: Tự động hủy lệnh tree.sync() toàn cầu nếu phát hiện bất kỳ extension nào nạp lỗi hoặc thiếu lệnh cốt lõi, bảo vệ tuyệt đối lệnh trên Discord không bị xóa sạch.",
+                    "Thêm cơ chế tự động thử lại (Retry Backoff) tối đa 2 lần khi nạp extension, chống lỗi timeout mạng tạm thời với Turso Cloud.",
+                    "Bổ sung lệnh Quản trị viên /sync và .m sync [guild/global]: Hỗ trợ đồng bộ tức thì 0 giây cho máy chủ (guild_only) để khôi phục hoặc test lệnh ngay lập tức không cần chờ Discord cache 1 tiếng."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.7.3",
         "date": "2026-09-09",

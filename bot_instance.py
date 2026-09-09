@@ -1,3 +1,4 @@
+import asyncio
 import sys
 import time
 import traceback
@@ -18,6 +19,20 @@ FEATURE_EXTENSIONS = [
     "features.tarot.cog",
     "features.cabin.cog",
 ]
+
+# Danh sách các Slash Command cốt lõi bắt buộc phải có mặt trước khi được phép sync lên Discord
+# Cơ chế Khóa An Toàn (Safety Lock) ngăn chặn triệt để tình trạng Discord xóa nhầm lệnh toàn cầu
+EXPECTED_CORE_SLASH_COMMANDS = {
+    "help",
+    "mhelp",
+    "version",
+    "setstatus",
+    "tomtat",
+    "autoembed",
+    "tarot",
+    "cabin",
+    "cabinstop",
+}
 
 
 def get_prefix(bot, message):
@@ -50,34 +65,58 @@ class SummaryBot(commands.Bot):
 
             failed_extensions = []
             for ext in FEATURE_EXTENSIONS:
-                try:
-                    await self.load_extension(ext)
-                    # Đếm số app_commands đã được nạp từ cog này
-                    cog_name = ext.split(".")[-2]  # e.g., "tarot", "cabin"
-                    loaded_cog = None
-                    for cog in self.cogs.values():
-                        if cog.__module__ == ext:
-                            loaded_cog = cog
-                            break
-                    cmd_count = len([c for c in self.tree.get_commands() if True]) if loaded_cog else "?"
-                    print(f"✅ Đã tải thành công extension: {ext}", flush=True)
-                except Exception as cog_error:
+                if ext in self.extensions:
+                    print(f"✅ Extension '{ext}' đã được nạp sẵn từ trước.", flush=True)
+                    continue
+                loaded = False
+                last_error = None
+                for attempt in range(1, 3):
+                    try:
+                        await self.load_extension(ext)
+                        loaded = True
+                        print(f"✅ Đã tải thành công extension: {ext} (lần {attempt})", flush=True)
+                        break
+                    except commands.ExtensionAlreadyLoaded:
+                        loaded = True
+                        print(f"✅ Extension '{ext}' đã được nạp sẵn.", flush=True)
+                        break
+                    except Exception as cog_error:
+                        last_error = cog_error
+                        if attempt < 2:
+                            print(f"⚠️ Thử tải lại extension '{ext}' sau 1.5s (lần {attempt}/2)... Lỗi: {cog_error}", flush=True)
+                            await asyncio.sleep(1.5)
+                if not loaded:
                     failed_extensions.append(ext)
-                    print(f"⚠️ Bỏ qua extension '{ext}' do không khả dụng hoặc lỗi: {cog_error}", flush=True)
-                    traceback.print_exc(file=sys.stdout)
+                    print(f"❌ Không thể tải extension '{ext}' sau các lần thử: {last_error}", flush=True)
+                    traceback.print_exception(type(last_error), last_error, last_error.__traceback__, file=sys.stdout)
 
+            # =====================================================================
+            # 🛡️ CƠ CHẾ KHÓA AN TOÀN ĐỒNG BỘ LỆNH (COMMAND SYNC SAFETY LOCK)
+            # Ngăn ngừa triệt để việc vô tình xóa lệnh toàn cầu khi bot khởi động lỗi
+            # =====================================================================
             if failed_extensions:
-                print(f"⚠️ [setup_hook] {len(failed_extensions)} extension(s) FAIL: {failed_extensions}", flush=True)
+                print(f"🛑 [SAFETY LOCK] Có {len(failed_extensions)} extension không thể nạp: {failed_extensions}.", flush=True)
+                print("⚠️ [SAFETY LOCK] TỰ ĐỘNG HỦY ĐỒNG BỘ SLASH COMMANDS ĐỂ TRÁNH DISCORD XÓA LỆNH TOÀN CẦU!", flush=True)
+                print("💡 Các lệnh Slash Commands cũ trên Discord sẽ được giữ nguyên an toàn.", flush=True)
+                return
 
-            # Log danh sách tất cả slash commands trước khi sync để dễ debug
             pending_cmds = self.tree.get_commands()
-            print(f"📋 [setup_hook] {len(pending_cmds)} slash commands sẽ được sync: {[c.name for c in pending_cmds]}", flush=True)
+            current_cmd_names = {c.name for c in pending_cmds}
+            missing_core = EXPECTED_CORE_SLASH_COMMANDS - current_cmd_names
 
-            print("🔄 Đang đồng bộ hóa Slash Commands...", flush=True)
+            if missing_core:
+                print(f"🚨 [SAFETY LOCK] CẢNH BÁO NGUY CẤP: Thiếu các Slash Commands cốt lõi: {sorted(list(missing_core))}!", flush=True)
+                print("⚠️ [SAFETY LOCK] TỰ ĐỘNG HỦY ĐỒNG BỘ ĐỂ BẢO VỆ CÁC LỆNH TRÊN DISCORD KHÔNG BỊ XÓA BỎ!", flush=True)
+                print(f"📋 Các lệnh hiện có trong Tree ({len(current_cmd_names)}): {sorted(list(current_cmd_names))}", flush=True)
+                print("👉 Vui lòng kiểm tra lại file code của các Cog liên quan.", flush=True)
+                return
+
+            print(f"📋 [setup_hook] Đã xác thực đầy đủ {len(pending_cmds)} Slash Commands: {sorted(list(current_cmd_names))}", flush=True)
+            print("🔄 Đang đồng bộ hóa Slash Commands toàn cầu...", flush=True)
             try:
                 synced = await self.tree.sync()
                 print(f"🎉 Đã đồng bộ hóa {len(synced)} Slash Commands toàn cầu thành công!", flush=True)
-                print(f"📋 [setup_hook] Danh sách đã sync: {[c.name for c in synced]}", flush=True)
+                print(f"📋 [setup_hook] Danh sách đã sync: {sorted([c.name for c in synced])}", flush=True)
             except Exception as sync_error:
                 print(f"❌ Lỗi khi đồng bộ hóa Slash Commands: {sync_error}", flush=True)
                 traceback.print_exc(file=sys.stdout)
@@ -762,4 +801,83 @@ async def setstatus_cmd(ctx: commands.Context, status_arg: str = "online", *, te
         await ctx.reply(f"✨ Đã cập nhật trạng thái bot: `[{status_val.upper()}]` {status_text}", mention_author=False)
     else:
         await ctx.reply("❌ Cập nhật trạng thái thất bại.", mention_author=False)
+
+
+# ==========================================
+# 8. SLASH COMMAND SYNC (ADMIN ONLY)
+# ==========================================
+@bot.tree.command(name="sync", description="Đồng bộ thủ công các Slash Commands (Dành cho Quản trị viên)")
+@app_commands.describe(guild_only="Chỉ đồng bộ cho máy chủ hiện tại (hiệu lực ngay tức thì 0s)")
+@app_commands.checks.has_permissions(administrator=True)
+async def sync_slash(interaction: discord.Interaction, guild_only: bool = True):
+    await interaction.response.defer(ephemeral=True)
+    if guild_only and interaction.guild:
+        try:
+            bot.tree.copy_global_to(guild=interaction.guild)
+            synced = await bot.tree.sync(guild=interaction.guild)
+            await interaction.followup.send(
+                f"✨ **Đã đồng bộ tức thì {len(synced)} Slash Commands cho máy chủ `{interaction.guild.name}`!**\n"
+                f"⚡ Các lệnh đã sẵn sàng sử dụng ngay lập tức (không cần chờ cache Discord).\n"
+                f"📋 Danh sách: `{sorted([c.name for c in synced])}`",
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(f"❌ Lỗi khi đồng bộ guild: {e}", ephemeral=True)
+    else:
+        # Global sync - kiểm tra khóa an toàn trước
+        current_cmds = {c.name for c in bot.tree.get_commands()}
+        missing_core = EXPECTED_CORE_SLASH_COMMANDS - current_cmds
+        if missing_core:
+            await interaction.followup.send(
+                f"🛑 **Khóa an toàn kích hoạt!** Không thể sync toàn cầu vì thiếu lệnh cốt lõi: `{sorted(list(missing_core))}`.\n"
+                f"👉 Vui lòng kiểm tra lại mã nguồn để tránh bị Discord xóa lệnh.",
+                ephemeral=True
+            )
+            return
+
+        try:
+            synced = await bot.tree.sync()
+            await interaction.followup.send(
+                f"🎉 **Đã đồng bộ thành công {len(synced)} Slash Commands toàn cầu!**\n"
+                f"⏳ Lệnh toàn cầu có thể mất tối đa 1 tiếng để cập nhật hoàn toàn trên toàn bộ client Discord.\n"
+                f"📋 Danh sách: `{sorted([c.name for c in synced])}`",
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.followup.send(f"❌ Lỗi khi đồng bộ toàn cầu: {e}", ephemeral=True)
+
+
+@bot.command(name="sync")
+@commands.has_permissions(administrator=True)
+async def sync_cmd(ctx: commands.Context, scope: str = "guild"):
+    """Đồng bộ Slash Commands: .m sync [guild/global]"""
+    scope_clean = scope.lower().strip()
+    if scope_clean == "global":
+        current_cmds = {c.name for c in bot.tree.get_commands()}
+        missing_core = EXPECTED_CORE_SLASH_COMMANDS - current_cmds
+        if missing_core:
+            await ctx.reply(
+                f"🛑 **Khóa an toàn kích hoạt!** Không thể sync toàn cầu vì thiếu lệnh cốt lõi: `{sorted(list(missing_core))}`.",
+                mention_author=False
+            )
+            return
+
+        try:
+            msg = await ctx.reply("🔄 Đang đồng bộ Slash Commands toàn cầu...", mention_author=False)
+            synced = await bot.tree.sync()
+            await msg.edit(content=f"🎉 **Đã đồng bộ {len(synced)} Slash Commands toàn cầu!**\n📋 Danh sách: `{sorted([c.name for c in synced])}`")
+        except Exception as e:
+            await ctx.reply(f"❌ Lỗi khi đồng bộ toàn cầu: {e}", mention_author=False)
+    else:
+        if not ctx.guild:
+            await ctx.reply("❌ Lệnh này chỉ dùng được trong máy chủ.", mention_author=False)
+            return
+        try:
+            msg = await ctx.reply(f"🔄 Đang đồng bộ Slash Commands cho `{ctx.guild.name}`...", mention_author=False)
+            bot.tree.copy_global_to(guild=ctx.guild)
+            synced = await bot.tree.sync(guild=ctx.guild)
+            await msg.edit(content=f"✨ **Đã đồng bộ tức thì {len(synced)} Slash Commands cho `{ctx.guild.name}`!**\n📋 Danh sách: `{sorted([c.name for c in synced])}`")
+        except Exception as e:
+            await ctx.reply(f"❌ Lỗi khi đồng bộ guild: {e}", mention_author=False)
+
 

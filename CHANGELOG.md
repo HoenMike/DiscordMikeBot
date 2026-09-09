@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.4] - 2026-09-09 — *Bot Init Safety Lock & Cabin Commands Restoration*
+
+### Fixed
+- **Khôi Phục Toàn Bộ Lệnh Cabin (Slash & Prefix Commands)**: Khôi phục 100% các Slash Commands (`/cabin`, `/cabinstop`) và Prefix Commands (`.m cabin`, `.m cabin stop`, `.m cabin list`, `.m cabinstop`, `.m cabinlist`) vốn bị mất trong đợt refactor debounce trước đó. Tích hợp trơn tru toàn bộ logic toggle, khiên bảo vệ, đè quyền với Debounce Batch Engine mới và chuẩn hóa định dạng trả lời `🎙️ **Dịch cabin:**`.
+- **Khóa An Toàn Đồng Bộ Lệnh (Command Sync Safety Lock)**: Giải quyết triệt để nguyên nhân gốc rễ khiến Discord xóa lệnh `/cabin` hiện tại và `/tarot` trước đây. Thiết lập danh sách `EXPECTED_CORE_SLASH_COMMANDS`; nếu bất kỳ extension nào nạp lỗi hoặc thiếu lệnh cốt lõi, bot **tự động hủy gọi `tree.sync()` toàn cầu** để bảo vệ tuyệt đối kho lệnh trên Discord không bị xóa sạch.
+
+### Added
+- **Cơ Chế Thử Lại Nạp Extension (Retry Backoff)**: Tự động thử lại tối đa 2 lần với độ trễ 1.5s nếu nạp extension gặp sự cố mạng tạm thời tới Turso Cloud.
+- **Lệnh Đồng Bộ Thủ Công Cho Quản Trị Viên (`/sync` & `.m sync`)**: Bổ sung Slash Command `/sync` và Prefix Command `.m sync [guild/global]` (Administrator). Cho phép đồng bộ tức thì 0 giây cho máy chủ (`guild_only=True`), giúp khôi phục hoặc kiểm thử lệnh ngay lập tức mà không cần chờ 1 tiếng Discord cache toàn cầu.
+
+---
+
 ## [2.7.3] - 2026-09-09 — *Cabin Debounce Batch Engine - Anti-RPM Message Aggregation*
 
 ### Changed

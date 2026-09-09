@@ -692,7 +692,10 @@ class TarotCog(commands.Cog):
 
     @weekly_card_loop.before_loop
     async def before_weekly_card_loop(self):
-        await self.bot.wait_until_ready()
+        try:
+            await self.bot.wait_until_ready()
+        except RuntimeError:
+            pass
 
 
 async def setup(bot: commands.Bot):
