@@ -152,6 +152,9 @@ class CabinManager:
         )
         self._sessions[(guild_id, target_id)] = session
 
+        # Luôn reset thời gian dịch gần nhất (cooldown) khi bắt đầu mới hoặc khi có người khác đè quyền
+        self._last_translated.pop((guild_id, target_id), None)
+
         try:
             db = await self._get_db()
             await db.execute("""
@@ -345,6 +348,10 @@ class CabinManager:
 
         self._last_translated[key] = now
         return True
+
+    def reset_cooldown(self, guild_id: int, target_id: int) -> None:
+        """Reset thời gian cooldown dịch gần nhất cho nạn nhân về 0."""
+        self._last_translated.pop((guild_id, target_id), None)
 
     async def increment_translated_count(self, guild_id: int, target_id: int) -> None:
         """Tăng số lượng tin nhắn đã dịch cho phiên này."""

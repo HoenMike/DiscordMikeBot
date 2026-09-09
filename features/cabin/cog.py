@@ -38,9 +38,10 @@ class CabinStopView(discord.ui.View):
     async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         user = interaction.user
 
-        # Kiểm tra quyền: Nạn nhân, Người bật hoặc Người có quyền Quản lý tin nhắn / Admin
+        # Kiểm tra quyền: Nạn nhân, Người tạo ban đầu, Người điều khiển hiện tại (nếu bị đè quyền), hoặc Quản trị viên
         is_target = (user.id == self.target_id)
-        is_creator = (user.id == self.creator_id)
+        session = cabin_manager.get_session(self.guild_id, self.target_id)
+        is_creator = (user.id == self.creator_id) or (session and user.id == session.creator_id)
         is_admin = False
         if isinstance(user, discord.Member):
             is_admin = user.guild_permissions.manage_messages or user.guild_permissions.administrator
@@ -138,40 +139,7 @@ class CabinCog(commands.Cog, name="Cabin"):
             )
             return
 
-        # 2. Cơ chế TOGGLE thông minh: Nếu người này đang bị cabin -> TẮT NGAY
-        if cabin_manager.is_active(guild.id, user.id):
-            # Kiểm tra quyền tắt
-            is_target = (interaction.user.id == user.id)
-            is_admin = interaction.user.guild_permissions.manage_messages or interaction.user.guild_permissions.administrator
-            session = cabin_manager.get_session(guild.id, user.id)
-            is_creator = session and (session.creator_id == interaction.user.id)
-
-            if not (is_target or is_creator or is_admin):
-                rem_str = format_duration(session.remaining_seconds) if session else "vài phút"
-                creator_str = f"<@{session.creator_id}>" if session else "người khác"
-                await interaction.response.send_message(
-                    f"⛔ **{user.display_name} hiện đã đang trong buồng Dịch Cabin rồi!**\n"
-                    f"• **Người yêu cầu:** {creator_str}\n"
-                    f"• **Thời gian còn lại:** `{rem_str}`\n\n"
-                    f"💡 *Người này đang được 'chăm sóc' rồi. Chỉ chính nạn nhân, người bật ban đầu hoặc Quản trị viên mới có thể dừng phiên này.*",
-                    ephemeral=True
-                )
-                return
-
-            await cabin_manager.stop_session(guild.id, user.id)
-
-            embed = discord.Embed(
-                title="🛑 ĐÃ TẮT CHẾ ĐỘ DỊCH CABIN",
-                description=(
-                    f"Đã giải thoát thành công cho {user.mention} theo yêu cầu của {interaction.user.mention}!\n\n"
-                    f"🕊️ Kể từ giờ, {user.display_name} có thể trò chuyện bình thường mà không bị bot bẻ lái nữa."
-                ),
-                color=0x95A5A6
-            )
-            await interaction.response.send_message(embed=embed)
-            return
-
-        # 3. Kiểm tra Khiên Chống Cabin của người mục tiêu (Được cấp từ Admin Dashboard)
+        # 2. Kiểm tra Khiên Chống Cabin của người mục tiêu (Được cấp từ Admin Dashboard)
         if cabin_manager.has_shield(guild.id, user.id):
             embed = discord.Embed(
                 title="🛡️ KHIÊN BẢO VỆ!",
@@ -181,9 +149,31 @@ class CabinCog(commands.Cog, name="Cabin"):
             await interaction.response.send_message(embed=embed)
             return
 
-        # 4. Kiểm tra giới hạn: 1 người chỉ được tạo tối đa 1 phiên cabin cùng lúc
+        # 3. Cơ chế TOGGLE thông minh: Nếu chính nạn nhân hoặc chính người tạo muốn dừng -> TẮT NGAY
+        active_session = cabin_manager.get_session(guild.id, user.id)
+        if active_session:
+            is_target = (interaction.user.id == user.id)
+            is_creator = (active_session.creator_id == interaction.user.id)
+
+            if is_target or is_creator:
+                await cabin_manager.stop_session(guild.id, user.id)
+                embed = discord.Embed(
+                    title="🛑 ĐÃ TẮT CHẾ ĐỘ DỊCH CABIN",
+                    description=(
+                        f"Đã giải thoát thành công cho {user.mention} theo yêu cầu của {interaction.user.mention}!\n\n"
+                        f"🕊️ Kể từ giờ, {user.display_name} có thể trò chuyện bình thường mà không bị bot bẻ lái nữa."
+                    ),
+                    color=0x95A5A6
+                )
+                await interaction.response.send_message(embed=embed)
+                return
+
+            # Nếu là người khác (C != target và C != creator cũ):
+            # C sẽ ĐÈ QUYỀN của người tạo trước (A), gỡ phiên của A ra và tính vào cooldown/session limit của C!
+
+        # 4. Kiểm tra giới hạn: C chỉ được tạo tối đa 1 phiên cabin cùng lúc (không được troll 2 người khác nhau)
         existing_session = cabin_manager.get_active_session_by_creator(guild.id, interaction.user.id)
-        if existing_session:
+        if existing_session and existing_session.target_id != user.id:
             rem_str = format_duration(existing_session.remaining_seconds)
             await interaction.response.send_message(
                 f"⏳ **Bạn đang có một phiên Dịch Cabin đang hoạt động!**\n"
@@ -195,7 +185,7 @@ class CabinCog(commands.Cog, name="Cabin"):
             )
             return
 
-        # 5. Nếu chưa bị cabin -> BẬT CABIN
+        # 5. Phân tích thời gian hợp lệ
         duration_seconds = parse_duration(thoi_gian)
         if duration_seconds is None:
             await interaction.response.send_message(
@@ -204,6 +194,8 @@ class CabinCog(commands.Cog, name="Cabin"):
                 ephemeral=True
             )
             return
+
+        old_creator_id = active_session.creator_id if active_session else None
 
         session = await cabin_manager.start_session(
             guild_id=guild.id,
@@ -216,19 +208,35 @@ class CabinCog(commands.Cog, name="Cabin"):
         )
 
         formatted_time = format_duration(duration_seconds)
-        embed = discord.Embed(
-            title="🎙️ ĐÃ BẬT CHẾ ĐỘ DỊCH CABIN TRỰC TIẾP!",
-            description=(
-                f"🎯 **Đối tượng được 'chăm sóc':** {user.mention}\n"
-                f"⏳ **Thời lượng:** `{formatted_time}`\n"
-                f"👤 **Người yêu cầu:** {interaction.user.mention}\n\n"
-                f"💡 *Kể từ giờ, mỗi khi {user.display_name} gửi tin nhắn trong server, "
-                f"bot sẽ quét ngữ cảnh cuộc trò chuyện và 'phiên dịch cabin' trực tiếp câu nói đó sang tầng ý nghĩa sâu xa!* 😂\n\n"
-                f"🛑 *Nạn nhân hoặc Quản trị viên có thể bấm nút bên dưới để dừng bất kỳ lúc nào.*"
-            ),
-            color=CABIN_EMBED_COLOR
-        )
-        embed.set_footer(text="MikeDaBot Cabin Engine • Powered by Gemini 3.5 Flash Lite")
+        if active_session:
+            embed = discord.Embed(
+                title="🎙️ ĐÃ ĐÈ QUYỀN DỊCH CABIN!",
+                description=(
+                    f"🎯 **Nạn nhân:** {user.mention}\n"
+                    f"👑 **Người điều khiển mới:** {interaction.user.mention}\n"
+                    f"🔄 **Đã gỡ quyền của:** <@{old_creator_id}>\n"
+                    f"⏳ **Thời lượng mới:** `{formatted_time}`\n\n"
+                    f"⚡ *Phiên cabin của <@{old_creator_id}> đã được gỡ bỏ hoàn toàn và chuyển sang cho {interaction.user.mention}. "
+                    f"Cooldown dịch của {user.display_name} đã được reset về 0 để tiếp tục troll ngay lập tức!* 😂\n\n"
+                    f"🛑 *Nạn nhân, người điều khiển mới hoặc Quản trị viên có thể bấm nút bên dưới để dừng bất kỳ lúc nào.*"
+                ),
+                color=CABIN_EMBED_COLOR
+            )
+        else:
+            embed = discord.Embed(
+                title="🎙️ ĐÃ BẬT CHẾ ĐỘ DỊCH CABIN TRỰC TIẾP!",
+                description=(
+                    f"🎯 **Đối tượng được 'chăm sóc':** {user.mention}\n"
+                    f"⏳ **Thời lượng:** `{formatted_time}`\n"
+                    f"👤 **Người yêu cầu:** {interaction.user.mention}\n\n"
+                    f"💡 *Kể từ giờ, mỗi khi {user.display_name} gửi tin nhắn trong server, "
+                    f"bot sẽ quét ngữ cảnh cuộc trò chuyện và 'phiên dịch cabin' trực tiếp câu nói đó sang tầng ý nghĩa sâu xa!* 😂\n\n"
+                    f"🛑 *Nạn nhân hoặc Quản trị viên có thể bấm nút bên dưới để dừng bất kỳ lúc nào.*"
+                ),
+                color=CABIN_EMBED_COLOR
+            )
+
+        embed.set_footer(text="MikeDaBot Cabin Engine • Powered by Gemini 3.8 Flash")
 
         view = CabinStopView(
             guild_id=guild.id,
@@ -363,35 +371,25 @@ class CabinCog(commands.Cog, name="Cabin"):
             await ctx.reply(embed=embed, mention_author=False)
             return
 
-        # Toggle: nếu đang bật -> tắt
-        if cabin_manager.is_active(ctx.guild.id, target.id):
+        # 3. Cơ chế TOGGLE thông minh: Nếu chính nạn nhân hoặc chính người tạo muốn dừng -> TẮT NGAY
+        active_session = cabin_manager.get_session(ctx.guild.id, target.id)
+        if active_session:
             is_target = (ctx.author.id == target.id)
-            is_admin = ctx.author.guild_permissions.manage_messages or ctx.author.guild_permissions.administrator
-            session = cabin_manager.get_session(ctx.guild.id, target.id)
-            is_creator = session and (session.creator_id == ctx.author.id)
+            is_creator = (active_session.creator_id == ctx.author.id)
 
-            if not (is_target or is_creator or is_admin):
-                rem_str = format_duration(session.remaining_seconds) if session else "vài phút"
-                creator_str = f"<@{session.creator_id}>" if session else "người khác"
+            if is_target or is_creator:
+                await cabin_manager.stop_session(ctx.guild.id, target.id)
                 await ctx.reply(
-                    f"⛔ **{target.display_name} hiện đã đang trong buồng Dịch Cabin rồi!**\n"
-                    f"• **Người yêu cầu:** {creator_str}\n"
-                    f"• **Thời gian còn lại:** `{rem_str}`\n\n"
-                    f"💡 *Chỉ chính nạn nhân, người bật ban đầu hoặc Quản trị viên mới có thể dừng phiên này.*",
+                    f"🛑 **Đã dừng Dịch Cabin cho {target.mention}!** Người này giờ đã có thể trò chuyện bình thường.",
                     mention_author=False
                 )
                 return
 
-            await cabin_manager.stop_session(ctx.guild.id, target.id)
-            await ctx.reply(
-                f"🛑 **Đã dừng Dịch Cabin cho {target.mention}!** Người này giờ đã có thể trò chuyện bình thường.",
-                mention_author=False
-            )
-            return
+            # Nếu là người khác (C != target và C != creator cũ): C sẽ đè quyền của người trước (A)!
 
-        # Kiểm tra giới hạn: 1 người chỉ được tạo tối đa 1 phiên cabin cùng lúc
+        # 4. Kiểm tra giới hạn: C chỉ được tạo tối đa 1 phiên cabin cùng lúc (không được troll 2 người khác nhau)
         existing_session = cabin_manager.get_active_session_by_creator(ctx.guild.id, ctx.author.id)
-        if existing_session:
+        if existing_session and existing_session.target_id != target.id:
             rem_str = format_duration(existing_session.remaining_seconds)
             await ctx.reply(
                 f"⏳ **Bạn đang có một phiên Dịch Cabin đang chạy!**\n"
@@ -402,11 +400,13 @@ class CabinCog(commands.Cog, name="Cabin"):
             )
             return
 
-        # Bật cabin
+        # 5. Phân tích thời gian hợp lệ
         duration_seconds = parse_duration(thoi_gian)
         if duration_seconds is None:
             await ctx.reply("❌ Thời gian không hợp lệ! Hãy nhập ví dụ: `15m`, `30m`, `1h` (Tối đa 3 giờ).", mention_author=False)
             return
+
+        old_creator_id = active_session.creator_id if active_session else None
 
         await cabin_manager.start_session(
             guild_id=ctx.guild.id,
@@ -419,16 +419,34 @@ class CabinCog(commands.Cog, name="Cabin"):
         )
 
         formatted_time = format_duration(duration_seconds)
-        embed = discord.Embed(
-            title="🎙️ ĐÃ BẬT CHẾ ĐỘ DỊCH CABIN TRỰC TIẾP!",
-            description=(
-                f"🎯 **Đối tượng:** {target.mention}\n"
-                f"⏳ **Thời lượng:** `{formatted_time}`\n"
-                f"👤 **Người yêu cầu:** {ctx.author.mention}\n\n"
-                f"💡 *Kể từ giờ, mỗi khi {target.display_name} nhắn tin, bot sẽ quét context cuộc trò chuyện và dịch trực tiếp sang tầng ý nghĩa sâu xa!*"
-            ),
-            color=CABIN_EMBED_COLOR
-        )
+        if active_session:
+            embed = discord.Embed(
+                title="🎙️ ĐÃ ĐÈ QUYỀN DỊCH CABIN!",
+                description=(
+                    f"🎯 **Nạn nhân:** {target.mention}\n"
+                    f"👑 **Người điều khiển mới:** {ctx.author.mention}\n"
+                    f"🔄 **Đã gỡ quyền của:** <@{old_creator_id}>\n"
+                    f"⏳ **Thời lượng mới:** `{formatted_time}`\n\n"
+                    f"⚡ *Phiên cabin của <@{old_creator_id}> đã được gỡ bỏ hoàn toàn và chuyển sang cho {ctx.author.mention}. "
+                    f"Cooldown dịch của {target.display_name} đã được reset về 0 để tiếp tục troll ngay lập tức!* 😂\n\n"
+                    f"🛑 *Nạn nhân, người điều khiển mới hoặc Quản trị viên có thể bấm nút bên dưới để dừng bất kỳ lúc nào.*"
+                ),
+                color=CABIN_EMBED_COLOR
+            )
+        else:
+            embed = discord.Embed(
+                title="🎙️ ĐÃ BẬT CHẾ ĐỘ DỊCH CABIN TRỰC TIẾP!",
+                description=(
+                    f"🎯 **Đối tượng:** {target.mention}\n"
+                    f"⏳ **Thời lượng:** `{formatted_time}`\n"
+                    f"👤 **Người yêu cầu:** {ctx.author.mention}\n\n"
+                    f"💡 *Kể từ giờ, mỗi khi {target.display_name} nhắn tin, bot sẽ quét context cuộc trò chuyện và dịch trực tiếp sang tầng ý nghĩa sâu xa!* 😂\n\n"
+                    f"🛑 *Nạn nhân hoặc Quản trị viên có thể bấm nút bên dưới để dừng bất kỳ lúc nào.*"
+                ),
+                color=CABIN_EMBED_COLOR
+            )
+
+        embed.set_footer(text="MikeDaBot Cabin Engine • Powered by Gemini 3.8 Flash")
         view = CabinStopView(
             guild_id=ctx.guild.id,
             target_id=target.id,
