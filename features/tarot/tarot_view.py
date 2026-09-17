@@ -17,9 +17,30 @@ from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading, generate_followup_answer
 from features.tarot.flavor import detect_spread_flavor
 from features.tarot.manager import TarotManager
-from core.ai import split_text
 
 WIDE_DIVIDER = "---"
+
+
+def build_reading_payload(embed_cards, ai_reading, title, footer, avatar_url=None):
+    card_text = embed_cards.description or ""
+    embed_cards.title = (embed_cards.title or "")[:256]
+    embed_cards.description = card_text[:3500]
+    title = title[:256]
+    footer = footer[:256]
+    budget = min(4096, 6000 - len(embed_cards) - len(title) - len(footer))
+    notice = "\n\nFull reading: tarot_reading.txt"
+    attachment = None
+    if len(ai_reading) > budget or len(card_text) > 3500:
+        description = ai_reading[:max(0, budget - len(notice))] + notice
+        attachment = discord.File(
+            io.BytesIO((card_text + "\n\n" + ai_reading).encode("utf-8")),
+            filename="tarot_reading.txt"
+        )
+    else:
+        description = ai_reading
+    reading = discord.Embed(title=title, description=description, color=embed_cards.color)
+    reading.set_footer(text=footer, icon_url=avatar_url)
+    return [embed_cards, reading], attachment
 
 SPREAD_SELECT_OPTIONS = [
     discord.SelectOption(
@@ -99,8 +120,8 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
         self.question_input = discord.ui.TextInput(
             label="Câu hỏi / Chủ đề muốn xem",
             style=discord.TextStyle.paragraph,
-            placeholder="Ví dụ: Công việc tháng tới của tôi ra sao? (Chỉ hỏi cho bản thân hoặc mối quan hệ bạn là người trong cuộc)",
-            default=launcher_view.question or "",
+            placeholder="Ví dụ: Công việc tháng tới của tôi ra sao? (Chỉ hỏi cho bản thân)",
+            default=(launcher_view.question or "")[:500],
             required=False,
             max_length=500
         )
@@ -110,7 +131,7 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
             label="Bối cảnh thực tế (Không bắt buộc)",
             style=discord.TextStyle.paragraph,
             placeholder="Ví dụ: Đang chuẩn bị chuyển việc hoặc sắp có đợt đánh giá...",
-            default=launcher_view.context or "",
+            default=(launcher_view.context or "")[:500],
             required=False,
             max_length=500
         )
@@ -157,6 +178,9 @@ class TarotLauncherView(discord.ui.View):
         self.question = question
         self.context = context
         self.trigger_message = trigger_message
+        self._starting = False
+        self._pending_ai_task = None
+        self._pending_flip = None
         self.message: Optional[discord.Message] = None
 
         self._build_components()
@@ -346,7 +370,23 @@ class TarotLauncherView(discord.ui.View):
         await self.start_reading(interaction)
 
     async def start_reading(self, interaction: discord.Interaction):
-        """Tạo quẻ bài và thay thế / đóng bảng điều khiển thiết lập."""
+        if self._starting or self.is_finished():
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            return
+        self._starting = True
+        try:
+            await self._start_reading(interaction)
+        finally:
+            if self._pending_ai_task is not None:
+                await self.tarot_manager.cancel_ai_task(self._pending_ai_task)
+                self._pending_ai_task = None
+            if self._pending_flip is not None:
+                self._pending_flip.stop()
+                self._pending_flip = None
+            self._starting = False
+
+    async def _start_reading(self, interaction: discord.Interaction):
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer()
@@ -371,7 +411,7 @@ class TarotLauncherView(discord.ui.View):
             actual_reader = random.choice(["neutral", "healer", "chaos"])
 
         bot_user = interaction.client.user if interaction and interaction.client else None
-        ai_task = asyncio.create_task(
+        ai_task = self.tarot_manager.create_ai_task(
             generate_tarot_reading(
                 spread_key=self.selected_spread,
                 drawn_cards=drawn_cards,
@@ -387,6 +427,7 @@ class TarotLauncherView(discord.ui.View):
             )
         )
 
+        self._pending_ai_task = ai_task
         flip_view = TarotFlipView(
             author_id=self.author_id,
             author_name=self.author_name,
@@ -403,6 +444,7 @@ class TarotLauncherView(discord.ui.View):
             channel_id=interaction.channel.id if interaction.channel else None
         )
 
+        self._pending_flip = flip_view
         image_buffer = await asyncio.to_thread(
             render_spread_to_bytes,
             self.selected_spread,
@@ -495,6 +537,8 @@ class TarotLauncherView(discord.ui.View):
             return
 
         flip_view.message = sent_msg
+        self._pending_ai_task = None
+        self._pending_flip = None
         self.tarot_manager.record_user_action(self.author_id)
 
         # 3. Dọn dẹp trigger message nếu có
@@ -591,9 +635,13 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
         original_question: Optional[str],
         original_reading: str,
         reader_style: str,
-        user_name: str
+        user_name: str,
+        result_view: "TarotResultActionView",
+        message: Optional[discord.Message] = None
     ):
         super().__init__()
+        self.result_view = result_view
+        self.message = message
         self.author_id = author_id
         self.drawn_cards = drawn_cards
         self.original_question = original_question
@@ -611,8 +659,25 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
         self.add_item(self.followup_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=False)
         question_text = self.followup_input.value.strip()
+        if interaction.user.id != self.author_id or not question_text:
+            await interaction.response.send_message("Invalid followup submission.", ephemeral=True)
+            return
+        if self.result_view.has_asked_followup or self.result_view.is_finished():
+            await interaction.response.send_message("Followup already submitted or expired.", ephemeral=True)
+            return
+        self.result_view.has_asked_followup = True
+        try:
+            await interaction.response.defer(ephemeral=False)
+        except BaseException:
+            self.result_view.has_asked_followup = False
+            raise
+        self.result_view.followup_button.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self.result_view)
+            except Exception:
+                pass
 
         bot_user = interaction.client.user if interaction and interaction.client else None
         answer = await generate_followup_answer(
@@ -685,15 +750,11 @@ class TarotResultActionView(discord.ui.View):
             original_question=self.question,
             original_reading=self.ai_reading,
             reader_style=self.reader_style,
-            user_name=self.author_name
+            user_name=self.author_name,
+            result_view=self,
+            message=interaction.message
         )
         await interaction.response.send_modal(modal)
-        self.has_asked_followup = True
-        button.disabled = True
-        try:
-            await interaction.message.edit(view=self)
-        except Exception:
-            pass
 
     @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
     async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -807,6 +868,8 @@ class TarotFlipView(discord.ui.View):
 
         self.revealed_indices: Set[int] = set()
         self._has_completed: bool = False
+        self._flip_lock = asyncio.Lock()
+        self._ai_cancelled = False
         self.message: Optional[discord.Message] = None
 
         # Màu embed theo phong cách hoặc Yes/No phán quyết
@@ -817,6 +880,12 @@ class TarotFlipView(discord.ui.View):
 
         self.start_time = time.monotonic()
         self._build_buttons()
+
+    async def cancel_ai_task(self) -> None:
+        if self._ai_cancelled:
+            return
+        self._ai_cancelled = True
+        await self.tarot_manager.cancel_ai_task(self.ai_task)
 
     def _build_buttons(self):
         """Khởi tạo và cập nhật trạng thái các nút bấm lật bài."""
@@ -894,15 +963,35 @@ class TarotFlipView(discord.ui.View):
         except Exception as e:
             print(f"⚠️ [TarotFlipView] Lỗi defer interaction: {e}", flush=True)
 
+        async with self._flip_lock:
+            if self._has_completed or self.is_finished():
+                return
+            try:
+                await self._process_flip(interaction)
+            except BaseException:
+                if self._has_completed:
+                    await self.tarot_manager.cancel_ai_task(self.ai_task)
+                    self.stop()
+                raise
+
+    async def _process_flip(self, interaction: discord.Interaction):
         custom_id = interaction.data.get("custom_id", "")
         if custom_id == "flip_all":
             self.revealed_indices = set(range(len(self.drawn_cards)))
         elif custom_id.startswith("flip_"):
-            idx = int(custom_id.split("_")[1])
+            try:
+                idx = int(custom_id.split("_")[1])
+            except (ValueError, IndexError):
+                return
+            if not 0 <= idx < len(self.drawn_cards) or idx in self.revealed_indices:
+                return
             self.revealed_indices.add(idx)
+        else:
+            return
 
-        # 3. Kiểm tra xem đã lật hết chưa
         is_completed = len(self.revealed_indices) == len(self.drawn_cards)
+        if is_completed:
+            self._has_completed = True
 
         # 4. Cập nhật nút bấm
         self._build_buttons()
@@ -918,7 +1007,6 @@ class TarotFlipView(discord.ui.View):
 
         # 6. Xây dựng Embed tương ứng
         if is_completed:
-            self._has_completed = True
 
             # Xây dựng danh sách lá bài rút được
             cards_summary_lines = []
@@ -1072,28 +1160,11 @@ class TarotFlipView(discord.ui.View):
             )
 
             # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
-            chunks = split_text(ai_reading, limit=4000)
-            if not chunks:
-                chunks = [ai_reading]
-
-            final_embeds = [embed_cards]
-            for idx_chunk, chunk in enumerate(chunks):
-                title = (
-                    self.style_info.get("embed_title", "📖 THÔNG ĐIỆP TỪ VŨ TRỤ")
-                    if idx_chunk == 0
-                    else f"{self.style_info.get('embed_title', '📖 Thông Điệp')} (Tiếp theo - Phần {idx_chunk + 1})"
-                )
-                emb_reading = discord.Embed(
-                    title=title,
-                    description=chunk,
-                    color=self.embed_color
-                )
-                if idx_chunk == len(chunks) - 1:
-                    emb_reading.set_footer(
-                        text=f"Quẻ bài của {self.author_name}",
-                        icon_url=self.author_avatar_url
-                    )
-                final_embeds.append(emb_reading)
+            final_embeds, reading_file = build_reading_payload(
+                embed_cards, ai_reading,
+                self.style_info.get("embed_title", "Tarot"),
+                f"Quẻ bài của {self.author_name}", self.author_avatar_url
+            )
 
             # View tương tác sau khi hoàn tất quẻ bài (Hỏi thêm AI & Đánh giá)
             action_view = TarotResultActionView(
@@ -1109,28 +1180,19 @@ class TarotFlipView(discord.ui.View):
                 activity_id=act_id
             )
 
-            # Cập nhật kết quả bài giải đầy đủ lên Discord kèm Action View
+            file.reset()
+            attachments = [file] + ([reading_file] if reading_file else [])
             try:
-                if not sent_image_already:
-                    await interaction.edit_original_response(
-                        embeds=final_embeds,
-                        attachments=[file],
-                        view=action_view
-                    )
-                else:
-                    await interaction.edit_original_response(
-                        embeds=final_embeds,
-                        view=action_view
-                    )
+                await interaction.edit_original_response(
+                    embeds=final_embeds, attachments=attachments, view=action_view
+                )
             except Exception:
                 if self.message:
-                    try:
-                        if not sent_image_already:
-                            await self.message.edit(embeds=final_embeds, attachments=[file], view=action_view)
-                        else:
-                            await self.message.edit(embeds=final_embeds, view=action_view)
-                    except Exception as ex:
-                        print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
+                    for attachment in attachments:
+                        attachment.reset()
+                    await self.message.edit(
+                        embeds=final_embeds, attachments=attachments, view=action_view
+                    )
             self.stop()
 
         else:
@@ -1186,17 +1248,34 @@ class TarotFlipView(discord.ui.View):
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
 
     async def on_timeout(self):
-        """Nếu sau 5 phút người dùng không lật hết, tự động lật toàn bộ."""
-        if self._has_completed:
-            return
+        async with self._flip_lock:
+            if self._has_completed:
+                return
+            self._has_completed = True
+            try:
+                await asyncio.wait_for(self._complete_timeout(), timeout=20.0)
+            except Exception as e:
+                print(f"[TarotFlipView] Lỗi on_timeout: {e}", flush=True)
+            finally:
+                await self.cancel_ai_task()
+                self.stop()
 
+    async def _complete_timeout(self):
         try:
             self.revealed_indices = set(range(len(self.drawn_cards)))
             self._build_buttons()
             for item in self.children:
                 item.disabled = True
 
-            ai_res = await self.ai_task
+            try:
+                ai_res = await asyncio.wait_for(asyncio.shield(self.ai_task), timeout=10.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                if self.message:
+                    try:
+                        await self.message.edit(content="⌛ *Quá lâu không nhận được luận giải từ AI. Quẻ bài của bạn đã được lưu nhưng không hiển thị bài giải đầy đủ.*", view=None)
+                    except Exception:
+                        pass
+                return
             if isinstance(ai_res, tuple):
                 if len(ai_res) >= 4:
                     ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], ai_res[1], ai_res[2], ai_res[3]
@@ -1312,28 +1391,11 @@ class TarotFlipView(discord.ui.View):
             )
 
             # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
-            chunks = split_text(ai_reading, limit=4000)
-            if not chunks:
-                chunks = [ai_reading]
-
-            final_embeds = [embed_cards]
-            for idx_chunk, chunk in enumerate(chunks):
-                title = (
-                    self.style_info.get("embed_title", "📖 THÔNG ĐIỆP TỪ VŨ TRỤ")
-                    if idx_chunk == 0
-                    else f"{self.style_info.get('embed_title', '📖 Thông Điệp')} (Tiếp theo - Phần {idx_chunk + 1})"
-                )
-                emb_reading = discord.Embed(
-                    title=title,
-                    description=chunk,
-                    color=self.embed_color
-                )
-                if idx_chunk == len(chunks) - 1:
-                    emb_reading.set_footer(
-                        text=f"Quẻ bài của {self.author_name}",
-                        icon_url=self.author_avatar_url
-                    )
-                final_embeds.append(emb_reading)
+            final_embeds, reading_file = build_reading_payload(
+                embed_cards, ai_reading,
+                self.style_info.get("embed_title", "Tarot"),
+                f"Quẻ bài của {self.author_name}", self.author_avatar_url
+            )
 
             action_view = TarotResultActionView(
                 author_id=self.author_id,
@@ -1349,7 +1411,11 @@ class TarotFlipView(discord.ui.View):
             )
 
             if self.message:
-                await self.message.edit(embeds=final_embeds, attachments=[file], view=action_view)
+                await self.message.edit(
+                    embeds=final_embeds,
+                    attachments=[file] + ([reading_file] if reading_file else []),
+                    view=action_view
+                )
         except Exception as e:
             print(f"[TarotFlipView] Lỗi on_timeout: {e}", flush=True)
 

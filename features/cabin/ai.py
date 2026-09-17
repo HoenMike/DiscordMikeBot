@@ -7,7 +7,7 @@ import re
 from typing import List, Optional, Tuple
 from google.genai import types
 import config
-from core.ai import get_ai_client
+from core.ai import bounded_ai_generate
 from features.cabin.constants import (
     CABIN_FALLBACK_MODELS,
     DEFAULT_CABIN_MODEL,
@@ -26,10 +26,12 @@ NGUYÊN TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ 100%):
 
 2. BẮT BUỘC NÓI Ở GÓC NHÌN NGÔI THỨ NHẤT (First-person: "Tao", "Tôi", "Mình", "Em"):
    - Đóng vai chính nạn nhân tự thú nhận sự thật thầm kín, lươn lẹo, sĩ diện hão, chối quanh hoặc tâm can thật sự đằng sau câu nói.
+   - ĐÂY LÀ HÀI HƯỚC HƯ CẤU (PARODY): Mọi "lời tự thú" chỉ là phóng sự vui, KHÔNG phải sự thật; tuyệt đối không đưa ra tuyên bố dứt khoát về đời tư, thiên hướng, sức khỏe, quan hệ hay bí mật có thật của bất kỳ ai.
    - Ví dụ:
      + Nạn nhân nói: "im not gay 🐱" -> "Mồm tao bảo không gay nhưng tay gài vội icon con mèo cute để gạ tình, đừng có soi nữa!"
      + Nạn nhân nói: "tối nay bận làm việc rồi" -> "Tao sợ vào game feed mạng bị chửi nên bịa cớ làm deadline để giữ chút thể diện."
    - TUYỆT ĐỐI TRÁNH ngôi thứ hai hoặc thứ ba: Không bao giờ dùng "Hắn ta...", "Nó đang...", "Bạn này muốn nói là...", "Ý của hắn là...".
+   - CÂU NHẠY CẢM (khủng hoảng, sức khỏe tâm thần, bị xúc phạm nghiêm trọng): Bỏ qua trò đùa, trả lời lịch sự, khuyến khích người nói tìm hỗ trợ thực tế.
 
 3. DỨT KHOÁT & HOÀN CHỈNH:
    - Trả về TRỰC TIẾP nội dung câu dịch (chỉ từ 1 đến 2 câu ngắn gọn, đắt giá, súc tích, kết thúc câu hoàn chỉnh).
@@ -136,16 +138,13 @@ async def generate_cabin_interpretation(
         last_error = None
         for model_name in CABIN_FALLBACK_MODELS:
             try:
-                client = get_ai_client()
                 # Giới hạn tối đa 7 giây mỗi lần gọi AI để phản hồi siêu tốc
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        client.models.generate_content,
-                        model=model_name,
-                        contents=user_prompt,
-                        config=CABIN_CONFIG,
-                    ),
-                    timeout=7.0
+                response = await bounded_ai_generate(
+                    model=model_name,
+                    contents=user_prompt,
+                    config=CABIN_CONFIG,
+                    timeout_sec=7.0,
+                    label="Cabin AI",
                 )
 
                 # Kiểm tra nếu bị cắt ngang do chạm max_output_tokens
@@ -227,15 +226,12 @@ async def generate_cabin_interpretation_batch(
         last_error = None
         for model_name in CABIN_FALLBACK_MODELS:
             try:
-                client = get_ai_client()
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        client.models.generate_content,
-                        model=model_name,
-                        contents=user_prompt,
-                        config=CABIN_CONFIG,
-                    ),
-                    timeout=7.0
+                response = await bounded_ai_generate(
+                    model=model_name,
+                    contents=user_prompt,
+                    config=CABIN_CONFIG,
+                    timeout_sec=7.0,
+                    label="Cabin AI Batch",
                 )
 
                 cand = response.candidates[0] if (response and response.candidates) else None

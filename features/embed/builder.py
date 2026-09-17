@@ -43,13 +43,7 @@ class NSFWFilter:
 
         is_nsfw_channel = getattr(channel, "is_nsfw", lambda: False)() if callable(getattr(channel, "is_nsfw", None)) else getattr(channel, "is_nsfw", False)
 
-        if is_nsfw_channel or (not post.is_nsfw and not post.is_spoiler):
-            return NSFWFilterResult(post=post, should_spoiler_media=False)
-
-        if post.is_spoiler and post.text:
-            post.text = f"||{post.text}||"
-
-        if post.is_nsfw:
+        if post.is_nsfw and not is_nsfw_channel:
             if nsfw_mode == "block":
                 return NSFWFilterResult(post=None, warning="Nội dung NSFW đã bị chặn theo cài đặt máy chủ.")
             elif nsfw_mode == "spoiler":
@@ -58,10 +52,8 @@ class NSFWFilter:
                     should_spoiler_media=True,
                     warning="Nội dung nhạy cảm (NSFW)"
                 )
-            else:
-                return NSFWFilterResult(post=post, should_spoiler_media=False)
 
-        return NSFWFilterResult(post=post, should_spoiler_media=False)
+        return NSFWFilterResult(post=post, should_spoiler_media=post.is_spoiler)
 
 
 def build_embed(post: PostData, filter_result: NSFWFilterResult) -> discord.Embed | None:
@@ -77,7 +69,7 @@ def build_embed(post: PostData, filter_result: NSFWFilterResult) -> discord.Embe
         url=post.url,
     )
 
-    author_kwargs = {"name": post.author}
+    author_kwargs = {"name": str(post.author or "Unknown")[:256]}
     if post.author_url:
         author_kwargs["url"] = post.author_url
     if post.author_avatar:
@@ -89,11 +81,13 @@ def build_embed(post: PostData, filter_result: NSFWFilterResult) -> discord.Embe
         description_parts.append(f"**{filter_result.warning}**\n")
 
     if post.text:
-        text = post.text
+        text = str(post.text)
+        if post.is_spoiler:
+            text = text.replace("||", "")
         if len(text) > MAX_TEXT_LENGTH:
-            text = text[:MAX_TEXT_LENGTH] + "..."
+            text = text[:MAX_TEXT_LENGTH - 3] + "..."
 
-        if post.is_spoiler and not text.startswith("||"):
+        if post.is_spoiler:
             text = f"||{text}||"
 
         description_parts.append(text)

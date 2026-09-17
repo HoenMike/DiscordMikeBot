@@ -2,7 +2,7 @@ import asyncio
 from typing import List, Optional
 from google.genai import types
 import config
-from core.ai import get_ai_client
+from core.ai import bounded_ai_generate
 
 # Cấu hình generation mặc định cho tất cả các lệnh gọi AI tóm tắt
 # temperature thấp để giảm thiểu hallucination, buộc AI bám sát dữ liệu
@@ -41,20 +41,17 @@ async def _generate_with_fallback(
             seen.add(m)
             ordered_models.append(m)
 
-    client = get_ai_client()
     last_error = None
 
     for model_name in ordered_models:
         try:
             print(f"🤖 [{task_label}] Gọi model '{model_name}'...", flush=True)
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    client.models.generate_content,
-                    model=model_name,
-                    contents=prompt,
-                    config=gen_config,
-                ),
-                timeout=timeout_sec
+            response = await bounded_ai_generate(
+                model=model_name,
+                contents=prompt,
+                config=gen_config,
+                timeout_sec=timeout_sec,
+                label=task_label,
             )
             if response and response.text:
                 return response.text
@@ -121,7 +118,7 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
         return text
     except Exception as e:
         print(f"❌ [MapReduce] Lỗi ở phân đoạn {chunk_index + 1}: {e}", flush=True)
-        return f"[Lỗi: Không thể phân tích phân đoạn {chunk_index + 1} do lỗi hệ thống API: {e}]"
+        return f"⚠️ [PHÂN ĐOẠN {chunk_index + 1} KHÔNG HOÀN THÀNH do lỗi API: {type(e).__name__}]. Nội dung phần này KHÔNG được đưa vào tổng hợp."
 
 
 async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
@@ -252,8 +249,14 @@ async def generate_summary(raw_messages, summary_type, clean_focus, scan_info):
         chunks = [raw_messages[i:i + chunk_size] for i in range(0, len(raw_messages), chunk_size)]
         total_chunks = len(chunks)
 
-        # Chạy song song các tasks Map
-        tasks = [summarize_chunk(idx, total_chunks, chunk, focus_instruction) for idx, chunk in enumerate(chunks)]
+        # Chạy song song các tasks Map (giới hạn đồng thời để tránh 429 & quá tải thread)
+        map_semaphore = asyncio.Semaphore(3)
+
+        async def bounded_chunk(idx, chunk):
+            async with map_semaphore:
+                return await summarize_chunk(idx, total_chunks, chunk, focus_instruction)
+
+        tasks = [bounded_chunk(idx, chunk) for idx, chunk in enumerate(chunks)]
         results = await asyncio.gather(*tasks)
 
         # Pha Reduce
@@ -400,7 +403,7 @@ async def evaluate_summary(raw_history_text, generated_summary, summary_type, cl
     ### 📊 BÁO CÁO ĐÁNH GIÁ CHẤT LƯỢNG TÓM TẮT
     - **Điểm số**: [Chấm điểm từ 1 đến 10]
     - **Fluff Check**: [ĐẠT / KHÔNG ĐẠT - Lý do ngắn gọn]
-    - **Chronology & Timeline Check**: [ĐẠT / KHÔNG ĐẠT - Lý do ngắn gọn]
+    - **Chronology & Timeline Check**: [ĐẠT / KHÔNG ĐẠT / KHÔNG ÁP DỤNG - Lý do ngắn gọn]
     - **User Tag & Aesthetics Check**: [ĐẠT / KHÔNG ĐẠT - Lý do ngắn gọn]
     - **Smart Synthesis & Focus Check**: [ĐẠT / KHÔNG ĐẠT / KHÔNG ÁP DỤNG - Lý do ngắn gọn]
 
@@ -410,6 +413,14 @@ async def evaluate_summary(raw_history_text, generated_summary, summary_type, cl
 
     #### 💡 Đề xuất cải tiến cụ thể:
     - [Gợi ý cải tiến cụ thể cho AI để cấu hình prompt khôn hơn hoặc xử lý tốt hơn]
+    """
+
+    if summary_type != "long":
+        eval_prompt += """
+    🚨 LƯU Ý CHẾ ĐỘ NGẮN (SHORT MODE): Bản tóm tắt này thuộc chế độ NGẮN GỌN.
+    - KHÔNG yêu cầu timeline chi tiết dạng `• [HH:MM - HH:MM]` hay phân chia `### 📅` — chỉ cần gạch đầu dòng chủ đề chính theo trình tự thời gian hợp lý.
+    - Bản tóm tắt hợp lệ khi có độ dài DƯỚI 1000 ký tự; vượt ngưỡng này mới tính là KHÔNG ĐẠT mục độ dài (không áp ngưỡng 3500 của chế độ dài).
+    - Ghi "KHÔNG ÁP DỤNG" cho các tiêu chí chỉ áp dụng chế độ dài thay vì trừ điểm.
     """
 
     try:

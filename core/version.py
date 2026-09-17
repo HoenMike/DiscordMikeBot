@@ -14,8 +14,65 @@ CURRENT_VERSION = "2.7.4"
 RELEASE_DATE = "2026-09-09"
 CODENAME = "Bot Init Safety Lock & Cabin Commands Restoration"
 
+CURRENT_VERSION = "2.7.5"
+RELEASE_DATE = "2026-09-17"
+CODENAME = "Tarot & Embed Hardening - Bounded AI & Secure Startup"
+
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.7.5",
+        "date": "2026-09-17",
+        "type": "bugfix",
+        "title": "Củng Cố Luồng Tarot/Embed, Giới Hạn AI Bất Đồng Bộ & Bảo Mật Khởi Động",
+        "summary": "Bản vá độ tin cậy toàn diện: sửa parser JSON Tarot làm lộ is_valid=false và JSON rác ra embed; bổ sung System Instruction an toàn chống prompt-injection cho Tarot; chuyển toàn bộ gọi AI (Tarot/Summary/Cabin) sang client bất đồng bộ có timeout hủy được request nền kèm semaphore giới hạn đồng thời; sửa split_text đảm bảo mọi chunk không vượt giới hạn Discord; bảo vệ luồng tương tác Tarot chống double-flip, dọn AI task mồ côi, giới hạn embed 6000 ký tự kèm attachment đầy đủ; vá các lỗ hổng Embed pipeline (spoiler, giới hạn nội dung, media download bound, chặn fallback khi bị block); giới hạn MapReduce đồng thời và đồng bộ QA evaluator với chế độ short; yêu cầu cấu hình ADMIN_PASSWORD/FLASK_SECRET_KEY bắt buộc khi khởi động; cảnh báo phân kỳ dữ liệu khi DB rớt về Local.",
+        "changes": [
+            {
+                "category": "🔮 Tarot AI & Luồng Tương Tác",
+                "items": [
+                    "Viết lại parser JSON đa tầng bằng json.JSONDecoder.raw_decode: sửa lỗi câu hỏi bị từ chối (is_valid=false) trở lại thành hợp lệ khi JSON lỗi, chặn JSON rác lọt ra embed và chữ None lọt vào bài giải.",
+                    "Bổ sung TAROT_SYSTEM_INSTRUCTION chèn vào cả 3 config AI: chống prompt-injection từ câu hỏi/@mention, cấm tuyên bố tương lai/suy nghĩ người khác như sự thật, khung xử lý khủng hoảng và ranh giới Yes/No.",
+                    "Chống double-flip: asyncio.Lock + cờ _has_completed cho TarotFlipView, chặn hoàn tất/save history 2 lần khi bấm nút song song.",
+                    "AI task lifecycle qua TarotManager (create/cancel/await): hủy task mồ côi khi gửi bài thất bại, khi flip lỗi giữa chừng, khi timeout và khi cog unload.",
+                    "Followup hỏi thêm chỉ tiêu tốn lượt khi submit modal thành công (trước đây mở modal là mất lượt).",
+                    "build_reading_payload giới hạn aggregate 6000 ký tự Discord: đọc quá dài được giữ nguyên trong attachment tarot_reading.txt."
+                ]
+            },
+            {
+                "category": "🧵 Client AI Bất Đồng Bộ & Giới Hạn Đồng Thời",
+                "items": [
+                    "bounded_ai_generate() mới trong core/ai.py dùng AsyncClient của google-genai: asyncio.wait_for giờ hủy thật request nền thay vì chỉ bỏ thread chạy tiếp ngốn quota.",
+                    "Chuyển Tarot (reading + followup), Summary (Map/Reduce/QA) và Cabin sang đường đi bất đồng bộ, loại bỏ to_thread cho các lệnh gọi model.",
+                    "Semaphore toàn cục 6 request AI đồng thời cho summary/cabin dùng chung, MapReduce chunk giới hạn 3 song song chống 429.",
+                    "Xác minh end-to-end qua SDK google-genai thật với GenerateContentConfig/Candidate object chuẩn."
+                ]
+            },
+            {
+                "category": "🪝 Embed Pipeline (Social Media)",
+                "items": [
+                    "Spoiler an toàn: link is_spoiler luôn che media, cắt chuỗi spoiler an toàn markdown (không đứt || giữa chừng), tên author clamp 256 ký tự tránh Discord 400.",
+                    "Lifecycle: cog_unload cancel + await toàn bộ worker task; delete origin xóa mọi preview liên quan (trước đây chỉ xóa 1); preview content clamp 2000 ký tự, allowed_mentions none chống @everyone ping qua display name.",
+                    "Media download giới hạn 10MB (tôn trọng filesize_limit guild), kiểm tra Content-Type spoiler thay vì mặc định .jpg.",
+                    "Chặn NSFW block rơi xuống Tier 1/2 (trước đây nội dung bị chặn vẫn được post qua proxy); yt-dlp chỉ upload MP4 progressive, không còn manifest HLS/DASH thành file mp4 hỏng."
+                ]
+            },
+            {
+                "category": "📝 Summary & Cabin",
+                "items": [
+                    "MapReduce: chunk thất bại được đánh dấu rõ 'KHÔNG HOÀN THÀNH' thay vì trộn lỗi hệ thống vào nội dung tổng hợp như dữ liệu thật.",
+                    "QA Evaluator mode-aware: chế độ short không còn bị trừ điểm theo timeline chi tiết hay ngưỡng 3500 ký tự của chế độ dài.",
+                    "Cabin: prompt đóng khung PARODY hư cấu, cấm tuyên bố đời tư/thiên hướng/sức khỏe người khác như sự thật, bổ sung nhánh xử lý lịch sự cho câu nhạy cảm."
+                ]
+            },
+            {
+                "category": "🔐 Cấu Hình & Cơ Sở Dữ Liệu",
+                "items": [
+                    "Bắt buộc ADMIN_PASSWORD & FLASK_SECRET_KEY khi khởi động (raise RuntimeError nếu thiếu); loại bỏ mật khẩu admin fallback cứng trong web/app.py.",
+                    "Cảnh báo phân kỳ dữ liệu khi Turso Cloud lỗi và bot rớt về Local SQLite: log timestamp giờ VN + nhắc merge thủ công nếu muốn giữ dữ liệu local."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.7.4",
         "date": "2026-09-09",

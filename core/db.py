@@ -8,7 +8,8 @@ Cung cấp interface đồng nhất cho toàn bộ hệ thống bot:
 
 import asyncio
 import os
-from typing import Any, List, Optional, Tuple, Union
+from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, List, Optional, Tuple, Union
 import config
 
 try:
@@ -151,6 +152,9 @@ class DatabaseClient:
         async with conn.lock:
             await conn.close()
 
+    def _vn_now_str(self) -> str:
+        return datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m/%Y %H:%M")
+
     async def _connect_conn(self, conn: _LoopConnection, force: bool = False) -> None:
         """Kết nối nội bộ cho một _LoopConnection cụ thể."""
         async with conn.lock:
@@ -201,6 +205,13 @@ class DatabaseClient:
             if not conn.logged:
                 conn.logged = True
                 print(f"💾 [Database] Đang sử dụng Local SQLite: {config.DB_PATH}", flush=True)
+                if config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL:
+                    print(
+                        "🚨 [Database] CẢNH BÁO DỮ LIỆU PHÂN KỲ: Bot đang chạy trên Local SQLite do Turso Cloud không truy cập được. "
+                        f"Dữ liệu ghi trong thời gian này (từ {self._vn_now_str()} giờ VN) KHÔNG tự động đồng bộ lên Cloud khi kết nối phục hồi. "
+                        "Cần xuất/merge thủ công nếu muốn giữ dữ liệu local này!",
+                        flush=True,
+                    )
 
     async def connect(self) -> None:
         """Khởi tạo kết nối đến Cloud hoặc Local DB cho loop hiện tại."""

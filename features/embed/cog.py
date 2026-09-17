@@ -97,10 +97,27 @@ class EmbedCog(commands.Cog):
         self._scan_task = asyncio.create_task(self._initial_orphan_scan())
 
     async def cog_unload(self):
-        if self._scan_task and not self._scan_task.done():
-            self._scan_task.cancel()
+        tasks = set(self._in_flight_tasks.values())
+        if self._scan_task:
+            tasks.add(self._scan_task)
+        tasks.discard(asyncio.current_task())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._in_flight_tasks.clear()
         if self.session and not self.session.closed:
             await self.session.close()
+
+    def _register_preview(self, origin_id: int, channel_id: int, preview_id: int):
+        previews = self._origin_to_preview_map.get(origin_id)
+        if previews is None:
+            previews = []
+            self._origin_to_preview_map[origin_id] = previews
+        target = (channel_id, preview_id)
+        if target not in previews:
+            previews.append(target)
+        self._preview_to_origin_map[preview_id] = (channel_id, origin_id)
 
 
     def _detect_urls(self, content: str) -> list[tuple[str, str, object, bool]]:
@@ -257,9 +274,8 @@ class EmbedCog(commands.Cog):
                 print(f"[EmbedCog] Lỗi ghi activity logger khi hủy task: {log_err}", flush=True)
 
         # 2. Xóa bản xem trước nếu đã được gửi ra kênh chat
-        target = self._origin_to_preview_map.pop(payload.message_id, None)
-        if target:
-            channel_id, preview_msg_id = target
+        targets = self._origin_to_preview_map.pop(payload.message_id, [])
+        for channel_id, preview_msg_id in targets:
             self._preview_to_origin_map.pop(preview_msg_id, None)
             try:
                 channel = self.bot.get_channel(channel_id)
@@ -296,8 +312,13 @@ class EmbedCog(commands.Cog):
                 pass
             except Exception as e:
                 print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
-        else:
-            self._preview_to_origin_map.pop(payload.message_id, None)
+        origin = self._preview_to_origin_map.pop(payload.message_id, None)
+        if origin:
+            channel_id, origin_id = origin
+            previews = self._origin_to_preview_map.get(origin_id, [])
+            previews[:] = [target for target in previews if target[1] != payload.message_id]
+            if not previews:
+                self._origin_to_preview_map.pop(origin_id, None)
 
     @commands.Cog.listener()
     async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent):
@@ -442,9 +463,15 @@ class EmbedCog(commands.Cog):
         # Nếu tin nhắn gốc đã bị xóa trong lúc bot đang tải video hoặc gọi proxy, không gửi nữa!
         if message.id in self._deleted_message_ids:
             print(f"[EmbedCog] Hủy gửi bản xem trước vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
+            if file:
+                file.close()
             return None
 
-        kwargs = {}
+        if content and len(content) > 2000:
+            if file:
+                file.close()
+            return None
+        kwargs = {"allowed_mentions": discord.AllowedMentions.none()}
         if content:
             kwargs["content"] = content
         if embeds:
@@ -483,14 +510,27 @@ class EmbedCog(commands.Cog):
                 return None
 
             # Lưu liên kết 2 chiều giữa tin nhắn gốc và bản xem trước
-            self._origin_to_preview_map[message.id] = (message.channel.id, sent_msg.id)
-            self._preview_to_origin_map[sent_msg.id] = (message.channel.id, message.id)
+            self._register_preview(message.id, message.channel.id, sent_msg.id)
             return sent_msg
         except discord.HTTPException as e:
             print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
             return None
+        finally:
+            if file:
+                file.close()
 
-    async def _download_video_file(self, video_urls: list[str] | str, platform_key: str) -> discord.File | None:
+    async def _read_media(self, response, max_bytes: int) -> bytes | None:
+        content_len = response.headers.get("Content-Length")
+        if content_len and int(content_len) > max_bytes:
+            return None
+        data = bytearray()
+        async for chunk in response.content.iter_chunked(65536):
+            if len(data) + len(chunk) > max_bytes:
+                return None
+            data.extend(chunk)
+        return bytes(data) if data else None
+
+    async def _download_video_file(self, video_urls: list[str] | str, platform_key: str, max_bytes: int = 10 * 1024 * 1024) -> discord.File | None:
         """Tải file video nếu kích thước <= 25MB để Discord phát native trực tiếp.
         Nếu video có nhiều định dạng ứng viên (HD, SD), tự động thử lần lượt cho đến khi tìm được định dạng <= 25MB."""
         if isinstance(video_urls, str):
@@ -503,13 +543,8 @@ class EmbedCog(commands.Cog):
             try:
                 async with self.session.get(v_url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                     if resp.status == 200:
-                        content_len = resp.headers.get("Content-Length")
-                        if content_len and int(content_len) > 25 * 1024 * 1024:
-                            print(f"[EmbedCog] Video ({int(content_len)/1024/1024:.2f}MB) vượt quá 25MB, đang thử định dạng tiếp theo...", flush=True)
-                            continue
-
-                        video_data = await resp.read()
-                        if len(video_data) <= 25 * 1024 * 1024:
+                        video_data = await self._read_media(resp, max_bytes)
+                        if video_data:
                             print(f"[EmbedCog] Đã tải thành công video {platform_key} ({len(video_data)/1024/1024:.2f}MB) để đính kèm trực tiếp.", flush=True)
                             return discord.File(
                                 fp=io.BytesIO(video_data),
@@ -601,7 +636,7 @@ class EmbedCog(commands.Cog):
 
             filter_result = self.nsfw_filter.process(post_data, message.channel, config)
             if filter_result.is_blocked:
-                return False
+                return True
 
             if post_data.media_type == "gallery" and len(post_data.media_urls) > 1:
                 embeds = build_gallery_embeds(post_data, filter_result)
@@ -614,9 +649,9 @@ class EmbedCog(commands.Cog):
 
             file = None
             if filter_result.should_spoiler_media and post_data.media_urls:
-                file = await self._create_spoiler_file(post_data.media_urls[0])
+                file = await self._create_spoiler_file(post_data.media_urls[0], max_bytes=message.guild.filesize_limit)
             elif post_data.media_type == "video" and post_data.media_urls:
-                file = await self._download_video_file(post_data.media_urls, platform_key)
+                file = await self._download_video_file(post_data.media_urls, platform_key, max_bytes=message.guild.filesize_limit)
 
             author_name = _clean_markdown_label(message.author.display_name)
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
@@ -723,7 +758,7 @@ class EmbedCog(commands.Cog):
 
             filter_result = self.nsfw_filter.process(post_data, message.channel, config)
             if filter_result.is_blocked:
-                return False
+                return True
 
             single_embed = build_embed(post_data, filter_result)
             if not single_embed:
@@ -738,9 +773,9 @@ class EmbedCog(commands.Cog):
 
             file = None
             if filter_result.should_spoiler_media and post_data.media_urls:
-                file = await self._create_spoiler_file(post_data.media_urls[0])
+                file = await self._create_spoiler_file(post_data.media_urls[0], max_bytes=message.guild.filesize_limit)
             elif post_data.media_type == "video" and post_data.media_urls:
-                file = await self._download_video_file(post_data.media_urls, platform_key)
+                file = await self._download_video_file(post_data.media_urls, platform_key, max_bytes=message.guild.filesize_limit)
 
             # Nếu đã đính kèm file video MP4 (Discord tự hiển thị video player native),
             # xóa ảnh thumbnail tĩnh khỏi embed để tránh bị lặp 2 lần hình ảnh trong giao diện chat
@@ -762,17 +797,21 @@ class EmbedCog(commands.Cog):
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
 
-    async def _create_spoiler_file(self, image_url: str) -> discord.File | None:
+    async def _create_spoiler_file(self, image_url: str, max_bytes: int = 10 * 1024 * 1024) -> discord.File | None:
         if self.session is None:
             return None
         try:
             async with self.session.get(image_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status != 200:
                     return None
-                image_data = await resp.read()
+                image_data = await self._read_media(resp, max_bytes)
+                if not image_data:
+                    return None
                 content_type = resp.headers.get("Content-Type", "image/jpeg")
-                ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp"}
-                ext = ext_map.get(content_type.split(";")[0].strip(), "jpg")
+                ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm"}
+                ext = ext_map.get(content_type.split(";")[0].strip().lower())
+                if not ext:
+                    return None
                 return discord.File(fp=io.BytesIO(image_data), filename=f"SPOILER_nsfw_media.{ext}", spoiler=True)
         except Exception:
             return None
@@ -817,8 +856,7 @@ class EmbedCog(commands.Cog):
                             try:
                                 await channel.fetch_message(orig_id)
                                 # Tin nhắn gốc vẫn còn -> Khôi phục vào bộ nhớ cache để tiếp tục đồng bộ
-                                self._origin_to_preview_map[orig_id] = (channel.id, msg.id)
-                                self._preview_to_origin_map[msg.id] = (channel.id, orig_id)
+                                self._register_preview(orig_id, channel.id, msg.id)
                                 restored_count += 1
                             except discord.NotFound:
                                 # Tin nhắn gốc đã bị xóa mất trước đó -> Dọn dẹp ngay embed mồ côi

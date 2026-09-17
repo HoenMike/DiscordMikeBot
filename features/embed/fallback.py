@@ -64,7 +64,7 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
         )
         return None
 
-    if not info:
+    if not isinstance(info, dict) or not info:
         print(
             f"[yt-dlp] Không trích xuất được dữ liệu từ {url}",
             flush=True,
@@ -74,7 +74,7 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
     media_url = info.get("url")
     thumbnail = info.get("thumbnail")
 
-    thumbnails = info.get("thumbnails", [])
+    thumbnails = [item for item in (info.get("thumbnails") or []) if isinstance(item, dict)]
     best_thumb = thumbnail
     if thumbnails:
         thumb_obj = max(
@@ -89,17 +89,26 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
     media_type = "text"
 
     # Thu thập tất cả các định dạng video có cả hình lẫn tiếng (progressive MP4)
-    formats = info.get("formats", [])
+    formats = info.get("formats") or []
     candidates = []
-    for f in formats:
-        if f.get("vcodec") != "none" and f.get("acodec") != "none" and f.get("url"):
+    for f in reversed(formats):
+        if not isinstance(f, dict):
+            continue
+        if (f.get("vcodec") not in (None, "none")
+                and f.get("acodec") not in (None, "none")
+                and f.get("ext") == "mp4"
+                and f.get("protocol") in ("http", "https")
+                and f.get("url")):
             candidates.append(f["url"])
 
     if candidates:
         # Giữ toàn bộ candidate URLs (từ chất lượng cao đến thấp) để tải định dạng phù hợp <= 25MB
         media_urls.extend(candidates)
         media_type = "video"
-    elif media_url:
+    elif (media_url and info.get("ext") == "mp4"
+            and info.get("protocol") in ("http", "https")
+            and info.get("vcodec") not in (None, "none")
+            and info.get("acodec") not in (None, "none")):
         media_urls.append(media_url)
         media_type = "video"
     elif best_thumb:
@@ -118,7 +127,7 @@ async def extract_media_ytdlp(url: str, platform_key: str) -> PostData | None:
         text=title if title else None,
         media_urls=media_urls,
         media_type=media_type,
-        is_nsfw=info.get("age_limit", 0) >= 18,
+        is_nsfw=(info.get("age_limit") or 0) >= 18,
         likes=info.get("like_count"),
         comments=info.get("comment_count"),
         retweets=None,

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Tuple
@@ -14,6 +15,27 @@ class TarotManager:
         self.db_path = str(config.DB_PATH)
         self._db: Optional[aiosqlite.Connection] = None
         self._user_last_action: dict[int, float] = {}
+        self._ai_tasks: set[asyncio.Task] = set()
+        self._closed = False
+
+    def create_ai_task(self, coroutine) -> asyncio.Task:
+        if self._closed:
+            coroutine.close()
+            raise RuntimeError("Tarot manager is closed")
+        task = asyncio.create_task(coroutine)
+        self._ai_tasks.add(task)
+        task.add_done_callback(self._finish_ai_task)
+        return task
+
+    def _finish_ai_task(self, task: asyncio.Task) -> None:
+        self._ai_tasks.discard(task)
+        if not task.cancelled():
+            task.exception()
+
+    async def cancel_ai_task(self, task: asyncio.Task) -> None:
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
     def check_user_cooldown(self, user_id: int, cooldown_seconds: float = 30.0) -> Tuple[bool, float]:
         """
@@ -109,9 +131,12 @@ class TarotManager:
         print("[TarotManager] Đã khởi tạo cơ sở dữ liệu Tarot thành công.", flush=True)
 
     async def close(self) -> None:
-        """Đóng kết nối SQLite khi shutdown."""
-        from core.db import db_client
-        await db_client.close()
+        self._closed = True
+        tasks = tuple(self._ai_tasks)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._ai_tasks.clear()
 
     @staticmethod
     def get_current_vn_date_str() -> str:

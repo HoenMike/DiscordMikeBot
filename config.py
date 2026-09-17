@@ -141,8 +141,17 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Khóa bảo mật & Mật khẩu Admin Web Console
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Crtm123123@")
-FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "mikedabot_secure_session_key_2026_salt")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
+
+_missing_secrets = [
+    name for name, value in [("ADMIN_PASSWORD", ADMIN_PASSWORD), ("FLASK_SECRET_KEY", FLASK_SECRET_KEY)] if not value
+]
+if _missing_secrets:
+    raise RuntimeError(
+        "Thiếu biến môi trường bắt buộc: " + ", ".join(_missing_secrets)
+        + ". Vui lòng cấu hình trong file .env trước khi khởi động bot!"
+    )
 
 # ==========================================
 # 2. CẤU HÌNH AI & MÔ HÌNH (CENTRALIZED AI CONFIG)

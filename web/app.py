@@ -21,7 +21,7 @@ app.secret_key = config.FLASK_SECRET_KEY
 
 def check_password_hash(provided_password: str) -> bool:
     """Kiểm tra mật khẩu bảo mật bằng HMAC SHA-256 an toàn chống timing attack."""
-    expected_pw = getattr(config, "ADMIN_PASSWORD", "Crtm123123@")
+    expected_pw = getattr(config, "ADMIN_PASSWORD", "")
     provided_hash = hashlib.sha256(provided_password.encode("utf-8")).hexdigest()
     expected_hash = hashlib.sha256(expected_pw.encode("utf-8")).hexdigest()
     return hmac.compare_digest(provided_hash, expected_hash)

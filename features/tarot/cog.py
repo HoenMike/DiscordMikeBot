@@ -97,8 +97,10 @@ class TarotCog(commands.Cog):
         self.weekly_card_loop.start()
 
     async def cog_unload(self):
-        """Đóng kết nối database khi hủy nạp cog."""
+        weekly_task = self.weekly_card_loop.get_task()
         self.weekly_card_loop.cancel()
+        pending = [task for task in (weekly_task,) if task is not None]
+        await asyncio.gather(*pending, return_exceptions=True)
         await self.tarot_manager.close()
 
     async def _show_history(
@@ -224,6 +226,9 @@ class TarotCog(commands.Cog):
         elif ctx:
             initial_msg = await ctx.reply("🔮 Đang kết nối năng lượng và trải bài Tarot...", mention_author=False)
 
+        ai_task = None
+        view = None
+        delivered = False
         try:
             # Lấy ngữ cảnh cũ (Trí nhớ bạn cũ) và danh sách lá bốc gần đây (Card Fatigue)
             recent_ctx = await self.tarot_manager.get_user_recent_context(user.id)
@@ -240,7 +245,7 @@ class TarotCog(commands.Cog):
             # 2. Zero-Latency Pre-fetch (kèm Trí nhớ bạn cũ & Nhận thức đối tượng @mention)
             bot_user = self.bot.user or (interaction.client.user if interaction and interaction.client else None)
             guild_obj = interaction.guild if interaction else (ctx.guild if ctx else None)
-            ai_task = asyncio.create_task(
+            ai_task = self.tarot_manager.create_ai_task(
                 generate_tarot_reading(
                     spread_key=spread_key,
                     drawn_cards=drawn_cards,
@@ -321,8 +326,9 @@ class TarotCog(commands.Cog):
                 await initial_msg.edit(content=None, embed=embed, attachments=[file], view=view)
                 view.message = initial_msg
 
-            # Chỉ ghi nhận cooldown sau khi gửi bài thành công
-            self.tarot_manager.record_user_action(user.id)
+            delivered = view.message is not None
+            if delivered:
+                self.tarot_manager.record_user_action(user.id)
 
         except Exception as e:
             print(f"❌ [TarotCog] Lỗi trong quá trình bốc bài: {e}", flush=True)
@@ -351,6 +357,13 @@ class TarotCog(commands.Cog):
                         await ctx.reply(err_text, mention_author=False)
                     except Exception:
                         pass
+
+        finally:
+            if not delivered:
+                if ai_task is not None:
+                    await self.tarot_manager.cancel_ai_task(ai_task)
+                if view is not None:
+                    view.stop()
 
     # =========================================================================
     # 1. SLASH COMMANDS

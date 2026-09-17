@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.5] - 2026-09-17 — *Tarot & Embed Hardening - Bounded AI & Secure Startup*
+
+### Fixed
+- **Tarot AI JSON Parser (nghiêm trọng)**: Viết lại tầng fallback parse JSON bằng `json.JSONDecoder.raw_decode` theo từng field. Trước đây JSON lỗi khiến câu hỏi bị từ chối (`is_valid: false`) trở lại thành hợp lệ, JSON rác lọt thẳng ra embed và giá trị `null` biến thành chữ "None" trong bài giải. Metadata-only response giờ trả về rỗng thay vì leak.
+- **Tarot Safety System Instruction**: Thêm `TAROT_SYSTEM_INSTRUCTION` vào cả 3 config AI (main/fallback/followup) — chống prompt-injection từ câu hỏi/@mention, cấm tuyên bố tương lai/suy nghĩ/tình cảm người khác như sự thật, khung xử lý khủng hoảng, Yes/No chỉ là xu hướng biểu tượng.
+- **Tarot Tương Tác**: Chống double-flip bằng `asyncio.Lock` (trước đây bấm 2 nút nhanh gây save history 2 lần); AI task mồ côi được cancel khi gửi bài thất bại/flip lỗi/timeout/cog unload; nút "Hỏi thêm" chỉ mất lượt khi submit modal thành công; embed kết quả giới hạn aggregate 6000 ký tự, bài đọc quá dài giữ nguyên trong attachment `tarot_reading.txt`.
+- **Embed Pipeline**: Spoiler luôn che media và cắt chuỗi an toàn markdown; tên author clamp 256 ký tự; `cog_unload` await toàn bộ worker task; delete origin xóa mọi preview liên quan; preview clamp 2000 ký tự; `allowed_mentions=none` chống @everyone ping; media download giới hạn 10MB; NSFW block không còn rơi xuống proxy tầng dưới; yt-dlp không upload manifest HLS/DASH thành mp4 hỏng.
+- **Async AI Client**: `bounded_ai_generate()` mới trong `core/ai.py` dùng AsyncClient của google-genai — timeout giờ hủy thật request nền (trước đây `wait_for(to_thread(...))` bỏ thread chạy tiếp ngốn quota); Tarot/Summary/Cabin chuyển hết sang đường đi async; semaphore 6 request đồng thời, MapReduce 3 chunk song song.
+- **Summary**: Chunk Map thất bại được đánh dấu "KHÔNG HOÀN THÀNH" thay vì trộn exception text vào tổng hợp; QA Evaluator mode-aware (chế độ short không bị trừ điểm theo timeline/ngưỡng 3500 của long).
+- **Config Bảo Mật**: Bot fail startup khi thiếu `ADMIN_PASSWORD`/`FLASK_SECRET_KEY`; xóa mật khẩu admin fallback cứng. ⚠️ Render cần set 2 biến này trước khi deploy.
+- **DB Phân Kỳ**: Cảnh báo kèm timestamp giờ VN khi Turso lỗi và bot rớt về Local SQLite (dữ liệu local không tự sync ngược cloud).
+
+---
+
 ## [2.7.4] - 2026-09-09 — *Bot Init Safety Lock & Cabin Commands Restoration*
 
 ### Fixed
