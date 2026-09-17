@@ -63,6 +63,41 @@ class SummaryBot(commands.Bot):
             await self.config_manager.init_db()
             await activity_logger.init_db()
 
+            # Xử lý lỗi toàn cục cho Slash Commands (bao gồm Cooldown)
+            @self.tree.error
+            async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+                if isinstance(error, app_commands.CommandOnCooldown):
+                    msg = f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(error.retry_after) + 1}s` nữa trước khi dùng lại lệnh."
+                    try:
+                        if interaction.response.is_done():
+                            await interaction.followup.send(msg, ephemeral=True)
+                        else:
+                            await interaction.response.send_message(msg, ephemeral=True)
+                    except Exception as send_err:
+                        print(f"⚠️ Không gửi được thông báo cooldown: {send_err}", flush=True)
+                    return
+                print(f"❌ [Slash Command Error] {type(error).__name__}: {error}", flush=True)
+                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stdout)
+
+            # Kiểm tra trạng thái tạm ngừng của máy chủ trước khi xử lý Slash Command
+            async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
+                if interaction.guild and self.config_manager.is_guild_suspended(interaction.guild.id):
+                    reason = self.config_manager.get_guild_suspension_reason(interaction.guild.id) or "Quản trị viên tạm ngừng"
+                    guild_name = interaction.guild.name
+                    msg = (
+                        f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng MikeDaBot.**\n"
+                        f"📝 **Lý do:** *{reason}*\n"
+                        f"👉 *Vui lòng liên hệ Quản trị viên bot để biết thêm chi tiết.*"
+                    )
+                    if interaction.response.is_done():
+                        await interaction.followup.send(msg, ephemeral=True)
+                    else:
+                        await interaction.response.send_message(msg, ephemeral=True)
+                    return False
+                return True
+
+            self.tree.interaction_check = check_guild_not_suspended
+
             failed_extensions = []
             for ext in FEATURE_EXTENSIONS:
                 if ext in self.extensions:
@@ -142,38 +177,6 @@ class SummaryBot(commands.Bot):
     async def on_error(self, event_method: str, *args, **kwargs):
         print(f"❌ [Bot Event Error] Lỗi nghiêm trọng tại event '{event_method}'", flush=True)
         traceback.print_exc(file=sys.stdout)
-
-        # Kiểm tra trạng thái tạm ngừng của máy chủ trước khi xử lý Slash Command
-        async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:
-            if interaction.guild and self.config_manager.is_guild_suspended(interaction.guild.id):
-                reason = self.config_manager.get_guild_suspension_reason(interaction.guild.id) or "Quản trị viên tạm ngừng"
-                guild_name = interaction.guild.name
-                msg = (
-                    f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng MikeDaBot.**\n"
-                    f"📝 **Lý do:** *{reason}*\n"
-                    f"👉 *Vui lòng liên hệ Quản trị viên bot để biết thêm chi tiết.*"
-                )
-                if interaction.response.is_done():
-                    await interaction.followup.send(msg, ephemeral=True)
-                else:
-                    await interaction.response.send_message(msg, ephemeral=True)
-                return False
-            return True
-
-        self.tree.interaction_check = check_guild_not_suspended
-
-        # Xử lý lỗi toàn cục cho Slash Commands (bao gồm Cooldown)
-        @self.tree.error
-        async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-            if isinstance(error, discord.app_commands.CommandOnCooldown):
-                msg = f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(error.retry_after) + 1}s` nữa trước khi dùng lại lệnh."
-                if interaction.response.is_done():
-                    await interaction.followup.send(msg, ephemeral=True)
-                else:
-                    await interaction.response.send_message(msg, ephemeral=True)
-            else:
-                print(f"❌ [Slash Command Error] {error}", flush=True)
-                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stdout)
 
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         """Xử lý lỗi toàn cục cho các lệnh Prefix (.m ...)."""

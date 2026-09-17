@@ -14,12 +14,36 @@ CURRENT_VERSION = "2.7.4"
 RELEASE_DATE = "2026-09-09"
 CODENAME = "Bot Init Safety Lock & Cabin Commands Restoration"
 
-CURRENT_VERSION = "2.7.5"
+CURRENT_VERSION = "2.7.6"
 RELEASE_DATE = "2026-09-17"
-CODENAME = "Tarot & Embed Hardening - Bounded AI & Secure Startup"
+CODENAME = "Modal Limit Clamp & Cooldown Message Restoration"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.7.6",
+        "date": "2026-09-17",
+        "type": "bugfix",
+        "title": "Sửa Lỗi Mở Modal Đặt Câu Hỏi Tarot & Khôi Phục Thông Báo Cooldown Thân Thiện",
+        "summary": "Bản vá nóng cho luồng Tarot: sửa lỗi 400 Bad Request (50035 Invalid Form Body) khi nhấn nút 'Đặt Câu Hỏi' do placeholder vượt 100 ký tự và giá trị câu hỏi cũ vượt max_length; đồng thời khắc phục lỗi toàn bộ thông báo cooldown Slash Command không được gửi thân thiện (chỉ log traceback ERROR) vì handler tree.error vốn được đăng ký sai chỗ trong on_error event nên gần như không bao giờ kích hoạt - nay được đăng ký ngay trong setup_hook.",
+        "changes": [
+            {
+                "category": "🔮 Vá Lỗi Modal Đặt Câu Hỏi Tarot (50035)",
+                "items": [
+                    "Rút gọn placeholder TextInput câu hỏi từ 106 xuống dưới 100 ký tự, khắc phục lỗi Discord 400 'placeholder: Must be 100 or fewer in length' khi bấm 'Đặt Câu Hỏi'.",
+                    "Clamp giá trị câu hỏi/bối cảnh cũ truyền vào modal xuống 500 ký tự đúng max_length, tránh 50035 khi mở lại modal với câu hỏi dài đã nhập từ prefix command."
+                ]
+            },
+            {
+                "category": "⏳ Khôi Phục Thông Báo Cooldown Thân Thiện",
+                "items": [
+                    "Chuyển đăng ký tree.error handler và interaction_check từ on_error event (gần như không bao giờ chạy) sang setup_hook để kích hoạt ngay khi bot khởi động.",
+                    "Khi người dùng gọi /tarot hoặc các Slash Command khác trong 30s cooldown, bot giờ phản hồi tin nhắn ephemeral thân thiện '⏳ Bạn đang thao tác quá nhanh...' thay vì ném CommandOnCooldown lên default handler gây traceback ERROR trong log.",
+                    "Lỗi cooldown sau khi defer dùng followup.send; lỗi hệ thống khác vẫn được log đầy đủ stack trace nhưng không crash interaction."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.7.5",
         "date": "2026-09-17",

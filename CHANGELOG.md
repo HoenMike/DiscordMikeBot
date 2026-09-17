@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.7.6] - 2026-09-17 — *Modal Limit Clamp & Cooldown Message Restoration*
+
+### Fixed
+- **Lỗi Mở Modal Đặt Câu Hỏi Tarot (50035 Invalid Form Body)**: Nhấn nút "Đặt Câu Hỏi" bị Discord từ chối 400 Bad Request vì placeholder TextInput dài 106 ký tự (giới hạn 100). Đã rút gọn placeholder và clamp giá trị câu hỏi/bối cảnh cũ xuống 500 ký tự đúng `max_length` khi truyền lại vào modal.
+- **Thông Báo Cooldown Thân Thiện**: Handler `tree.error` vốn được đăng ký bên trong event `on_error` (gần như không bao giờ kích hoạt) khiến mọi lỗi `CommandOnCooldown` ném lên default handler → chỉ có traceback ERROR trong log, người dùng không nhận thông báo. Handler nay đăng ký trong `setup_hook`: cooldown trả tin nhắn ephemeral thân thiện kèm số giây chờ, không crash.
+
+---
+
 ## [2.7.5] - 2026-09-17 — *Tarot & Embed Hardening - Bounded AI & Secure Startup*
 
 ### Fixed
