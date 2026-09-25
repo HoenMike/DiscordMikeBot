@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime, timezone, timedelta
-import random
 import traceback
 from typing import Optional, Union
 import discord
@@ -23,6 +22,7 @@ from features.tarot.tarot_view import (
     WIDE_DIVIDER
 )
 from core.ai import split_text
+from core.branding import BOT_BRAND_NAME, runtime_bot_name
 
 VN_TZ = timezone(timedelta(hours=7))
 
@@ -153,7 +153,7 @@ class TarotCog(commands.Cog):
         spread_key: str,
         question: Optional[str] = None,
         context: Optional[str] = None,
-        reader_key: str = "random",
+        reader_key: str = "auto",
         interaction: Optional[discord.Interaction] = None,
         ctx: Optional[commands.Context] = None
     ):
@@ -170,9 +170,9 @@ class TarotCog(commands.Cog):
         clean_question = question.strip() if question else ""
         clean_context = context.strip() if context else ""
 
-        # Nếu không chọn Reader hoặc chọn Ngẫu Nhiên, random 1 trong 3 tính cách
+        # Legacy random choice now resolves to Asumi's adaptive mood.
         if not reader_key or reader_key == "random" or reader_key not in READER_STYLES:
-            reader_key = random.choice(["neutral", "healer", "chaos"])
+            reader_key = "auto"
 
         # 1. Kiểm tra điều kiện bắt buộc nhập câu hỏi
         if spread_info.get("requires_question", True) and not clean_question:
@@ -257,7 +257,7 @@ class TarotCog(commands.Cog):
                     user_id=user.id,
                     guild=guild_obj,
                     bot_id=bot_user.id if bot_user else None,
-                    bot_name=bot_user.display_name if bot_user else "MikeDaBot"
+                    bot_name=runtime_bot_name(bot_user)
                 )
             )
 
@@ -376,7 +376,7 @@ class TarotCog(commands.Cog):
         spread="Kiểu trải bài Tarot bạn muốn thực hiện",
         question="Câu hỏi hoặc chủ đề bạn muốn hỏi bài (Bắt buộc với hầu hết các trải bài)",
         context="Bối cảnh/hoàn cảnh hiện tại (Ví dụ: đang có crush, sắp chuyển việc...) để bài giải chuẩn xác hơn",
-        reader="Người giải bài bạn muốn tham vấn (Orion, Celeste, Jester hoặc để ngẫu nhiên)"
+        reader="Phong cách của Asumi (Tự động, Tĩnh, Dịu hoặc Tinh quái)"
     )
     @app_commands.choices(spread=[
         app_commands.Choice(name="🌟 Daily Card (Năng lượng & thông điệp ngày - 1 lá)", value="daily"),
@@ -390,10 +390,10 @@ class TarotCog(commands.Cog):
         app_commands.Choice(name="👑 Celtic Cross (Trải bài chuyên sâu toàn diện 10 góc nhìn - 10 lá)", value="celtic"),
     ])
     @app_commands.choices(reader=[
-        app_commands.Choice(name="🎲 Ngẫu Nhiên", value="random"),
-        app_commands.Choice(name="⚖️ Orion", value="neutral"),
-        app_commands.Choice(name="🌸 Celeste", value="healer"),
-        app_commands.Choice(name="🃏 Jester", value="chaos"),
+        app_commands.Choice(name="✨ Tự động", value="auto"),
+        app_commands.Choice(name="🌙 Tĩnh", value="neutral"),
+        app_commands.Choice(name="🌸 Dịu", value="healer"),
+        app_commands.Choice(name="🃏 Tinh quái", value="chaos"),
     ])
     @app_commands.checks.cooldown(1, 30.0, key=lambda i: i.user.id)
     async def tarot_slash(
@@ -404,7 +404,7 @@ class TarotCog(commands.Cog):
         context: str | None = None,
         reader: app_commands.Choice[str] | None = None
     ):
-        reader_key = reader.value if reader else "random"
+        reader_key = reader.value if reader else "auto"
         if not spread:
             # Mở launcher riêng tư (Ephemeral) trực tiếp 100%
             user_avatar = interaction.user.display_avatar.url if interaction.user.display_avatar else None
@@ -457,7 +457,7 @@ class TarotCog(commands.Cog):
                         f"👉 *Bạn có thể gõ `/tarot` hoặc `.m tarot {spread_key} {question}` để bắt đầu ngay!*",
             color=0x8B5CF6
         )
-        embed.set_footer(text="Gợi ý chiêm tinh thông minh MikeDaBot", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(text="Gợi ý Tarot từ Asumi", icon_url=interaction.user.display_avatar.url)
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
@@ -507,7 +507,7 @@ class TarotCog(commands.Cog):
 
     @app_commands.command(
         name="tarot_help",
-        description="Xem hướng dẫn chi tiết về 9 kiểu trải bài, 3 Reader và cách bốc bài Tarot"
+        description="Xem hướng dẫn 9 kiểu trải bài và 4 phong cách của Asumi"
     )
     async def tarot_help_slash(self, interaction: discord.Interaction):
         from bot_instance import send_bot_help
@@ -538,7 +538,7 @@ class TarotCog(commands.Cog):
                 author_avatar_url=user_avatar,
                 tarot_manager=self.tarot_manager,
                 selected_spread="daily",
-                selected_reader="random",
+                selected_reader="auto",
                 question=None
             )
             embed = launcher.build_launcher_embed()
@@ -615,7 +615,7 @@ class TarotCog(commands.Cog):
                 spread_key=spread_key,
                 question=question,
                 context=None,
-                reader_key="random",
+                reader_key="auto",
                 ctx=ctx
             )
             return
@@ -629,7 +629,7 @@ class TarotCog(commands.Cog):
             author_avatar_url=user_avatar,
             tarot_manager=self.tarot_manager,
             selected_spread="single",
-            selected_reader="random",
+            selected_reader="auto",
             question=full_query
         )
         embed = launcher.build_launcher_embed()
@@ -681,7 +681,7 @@ class TarotCog(commands.Cog):
                     spread_key="daily",
                     drawn_cards=drawn_cards,
                     question="Năng lượng và thông điệp tuần mới cho toàn thể cộng đồng máy chủ",
-                    reader_style="neutral",
+                    reader_style="auto",
                     user_name="Cộng Đồng Server"
                 )
                 ai_reading = ai_res[0] if isinstance(ai_res, tuple) else ai_res
@@ -713,4 +713,3 @@ class TarotCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TarotCog(bot))
-

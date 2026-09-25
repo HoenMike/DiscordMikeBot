@@ -15,6 +15,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from core.activity_logger import activity_logger
+from core.branding import BOT_BRAND_NAME
 from features.cabin.ai import generate_cabin_interpretation, generate_cabin_interpretation_batch
 from features.cabin.constants import (
     CABIN_EMBED_COLOR,
@@ -251,7 +252,7 @@ class CabinCog(commands.Cog, name="Cabin"):
                 color=CABIN_EMBED_COLOR
             )
 
-        embed.set_footer(text="MikeDaBot Cabin Engine • Powered by Gemini 3.8 Flash")
+        embed.set_footer(text=f"{BOT_BRAND_NAME} Cabin Engine • Powered by Gemini 3.8 Flash")
 
         view = CabinStopView(
             guild_id=guild.id,
@@ -461,7 +462,7 @@ class CabinCog(commands.Cog, name="Cabin"):
                 color=CABIN_EMBED_COLOR
             )
 
-        embed.set_footer(text="MikeDaBot Cabin Engine • Powered by Gemini 3.8 Flash")
+        embed.set_footer(text=f"{BOT_BRAND_NAME} Cabin Engine • Powered by Gemini 3.8 Flash")
         view = CabinStopView(
             guild_id=ctx.guild.id,
             target_id=target.id,

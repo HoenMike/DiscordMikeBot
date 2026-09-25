@@ -2,6 +2,9 @@ import asyncio
 import io
 import re
 import time
+import secrets
+from dataclasses import replace
+from urllib.parse import urlparse
 
 import aiohttp
 import discord
@@ -13,12 +16,20 @@ from features.embed.ui import PlatformToggleView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy
+from features.embed.validator import is_generic_or_login_preview
+from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
 from core.webhook_sender import BoundedDict
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
 MAX_LINKS_PER_MESSAGE = 3
-_PIPELINE_TIMEOUT = 45
+_PIPELINE_TIMEOUT = 70
+_UNFURL_DELAYS = (1.0, 1.5, 1.5, 2.0)
+_SEND_TIMEOUT = 15
+
+
+class PreviewSendUncertain(Exception):
+    """Discord may have accepted a send; another tier must not duplicate it."""
 
 # Regex kiểm tra domain hợp lệ
 _DOMAIN_PATTERN = re.compile(
@@ -81,6 +92,7 @@ class EmbedCog(commands.Cog):
         self._scan_task: asyncio.Task | None = None
         # Lock quản lý đồng bộ reaction theo từng tin nhắn để tránh race condition khi nhiều người tương tác cùng lúc
         self._reaction_locks = BoundedDict(max_size=1000)
+        self._pending_sends = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -119,6 +131,68 @@ class EmbedCog(commands.Cog):
             previews.append(target)
         self._preview_to_origin_map[preview_id] = (channel_id, origin_id)
 
+    def _unregister_preview(self, origin_id: int, preview_id: int) -> None:
+        self._preview_to_origin_map.pop(preview_id, None)
+        previews = self._origin_to_preview_map.get(origin_id, [])
+        previews[:] = [target for target in previews if target[1] != preview_id]
+        if not previews:
+            self._origin_to_preview_map.pop(origin_id, None)
+
+    async def _settle_io(self, task: asyncio.Task):
+        """Giữ ownership đến khi I/O có timeout kết thúc, kể cả khi caller bị hủy."""
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+            except Exception:
+                break
+        return cancelled
+
+    async def _discard_preview(self, origin_id: int, preview: discord.Message) -> bool:
+        task = asyncio.create_task(asyncio.wait_for(preview.delete(), timeout=5))
+        cancelled = await self._settle_io(task)
+        removed = False
+        try:
+            task.result()
+            removed = True
+        except discord.NotFound:
+            removed = True
+        except (discord.HTTPException, asyncio.TimeoutError) as exc:
+            print(f"[Embed][{origin_id}] Không xóa được preview {preview.id}: {type(exc).__name__}; giữ mapping.", flush=True)
+        if removed:
+            self._unregister_preview(origin_id, preview.id)
+        if cancelled:
+            raise asyncio.CancelledError
+        return removed
+
+    async def _verify_proxy_unfurl(self, origin_id: int, preview: discord.Message, platform_key: str) -> tuple[bool, str]:
+        """Fetch the rendered message over a bounded grace window; send acceptance is not preview acceptance."""
+        for delay in _UNFURL_DELAYS:
+            await asyncio.sleep(delay)
+            if origin_id in self._deleted_message_ids:
+                return False, "origin_deleted"
+            try:
+                current = await preview.channel.fetch_message(preview.id)
+            except discord.NotFound:
+                return False, "preview_deleted"
+            except (discord.Forbidden, discord.HTTPException):
+                continue
+            for embed in current.embeds:
+                if is_generic_or_login_preview(
+                    title=embed.title or "", description=embed.description or "",
+                    final_url=embed.url or "", platform_key=platform_key,
+                    meta_tags={"og:image": getattr(embed.image, "url", "") or getattr(embed.thumbnail, "url", "") or "",
+                               "og:video": getattr(embed.video, "url", "") or ""},
+                ):
+                    return False, "generic_or_login_card"
+                if embed.video or embed.image or embed.thumbnail or (
+                    embed.title and embed.title.casefold() not in {"facebook", "instagram", "tiktok", "twitter", "x"}
+                ) or (embed.description and len(embed.description.strip()) > 20):
+                    return True, "usable_embed"
+        return False, "unfurl_timeout"
+
 
     def _detect_urls(self, content: str) -> list[tuple[str, str, object, bool]]:
         raw_urls = extract_urls(content)
@@ -138,6 +212,16 @@ class EmbedCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        nonce = str(getattr(message, "nonce", ""))
+        pending = self._pending_sends.get(nonce)
+        if pending and message.author.bot and message.channel.id == pending["channel_id"]:
+            if self.bot.user and message.author.id == self.bot.user.id:
+                pending["preview"] = message
+                self._register_preview(pending["origin_id"], message.channel.id, message.id)
+                if pending["discard"] or pending["origin_id"] in self._deleted_message_ids:
+                    await self._discard_preview(pending["origin_id"], message)
+                    self._pending_sends.pop(nonce, None)
+                return
         if message.author.bot or not message.guild or not message.content:
             return
 
@@ -163,6 +247,7 @@ class EmbedCog(commands.Cog):
             return
 
         any_success = False
+        any_blocked = False
         platforms_enabled = config.get("platforms_enabled", {})
 
         curr_task = asyncio.current_task()
@@ -180,7 +265,7 @@ class EmbedCog(commands.Cog):
                     continue
 
                 t_embed_start = time.monotonic()
-                success = await self._process_url_with_fallback(
+                result = await self._process_url_with_fallback(
                     message, platform_key, url, match, config,
                     is_spoiler=is_spoiler
                 )
@@ -202,26 +287,39 @@ class EmbedCog(commands.Cog):
                         channel_name=getattr(message.channel, 'name', 'Unknown'),
                         channel_id=message.channel.id,
                         prompt=url,
-                        response=f"Tạo bản xem trước {platform_name} thành công" if success else f"Không thể tạo bản xem trước {platform_name}",
-                        status="success" if success else "error",
+                        response=f"Tạo bản xem trước {platform_name} thành công" if result.success else f"Không thể tạo bản xem trước {platform_name}: {result.reason}",
+                        status="success" if result.success else ("warning" if result.status == "blocked" else "error"),
                         duration_ms=elapsed_ms,
                         details={
                             "platform": platform_key,
-                            "url": url,
-                            "is_spoiler": is_spoiler
+                            "source_url": url,
+                            "is_spoiler": is_spoiler,
+                            "tier": result.tier,
+                            "reason": result.reason,
+                            "proxy_domain": result.proxy_domain,
+                            "unfurl_verified": result.unfurl_verified,
+                            "used_fallback": result.used_fallback,
+                            "fallback_reason": result.fallback_reason,
+                            "origin_message_id": result.origin_message_id,
+                            "preview_message_id": result.preview_message_id,
+                            "result_status": result.status,
                         }
                     )
                 except Exception as act_err:
                     print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Embed: {act_err}", flush=True)
 
-                if success:
+                if result.success:
                     any_success = True
-                elif message.id not in self._deleted_message_ids:
+                elif result.status == "blocked":
+                    any_blocked = True
+                elif result.status not in ("blocked", "cancelled") and message.id not in self._deleted_message_ids:
                     platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
                     try:
+                        reason = ("🔒 Bài viết có thể không công khai hoặc yêu cầu đăng nhập."
+                                  if result.reason == "generic_or_login_card" else
+                                  "⚠️ Không thể tạo preview cho liên kết này.")
                         await message.reply(
-                            f"⚠️ Không thể tạo bản xem trước cho liên kết **{platform_name}** này "
-                            f"(nội dung có thể ở chế độ riêng tư, nhóm kín hoặc yêu cầu đăng nhập).",
+                            f"{reason}",
                             mention_author=False,
                             delete_after=15,
                         )
@@ -229,13 +327,13 @@ class EmbedCog(commands.Cog):
                         pass
         except asyncio.CancelledError:
             print(f"[EmbedCog] Task xử lý embed cho tin nhắn {message.id} đã bị hủy do tin nhắn gốc bị xóa.", flush=True)
-            return
+            raise
         finally:
             self._in_flight_tasks.pop(message.id, None)
 
         # Ẩn khung embed lỗi mặc định của Discord trên tin nhắn gốc của người dùng
         # Giữ nguyên 100% tin nhắn gốc (ảnh, nội dung, danh tính) để tránh mất ảnh và hỗ trợ Reply vàng chat chuẩn Discord
-        if any_success and config.get("suppress_original_embed", True):
+        if (any_success or any_blocked) and config.get("suppress_original_embed", True):
             if message.id not in self._deleted_message_ids:
                 try:
                     await message.edit(suppress=True)
@@ -274,9 +372,8 @@ class EmbedCog(commands.Cog):
                 print(f"[EmbedCog] Lỗi ghi activity logger khi hủy task: {log_err}", flush=True)
 
         # 2. Xóa bản xem trước nếu đã được gửi ra kênh chat
-        targets = self._origin_to_preview_map.pop(payload.message_id, [])
+        targets = list(self._origin_to_preview_map.get(payload.message_id, []))
         for channel_id, preview_msg_id in targets:
-            self._preview_to_origin_map.pop(preview_msg_id, None)
             try:
                 channel = self.bot.get_channel(channel_id)
                 if channel is None:
@@ -287,7 +384,8 @@ class EmbedCog(commands.Cog):
 
                 if channel:
                     partial_msg = channel.get_partial_message(preview_msg_id)
-                    await partial_msg.delete()
+                    if not await self._discard_preview(payload.message_id, partial_msg):
+                        continue
                     print(f"[EmbedCog] 🗑️ Đã tự động xóa Embed Preview (ID: {preview_msg_id}) do tin nhắn gốc (ID: {payload.message_id}) bị xóa.", flush=True)
                     try:
                         from core.activity_logger import activity_logger
@@ -479,45 +577,41 @@ class EmbedCog(commands.Cog):
         if file:
             kwargs["file"] = file
 
+        cancelled = False
+        nonce = secrets.token_hex(12)
+        pending = {"origin_id": message.id, "channel_id": message.channel.id,
+                   "preview": None, "discard": False}
+        self._pending_sends[nonce] = pending
+        kwargs["nonce"] = nonce
         try:
-            sent_msg = await message.channel.send(**kwargs)
-
-            # Kiểm tra một lần nữa ngay sau khi gửi (phòng trường hợp event xóa tin nhắn xảy ra ngay lúc send)
-            if message.id in self._deleted_message_ids:
-                try:
-                    await sent_msg.delete()
-                    print(f"[EmbedCog] 🗑️ Đã thu hồi bản xem trước vừa gửi vì tin nhắn gốc (ID: {message.id}) đã bị xóa.", flush=True)
-                    try:
-                        from core.activity_logger import activity_logger
-                        activity_logger.log(
-                            action_type="embed",
-                            action_name="Embed: Thu hồi bản xem trước",
-                            user_id=message.author.id,
-                            user_name=message.author.display_name,
-                            guild_name=message.guild.name if message.guild else "Direct Message",
-                            guild_id=message.guild.id if message.guild else None,
-                            channel_name=getattr(message.channel, "name", "Unknown Channel"),
-                            channel_id=message.channel.id,
-                            prompt=f"Preview ID: {sent_msg.id}",
-                            response=f"Đã thu hồi bản xem trước vừa gửi vì tin nhắn gốc ({message.id}) đã bị người dùng xóa.",
-                            status="warning",
-                            details={"origin_message_id": message.id, "preview_message_id": sent_msg.id}
-                        )
-                    except Exception as log_err:
-                        print(f"[EmbedCog] Lỗi ghi activity logger khi thu hồi embed: {log_err}", flush=True)
-                except Exception:
-                    pass
-                return None
-
-            # Lưu liên kết 2 chiều giữa tin nhắn gốc và bản xem trước
+            # Shield chỉ bảo vệ I/O có giới hạn; caller luôn chờ task kết thúc.
+            task = asyncio.create_task(asyncio.wait_for(message.channel.send(**kwargs), timeout=_SEND_TIMEOUT))
+            cancelled = await self._settle_io(task)
+            sent_msg = task.result()
             self._register_preview(message.id, message.channel.id, sent_msg.id)
+            self._pending_sends.pop(nonce, None)
+            if cancelled or message.id in self._deleted_message_ids:
+                await self._discard_preview(message.id, sent_msg)
+                return None
             return sent_msg
-        except discord.HTTPException as e:
-            print(f"[EmbedCog] Lỗi khi gửi bản xem trước: {e}", flush=True)
-            return None
+        except (discord.HTTPException, asyncio.TimeoutError) as e:
+            pending["discard"] = True
+            # A gateway MESSAGE_CREATE can resolve a send even if its HTTP response
+            # was lost. Keep the nonce owned for a late event; never send a duplicate.
+            accepted = pending["preview"]
+            if accepted is not None:
+                await self._discard_preview(message.id, accepted)
+                self._pending_sends.pop(nonce, None)
+            elif isinstance(e, discord.HTTPException) and 400 <= e.status < 500:
+                self._pending_sends.pop(nonce, None)
+                return None
+            print(f"[Embed][{message.id}] Kết quả gửi chưa xác định ({type(e).__name__}); dừng fallback, giữ nonce để đối soát gateway.", flush=True)
+            raise PreviewSendUncertain from e
         finally:
             if file:
                 file.close()
+            if cancelled:
+                raise asyncio.CancelledError
 
     async def _read_media(self, response, max_bytes: int) -> bytes | None:
         content_len = response.headers.get("Content-Length")
@@ -561,7 +655,7 @@ class EmbedCog(commands.Cog):
         match: object,
         config: dict,
         is_spoiler: bool = False,
-    ) -> bool:
+    ) -> PreviewResult:
         t_start = time.monotonic()
         try:
             result = await asyncio.wait_for(
@@ -578,7 +672,7 @@ class EmbedCog(commands.Cog):
         except asyncio.TimeoutError:
             elapsed = time.monotonic() - t_start
             print(f"[EmbedCog] Hết thời gian chờ ({_PIPELINE_TIMEOUT}s) cho {platform_key}: {url}", flush=True)
-            return False
+            return PreviewResult(reason="pipeline_timeout", platform=platform_key, origin_message_id=message.id)
 
     async def _run_fallback_chain(
         self,
@@ -588,30 +682,38 @@ class EmbedCog(commands.Cog):
         match: object,
         config: dict,
         is_spoiler: bool = False,
-    ) -> bool:
+    ) -> PreviewResult:
         if message.id in self._deleted_message_ids:
-            return False
+            return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
-        # Tier 0: API Fetcher
-        if await self._try_api_fetcher(message, platform_key, url, match, config, is_spoiler=is_spoiler):
-            return True
+        safety = PreviewSafety()
+        # Trạng thái nhạy cảm chỉ tăng trong cùng một URL.
+        api_result = await self._try_api_fetcher(message, platform_key, url, match, config, is_spoiler=is_spoiler, safety=safety)
+        if isinstance(api_result, PreviewResult):
+            return api_result
+        if api_result:
+            return PreviewResult("success", "api", "api_preview_sent", platform_key, origin_message_id=message.id)
 
         if message.id in self._deleted_message_ids:
-            return False
+            return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
         # Tier 1: Proxy URL Chain
-        if await self._try_proxy_chain(message, platform_key, url, config, is_spoiler=is_spoiler):
-            return True
+        proxy_result = await self._try_proxy_chain(message, platform_key, url, config, is_spoiler=is_spoiler, safety=safety)
+        if proxy_result.success or proxy_result.status in ("blocked", "cancelled", "degraded"):
+            return proxy_result
 
         if message.id in self._deleted_message_ids:
-            return False
+            return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
         # Tier 2: yt-dlp Fallback
-        if await self._try_ytdlp_fallback(message, platform_key, url, config, is_spoiler=is_spoiler):
-            return True
+        ytdlp_result = await self._try_ytdlp_fallback(message, platform_key, url, config, is_spoiler=is_spoiler, safety=safety)
+        if isinstance(ytdlp_result, PreviewResult):
+            return replace(ytdlp_result, fallback_reason=proxy_result.reason)
+        if ytdlp_result:
+            return PreviewResult("success", "ytdlp", "fallback_sent", platform_key, origin_message_id=message.id, used_fallback=True, fallback_reason=proxy_result.reason)
 
         print(f"[EmbedCog] Tất cả các tier đã thất bại cho {platform_key}: {url}", flush=True)
-        return False
+        return PreviewResult(reason=proxy_result.reason, platform=platform_key, origin_message_id=message.id)
 
     async def _try_api_fetcher(
         self,
@@ -621,7 +723,8 @@ class EmbedCog(commands.Cog):
         match: object,
         config: dict,
         is_spoiler: bool = False,
-    ) -> bool:
+        safety: PreviewSafety | None = None,
+    ) -> PreviewResult | bool:
         fetcher = FETCHER_MAP.get(platform_key)
         if not fetcher or self.session is None:
             return False
@@ -631,12 +734,16 @@ class EmbedCog(commands.Cog):
             if post_data is None:
                 return False
 
+            if safety is not None:
+                safety.is_nsfw |= post_data.is_nsfw
+                post_data.is_nsfw = safety.is_nsfw
+
             if is_spoiler:
                 post_data.is_spoiler = True
 
             filter_result = self.nsfw_filter.process(post_data, message.channel, config)
             if filter_result.is_blocked:
-                return True
+                return PreviewResult("blocked", "api", "nsfw_blocked", platform_key, origin_message_id=message.id)
 
             if post_data.media_type == "gallery" and len(post_data.media_urls) > 1:
                 embeds = build_gallery_embeds(post_data, filter_result)
@@ -662,7 +769,11 @@ class EmbedCog(commands.Cog):
                 embeds=embeds,
                 file=file,
             )
-            return bool(sent_msg)
+            return (PreviewResult("success", "api", "api_preview_sent", platform_key,
+                                  origin_message_id=message.id, preview_message_id=sent_msg.id)
+                    if sent_msg else False)
+        except PreviewSendUncertain:
+            return PreviewResult("degraded", "api", "send_outcome_unknown", platform_key, origin_message_id=message.id)
         except Exception as e:
             print(f"[EmbedCog] Tier 0 (API) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
@@ -674,9 +785,11 @@ class EmbedCog(commands.Cog):
         url: str,
         config: dict,
         is_spoiler: bool = False,
-    ) -> bool:
+        safety: PreviewSafety | None = None,
+    ) -> PreviewResult:
+        safety = safety if safety is not None else PreviewSafety()
         if self.session is None:
-            return False
+            return PreviewResult(reason="session_unavailable", platform=platform_key, origin_message_id=message.id)
 
         try:
             guild_proxy_domains = None
@@ -685,56 +798,64 @@ class EmbedCog(commands.Cog):
                     message.guild.id, platform_key
                 )
 
-            proxy_url, is_proxy_nsfw = await find_valid_proxy(
-                self.session, url, platform_key,
-                guild_proxy_domains=guild_proxy_domains,
-            )
-            if not proxy_url:
-                return False
+            domains = guild_proxy_domains if guild_proxy_domains is not None else PROXY_DOMAINS.get(platform_key, [])
+            tried: set[str] = set()
+            last_reason = "no_valid_proxy"
+            for _ in range(len(domains)):
+                if message.id in self._deleted_message_ids:
+                    return PreviewResult("cancelled", "proxy", "origin_deleted", platform_key, origin_message_id=message.id)
+                proxy_url, is_proxy_nsfw = await find_valid_proxy(
+                    self.session, url, platform_key,
+                    guild_proxy_domains=guild_proxy_domains, excluded_domains=tried,
+                    attempted_domains=tried,
+                )
+                if not proxy_url:
+                    break
+                domain = urlparse(proxy_url).hostname or ""
+                tried.add(domain)
 
-            is_nsfw_channel = getattr(message.channel, "is_nsfw", False)
-            if callable(is_nsfw_channel):
-                is_nsfw_channel = is_nsfw_channel()
-
-            is_effective_nsfw = is_proxy_nsfw and not is_nsfw_channel
-            nsfw_mode = config.get("nsfw_mode", "spoiler")
-
-            # Tạo header Subtext xám siêu nhỏ: Vừa dẫn link nhảy về tin nhắn gốc, vừa chứa link proxy để Discord crawl embed
-            # Khi là spoiler/NSFW: Bọc spoiler link proxy (||[Xem bài viết gốc](proxy_url)||) để Discord che mờ embed, giữ nguyên dòng trả lời luôn hiển thị rõ ràng
-            author_name = _clean_markdown_label(message.author.display_name)
-            author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
-
-            if is_effective_nsfw:
-                if nsfw_mode == "block":
+                is_nsfw_channel = getattr(message.channel, "is_nsfw", False)
+                if callable(is_nsfw_channel):
+                    is_nsfw_channel = is_nsfw_channel()
+                safety.is_nsfw |= is_proxy_nsfw
+                is_effective_nsfw = safety.is_nsfw and not is_nsfw_channel
+                if is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "block":
                     try:
-                        await message.reply(
-                            "⚠️ Nội dung NSFW đã bị chặn theo cài đặt của máy chủ.",
-                            mention_author=False,
-                            delete_after=10,
-                        )
-                    except Exception:
+                        await message.reply("⚠️ Nội dung NSFW đã bị chặn theo cài đặt của máy chủ.", mention_author=False, delete_after=10)
+                    except (discord.Forbidden, discord.HTTPException):
                         pass
-                    return True
-                elif nsfw_mode == "spoiler":
-                    wrapped_proxy_url = f"-# {author_jump} • ||[Xem bài viết gốc]({proxy_url})||"
-                else:  # allow
-                    if is_spoiler:
-                        wrapped_proxy_url = f"-# {author_jump} • ||[Xem bài viết gốc]({proxy_url})||"
-                    else:
-                        wrapped_proxy_url = f"-# {author_jump} • [Xem bài viết gốc]({proxy_url})"
-            elif is_spoiler:
-                wrapped_proxy_url = f"-# {author_jump} • ||[Xem bài viết gốc]({proxy_url})||"
-            else:
-                wrapped_proxy_url = f"-# {author_jump} • [Xem bài viết gốc]({proxy_url})"
+                    return PreviewResult("blocked", "proxy", "nsfw_blocked", platform_key, domain, message.id)
 
-            sent_msg = await self._send_embed_preview(
-                message=message,
-                content=wrapped_proxy_url,
-            )
-            return bool(sent_msg)
+                author_name = _clean_markdown_label(message.author.display_name)
+                author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
+                link = f"[Xem bài viết gốc]({proxy_url})"
+                if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
+                    link = f"||{link}||"
+                sent_msg = await self._send_embed_preview(message=message, content=f"-# {author_jump} • {link}")
+                if not sent_msg:
+                    last_reason = "proxy_send_failed"
+                    continue
+                verified = False
+                try:
+                    verified, last_reason = await self._verify_proxy_unfurl(message.id, sent_msg, platform_key)
+                    if verified and message.id not in self._deleted_message_ids:
+                        return PreviewResult("success", "proxy", "usable_embed", platform_key, domain, message.id, sent_msg.id, True)
+                    if message.id in self._deleted_message_ids:
+                        verified = False
+                        last_reason = "origin_deleted"
+                finally:
+                    if not verified:
+                        removed = await self._discard_preview(message.id, sent_msg)
+                if not removed:
+                    return PreviewResult("degraded", "proxy", "cleanup_failed", platform_key, domain, message.id, sent_msg.id)
+            return PreviewResult(reason=last_reason, platform=platform_key, origin_message_id=message.id)
+        except asyncio.CancelledError:
+            raise
+        except PreviewSendUncertain:
+            return PreviewResult("degraded", "proxy", "send_outcome_unknown", platform_key, origin_message_id=message.id)
         except Exception as e:
             print(f"[EmbedCog] Tier 1 (Proxy) lỗi cho {platform_key} ({url}): {e}", flush=True)
-            return False
+            return PreviewResult(reason="proxy_error", platform=platform_key, origin_message_id=message.id)
 
     async def _try_ytdlp_fallback(
         self,
@@ -743,7 +864,8 @@ class EmbedCog(commands.Cog):
         url: str,
         config: dict,
         is_spoiler: bool = False,
-    ) -> bool:
+        safety: PreviewSafety | None = None,
+    ) -> PreviewResult | bool:
         # Chỉ kích hoạt fallback yt-dlp cho các nền tảng video được hỗ trợ
         if platform_key not in ("twitter", "tiktok", "instagram", "facebook", "reddit", "twitch"):
             return False
@@ -753,12 +875,16 @@ class EmbedCog(commands.Cog):
             if post_data is None:
                 return False
 
+            if safety is not None:
+                safety.is_nsfw |= post_data.is_nsfw
+                post_data.is_nsfw = safety.is_nsfw
+
             if is_spoiler:
                 post_data.is_spoiler = True
 
             filter_result = self.nsfw_filter.process(post_data, message.channel, config)
             if filter_result.is_blocked:
-                return True
+                return PreviewResult("blocked", "ytdlp", "nsfw_blocked", platform_key, origin_message_id=message.id, used_fallback=True)
 
             single_embed = build_embed(post_data, filter_result)
             if not single_embed:
@@ -792,7 +918,11 @@ class EmbedCog(commands.Cog):
                 embeds=[single_embed],
                 file=file,
             )
-            return bool(sent_msg)
+            return (PreviewResult("success", "ytdlp", "fallback_sent", platform_key,
+                                  origin_message_id=message.id, preview_message_id=sent_msg.id, used_fallback=True)
+                    if sent_msg else False)
+        except PreviewSendUncertain:
+            return PreviewResult("degraded", "ytdlp", "send_outcome_unknown", platform_key, origin_message_id=message.id)
         except Exception as e:
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
@@ -1104,7 +1234,7 @@ class ProxyCog(commands.Cog):
             default_lines = [f"`{i}.` {d}" for i, d in enumerate(default_domains, start=1)]
             embed.add_field(name="Danh sách mặc định toàn cục", value="\n".join(default_lines), inline=False)
 
-        embed.set_footer(text="Proxy được thử theo thứ tự từ trên xuống. Proxy hợp lệ đầu tiên sẽ được sử dụng.", icon_url=platform_info.get("icon_url"))
+        embed.set_footer(text="Proxy được thử theo thứ tự từ trên xuống cho đến khi Discord hiển thị bản xem trước dùng được.", icon_url=platform_info.get("icon_url"))
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @proxy_group.command(name="set", description="Ghi đè danh sách proxy cho nền tảng (phân cách bằng dấu phẩy)")

@@ -1,9 +1,23 @@
 # Changelog
 
-All notable changes to the **MikeDaBot** project are documented in this file.
+Các thay đổi của bot Discord **Asumi** được ghi tại đây.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.BugFix`).
+Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) và dùng
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.BugFix`).
+
+---
+
+## [2.8.0] - 2026-09-25 — *Asumi - Xác minh bản xem trước & Thống nhất phong cách Tarot*
+
+### Tên gọi Asumi
+- Đổi tên hiển thị hiện tại trong Discord, website, phần trợ giúp, Cabin và thông tin phiên bản thành Asumi. Tarot vẫn nhận tên gọi cũ trong câu hỏi; tên repository, cơ sở dữ liệu và lịch sử phát hành được giữ nguyên.
+
+### Bản xem trước mạng xã hội có xác minh
+- Loại thẻ đăng nhập Facebook chung chung dù có ảnh OG. Sau khi gửi liên kết proxy, bot chờ và kiểm tra bản xem trước trên Discord trong thời gian giới hạn; nếu không dùng được, bot xóa tin thử, chuyển sang proxy tiếp theo rồi dùng phương án dự phòng khi cần.
+- Chỉ ẩn embed gốc và ghi nhận thành công khi đã có bản thay thế dùng được. Thông báo ngắn gọn khi phải dùng phương án dự phòng hoặc khi không thể tạo bản xem trước.
+
+### Một Asumi với nhiều phong cách Tarot
+- Asumi là nhân vật Tarot duy nhất, có bốn phong cách: Tự động, Tĩnh, Dịu và Tinh quái. Tự động là mặc định. Prompt ngắn hơn, bám câu hỏi và tránh câu nói lặp lại; quy tắc an toàn và bộ phân tích JSON có cấu trúc vẫn được giữ. ID phong cách cũ, lịch sử và đánh giá vẫn tương thích.
 
 ---
 

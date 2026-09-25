@@ -1,6 +1,6 @@
-# MikeDaBot - Discord Summary Bot
+# Asumi - Bot Discord đa tính năng
 
-Bot Discord tích hợp AI (Gemini / Gemma 4) chuyên tóm tắt lịch sử trò chuyện và tự động nhúng nội dung mạng xã hội.
+Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản xem trước liên kết mạng xã hội, trải bài Tarot và các tiện ích trong máy chủ.
 
 ---
 
@@ -305,7 +305,7 @@ Dự án được cấu hình sẵn để chạy trên Render hoặc các nền 
 Nếu bot đã ở trong server của bạn, bạn chỉ cần cấp quyền cho **Role của Bot**:
 
 1. Mở **Server Settings (Cài đặt máy chủ)** $\rightarrow$ Chọn mục **Roles (Vai trò)**.
-2. Tìm và bấm vào Role có tên của bot (ví dụ: `MikeDaBot`).
+2. Tìm và bấm vào Role có tên của bot (ví dụ: `Asumi`).
 3. Chuyển sang tab **Permissions (Quyền hạn)**.
 4. Bật các quyền sau:
    - ✅ **Manage Webhooks** (*Quản lý Webhook*)
@@ -325,7 +325,7 @@ Nếu bot đã ở trong server của bạn, bạn chỉ cần cấp quyền cho
 Nếu bạn muốn tạo một đường link mời bot sang các máy chủ khác với đầy đủ quyền được chọn sẵn:
 
 1. Truy cập [Discord Developer Portal](https://discord.com/developers/applications).
-2. Chọn ứng dụng Bot của bạn (`MikeDaBot`).
+2. Chọn ứng dụng Bot của bạn (`Asumi`).
 3. **Bật Gateway Intents** (Bắt buộc):
    - Vào menu **Bot** ở thanh bên trái.
    - Cuộn xuống phần **Privileged Gateway Intents**.
@@ -356,4 +356,3 @@ https://discord.com/oauth2/authorize?client_id=CLIENT_ID_CUA_BAN&permissions=268
 ## Giấy phép
 
 Liên hệ tác giả để biết thêm thông tin về giấy phép sử dụng.
-

@@ -1,7 +1,6 @@
 import asyncio
 import time
 import io
-import random
 from typing import List, Optional, Set, Any
 import discord
 
@@ -17,6 +16,7 @@ from features.tarot.renderer import render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading, generate_followup_answer
 from features.tarot.flavor import detect_spread_flavor
 from features.tarot.manager import TarotManager
+from core.branding import BOT_BRAND_NAME, runtime_bot_name
 
 WIDE_DIVIDER = "---"
 
@@ -92,19 +92,23 @@ SPREAD_SELECT_OPTIONS = [
 
 READER_SELECT_OPTIONS = [
     discord.SelectOption(
-        label="🎲 Ngẫu Nhiên",
-        value="random"
+        label="✨ Tự động",
+        value="auto",
+        description="Asumi tự bắt nhịp với câu hỏi của bạn"
     ),
     discord.SelectOption(
-        label="⚖️ Orion",
+        label="🌙 Tĩnh",
+        description="Điềm đạm, sâu sắc và trực diện",
         value="neutral"
     ),
     discord.SelectOption(
-        label="🌸 Celeste",
+        label="🌸 Dịu",
+        description="Ấm áp, tinh tế và nhẹ nhàng",
         value="healer"
     ),
     discord.SelectOption(
-        label="🃏 Jester",
+        label="🃏 Tinh quái",
+        description="Lém lỉnh, vui vẻ và cà khịa đúng lúc",
         value="chaos"
     ),
 ]
@@ -162,7 +166,7 @@ class TarotLauncherView(discord.ui.View):
         author_avatar_url: Optional[str],
         tarot_manager: TarotManager,
         selected_spread: str = "daily",
-        selected_reader: str = "random",
+        selected_reader: str = "auto",
         question: Optional[str] = None,
         context: Optional[str] = None,
         trigger_message: Optional[discord.Message] = None,
@@ -192,7 +196,7 @@ class TarotLauncherView(discord.ui.View):
         """Xây dựng Embed hiển thị thông tin và trạng thái lựa chọn hiện tại."""
         spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
         if self.selected_reader == "random" or self.selected_reader not in READER_STYLES:
-            reader_display = "🎲 **Ngẫu Nhiên**"
+            reader_display = "✨ **Tự động**"
             embed_color = 0x7851A9
         else:
             reader_info = READER_STYLES[self.selected_reader]
@@ -206,12 +210,12 @@ class TarotLauncherView(discord.ui.View):
             f"Chào mừng **{self.author_name}** đến với không gian chiêm tinh học Tarot!\n",
             f"**🔮 THIẾT LẬP QUẺ BÀI:**",
             f"• 🃏 **Kiểu trải bài:** **{spread_info['name']}**",
-            f"• 🎭 **Người giải bài:** {reader_display}",
+            f"• 🎭 **Phong cách của Asumi:** {reader_display}",
             f"• ❓ **Câu hỏi / Chủ đề:** {q_status}",
             f"• 📝 **Bối cảnh:** {ctx_status}",
             WIDE_DIVIDER,
             "💡 **Hướng dẫn thao tác:**",
-            "1. Chọn kiểu trải bài & người giải bài từ **2 Menu thả xuống** bên dưới.",
+            "1. Chọn kiểu trải bài & phong cách từ **2 Menu thả xuống** bên dưới.",
             "2. Nhấn nút **✏️ Đặt Câu Hỏi** để nhập câu hỏi / bối cảnh cụ thể.",
             "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để trải bài ra kênh chat!",
             "⚠️ *Lưu ý: Tarot chỉ giải quẻ cho chính bạn hoặc mối quan hệ bạn là người trong cuộc cần lời khuyên. Câu hỏi bốc bài thay/soi mói đời tư người thứ ba sẽ bị từ chối.*"
@@ -223,7 +227,7 @@ class TarotLauncherView(discord.ui.View):
             color=embed_color
         )
         embed.set_footer(
-            text=f"Quẻ bài của {self.author_name} • MikeBot Tarot",
+            text=f"Quẻ bài của {self.author_name} • {BOT_BRAND_NAME} Tarot",
             icon_url=self.author_avatar_url
         )
         return embed
@@ -251,7 +255,7 @@ class TarotLauncherView(discord.ui.View):
 
         # 2. Select Menu: Chọn người giải bài (Row 1)
         reader_select = discord.ui.Select(
-            placeholder="🎭 Chọn người giải bài...",
+            placeholder="🎭 Phong cách của Asumi...",
             options=[
                 discord.SelectOption(
                     label=opt.label,
@@ -405,10 +409,10 @@ class TarotLauncherView(discord.ui.View):
         )
         spread_info = SPREAD_DEFINITIONS[self.selected_spread]
 
-        # Nếu không chọn hoặc chọn Ngẫu nhiên, tự động random 1 trong 3 Reader
+        # Legacy random choice now resolves to Asumi's adaptive mood.
         actual_reader = self.selected_reader
         if actual_reader == "random" or not actual_reader or actual_reader not in READER_STYLES:
-            actual_reader = random.choice(["neutral", "healer", "chaos"])
+            actual_reader = "auto"
 
         bot_user = interaction.client.user if interaction and interaction.client else None
         ai_task = self.tarot_manager.create_ai_task(
@@ -423,7 +427,7 @@ class TarotLauncherView(discord.ui.View):
                 user_id=self.author_id,
                 guild=interaction.guild if interaction else None,
                 bot_id=bot_user.id if bot_user else None,
-                bot_name=bot_user.display_name if bot_user else "MikeDaBot"
+                bot_name=runtime_bot_name(bot_user)
             )
         )
 
@@ -458,7 +462,7 @@ class TarotLauncherView(discord.ui.View):
             desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
         if self.context:
             desc_lines.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-        desc_lines.append(f"**🎭 Người trải bài:** {flip_view.style_info['name']}\n")
+        desc_lines.append(f"**🎭 Phong cách Asumi:** {flip_view.style_info['name']}\n")
 
         desc_lines.append(WIDE_DIVIDER)
 
@@ -690,7 +694,7 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
             user_id=interaction.user.id if interaction and interaction.user else None,
             guild=interaction.guild if interaction else None,
             bot_id=bot_user.id if bot_user else None,
-            bot_name=bot_user.display_name if bot_user else "MikeDaBot"
+            bot_name=runtime_bot_name(bot_user)
         )
 
         embed = discord.Embed(
@@ -698,7 +702,7 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
             description=f"**Thắc mắc:** *\"{question_text}\"*\n\n{answer}",
             color=0x8B5CF6
         )
-        embed.set_footer(text="Phản hồi bổ sung từ Tarot Reader", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(text="Phản hồi thêm từ Asumi", icon_url=interaction.user.display_avatar.url)
         await interaction.followup.send(embed=embed)
 
 
@@ -844,7 +848,7 @@ class TarotFlipView(discord.ui.View):
         guild_id: Optional[int] = None,
         channel_id: Optional[int] = None,
         context: Optional[str] = None,
-        reader_style: str = "neutral",
+        reader_style: str = "auto",
         timeout: float = 300.0,
     ):
         super().__init__(timeout=timeout)
@@ -857,10 +861,10 @@ class TarotFlipView(discord.ui.View):
         self.question = question
         self.context = context
         if reader_style == "random" or not reader_style or reader_style not in READER_STYLES:
-            self.reader_style = random.choice(["neutral", "healer", "chaos"])
+            self.reader_style = "auto"
         else:
             self.reader_style = reader_style
-        self.style_info = READER_STYLES.get(self.reader_style, READER_STYLES["neutral"])
+        self.style_info = READER_STYLES.get(self.reader_style, READER_STYLES["auto"])
         self.ai_task = ai_task
         self.tarot_manager = tarot_manager
         self.guild_id = guild_id
@@ -1022,7 +1026,7 @@ class TarotFlipView(discord.ui.View):
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
             if self.context:
                 desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-            desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
+            desc_cards.append(f"**🎭 Phong cách Asumi:** {self.style_info['name']}\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")
@@ -1312,7 +1316,7 @@ class TarotFlipView(discord.ui.View):
                 desc_cards.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
             if self.context:
                 desc_cards.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-            desc_cards.append(f"**🎭 Người trải bài:** {self.style_info['name']}\n")
+            desc_cards.append(f"**🎭 Phong cách Asumi:** {self.style_info['name']}\n")
             if self.spread_key == "yes_no":
                 badge, verdict_desc, _ = get_yes_no_verdict(self.drawn_cards[0].card, self.drawn_cards[0].is_reversed)
                 desc_cards.append(f"**⚡ Phán Quyết Yes / No:** {badge}\n> *{verdict_desc}*\n")

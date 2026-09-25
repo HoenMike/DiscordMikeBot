@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MikeDaBot - Admin & Activity Console</title>
+    <title>Asumi - Admin & Activity Console</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -78,14 +78,14 @@
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 id="header-bot-name" class="font-bold text-sm text-white tracking-tight">MikeDaBot</h1>
+                        <h1 id="header-bot-name" class="font-bold text-sm text-white tracking-tight">Asumi</h1>
                         <span id="header-status-badge" class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             Online
                         </span>
                         <button onclick="switchTab('version')" id="header-version-badge" title="Bấm để xem thông tin phiên bản & patchnotes" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30 hover:bg-brand-500/30 transition-all cursor-pointer">
                             <i data-lucide="tag" class="w-2.5 h-2.5"></i>
-                            <span id="header-version-text">v2.6.0</span>
+                            <span id="header-version-text">v{{ release_version }}</span>
                         </button>
                     </div>
                 </div>
@@ -147,7 +147,7 @@
                 <button onclick="switchTab('version')" id="tab-btn-version" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="git-commit" class="w-3.5 h-3.5 text-brand-400"></i>
                     <span>Phiên Bản & Patchnotes</span>
-                    <span id="tab-version-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-500/20 text-brand-300 font-mono font-bold">v2.6.0</span>
+                    <span id="tab-version-badge" class="px-1.5 py-0.2 rounded-full text-[10px] bg-brand-500/20 text-brand-300 font-mono font-bold">v{{ release_version }}</span>
                 </button>
                 <button onclick="switchTab('tarot')" id="tab-btn-tarot" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5 text-purple-400"></i>
@@ -294,7 +294,7 @@
             <!-- Toolbar -->
             <div class="flex-shrink-0 flex flex-wrap items-center justify-between gap-2 bg-dark-card border border-dark-border rounded-xl p-2.5">
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-slate-300 font-medium">Danh sách các máy chủ Discord mà MikeDaBot đang có mặt</span>
+                    <span class="text-xs text-slate-300 font-medium">Danh sách các máy chủ Discord mà Asumi đang có mặt</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <button onclick="copyInviteLink()" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-600/20 hover:bg-brand-600/30 text-brand-300 border border-brand-500/30 transition-all">
@@ -746,7 +746,7 @@
                     </div>
                     <div>
                         <div class="flex items-center gap-2 mb-1">
-                            <h3 id="presence-bot-name-preview" class="text-base font-bold text-white">MikeDaBot</h3>
+                            <h3 id="presence-bot-name-preview" class="text-base font-bold text-white">Asumi</h3>
                             <span id="presence-status-badge-preview" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                                 Online
                             </span>
@@ -901,11 +901,11 @@
                     </div>
                     <div>
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="text-lg font-black text-white tracking-tight">MikeDaBot</span>
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-brand-500 text-white shadow-md shadow-brand-500/40">v2.0.0</span>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Major Release</span>
+                            <span class="text-lg font-black text-white tracking-tight">Asumi</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-brand-500 text-white shadow-md shadow-brand-500/40">v{{ release_version }}</span>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Minor Release</span>
                         </div>
-                        <p class="text-xs text-slate-300">Codename: <span class="font-semibold text-brand-300">Hybrid Engine & Dynamic Presence</span> • Phát hành: <span class="text-slate-400">28/08/2026</span></p>
+                        <p class="text-xs text-slate-300">Codename: <span class="font-semibold text-brand-300">{{ release_codename }}</span> • Phát hành: <span class="text-slate-400">{{ release_date }}</span></p>
                     </div>
                 </div>
 
@@ -984,7 +984,7 @@
                 <div>
                     <label class="text-slate-400 font-semibold uppercase text-[10px] tracking-wider block mb-1">
                         <i data-lucide="bot" class="w-3.5 h-3.5 inline mr-1 text-emerald-400"></i>
-                        Phản Hồi Từ MikeDaBot:
+                        Phản Hồi Từ Asumi:
                     </label>
                     <div id="modal-response" class="p-3 rounded-xl bg-dark-terminal border border-dark-border text-slate-200 whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed">
                         --
@@ -1561,7 +1561,7 @@
 
             const lines = [
                 `==================================================`,
-                `📋 [DISCORD MIKEBOT - ACTION LOG DEBUG DATA]`,
+                `📋 [ASUMI - ACTION LOG DEBUG DATA]`,
                 `==================================================`,
                 `• ID: #${item.id}`,
                 `• Thời gian: ${item.timestamp || item.time_short}`,
@@ -1867,7 +1867,7 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            showToast(`MikeDaBot đã rời khỏi server "${guildName}" thành công.`, "info");
+                            showToast(`Asumi đã rời khỏi server "${guildName}" thành công.`, "info");
                             await fetchGuildsData();
                         } else {
                             showToast("Lỗi: " + data.error, "error");
@@ -2051,9 +2051,10 @@
                         stylesContainer.innerHTML = `<span class="text-slate-500 italic text-[11px]">Chưa có lượt đánh giá nào được ghi nhận trên hệ thống.</span>`;
                     } else {
                         const styleNames = {
-                            "neutral": "🔮 Khách quan (Neutral)",
-                            "healer": "🧙‍♂️ Chữa lành (Healer)",
-                            "chaos": "⚡ Thẳng thắn (Chaos)"
+                            "neutral": "🌙 Tĩnh",
+                            "auto": "✨ Tự động",
+                            "healer": "🌸 Dịu",
+                            "chaos": "🃏 Tinh quái"
                         };
                         stylesContainer.innerHTML = data.by_style.map(s => {
                             const name = styleNames[s.style] || s.style;

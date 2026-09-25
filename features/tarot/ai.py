@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from google.genai import types
 import config
 from core.ai import bounded_ai_generate
+from core.branding import BOT_BRAND_NAME, LEGACY_BOT_ALIASES
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict, READER_STYLES
 
 # Semaphore giới hạn tối đa 3 request AI đồng thời để tránh 429 Rate Limit
@@ -35,7 +36,7 @@ class TarotAIResponseSchema(BaseModel):
     conclusion: str = Field(description="Kết luận trực diện, đúc kết xu hướng rõ ràng không lấp lửng trong 1-2 câu", default="")
     cards_analysis: str = Field(description="Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi", default="")
     advice: str = Field(description="Lời khuyên hành động thực tế và thông điệp khích lệ trong 1-2 câu", default="")
-    full_reading: str = Field(description="Toàn bộ bài giải hoàn chỉnh bằng Markdown súc tích vừa phải, gồm 3 mục rõ ràng", default="")
+    full_reading: str = Field(description="Toàn bộ bài giải Markdown tự nhiên, độ dài và cấu trúc phù hợp kiểu trải bài; không bắt buộc ba đề mục", default="")
 
 
 # Cấu hình AI Tarot chính (buộc trả về JSON có cấu trúc an toàn, giới hạn thinking_budget để tránh timeout)
@@ -83,7 +84,7 @@ def extract_question_mentions_context(
     user_id: Optional[int] = None,
     guild: Optional[Any] = None,
     bot_id: Optional[int] = None,
-    bot_name: str = "MikeDaBot"
+    bot_name: str = BOT_BRAND_NAME
 ) -> Tuple[str, str]:
     """
     Trích xuất và phân tích đối tượng được tag/nhắc đến trong câu hỏi Tarot:
@@ -113,7 +114,7 @@ def extract_question_mentions_context(
         pattern = rf"<@!?{uid}>"
 
         if bot_id and uid == bot_id:
-            tag_name = f"@{bot_name}"
+            tag_name = f"@{BOT_BRAND_NAME}"
             entities.append({"type": "bot", "name": tag_name, "id": uid, "desc": "Chính Bạn (Tarot Bot / Reader)"})
             clean_q = re.sub(pattern, tag_name, clean_q)
         elif user_id and uid == user_id:
@@ -133,7 +134,7 @@ def extract_question_mentions_context(
 
             tag_name = f"@{m_name}"
             clean_q = re.sub(pattern, tag_name, clean_q)
-            if is_bot or (bot_name and m_name.lower() == bot_name.lower()):
+            if is_bot or m_name.casefold() in LEGACY_BOT_ALIASES | {BOT_BRAND_NAME.casefold(), (bot_name or "").casefold()}:
                 entities.append({"type": "bot", "name": tag_name, "id": uid, "desc": "Bot trong server"})
             else:
                 entities.append({"type": "other", "name": tag_name, "id": uid, "desc": f"Thành viên khác trong server ({tag_name})"})
@@ -146,8 +147,9 @@ def extract_question_mentions_context(
         if any(e["name"].lstrip("@").lower() == t_lower for e in entities):
             continue
 
-        if t_lower in ["bot", "mikedabot", "mike bot", "mikesbot", "mike_bot"] or (bot_name and t_lower == bot_name.lower()):
-            entities.append({"type": "bot", "name": f"@{t_clean}", "id": bot_id, "desc": "Chính Bạn (Tarot Bot / Reader)"})
+        if t_lower in LEGACY_BOT_ALIASES | {"bot", BOT_BRAND_NAME.casefold()} or (bot_name and t_lower == bot_name.casefold()):
+            entities.append({"type": "bot", "name": f"@{BOT_BRAND_NAME}", "id": bot_id, "desc": "Chính Bạn (Tarot Bot / Reader)"})
+            clean_q = re.sub(rf"(?<!\w)@{re.escape(t_clean)}\b", f"@{BOT_BRAND_NAME}", clean_q, flags=re.IGNORECASE)
         elif t_lower == user_name.lower() or (user_id and str(user_id) == t_clean):
             entities.append({"type": "self", "name": f"@{t_clean}", "id": user_id, "desc": f"Chính người hỏi ({user_name})"})
         else:
@@ -163,6 +165,14 @@ def extract_question_mentions_context(
                 entities.append({"type": "bot", "name": f"@{m_found_name}", "id": None, "desc": "Bot trong server"})
             else:
                 entities.append({"type": "other", "name": f"@{m_found_name}", "id": None, "desc": f"Thành viên khác trong server (@{m_found_name})"})
+
+    # Plain-text references are common in follow-ups; keep legacy input working.
+    if not any(e["type"] == "bot" for e in entities):
+        names = sorted(LEGACY_BOT_ALIASES | {BOT_BRAND_NAME.casefold()}, key=len, reverse=True)
+        pattern = r"(?<!\w)(?:" + "|".join(re.escape(name) for name in names) + r")(?!\w)"
+        if re.search(pattern, clean_q, flags=re.IGNORECASE):
+            entities.append({"type": "bot", "name": f"@{BOT_BRAND_NAME}", "id": bot_id, "desc": "Chính Bạn (Tarot Bot / Reader)"})
+            clean_q = re.sub(pattern, BOT_BRAND_NAME, clean_q, flags=re.IGNORECASE)
 
     if not entities:
         return clean_q, "- Phân tích đối tượng: Người hỏi tự hỏi cho chính bản thân mình (không tag đối tượng cụ thể)."
@@ -200,116 +210,48 @@ def extract_question_mentions_context(
 
 
 def _build_tarot_prompt(
-    spread_key: str,
-    spread_name: str,
-    drawn_cards: List[DrawnCard],
-    question: Optional[str],
-    user_name: str,
-    context: Optional[str] = None,
-    reader_style: str = "neutral",
-    recent_context: Optional[Dict] = None,
-    user_id: Optional[int] = None,
-    guild: Optional[Any] = None,
-    bot_id: Optional[int] = None,
-    bot_name: str = "MikeDaBot"
+    spread_key: str, spread_name: str, drawn_cards: List[DrawnCard],
+    question: Optional[str], user_name: str, context: Optional[str] = None,
+    reader_style: str = "auto", recent_context: Optional[Dict] = None,
+    user_id: Optional[int] = None, guild: Optional[Any] = None,
+    bot_id: Optional[int] = None, bot_name: str = BOT_BRAND_NAME,
 ) -> str:
-    """Xây dựng prompt AI có trí nhớ bạn cũ, nhận thức @mentions và yêu cầu trả JSON có cấu trúc."""
     clean_question, mentions_info = extract_question_mentions_context(
-        question=question,
-        user_name=user_name,
-        user_id=user_id,
-        guild=guild,
-        bot_id=bot_id,
-        bot_name=bot_name
+        question, user_name, user_id, guild, bot_id, bot_name,
     )
-
-    cards_context = _format_cards_context(drawn_cards)
-    style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
-    persona_prompt = style_info["persona_prompt"]
-
-    memory_prompt = ""
+    style_info = READER_STYLES.get(reader_style, READER_STYLES["auto"])
+    memory_text = ""
     if recent_context:
-        mem_topic = recent_context.get('topic_tag', 'chung')
-        mem_mood = recent_context.get('mood_tag', '')
-        mem_vibe = f"{mem_topic} ({mem_mood})" if mem_mood else mem_topic
-        memory_prompt = f"""
-        🧠 NGỮ CẢNH LẦN ĐỌC TRƯỚC (khoảng {recent_context.get('approx_time', 'vài ngày trước')}):
-        - Người này từng chiêm nghiệm về chủ đề: [{mem_vibe}], lá bài chủ đạo là [{recent_context.get('last_card_name', '')}].
-        🚨 QUY TẮC NHỚ MANG MÁNG: Nếu bạn muốn liên hệ với lần đọc trước, CHỈ ĐƯỢC nhắc lướt qua một cách tự nhiên như người quen nhớ mang máng (ví dụ: 'Lần trước khi nói về chuyện {mem_topic}, năng lượng có phần chông chênh...'). TUYỆT ĐỐI KHÔNG trích dẫn nguyên văn câu hỏi cũ, KHÔNG bịa đặt chi tiết riêng tư.
-        """.strip()
-
-    ctx_str = f'\n- Bối cảnh thực tế: "{context}"' if context else ""
-    q_str = f'"{clean_question}"' if clean_question else "Tổng quan năng lượng ngày"
-
-    yes_no_info = ""
+        memory_text = (
+            f"Lần trước người hỏi từng xem chủ đề {recent_context.get('topic_tag', 'chung')} "
+            f"với lá {recent_context.get('last_card_name', '')}. Chỉ liên hệ nếu thực sự liên quan; "
+            "không bịa chi tiết hay khẳng định tâm trạng cũ."
+        )
+    verdict = ""
     if spread_key == "yes_no" and drawn_cards:
         badge, verdict_desc, _ = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
-        yes_no_info = f"\n- Phán Quyết Yes / No Chính Thức Của Quẻ Bài: [{badge}] ({verdict_desc})"
+        verdict = f"Phán quyết biểu tượng phải nhất quán: {badge} ({verdict_desc})."
+    spread_guidance = {
+        "daily": "Nhẹ, nhanh, có chút nét riêng.",
+        "single": "Ngắn, như một cuộc trò chuyện; không cần ba đề mục.",
+        "yes_no": "Nêu phán quyết biểu tượng trước, sau đó giải thích; không mâu thuẫn với phán quyết.",
+        "celtic": "Kể một câu chuyện nhất quán qua mười vị trí; có thể dài hơn.",
+    }.get(spread_key, "Nối ý nghĩa các lá thành một mạch, không liệt kê định nghĩa rời rạc.")
+    return f"""
+Bạn là Asumi, một cô gái thông minh, tinh ý, thân thiện, hơi bí ẩn và biết khi nào nên vui hay nghiêm túc. Dùng 'mình' tự nhiên, không tự xưng tên ở mỗi đoạn. Tarot là cách tự chiêm nghiệm, không phải tiên tri.
+Phong cách của Asumi: {style_info['persona_prompt']}
+Người hỏi: {user_name}. Câu hỏi: {clean_question or 'Tổng quan năng lượng ngày'}. Bối cảnh: {context or 'Không có'}.
+{mentions_info}
+Trải bài: {spread_name} ({len(drawn_cards)} lá). {verdict}
+Lá bài và chiều/vị trí chính xác:
+{_format_cards_context(drawn_cards)}
+{memory_text}
 
-    cards_header = "Ý NGHĨA LÁ BÀI" if len(drawn_cards) == 1 else "Ý NGHĨA CÁC LÁ BÀI"
+Chỉ dùng dữ kiện được cung cấp. Gắn biểu tượng lá bài vào câu hỏi, đưa ra góc nhìn và bước thực tế; không đọc suy nghĩ hay bí mật của người khác. Nếu hỏi chuyện riêng tư của hai người thứ ba mà người hỏi không liên quan, từ chối ngắn gọn. Câu hỏi lành mạnh về người trong cuộc vẫn hợp lệ. Khủng hoảng hoặc vấn đề y tế, pháp lý, tài chính cần lời hỗ trợ thực tế, không đùa hay khẳng định chắc chắn.
+Cách trình bày: {spread_guidance} Dùng câu tự nhiên, tránh câu cửa miệng, biệt danh thân mật và văn mẫu. Không bắt buộc tiêu đề cố định.
+Trả JSON hợp lệ với các khóa is_valid, topic_tag, mood_tag, summary_headline, conclusion, cards_analysis, advice, full_reading. full_reading là lời giải hoàn chỉnh dạng Markdown tự nhiên; các trường còn lại là metadata ngắn để parser và giao diện hoạt động. Nếu is_valid=false, full_reading là lời từ chối phù hợp, không tiết lộ dữ liệu riêng tư.
+""".strip()
 
-    prompt = f"""
-    Bạn là Tarot Reader chuyên nghiệp và am tường triết lý 78 lá bài Tarot Rider-Waite.
-    Hãy đọc quẻ bài cho `{user_name}` dựa trên đúng ý nghĩa biểu tượng của các lá bài được rút.
-
-    {persona_prompt}
-
-    {memory_prompt}
-
-    THÔNG TIN QUẺ BÀI:
-    - Người hỏi: `{user_name}` | Câu hỏi: {q_str}{ctx_str}
-    {mentions_info}
-    - Kiểu trải bài: {spread_name} ({len(drawn_cards)} lá){yes_no_info}
-    - Danh sách lá bài & Ý nghĩa biểu tượng chuẩn:
-    {cards_context}
-
-    🚨 NGUYÊN TẮC GIẢI BÀI BẮT BUỘC (QUAN TRỌNG):
-    1. ĐÚNG BẢN CHẤT Ý NGHĨA TAROT: Cả 3 Persona (Orion, Celeste, Jester) đều phải giải đúng ý nghĩa nguyên bản của lá bài.
-    2. SỰ KHÁC BIỆT CHỈ Ở PHONG CÁCH DIỄN ĐẠT:
-       - Orion: phân tích điềm tĩnh, triết lý, thực tế, dứt khoát và sâu sắc.
-       - Celeste: vỗ về, chữa lành, dịu dàng, ấm áp và tìm ánh sáng hy vọng.
-       - Jester: dí dỏm, tếu táo, trào phúng vui tươi nhưng mang tính xây dựng, tuyệt đối KHÔNG công kích cá nhân.
-    3. ĐỘ DÀI VỪA PHẢI, CÔ ĐỌNG & SÚC TÍCH (QUAN TRỌNG - CHỐNG DÀI DÒNG):
-       - Giữ độ dài bài giải vừa phải, súc tích, đi thẳng vào trọng tâm, tuyệt đối KHÔNG viết dài dòng lê thê hay dàn trải nhiều mục không cần thiết.
-       - Mỗi phần cần gãy gọn, giàu thông tin và cô đọng để người đọc tiếp nhận nhanh chóng.
-    4. QUY TẮC ĐẠO ĐỨC & RANH GIỚI TRẢI BÀI (NGƯỜI HỎI & NGƯỜI THỨ BA - BẮT BUỘC TUÂN THỦ):
-       - BẢN CHẤT CỦA TAROT: Tarot là công cụ soi chiếu nội tâm và trao lời khuyên, định hướng hành động cho CHÍNH người đang bốc bài (`{user_name}`).
-       - TRƯỜNG HỢP HỢP LỆ:
-         + Người hỏi (`{user_name}`) hỏi về bản thân mình (công việc, học tập, tình cảm, định hướng phát triển cá nhân).
-         + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là một bên trong mối quan hệ/tình huống đó và đang tìm kiếm góc nhìn, lời khuyên cho chính bản thân mình.
-         + CÂU HỎI VÙNG XÁM / TRÊU ĐÙA / KHEN NGỢI BẠN BÈ: Hoàn toàn hợp lệ (`is_valid: true`). Dùng năng lượng lá bài để nhận xét, tán dương hoặc trêu đùa dí dỏm về người bạn đó.
-       - TRƯỜNG HỢP TUYỆT ĐỐI KHÔNG HỢP LỆ (CHỈ TỪ CHỐI KHI CÓ Ý ĐỒ XẤU / SOI MÓI ĐỜI TƯ ĐỘC HẠI):
-         + Chỉ từ chối (`is_valid: false`) khi người yêu cầu bốc bài (`{user_name}`) KHÔNG NẰM TRONG NHỮNG NGƯỜI MUỐN NHẬN LỜI KHUYÊN, mà bốc bài để soi mói đời tư, bí mật cá nhân, chuyện tình cảm chia tay/cắm sừng/nợ nần giữa hai người thứ ba B và C mà `{user_name}` không phải là người trong cuộc.
-       - HÀNH ĐỘNG KHI CÂU HỎI KHÔNG HỢP LỆ: BẮT BUỘC từ chối khéo léo theo Persona (`is_valid: false`), khuyên `{user_name}` tập trung năng lượng vào cuộc sống và bài học của chính mình.
-    5. TRẢ LỜI ĐÚNG TRỌNG TÂM & LÁI THEO LÁ BÀI:
-       - Người hỏi hỏi về điều gì thì tập trung giải mã đúng điều đó (công việc, học tập, tài chính, hay tình cảm). Tuyệt đối KHÔNG tự suy diễn mọi câu hỏi thành chuyện tình cảm lứa đôi hay áp đặt văn mẫu sáo rỗng.
-       - Gắn hình ảnh, hành động của lá bài với sự việc cụ thể trong câu hỏi.
-       - Lời khuyên phải mang tính hành động cụ thể (Actionable Advice), không sáo rỗng.
-    6. ĐỒNG BỘ TUYỆT ĐỐI VỚI PHÁN QUYẾT YES / NO (NẾU LÀ TRẢI BÀI YES/NO):
-       - Phán quyết Yes/No và toàn bộ bài giải BẮT BUỘC phải đồng thuận với Phán Quyết Yes / No Chính Thức được nêu ở trên.
-    7. PHÂN BIỆT RÕ VAI TRÒ ĐỐI TƯỢNG KHI CÓ TAG (@MENTION) TRONG CÂU HỎI:
-       - Phân biệt 3 đối tượng độc lập: Người bốc bài (`{user_name}`), Thành viên khác được tag (@Name), và Chính Bạn (Tarot Reader).
-
-    🚨 YÊU CẦU ĐỊNH DẠNG ĐẦU RA (BẮT BUỘC TRẢ JSON CHUẨN VỚI 3 MỤC SÚC TÍCH):
-    1. `is_valid`: True nếu hợp lệ, False nếu câu hỏi soi mói đời tư người thứ ba độc hại.
-    2. `topic_tag`: 1 trong các tag `career`, `love`, `finance`, `health`, `study`, `general`.
-    3. `mood_tag`: 1 cụm từ tiếng Việt ngắn gọn mô tả vibe/tâm trạng chủ đạo (ví dụ: 'Cày cuốc chăm chỉ', 'Chữa lành & Tĩnh lặng', 'Thăng hoa & Tự tin'...).
-    4. `summary_headline`: 1 câu tóm tắt cực ngắn (dưới 15 từ) đúc kết thông điệp cốt lõi.
-    5. `conclusion`: Đưa ra câu kết luận trực diện, đúc kết xu hướng trong 1-2 câu súc tích. Trả lời thẳng vào trọng tâm câu hỏi của {user_name}, đồng bộ với phán quyết Yes/No (nếu có).
-    6. `cards_analysis`: Phân tích súc tích từng lá bài trong ngữ cảnh câu hỏi, mỗi lá BẮT BUỘC có gạch đầu dòng '• **Tên lá bài**:' và xuống hàng riêng biệt. Mỗi lá viết cô đọng trong khoảng 2-3 câu, liên kết biểu tượng lá bài với sự việc cụ thể, tuyệt đối không chép định nghĩa lý thuyết dài dòng.
-    7. `advice`: Lời khuyên hành động thực tế (1-2 câu ngắn gọn), thông thái và khích lệ người hỏi.
-    8. `full_reading`: Toàn bộ bài giải hoàn chỉnh dạng Markdown vừa vặn, BẮT BUỘC đúng chuẩn 3 mục phân tách bằng 2 dấu xuống dòng (\\n\\n):
-       🎯 **KẾT LUẬN & TỔNG QUAN:**
-       (Nội dung kết luận trực diện, súc tích 1-2 câu)
-
-       🃏 **{cards_header}:**
-       • **[Tên lá bài 1]**: (Phân tích súc tích 2-3 câu gắn liền sự việc)
-       • **[Tên lá bài 2]**: (Phân tích súc tích 2-3 câu gắn liền sự việc)
-
-       💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**
-       (1-2 câu hành động cụ thể, thực tế)
-    """.strip()
-    return prompt
 
 
 def _clean_and_format_tarot_markdown(text: str) -> str:
@@ -554,13 +496,13 @@ async def generate_tarot_reading(
     drawn_cards: List[DrawnCard],
     question: Optional[str] = None,
     context: Optional[str] = None,
-    reader_style: str = "neutral",
+    reader_style: str = "auto",
     user_name: str = "Bạn",
     recent_context: Optional[Dict] = None,
     user_id: Optional[int] = None,
     guild: Optional[Any] = None,
     bot_id: Optional[int] = None,
-    bot_name: str = "MikeDaBot"
+    bot_name: str = BOT_BRAND_NAME
 ) -> Tuple[str, str, str, str, bool]:
     """
     Gọi AI phân tích quẻ bài với Concurrency Semaphore và Fallback Cascade:
@@ -669,12 +611,12 @@ async def generate_followup_answer(
     original_question: Optional[str],
     original_reading: str,
     user_followup_question: str,
-    reader_style: str = "neutral",
+    reader_style: str = "auto",
     user_name: str = "Bạn",
     user_id: Optional[int] = None,
     guild: Optional[Any] = None,
     bot_id: Optional[int] = None,
-    bot_name: str = "MikeDaBot"
+    bot_name: str = BOT_BRAND_NAME
 ) -> str:
     """
     Trả lời câu hỏi đào sâu bổ sung của người dùng dựa trên ngữ cảnh quẻ bài vừa giải.
@@ -690,11 +632,11 @@ async def generate_followup_answer(
     )
 
     cards_context = _format_cards_context(drawn_cards)
-    style_info = READER_STYLES.get(reader_style, READER_STYLES["neutral"])
+    style_info = READER_STYLES.get(reader_style, READER_STYLES["auto"])
     persona_prompt = style_info["persona_prompt"]
 
     prompt = f"""
-    Bạn là Tarot Reader. Người hỏi `{user_name}` vừa bốc một quẻ bài và có một câu hỏi thắc mắc thêm để làm rõ ý nghĩa.
+    Bạn là Asumi, cùng người vừa giải bài. Người hỏi `{user_name}` vừa bốc một quẻ bài và có một câu hỏi thắc mắc thêm để làm rõ ý nghĩa.
     {persona_prompt}
 
     THÔNG TIN QUẺ BÀI ĐÃ RÚT:
@@ -716,7 +658,7 @@ async def generate_followup_answer(
       + Tarot là công cụ soi chiếu nội tâm cho chính người hỏi `{user_name}`.
       + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là người trong cuộc đang tìm kiếm lời khuyên, hoặc đây là câu hỏi trêu đùa/khen ngợi bạn bè lành mạnh trong server (vùng xám/banter - KHÔNG được quá strict).
       + CHỈ TỪ CHỐI nếu câu hỏi mang tính soi mói đời tư, bí mật độc hại của bên thứ ba mà `{user_name}` không liên quan.
-      + Khi câu hỏi không hợp lệ, hãy từ chối trả lời khéo léo theo đúng Persona (Orion nghiêm nghị giữ ranh giới, Celeste dịu dàng nhắc nhở tôn trọng riêng tư, Jester cà khịa tính hóng chuyện thiên hạ) và khuyên `{user_name}` tập trung năng lượng vào bản thân.
+      + Khi câu hỏi không hợp lệ, từ chối nhẹ nhàng và hướng người hỏi về điều họ có thể tự quyết định. Không đổi nhân vật hay dùng câu đùa cố định.
     """.strip()
 
     models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
@@ -762,7 +704,7 @@ async def generate_followup_answer(
                     continue
                 continue
 
-    return f"✨ Dựa trên các lá bài đã rút, vũ trụ nhắc nhở bạn hãy giữ tâm thế vững vàng, lắng nghe trực giác bên trong khi đối diện với câu hỏi '{user_followup_question}'."
+    return "Mình chưa thể giải thích thêm lúc này. Bạn thử hỏi lại sau nhé."
 
 
 def recommend_spread_for_question(question: str) -> Tuple[str, str, str]:

@@ -2,11 +2,12 @@ import io
 import re
 from collections import OrderedDict
 import discord
+from core.branding import BOT_BRAND_NAME
 
 # Cache webhook theo channel ID để tránh tạo lại mỗi lần gửi.
 _webhook_cache: dict[int, discord.Webhook] = {}
 
-WEBHOOK_NAME = "MikeDaBot Proxy"
+WEBHOOK_NAME = f"{BOT_BRAND_NAME} Proxy"
 
 # Giới hạn ký tự tối đa cho content gửi qua Discord API
 _MAX_CONTENT_LENGTH = 2000

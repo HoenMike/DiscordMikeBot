@@ -114,6 +114,48 @@ _FAILED_DOMAINS_CACHE: dict[str, float] = {}
 _FAILED_DOMAIN_TTL = 30.0  # 30 giây
 
 
+def is_generic_or_login_preview(
+    title: str = "", description: str = "", final_url: str = "",
+    meta_tags: dict[str, str] | None = None, platform_key: str = "",
+) -> bool:
+    """Kết hợp ngữ cảnh metadata; câu trích dẫn trong bài thật không phải trang login."""
+    from html import unescape
+    import unicodedata
+
+    if platform_key != "facebook":
+        return False
+    tags = meta_tags or {}
+    title = title or tags.get("og:title") or tags.get("twitter:title") or ""
+    description = description or tags.get("og:description") or tags.get("twitter:description") or ""
+    def normalize(value):
+        value = unicodedata.normalize("NFKC", unescape(value or "")).casefold()
+        return re.sub(r"\s+", " ", value).strip(" .|–—-")
+
+    title, description = normalize(title), normalize(description)
+    path = urlparse(final_url).path.casefold()
+    if re.search(r"/(?:login(?:\.php)?|checkpoint|challenge|auth)(?:/|$)", path):
+        return True
+    service_title = title in {"", "facebook", "facebook | facebook", "facebed"}
+    auth_pattern = r"^(?:facebook\s*[-–—|:]?\s*)?(?:log\s*(?:in|into)|sign\s*(?:in|up)|login|đăng nhập)\b"
+    auth_title = bool(re.search(auth_pattern, title))
+    auth_description = bool(re.search(auth_pattern, description))
+    landing_description = description.startswith("see posts, photos and more on facebook")
+    unavailable = description.startswith(("this content isn't available", "this content is not available", "this post is private"))
+    image = tags.get("og:image") or tags.get("twitter:image") or ""
+    generic_image = bool(re.search(r"(?:^|[/_.-])(?:logo|favicon|placeholder|facebook_icon)(?:[/_.-]|$)", urlparse(image).path.casefold()))
+    video = any(tags.get(key) for key in ("og:video", "og:video:url", "og:video:secure_url", "twitter:player", "twitter:player:stream"))
+    error_title = title.startswith(("this content isn't available", "this content is not available", "this reel is unavailable", "this post is private", "post unavailable", "page not found"))
+    if error_title:
+        return True
+    if service_title or auth_title:
+        if auth_title or auth_description or landing_description or unavailable:
+            return True
+        # A service name plus an opaque CDN image is not evidence of a post.
+        if not description and not video:
+            return True
+    return False
+
+
 def _mark_domain_failed(domain: str) -> None:
     """Đánh dấu domain tạm thời bị lỗi server/mạng để cooldown."""
     if domain:
@@ -311,7 +353,7 @@ async def validate_via_og_metadata(
             html_text = content.decode("utf-8", errors="ignore")
 
             # Kiểm tra nếu trang chứa thông báo gỡ bỏ / ngừng dịch vụ / chặn truy cập
-            if _DEAD_OR_ERROR_PATTERN.search(html_text):
+            if platform_key != "facebook" and _DEAD_OR_ERROR_PATTERN.search(html_text):
                 print(
                     f"[ProxyValidator] Proxy trả về thông báo lỗi/ngừng dịch vụ: {proxy_url}",
                     flush=True,
@@ -320,6 +362,11 @@ async def validate_via_og_metadata(
 
             # Trích xuất toàn bộ thẻ meta property/name -> content
             meta_tags = _extract_meta_tags(html_text)
+
+            if is_generic_or_login_preview(
+                final_url=final_url_str, meta_tags=meta_tags, platform_key=platform_key,
+            ):
+                return False, False
 
             # 1. Kiểm tra sự tồn tại của media thực tế (ảnh, video, audio, player)
             has_media = False
@@ -362,7 +409,7 @@ async def validate_via_og_metadata(
                 )
                 return False, False
 
-            if combined_text.lower() not in _GENERIC_SERVICE_NAMES and not _DEAD_OR_ERROR_PATTERN.search(combined_text):
+            if combined_text.lower() not in _GENERIC_SERVICE_NAMES and (platform_key == "facebook" or not _DEAD_OR_ERROR_PATTERN.search(combined_text)):
                 return True, is_nsfw
 
             print(
@@ -403,6 +450,8 @@ async def find_valid_proxy(
     original_url: str,
     platform_key: str,
     guild_proxy_domains: list[str] | None = None,
+    excluded_domains: set[str] | None = None,
+    attempted_domains: set[str] | None = None,
 ) -> tuple[str | None, bool]:
     """Thực hiện Chain of Responsibility: thử từng proxy domain theo thứ tự ưu tiên. Trả về (proxy_url, is_nsfw)."""
     if guild_proxy_domains is not None:
@@ -419,6 +468,10 @@ async def find_valid_proxy(
 
     now = time.monotonic()
     for i, domain in enumerate(proxy_domains, start=1):
+        if domain in (excluded_domains or set()):
+            continue
+        if attempted_domains is not None:
+            attempted_domains.add(domain)
         if domain in _FAILED_DOMAINS_CACHE:
             if now < _FAILED_DOMAINS_CACHE[domain]:
                 print(

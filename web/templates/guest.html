@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MikeDaBot — Trợ Lý Discord Toàn Diện & Thông Minh</title>
-    <meta name="description" content="Trang thông tin chính thức của MikeDaBot: Tự động nhúng video 9 mạng xã hội, bốc bài Tarot chiêm tinh 78 lá, tóm tắt tin nhắn AI MapReduce và nhật ký cập nhật changelog mới nhất.">
+    <title>Asumi — Bot Discord đa tính năng</title>
+    <meta name="description" content="Trang thông tin của bot Discord Asumi: tạo bản xem trước liên kết mạng xã hội, trải bài Tarot, tóm tắt hội thoại bằng AI và xem lịch sử cập nhật.">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -117,15 +117,15 @@
             <!-- Brand & Identity -->
             <a href="/" class="flex items-center gap-3 group">
                 <div class="relative">
-                    <img id="nav-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="MikeDaBot Avatar" class="w-9 h-9 rounded-xl ring-1 ring-white/20 object-cover bg-brand-700 shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <img id="nav-avatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="Asumi Avatar" class="w-9 h-9 rounded-xl ring-1 ring-white/20 object-cover bg-brand-700 shadow-md group-hover:scale-105 transition-transform duration-300">
                     <span id="nav-status-indicator" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-dark-bg"></span>
                 </div>
                 <div class="flex flex-col">
                     <div class="flex items-center gap-2">
-                        <span id="nav-bot-name" class="font-bold text-base text-white tracking-tight group-hover:text-brand-300 transition-colors">MikeDaBot</span>
-                        <span id="nav-version-badge" class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-brand-500/15 text-brand-300 border border-brand-500/30 code-font">v2.6.0</span>
+                        <span id="nav-bot-name" class="font-bold text-base text-white tracking-tight group-hover:text-brand-300 transition-colors">Asumi</span>
+                        <span id="nav-version-badge" class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-brand-500/15 text-brand-300 border border-brand-500/30 code-font">v{{ release_version }}</span>
                     </div>
-                    <span class="text-[10px] text-slate-400 font-medium tracking-wide">Discord Bot Assistant</span>
+                    <span class="text-[10px] text-slate-400 font-medium tracking-wide">Bot Discord đa tính năng</span>
                 </div>
             </a>
 
@@ -176,13 +176,13 @@
                     </span>
                     <span id="hero-status-text">Hệ thống đang hoạt động ổn định</span>
                     <span class="text-white/20">•</span>
-                    <span class="code-font text-brand-300 font-semibold" id="hero-version-pill">v2.6.0</span>
+                    <span class="code-font text-brand-300 font-semibold" id="hero-version-pill">v{{ release_version }}</span>
                 </div>
 
                 <!-- Big Headline -->
                 <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight max-w-4xl mx-auto">
                     Nâng Tầm Trải Nghiệm Máy Chủ Với 
-                    <span class="bg-gradient-to-r from-brand-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">Trợ Lý Thông Minh</span>
+                    <span class="bg-gradient-to-r from-brand-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">Bot Discord Asumi</span>
                 </h1>
 
                 <!-- Subtitle -->
@@ -194,11 +194,11 @@
                 <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
                     <a id="hero-invite-btn" href="#" target="_blank" class="inline-flex items-center gap-2.5 px-6 py-3.5 text-sm font-semibold rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-xl shadow-brand-600/30 transition-all duration-300 active:scale-95">
                         <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                        <span>Thêm MikeDaBot Vào Discord</span>
+                        <span>Thêm Asumi Vào Discord</span>
                     </a>
                     <a href="#changelog" class="inline-flex items-center gap-2 px-5 py-3.5 text-sm font-semibold rounded-2xl glass-panel text-slate-200 hover:text-white hover:bg-slate-800/80 transition-all duration-300 active:scale-95">
                         <i data-lucide="newspaper" class="w-4 h-4 text-emerald-400"></i>
-                        <span>Xem Bản Cập Nhật v2.6.0</span>
+                        <span>Xem Bản Cập Nhật v{{ release_version }}</span>
                     </a>
                 </div>
 
@@ -318,7 +318,7 @@
                         <ul class="space-y-2 text-xs text-slate-400">
                             <li class="flex items-center gap-2">
                                 <i data-lucide="check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-                                <span>3 phong cách Reader: <strong>Orion</strong> (Logic), <strong>Celeste</strong> (Thấu cảm), <strong>Jester</strong> (Cà khịa).</span>
+                                <span>Asumi có bốn phong cách: <strong>Tự động</strong>, <strong>Tĩnh</strong>, <strong>Dịu</strong> và <strong>Tinh quái</strong>.</span>
                             </li>
                             <li class="flex items-center gap-2">
                                 <i data-lucide="check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
@@ -449,11 +449,11 @@
                             <span id="latest-badge-type" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-brand-500/20 text-brand-300 border border-brand-500/30">
                                 ✨ [FEATURE UPDATE]
                             </span>
-                            <span id="latest-version" class="text-xl font-extrabold text-white code-font tracking-tight">v2.6.0</span>
-                            <span id="latest-date" class="text-xs text-slate-400">2026-09-04</span>
+                            <span id="latest-version" class="text-xl font-extrabold text-white code-font tracking-tight">v{{ release_version }}</span>
+                            <span id="latest-date" class="text-xs text-slate-400">{{ release_date }}</span>
                         </div>
                         <span id="latest-codename" class="text-xs text-brand-300 font-medium italic">
-                            Public Guest Landing Page & Role-Based Dashboard Architecture
+                            {{ release_codename }}
                         </span>
                     </div>
 
@@ -493,11 +493,11 @@
     <footer class="glass-panel border-t border-white/5 py-8 mt-auto z-10">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <div class="flex items-center gap-3">
-                <span class="font-semibold text-slate-200">MikeDaBot</span>
+                <span class="font-semibold text-slate-200">Asumi</span>
                 <span>•</span>
-                <span>Phiên bản <strong class="text-brand-300 code-font">v2.6.0</strong></span>
+                <span>Phiên bản <strong class="text-brand-300 code-font">v{{ release_version }}</strong></span>
                 <span>•</span>
-                <span>© 2026 MikeDaBot Team.</span>
+                <span>© 2026 Asumi Team.</span>
             </div>
             <div class="flex items-center gap-5">
                 <a href="#features" class="hover:text-white transition-colors">Tính năng</a>

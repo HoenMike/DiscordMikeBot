@@ -9,6 +9,7 @@ from discord.ext import commands
 from core.config_manager import ConfigManager
 from core.activity_logger import activity_logger
 from core.version import CURRENT_VERSION
+from core.branding import BOT_BRAND_NAME
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -85,7 +86,7 @@ class SummaryBot(commands.Bot):
                     reason = self.config_manager.get_guild_suspension_reason(interaction.guild.id) or "Quản trị viên tạm ngừng"
                     guild_name = interaction.guild.name
                     msg = (
-                        f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng MikeDaBot.**\n"
+                        f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng {BOT_BRAND_NAME}.**\n"
                         f"📝 **Lý do:** *{reason}*\n"
                         f"👉 *Vui lòng liên hệ Quản trị viên bot để biết thêm chi tiết.*"
                     )
@@ -201,7 +202,7 @@ class SummaryBot(commands.Bot):
                 reason = self.config_manager.get_guild_suspension_reason(message.guild.id) or "Quản trị viên tạm ngừng"
                 guild_name = message.guild.name
                 msg = (
-                    f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng MikeDaBot.**\n"
+                    f"⛔ **Máy chủ `{guild_name}` hiện đang bị tạm ngừng sử dụng {BOT_BRAND_NAME}.**\n"
                     f"📝 **Lý do:** *{reason}*\n"
                     f"👉 *Vui lòng liên hệ Quản trị viên bot để biết thêm chi tiết.*"
                 )
@@ -228,9 +229,9 @@ bot = SummaryBot()
 
 def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
     embed = discord.Embed(
-        title="🤖 HƯỚNG DẪN SỬ DỤNG MIKEBOT (TỔNG QUAN & TÍNH NĂNG MỚI)",
+        title=f"🤖 HƯỚNG DẪN SỬ DỤNG {BOT_BRAND_NAME.upper()} (TỔNG QUAN & TÍNH NĂNG MỚI)",
         description=(
-            "Chào mừng bạn đến với **MikeDaBot**! Trợ lý Discord thông minh tích hợp AI đa nhiệm, "
+            f"Chào mừng bạn đến với **{BOT_BRAND_NAME}**! Bot Discord đa tính năng tích hợp AI, "
             "hỗ trợ cả **Slash Command** (`/`) lẫn **Prefix Command** (`.m`, `.M`).\n\n"
             "💡 *Hãy sử dụng menu thả xuống bên dưới để tra cứu chi tiết từng tính năng & cơ chế QoL!*"
         ),
@@ -240,7 +241,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         name="🔮 1. BỐC BÀI TAROT (CHIÊM TINH)",
         value=(
             "• Rút bài 78 lá Rider-Waite với hình ảnh Canvas trực quan độ phân giải cao.\n"
-            "• Luận giải đa tầng với 3 tính cách Reader độc đáo (`Orion`, `Celeste`, `Jester`).\n"
+            "• Một Asumi với bốn phong cách: Tự động, Tĩnh, Dịu và Tinh quái.\n"
             "• Hạt nhân năng lượng vũ trụ theo khung giờ (1 tiếng/khung) & Nút đánh giá phản hồi.\n"
             "👉 **Lệnh:** `/tarot`, `.m tarot` | **Xem chi tiết:** Chọn mục `🔮 Tarot` bên dưới."
         ),
@@ -283,7 +284,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Hybrid Engine v{CURRENT_VERSION}",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Hybrid Engine v{CURRENT_VERSION}",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -314,19 +315,20 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.add_field(
-        name="🎭 3 NGƯỜI GIẢI BÀI (AI READERS)",
+        name="🎭 PHONG CÁCH CỦA ASUMI",
         value=(
-            "• **⚖️ Orion**: Trưởng thành, ôn hòa, điềm đạm, phân tích logic và thực tế.\n"
-            "• **🌸 Celeste**: Dịu dàng, ấm áp, thấu cảm và vỗ về cảm xúc tâm hồn.\n"
-            "• **🃏 Jester**: Tinh quái, trào phúng, hài hước châm biếm và 'bẻ lái' bất ngờ.\n"
-            "• **🎲 Ngẫu Nhiên**: Tự động chọn ngẫu nhiên 1 trong 3 Reader."
+            "• **✨ Tự động**: Asumi tự bắt nhịp với câu hỏi.\n"
+            "• **🌙 Tĩnh**: Điềm đạm và trực diện.\n"
+            "• **🌸 Dịu**: Ấm áp và tinh tế.\n"
+            "• **🃏 Tinh quái**: Lém lỉnh đúng lúc.\n"
+            "Chọn **Tự động** để Asumi tự bắt nhịp với câu hỏi của bạn."
         ),
         inline=False
     )
     embed.add_field(
         name="💡 DANH SÁCH LỆNH TAROT ĐẦY ĐỦ",
         value=(
-            "• `/tarot` hoặc `.m tarot` : Mở bảng chọn kiểu bài & Reader trực quan\n"
+            "• `/tarot` hoặc `.m tarot` : Mở bảng chọn kiểu bài & phong cách Asumi\n"
             "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `.m tarot yes_no Có nên đổi việc?`\n"
             "• `/tarot_history` hoặc `.m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
             "• `/tarot_recommend [question]` hoặc `.m tarot recommend [câu hỏi]` : AI gợi ý kiểu trải bài phù hợp nhất\n"
@@ -349,7 +351,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Tarot Engine v2.0",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Tarot Engine v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -406,7 +408,7 @@ def build_summary_help_embed(user: Union[discord.User, discord.Member]) -> disco
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Summary Engine v2.0",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Summary Engine v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -457,7 +459,7 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot AutoEmbed v2.0",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} AutoEmbed v2.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
@@ -499,14 +501,14 @@ def build_cabin_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • MikeBot Cabin Engine v1.0",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Cabin Engine v1.0",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
 
 
 class HelpView(discord.ui.View):
-    """View điều hướng tương tác giữa các trang hướng dẫn của MikeBot."""
+    """View điều hướng tương tác giữa các trang hướng dẫn của Asumi."""
 
     def __init__(self, author_id: int, current_tab: str = "overview", timeout: float = 180.0):
         super().__init__(timeout=timeout)
@@ -523,13 +525,13 @@ class HelpView(discord.ui.View):
                 discord.SelectOption(
                     label="🌐 Tổng Quan Tính Năng",
                     value="overview",
-                    description="Xem tổng quan tất cả các lệnh của MikeBot",
+                    description="Xem tổng quan tất cả các lệnh của Asumi",
                     default=(self.current_tab == "overview")
                 ),
                 discord.SelectOption(
                     label="🔮 Bốc Bài Tarot (Chi Tiết)",
                     value="tarot",
-                    description="Hướng dẫn 9 trải bài, 3 Reader & cú pháp bốc Tarot",
+                    description="Hướng dẫn 9 trải bài, 4 phong cách & cú pháp bốc Tarot",
                     default=(self.current_tab == "tarot")
                 ),
                 discord.SelectOption(
@@ -659,7 +661,7 @@ async def send_bot_help(
         print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Help: {act_err}", flush=True)
 
 
-@bot.tree.command(name="help", description="Xem hướng dẫn sử dụng chi tiết các tính năng của MikeBot")
+@bot.tree.command(name="help", description="Xem hướng dẫn sử dụng chi tiết các tính năng của Asumi")
 @app_commands.describe(feature="Chọn tính năng bạn muốn xem hướng dẫn chi tiết")
 @app_commands.choices(feature=[
     app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
@@ -675,7 +677,7 @@ async def help_slash(
     await send_bot_help(interaction, feature=chosen, ephemeral=True)
 
 
-@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng MikeBot (Tarot, Tóm tắt, Embed)")
+@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng Asumi (Tarot, Tóm tắt, Embed)")
 @app_commands.describe(feature="Chọn tính năng bạn muốn xem hướng dẫn chi tiết")
 @app_commands.choices(feature=[
     app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
@@ -882,5 +884,3 @@ async def sync_cmd(ctx: commands.Context, scope: str = "guild"):
             await msg.edit(content=f"✨ **Đã đồng bộ tức thì {len(synced)} Slash Commands cho `{ctx.guild.name}`!**\n📋 Danh sách: `{sorted([c.name for c in synced])}`")
         except Exception as e:
             await ctx.reply(f"❌ Lỗi khi đồng bộ guild: {e}", mention_author=False)
-
-

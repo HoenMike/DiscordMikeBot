@@ -19,6 +19,13 @@ app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 't
 app.secret_key = config.FLASK_SECRET_KEY
 
 
+@app.context_processor
+def release_template_context():
+    from core.version import RELEASE_DATE, CODENAME
+    return {"release_version": CURRENT_VERSION, "release_date": RELEASE_DATE,
+            "release_codename": CODENAME}
+
+
 def check_password_hash(provided_password: str) -> bool:
     """Kiểm tra mật khẩu bảo mật bằng HMAC SHA-256 an toàn chống timing attack."""
     expected_pw = getattr(config, "ADMIN_PASSWORD", "")
@@ -144,7 +151,8 @@ def api_public_stats():
     bot_status = "Offline"
     guild_count = 0
     total_users = 0
-    bot_name = "MikeDaBot"
+    from core.branding import BOT_BRAND_NAME, runtime_bot_name
+    bot_name = BOT_BRAND_NAME
     bot_avatar = "https://cdn.discordapp.com/embed/avatars/0.png"
     bot_id = ""
     invite_url = ""
@@ -162,7 +170,7 @@ def api_public_stats():
         guild_count = len(bot.guilds)
         total_users = sum(g.member_count for g in bot.guilds if g.member_count)
         if bot.user:
-            bot_name = bot.user.name
+            bot_name = runtime_bot_name(bot.user)
             bot_avatar = bot.user.display_avatar.url if bot.user.display_avatar else bot_avatar
             bot_id = str(bot.user.id)
             invite_url = f"https://discord.com/oauth2/authorize?client_id={bot_id}&permissions=275414838784&scope=bot%20applications.commands"

@@ -10,16 +10,35 @@ Quy tắc phiên bản: Major.Minor.BugFix (Ví dụ: 2.4.1)
 from typing import Dict, List, Any, Optional
 import discord
 
-CURRENT_VERSION = "2.7.4"
-RELEASE_DATE = "2026-09-09"
-CODENAME = "Bot Init Safety Lock & Cabin Commands Restoration"
+from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.7.6"
-RELEASE_DATE = "2026-09-17"
-CODENAME = "Modal Limit Clamp & Cooldown Message Restoration"
+CURRENT_VERSION = "2.8.0"
+RELEASE_DATE = "2026-09-25"
+CODENAME = "Asumi - Verified Embeds & Unified Reader"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.8.0",
+        "date": "2026-09-25",
+        "type": "minor",
+        "title": "Asumi: Xác minh bản xem trước & Thống nhất phong cách Tarot",
+        "summary": "Asumi là tên sản phẩm mới. Preview proxy được xác minh trên Discord trước khi tính thành công; Tarot dùng một Asumi với nhiều phong cách và chế độ Tự động mặc định.",
+        "changes": [
+            {"category": "✨ Tên gọi Asumi", "items": [
+                "Cập nhật tên hiện tại trong Discord, website, help, Cabin và version tracker; giữ alias cũ để nhận câu hỏi và giữ nguyên tên hạ tầng/lịch sử.",
+            ]},
+            {"category": "🪝 Bản xem trước mạng xã hội có xác minh", "items": [
+                "Chặn thẻ đăng nhập/generic Facebook dù có OG image; xác minh Discord unfurl trong khoảng chờ giới hạn.",
+                "Thử proxy tiếp theo khi preview không dùng được; dọn tin nhắn lỗi và chuyển sang fallback yt-dlp nếu cần.",
+                "Chỉ ẩn embed gốc và ghi thành công khi đã có bản xem trước dùng được.",
+            ]},
+            {"category": "🔮 Một Asumi với nhiều phong cách Tarot", "items": [
+                "Một nhân vật Asumi với Tự động, Tĩnh, Dịu, Tinh quái; Tự động là mặc định.",
+                "Prompt ngắn hơn, bám ngữ cảnh và giữ an toàn; style ID cũ và lịch sử/rating vẫn tương thích.",
+            ]},
+        ],
+    },
     {
         "version": "2.7.6",
         "date": "2026-09-17",
@@ -969,7 +988,7 @@ def build_version_embed(user: Optional[discord.User | discord.Member] = None) ->
     }.get(latest.get("type", "minor"), "✨ [UPDATE]")
 
     embed = discord.Embed(
-        title=f"🤖 THÔNG TIN PHIÊN BẢN MIKEBOT — v{CURRENT_VERSION}",
+        title=f"🤖 THÔNG TIN PHIÊN BẢN {BOT_BRAND_NAME.upper()} — v{CURRENT_VERSION}",
         description=(
             f"**{badge_type}**: **{latest['title']}**\n"
             f"📅 **Ngày phát hành:** `{latest['date']}` • **Codename:** *{CODENAME}*\n\n"
@@ -997,7 +1016,7 @@ def build_version_embed(user: Optional[discord.User | discord.Member] = None) ->
 
     if user:
         embed.set_footer(
-            text=f"Yêu cầu bởi {user.display_name} • MikeDaBot Version Tracker",
+            text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Version Tracker",
             icon_url=user.display_avatar.url if user.display_avatar else None
         )
     return embed

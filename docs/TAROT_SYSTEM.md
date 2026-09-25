@@ -1,6 +1,8 @@
 # 🔮 TÀI LIỆU HỆ THỐNG BỐC BÀI VÀ LUẬN GIẢI TAROT AI (TAROT SYSTEM ARCHITECTURE)
 
-Tài liệu này mô tả chi tiết toàn bộ kiến trúc, luồng xử lý và cách thức vận hành của tính năng **Tarot AI** trong dự án **DiscordMikeBot**.
+Tài liệu này mô tả kiến trúc và luồng xử lý Tarot AI của **Asumi** (repository DiscordMikeBot).
+
+> v2.8.0: Asumi là nhân vật Tarot duy nhất. `auto` là mặc định; `neutral`, `healer`, `chaos` là các style ID tương thích dữ liệu cũ, nay hiển thị lần lượt là Tĩnh, Dịu, Tinh quái. Prompt mới điều chỉnh cách nói theo câu hỏi, vẫn dùng schema JSON và các ranh giới an toàn hiện có.
 
 ---
 
@@ -142,17 +144,10 @@ Sử dụng thư viện **Pillow (PIL)** để tạo ảnh chất lượng cao m
 ### 3.3. Module Trí Tuệ Nhân Tạo & Fallback Cascade (`ai.py`)
 Sử dụng SDK mới nhất của Google (`google-genai`):
 
-#### Danh sách Model Fallback Cascade:
-Khi gọi AI, hệ thống sẽ tuần tự thử qua các model:
-1. `gemini-2.5-flash` *(Ưu tiên 1 - Tốc độ nhanh nhất, thông minh)*
-2. `gemini-2.5-pro` *(Ưu tiên 2 - Sâu sắc, phân tích đa chiều)*
-3. `gemini-2.0-flash` *(Ưu tiên 3 - Dự phòng hiệu năng cao)*
-4. `gemini-1.5-flash` *(Ưu tiên 4 - Ổn định)*
-5. `gemma-4-31b-it` *(Ưu tiên 5 - Fallback mã nguồn mở)*
-
-- **Cơ chế Timeout 12 giây**: Mỗi model chỉ được tối đa 12s để phản hồi. Nếu bị trễ hoặc nghẽn, lập tức fallback sang model kế tiếp để tránh làm gián đoạn trải nghiệm người dùng.
+#### Model Fallback Cascade:
+`features/tarot/ai.py` dùng `config.TAROT_FALLBACK_MODELS` (hoặc danh sách mặc định trong module), bỏ model trùng và thử tuần tự. Timeout là 16 giây cho bài dưới 5 lá, 26 giây cho bài dài; follow-up dùng 12 giây.
 - **Prompt Engineering chuyên sâu**:
-  - Tích hợp tính cách theo từng **Reader Style** (`neutral`, `healer`, `chaos`).
+  - Một Asumi với `auto` mặc định; các ID `neutral`, `healer`, `chaos` tương ứng Tĩnh, Dịu, Tinh quái để giữ tương thích dữ liệu.
   - Gợi mở câu hỏi người dùng đặt ra kết hợp với bối cảnh cuộc sống.
   - Phân tích tương quan giữa các lá bài, sự chuyển dịch từ Quá khứ sang Tương lai hoặc mâu thuẫn giữa 2 lựa chọn.
   - Dọn dẹp lời chào rườm rà qua Regex, trả về văn bản mạch lạc, bố cục rõ ràng với emoji tinh tế.
@@ -214,13 +209,14 @@ Gồm 2 tầng View Discord UI:
 
 ---
 
-### 4.2. Danh Sách 3 Phong Cách Reader
+### 4.2. Phong cách của Asumi
 
 | Phong Cách | Biểu Tượng | Đặc Điểm Giọng Văn & Phong Thái |
 | :--- | :---: | :--- |
-| `neutral` | 🧙‍♂️ | **Chiêm tinh gia thông thái**: Khách quan, chuẩn mực, học thuật, phân tích đa chiều. |
-| `healer` | 🌿 | **Người chữa lành (Healer)**: Dịu dàng, thấu cảm, vỗ về tâm hồn, hướng đến bình an. |
-| `chaos` | 😈 | **Nhà tiên tri "Cà khịa" (Chaos/Savage)**: Hài hước, châm biếm sâu cay, nói thẳng sự thật nhưng trúng tim đen. |
+| `auto` | ✨ | **Tự động**: Asumi tự chọn mức ấm áp, rõ ràng và hài hước theo câu hỏi. |
+| `neutral` | 🌙 | **Tĩnh**: Điềm đạm, sâu sắc, trực diện. |
+| `healer` | 🌸 | **Dịu**: Ấm áp và tinh tế, không ép ngôn ngữ chữa lành. |
+| `chaos` | 🃏 | **Tinh quái**: Lém lỉnh đúng lúc, không đùa khi vấn đề nghiêm túc. |
 
 ---
 
@@ -229,7 +225,7 @@ Gồm 2 tầng View Discord UI:
 1. **Khởi chạy lệnh**:
    - Người dùng gõ `/tarot` hoặc `$m tarot "Tôi có nên đổi việc không?"`.
 2. **Chọn thông số quẻ**:
-   - Menu xuất hiện $\rightarrow$ Chọn Trải bài (vd: `Quá khứ - Hiện tại - Tương lai`) $\rightarrow$ Chọn Phong cách (`Healer`) $\rightarrow$ Bấm *"🔮 Bắt đầu bốc bài"*.
+   - Menu xuất hiện $\rightarrow$ Chọn trải bài và phong cách Asumi (mặc định `auto`) $\rightarrow$ Bấm *"🔮 Bắt đầu bốc bài"*.
 3. **Bốc bài & Khởi động AI ngầm**:
    - Server bốc 3 lá ngẫu nhiên (vd: *The Fool*, *Three of Swords [NGƯỢC]*, *The Star*).
    - Render ảnh 3 lá mặt úp.
