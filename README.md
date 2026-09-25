@@ -71,6 +71,19 @@ Giao diện web Flask hiển thị thông tin giám sát thời gian thực:
 - Console log trực tiếp.
 - Kết quả kiểm thử từ lệnh `/test_tomtat`.
 
+### Asumi Watch Engine (Theo dõi Web & Cảnh báo thông minh)
+
+Hệ thống giám sát Web bền vững (Persistent Web Monitoring) hỗ trợ theo dõi các chủ đề tin tức, thông báo phát hành, diễn biến drama hoặc điều kiện cụ thể trong tương lai.
+
+- **Brave Search Integration**: Sử dụng Brave Search API làm nguồn tìm kiếm Web tổng quát. Key là tùy chọn; nếu chưa cấu hình bot vẫn hoạt động bình thường các tính năng khác.
+- **Quản lý hạn ngạch (Search Budget)**: Hạn ngạch request hàng tháng có thể cấu hình (mặc định 900 request), kèm cơ chế điều tiết mềm chia đều theo ngày và bộ nhớ đệm Search Cache TTL 6 giờ dùng chung giữa các Watch có cùng truy vấn.
+- **Tiết kiệm chi phí tối đa (Delta-first)**:
+  - Không có kết quả mới $\rightarrow$ Không gọi Gemini $\rightarrow$ Không gửi thông báo Discord.
+  - Lần chạy đầu tiên (First-run) thiết lập ngữ cảnh nền (Silent Baseline), không làm phiền người dùng với các bài báo cũ.
+- **Phân tách Trạng Thái Discovered != Evaluated**: Kết quả tìm kiếm mới được lưu trữ bền vững. Nếu Gemini gặp sự cố, ứng viên vẫn được giữ nguyên trạng thái để thử lại sau mà không cần tốn thêm request tìm kiếm Brave.
+- **AI Đánh giá thay đổi có ý nghĩa**: Mô hình `GEMINI_DATA_MODEL` phân biệt rõ giữa URL mới và sự kiện mới thật sự (chống duplicate bài viết tổng hợp, rewrite SEO); phòng vệ prompt-injection nghiêm ngặt từ nội dung web không đáng tin cậy.
+- **Thông báo có nguồn dẫn**: Trích xuất 1–3 nguồn uy tín nhất, trình bày rõ ràng, không tag @everyone.
+
 ### Graceful Shutdown
 
 Khi nhận tín hiệu tắt (SIGTERM/SIGINT), bot hoãn tối đa 15 giây để hoàn thành các lệnh tóm tắt đang xử lý, gửi thông báo cho người dùng, sau đó đóng kết nối.
@@ -173,6 +186,21 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 
 Xem lại danh sách tối đa 5 lượt bốc bài gần nhất của bản thân (gửi dưới dạng tin nhắn riêng ephemeral).
 
+### `/watch`
+
+Nhóm lệnh quản lý hệ thống giám sát Web bền vững (Asumi Watch Engine):
+
+| Lệnh | Mô tả |
+|------|-------|
+| `/watch create` | Khởi tạo mục theo dõi mới qua giao diện Modal (Tiêu đề, Truy vấn tìm kiếm, Điều kiện thông báo, Chu kỳ, Tự động dừng khi đạt điều kiện) |
+| `/watch list` | Xem danh sách các mục Watch đang theo dõi của bạn |
+| `/watch view <id>` | Xem chi tiết cấu hình, trạng thái ngữ cảnh hiện tại và lịch sử chạy của một Watch |
+| `/watch pause <id>` | Tạm dừng một mục theo dõi |
+| `/watch resume <id>` | Tiếp tục một mục theo dõi đang tạm dừng |
+| `/watch delete <id>` | Xóa hoàn toàn một mục theo dõi |
+| `/watch run-now <id>` | Kích hoạt kiểm tra ngay lập tức một Watch (áp dụng cooldown 60s và tuân thủ hạn ngạch) |
+| `/watch budget` | Xem thống kê sử dụng hạn ngạch tìm kiếm Brave Search trong tháng |
+
 ---
 
 ## Cấu trúc dự án
@@ -192,6 +220,15 @@ DiscordMikeBot/
     proxy_cog.py          # Nhóm lệnh /proxy (view, set, reset) quản lý proxy per-guild
     summary_cog.py        # Lệnh /tomtat và /test_tomtat tóm tắt AI
   features/
+    watch/                # Module Asumi Watch Engine (Persistent Web Monitoring)
+      cog.py              # Slash Commands /watch, UI Modals, Ownership check
+      manager.py          # WatchManager CRUD, SQLite/Turso persistence, budget gating
+      scheduler.py        # WatchScheduler tasks.loop, Semaphore(2), delta execution
+      search.py           # BraveSearchProvider, SearchCache TTL, URL normalization
+      evaluator.py        # AI Evaluator (GEMINI_DATA_MODEL) & prompt-injection defense
+      notifier.py         # Formatting Discord notification embed & delivery
+      models.py           # Dataclasses & Enums (WatchDefinition, WatchRun, etc.)
+      constants.py        # Cadence constants, limits, embed colors, text templates
     tarot/                # Module trọn gói tính năng Tarot AI
       tarot_cog.py        # Slash Commands /tarot & /tarot_history
       deck.py             # Dữ liệu 78 lá Rider-Waite, metadata, keywords & Yes/No logic

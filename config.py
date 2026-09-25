@@ -257,6 +257,20 @@ DB_PATH = DATA_DIR / "bot_config.db"
 TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "libsql://mikebotdb-hoenmike.aws-ap-northeast-1.turso.io")
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 
+# ==========================================
+# 4. CẤU HÌNH WATCH ENGINE (PERSISTENT WEB MONITORING)
+# ==========================================
+BRAVE_SEARCH_API_KEY = os.getenv("BRAVE_SEARCH_API_KEY", "").strip()
+WATCH_ENABLED = os.getenv("WATCH_ENABLED", "true").lower() in ("true", "1", "yes")
+WATCH_MONTHLY_SEARCH_BUDGET = int(os.getenv("WATCH_MONTHLY_SEARCH_BUDGET", "900"))
+WATCH_DEFAULT_INTERVAL_HOURS = int(os.getenv("WATCH_DEFAULT_INTERVAL_HOURS", "24"))
+WATCH_MIN_INTERVAL_HOURS = int(os.getenv("WATCH_MIN_INTERVAL_HOURS", "4"))
+WATCH_SEARCH_CACHE_HOURS = int(os.getenv("WATCH_SEARCH_CACHE_HOURS", "6"))
+WATCH_MAX_ACTIVE_PER_USER = int(os.getenv("WATCH_MAX_ACTIVE_PER_USER", "5"))
+WATCH_MAX_ACTIVE_GLOBAL = int(os.getenv("WATCH_MAX_ACTIVE_GLOBAL", "30"))
+WATCH_MAX_CONCURRENT_RUNS = int(os.getenv("WATCH_MAX_CONCURRENT_RUNS", "2"))
+WATCH_AI_EVAL_ENABLED = os.getenv("WATCH_AI_EVAL_ENABLED", "true").lower() in ("true", "1", "yes")
+
 # Stats variables
 start_time = datetime.now(timezone.utc)
 summary_count = 0

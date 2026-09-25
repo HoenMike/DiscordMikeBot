@@ -19,6 +19,7 @@ FEATURE_EXTENSIONS = [
     "features.summary.cog",
     "features.tarot.cog",
     "features.cabin.cog",
+    "features.watch.cog",
 ]
 
 # Danh sách các Slash Command cốt lõi bắt buộc phải có mặt trước khi được phép sync lên Discord
@@ -33,6 +34,7 @@ EXPECTED_CORE_SLASH_COMMANDS = {
     "tarot",
     "cabin",
     "cabinstop",
+    "watch",
 }
 
 
@@ -275,7 +277,16 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         inline=False
     )
     embed.add_field(
-        name="⚙️ 5. HỆ THỐNG & QUẢN TRỊ (SYSTEM & STATUS)",
+        name="🔭 5. THEO DÕI WEB (ASUMI WATCH)",
+        value=(
+            "• Cho Asumi theo dõi một chủ đề theo lịch và chỉ báo khi có thay đổi đáng chú ý.\n"
+            "• Tần suất mặc định hàng ngày (24 giờ), kiểm tra thông minh không gửi tin nhắn nếu không có diễn biến mới.\n"
+            "👉 **Lệnh:** `/watch create`, `/watch list` | **Xem chi tiết:** Chọn mục `🔭 Watch` bên dưới."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="⚙️ 6. HỆ THỐNG & QUẢN TRỊ (SYSTEM & STATUS)",
         value=(
             "• `/version` (`.m ver`): Xem phiên bản hiện tại & toàn bộ nhật ký cập nhật (Patchnotes).\n"
             "• `/setstatus`: Đổi trạng thái bot động (Online, Idle, DND, Xoay tua tính năng) dành cho Admin.\n"
@@ -507,6 +518,54 @@ def build_cabin_help_embed(user: Union[discord.User, discord.Member]) -> discord
     return embed
 
 
+def build_watch_help_embed(user: Union[discord.User, discord.Member]) -> discord.Embed:
+    embed = discord.Embed(
+        title="🔭 HƯỚNG DẪN TÍNH NĂNG THEO DÕI WEB (ASUMI WATCH)",
+        description=(
+            "Cho Asumi theo dõi một chủ đề theo lịch và chỉ báo khi có thay đổi đáng chú ý.\n"
+            "Hệ thống tự động lọc bỏ tin trùng lặp, thiết lập mốc so sánh ban đầu và chỉ thông báo khi có diễn biến mới."
+        ),
+        color=0x3B82F6
+    )
+    embed.add_field(
+        name="⚙️ DANH SÁCH LỆNH WATCH",
+        value=(
+            "• `/watch create` : Tạo mục theo dõi mới (Tiêu đề, từ khóa tìm kiếm, điều kiện và tần suất)\n"
+            "• `/watch list` : Xem danh sách các chủ đề bạn đang theo dõi kèm trạng thái\n"
+            "• `/watch view [id]` : Xem chi tiết tóm tắt bối cảnh và diễn biến mới nhất của một Watch\n"
+            "• `/watch pause [id]` : Tạm dừng theo dõi một Watch\n"
+            "• `/watch resume [id]` : Kích hoạt lại Watch đang tạm dừng\n"
+            "• `/watch delete [id]` : Xóa bỏ hoàn toàn Watch và dữ liệu lịch sử\n"
+            "• `/watch run-now [id]` : Yêu cầu kiểm tra thủ công ngay lập tức (áp dụng cooldown an toàn)\n"
+            "• `/watch budget` : Xem thống kê sử dụng và hạn ngạch tìm kiếm Web trong tháng"
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="⏳ TẦN SUẤT KIỂM TRA (CADENCE)",
+        value=(
+            "• **Hàng ngày (24 giờ)**: Tần suất mặc định tối ưu nhất.\n"
+            "• **Nhanh (6 giờ)**: Phù hợp chủ đề tin nóng đang có biến chuyển nhanh.\n"
+            "• **Thư thả (72 giờ) & Hàng tuần (168 giờ)**: Dành cho các dự án dài hạn."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🎯 NGUYÊN TẮC HOẠT ĐỘNG THÔNG MINH",
+        value=(
+            "• **Không có thay đổi = Không gửi tin nhắn**: Tránh gây loãng kênh chat.\n"
+            "• **Mốc so sánh ban đầu (Baseline)**: Lần kiểm tra đầu tiên chỉ lưu mốc dữ liệu để đối chiếu, không báo tin cũ.\n"
+            "• **Bảo vệ ngân sách**: Dùng bộ đệm (cache) chia sẻ giữa các Watch trùng từ khóa."
+        ),
+        inline=False
+    )
+    embed.set_footer(
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Watch Engine v1.0",
+        icon_url=user.display_avatar.url if user.display_avatar else None
+    )
+    return embed
+
+
 class HelpView(discord.ui.View):
     """View điều hướng tương tác giữa các trang hướng dẫn của Asumi."""
 
@@ -552,6 +611,12 @@ class HelpView(discord.ui.View):
                     description="Hướng dẫn chế độ phiên dịch trực tiếp bẻ lái câu nói",
                     default=(self.current_tab == "cabin")
                 ),
+                discord.SelectOption(
+                    label="🔭 Theo Dõi Web (Watch)",
+                    value="watch",
+                    description="Hướng dẫn theo dõi Web & cảnh báo thông minh",
+                    default=(self.current_tab == "watch")
+                ),
             ],
             row=0
         )
@@ -577,6 +642,8 @@ class HelpView(discord.ui.View):
             return build_embed_help_embed(user)
         elif self.current_tab == "cabin":
             return build_cabin_help_embed(user)
+        elif self.current_tab == "watch":
+            return build_watch_help_embed(user)
         else:
             return build_overview_embed(user)
 
@@ -667,6 +734,7 @@ async def send_bot_help(
     app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
     app_commands.Choice(name="📝 Tóm Tắt Tin Nhắn (AI)", value="summary"),
     app_commands.Choice(name="👑 Tự Động Fix Embed Link", value="embed"),
+    app_commands.Choice(name="🔭 Theo Dõi Web (Watch)", value="watch"),
     app_commands.Choice(name="🌐 Tổng Quan Tất Cả Tính Năng", value="overview"),
 ])
 async def help_slash(
@@ -677,12 +745,13 @@ async def help_slash(
     await send_bot_help(interaction, feature=chosen, ephemeral=True)
 
 
-@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng Asumi (Tarot, Tóm tắt, Embed)")
+@bot.tree.command(name="mhelp", description="Mở nhanh bảng hướng dẫn sử dụng Asumi (Tarot, Tóm tắt, Embed, Watch)")
 @app_commands.describe(feature="Chọn tính năng bạn muốn xem hướng dẫn chi tiết")
 @app_commands.choices(feature=[
     app_commands.Choice(name="🔮 Bốc Bài Tarot (Chi Tiết)", value="tarot"),
     app_commands.Choice(name="📝 Tóm Tắt Tin Nhắn (AI)", value="summary"),
     app_commands.Choice(name="👑 Tự Động Fix Embed Link", value="embed"),
+    app_commands.Choice(name="🔭 Theo Dõi Web (Watch)", value="watch"),
     app_commands.Choice(name="🌐 Tổng Quan Tất Cả Tính Năng", value="overview"),
 ])
 async def mhelp_slash(
@@ -704,6 +773,8 @@ async def help_cmd(ctx: commands.Context, *, feature_arg: Optional[str] = None):
             chosen = "summary"
         elif arg_lower in ["embed", "fixembed", "link"]:
             chosen = "embed"
+        elif arg_lower in ["watch", "theodoi", "theo_doi", "timkiem"]:
+            chosen = "watch"
     await send_bot_help(ctx, feature=chosen)
 
 

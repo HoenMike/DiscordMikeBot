@@ -159,6 +159,11 @@
                     <span>Dịch Cabin & Khiên</span>
                     <span id="badge-total-cabin" class="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-500/20 text-sky-300 font-mono">0 khiên</span>
                 </button>
+                <button onclick="switchTab('watch')" id="tab-btn-watch" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                    <i data-lucide="eye" class="w-3.5 h-3.5 text-blue-400"></i>
+                    <span>Theo Dõi Web (Watch)</span>
+                    <span id="badge-total-watch" class="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-500/20 text-blue-300 font-mono">0</span>
+                </button>
                 <button onclick="switchTab('guilds')" id="tab-btn-guilds" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="server" class="w-3.5 h-3.5"></i>
                     <span>Máy Chủ Đang Tham Gia</span>
@@ -210,6 +215,10 @@
                     <button onclick="filterActivities('command')" id="filter-btn-command" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
                         <i data-lucide="terminal" class="w-3 h-3 inline mr-1 text-amber-400"></i>
                         Lệnh Bot (<span id="filter-count-command">0</span>)
+                    </button>
+                    <button onclick="filterActivities('watch')" id="filter-btn-watch" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="eye" class="w-3 h-3 inline mr-1 text-blue-400"></i>
+                        Watch (<span id="filter-count-watch">0</span>)
                     </button>
                 </div>
 
@@ -668,6 +677,101 @@
         </section>
 
         <!-- ========================================== -->
+        <!-- TAB: ASUMI WATCH ENGINE (WEB MONITORING) -->
+        <!-- ========================================== -->
+        <section id="tab-content-watch" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-3 overflow-y-auto pr-1">
+            <!-- Top Summary Cards (Section 55) -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 flex-shrink-0">
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Active Watches</p>
+                    <h4 id="watch-stat-active" class="text-lg font-bold text-blue-400 code-font mt-1">0</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Checks Hôm Nay</p>
+                    <h4 id="watch-stat-today" class="text-lg font-bold text-emerald-400 code-font mt-1">0</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Searches Tháng</p>
+                    <h4 id="watch-stat-searches" class="text-lg font-bold text-amber-400 code-font mt-1">0</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Hạn Ngạch / Tháng</p>
+                    <h4 id="watch-stat-budget" class="text-sm font-bold text-white code-font mt-1">0 / 900</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Cache Hits</p>
+                    <h4 id="watch-stat-cache" class="text-lg font-bold text-indigo-400 code-font mt-1">0</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">AI Evaluations</p>
+                    <h4 id="watch-stat-ai" class="text-lg font-bold text-purple-400 code-font mt-1">0</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Thông Báo Đã Gửi</p>
+                    <h4 id="watch-stat-notifs" class="text-lg font-bold text-sky-400 code-font mt-1">0</h4>
+                </div>
+                <div class="p-3 rounded-xl bg-dark-card border border-dark-border flex flex-col justify-between">
+                    <p class="text-[10px] font-medium text-slate-400">Tỷ Lệ Có Biến</p>
+                    <h4 id="watch-stat-rate" class="text-lg font-bold text-rose-400 code-font mt-1">0%</h4>
+                </div>
+            </div>
+
+            <!-- Main Table Section (Section 56) -->
+            <div class="bg-dark-card border border-dark-border rounded-xl flex flex-col overflow-hidden shadow-xl">
+                <!-- Toolbar -->
+                <div class="p-3 border-b border-dark-border/80 flex flex-wrap items-center justify-between gap-2 bg-dark-surface/50">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-white tracking-tight">Danh Sách Asumi Watch Đang Quản Lý</h3>
+                            <p class="text-[11px] text-slate-400">Giám sát mục tiêu theo dõi, trạng thái chu kỳ, kết quả và nhật ký cảnh báo.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="watch-status-filter" onchange="filterWatchesByStatus(this.value)" class="bg-dark-surface border border-dark-border text-slate-300 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <option value="all">Tất cả trạng thái</option>
+                            <option value="active">🟢 Đang chạy (Active)</option>
+                            <option value="paused">⏸️ Tạm dừng (Paused)</option>
+                            <option value="completed">✅ Hoàn tất (Completed)</option>
+                            <option value="config_error">⚠️ Lỗi cấu hình</option>
+                        </select>
+                        <button onclick="fetchWatchData()" title="Làm mới danh sách" class="p-1.5 rounded-lg bg-dark-surface hover:bg-slate-800 text-slate-400 hover:text-white border border-dark-border transition-all">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-x-auto min-h-[300px]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-dark-surface border-b border-dark-border text-slate-400 uppercase text-[10px] tracking-wider select-none font-semibold">
+                            <tr>
+                                <th class="py-2.5 px-3">Mục Theo Dõi / Query</th>
+                                <th class="py-2.5 px-3">Chủ Sở Hữu</th>
+                                <th class="py-2.5 px-3">Máy Chủ / Kênh</th>
+                                <th class="py-2.5 px-3">Trạng Thái</th>
+                                <th class="py-2.5 px-3">Chu Kỳ</th>
+                                <th class="py-2.5 px-3">Kiểm Tra Gần Nhất</th>
+                                <th class="py-2.5 px-3">Báo Gần Nhất</th>
+                                <th class="py-2.5 px-3">Lần Chạy Kế</th>
+                                <th class="py-2.5 px-3 text-right">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="watch-table-tbody" class="divide-y divide-dark-border/40">
+                            <tr>
+                                <td colspan="9" class="py-12 text-center text-slate-500 italic">
+                                    Đang tải dữ liệu Watch Engine...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
         <!-- TAB 5: LIVE CONSOLE LOGS -->
         <!-- ========================================== -->
         <section id="tab-content-logs" class="tab-content hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
@@ -1030,6 +1134,84 @@
         </div>
     </div>
 
+    <!-- Watch Detail Modal (Section 57) -->
+    <div id="watch-detail-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-dark-card border border-dark-border rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="p-3.5 border-b border-dark-border bg-dark-surface flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                        <i data-lucide="eye" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 id="watch-modal-title" class="font-bold text-sm text-white">Chi tiết Watch</h3>
+                        <p id="watch-modal-subtitle" class="text-[11px] text-slate-400">ID #... • Chủ sở hữu: ...</p>
+                    </div>
+                </div>
+                <button onclick="closeWatchDetailModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body Scrollable -->
+            <div class="p-4 overflow-y-auto flex-1 flex flex-col gap-3.5">
+                <!-- Watch Metadata Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                    <div class="p-2.5 rounded-xl bg-dark-surface border border-dark-border">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">Từ khóa tìm kiếm</span>
+                        <div id="watch-modal-query" class="text-xs font-mono text-blue-300 mt-1 truncate"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-dark-surface border border-dark-border">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">Điều kiện thông báo</span>
+                        <div id="watch-modal-condition" class="text-xs text-slate-200 mt-1 truncate"></div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-dark-surface border border-dark-border">
+                        <span class="text-[10px] text-slate-400 uppercase font-semibold">Chu kỳ & Trạng thái</span>
+                        <div id="watch-modal-cadence" class="text-xs text-slate-200 mt-1"></div>
+                    </div>
+                </div>
+
+                <!-- Semantic Compact State Box -->
+                <div class="p-3 rounded-xl bg-dark-terminal border border-dark-border flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between text-xs text-slate-400 border-b border-dark-border/60 pb-1.5">
+                        <span class="font-semibold text-slate-300 flex items-center gap-1.5">
+                            <i data-lucide="brain" class="w-3.5 h-3.5 text-purple-400"></i> Bối Cảnh Nhận Thức Hiện Tại (Compact State)
+                        </span>
+                        <span id="watch-modal-last-evaluated" class="text-[10px] font-mono text-slate-500"></span>
+                    </div>
+                    <p id="watch-modal-state-summary" class="text-xs text-slate-200 italic leading-relaxed"></p>
+                    <div id="watch-modal-state-facts" class="text-[11px] text-slate-400 flex flex-col gap-1 mt-1"></div>
+                </div>
+
+                <!-- Recent Discovered / Evaluated Results -->
+                <div class="flex flex-col gap-1.5">
+                    <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i data-lucide="file-search" class="w-3.5 h-3.5 text-blue-400"></i> Kết Quả Tìm Kiếm Đã Thu Nhận Gần Đây
+                    </span>
+                    <div id="watch-modal-results-list" class="max-h-48 overflow-y-auto flex flex-col gap-1.5 pr-1"></div>
+                </div>
+
+                <!-- Recent Runs Execution History -->
+                <div class="flex flex-col gap-1.5">
+                    <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                        <i data-lucide="history" class="w-3.5 h-3.5 text-emerald-400"></i> Lịch Sử Thực Thi Gần Nhất (watch_runs)
+                    </span>
+                    <div id="watch-modal-runs-list" class="max-h-48 overflow-y-auto flex flex-col gap-1 pr-1 font-mono text-[11px]"></div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 border-t border-dark-border bg-dark-surface/50 flex items-center justify-between gap-2 flex-shrink-0">
+                <button id="watch-modal-run-btn" onclick="handleRunWatchFromModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all">
+                    <i data-lucide="play" class="w-3.5 h-3.5"></i> Chạy Kiểm Tra Ngay
+                </button>
+                <button onclick="closeWatchDetailModal()" class="px-3.5 py-1.5 rounded-lg bg-dark-surface hover:bg-slate-700 text-xs font-semibold text-white border border-dark-border transition-colors">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Reusable Action Confirmation & Prompt Modal -->
     <div id="action-confirm-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
         <div class="bg-dark-card border border-dark-border rounded-2xl max-w-md w-full p-4 flex flex-col gap-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -1277,6 +1459,8 @@
                 fetchTarotRatingStats();
             } else if (tab === 'cabin') {
                 fetchCabinData();
+            } else if (tab === 'watch') {
+                fetchWatchData();
             } else if (tab === 'logs') {
                 renderLogs(true);
             }
@@ -1301,6 +1485,10 @@
                 case 'command':
                     return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                         <i data-lucide="terminal" class="w-3 h-3 text-amber-400"></i> Lệnh Bot
+                    </span>`;
+                case 'watch':
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                        <i data-lucide="eye" class="w-3 h-3 text-sky-400"></i> Watch
                     </span>`;
                 default:
                     return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/30">
@@ -2864,6 +3052,288 @@
             lucide.createIcons();
         }
 
+
+        // ==========================================
+        // WATCH ENGINE (v2.9.0) JAVASCRIPT HANDLERS
+        // ==========================================
+        let allWatches = [];
+        let watchStatusFilterValue = 'all';
+        let currentModalWatchId = null;
+
+        function filterWatchesByStatus(val) {
+            watchStatusFilterValue = val;
+            renderWatchTable();
+        }
+
+        async function fetchWatchData() {
+            try {
+                const [statsRes, budgetRes, listRes] = await Promise.all([
+                    fetch('/api/watch/stats'),
+                    fetch('/api/watch/budget'),
+                    fetch('/api/watch/list')
+                ]);
+
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    const elActive = document.getElementById('watch-stat-active');
+                    if (elActive) elActive.textContent = stats.active_watches || 0;
+                    const elToday = document.getElementById('watch-stat-today');
+                    if (elToday) elToday.textContent = stats.checks_today || 0;
+                    const elSearches = document.getElementById('watch-stat-searches');
+                    if (elSearches) elSearches.textContent = stats.search_requests_month || 0;
+                    const elCache = document.getElementById('watch-stat-cache');
+                    if (elCache) elCache.textContent = stats.cache_hits_month || 0;
+                    const elAi = document.getElementById('watch-stat-ai');
+                    if (elAi) elAi.textContent = stats.ai_evaluations_month || 0;
+                    const elNotifs = document.getElementById('watch-stat-notifs');
+                    if (elNotifs) elNotifs.textContent = stats.notifications_sent_month || 0;
+                    const elRate = document.getElementById('watch-stat-rate');
+                    if (elRate) elRate.textContent = (stats.meaningful_change_rate || 0) + '%';
+                }
+
+                if (budgetRes.ok) {
+                    const budget = await budgetRes.json();
+                    const elBudget = document.getElementById('watch-stat-budget');
+                    if (elBudget) {
+                        elBudget.textContent = `${budget.search_requests_used} / ${budget.search_budget_limit}`;
+                    }
+                }
+
+                if (listRes.ok) {
+                    allWatches = await listRes.json();
+                    renderWatchTable();
+                }
+            } catch (err) {
+                console.error('Error fetching watch data:', err);
+            }
+        }
+
+        function getWatchStatusBadge(status) {
+            switch(status) {
+                case 'active':
+                    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Đang chạy</span>';
+                case 'paused':
+                    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Tạm dừng</span>';
+                case 'completed':
+                    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-300 border border-blue-500/30"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Hoàn tất</span>';
+                case 'config_error':
+                    return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Lỗi cấu hình</span>';
+                default:
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/15 text-slate-300 border border-slate-500/30">${escapeHtml(status)}</span>`;
+            }
+        }
+
+        function renderWatchTable() {
+            const tbody = document.getElementById('watch-table-tbody');
+            if (!tbody) return;
+
+            const filtered = allWatches.filter(w => {
+                if (watchStatusFilterValue === 'all') return true;
+                return w.status === watchStatusFilterValue;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="py-12 text-center text-slate-500 italic">Không tìm thấy mục Watch nào phù hợp.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(w => {
+                const isPaused = w.status === 'paused';
+                const pauseToggleTitle = isPaused ? 'Tiếp tục theo dõi' : 'Tạm dừng theo dõi';
+                const pauseToggleIcon = isPaused ? 'play' : 'pause';
+                const pauseToggleColor = isPaused ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-amber-400 hover:bg-amber-500/10';
+
+                return `
+                    <tr class="hover:bg-dark-surface/40 transition-colors">
+                        <td class="py-2.5 px-3">
+                            <div class="font-bold text-white flex items-center gap-1.5">
+                                <span class="text-slate-500 font-mono text-[10px]">#${w.id}</span>
+                                <span>${escapeHtml(w.title)}</span>
+                            </div>
+                            <div class="text-[11px] font-mono text-blue-300 truncate max-w-[220px]" title="${escapeHtml(w.search_query)}">
+                                🔍 ${escapeHtml(w.search_query)}
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px]">
+                            ${escapeHtml(String(w.owner_user_id))}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-400 text-[11px]">
+                            <div>${w.guild_id ? 'Server: ' + escapeHtml(String(w.guild_id)) : 'DM'}</div>
+                            <div class="text-[10px] text-slate-500">Kênh: #${escapeHtml(String(w.channel_id))}</div>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            ${getWatchStatusBadge(w.status)}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px]">
+                            ${w.cadence_hours}h
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-400 text-[11px]">
+                            ${w.last_checked_at ? escapeHtml(w.last_checked_at.slice(0, 16)) : 'Chưa chạy'}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-400 text-[11px]">
+                            ${w.last_notified_at ? escapeHtml(w.last_notified_at.slice(0, 16)) : 'Chưa có'}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px]">
+                            ${w.next_run_at ? escapeHtml(w.next_run_at.slice(0, 16)) : 'N/A'}
+                        </td>
+                        <td class="py-2.5 px-3 text-right">
+                            <div class="inline-flex items-center gap-1 justify-end">
+                                <button onclick="viewWatchDetail(${w.id})" title="Xem chi tiết" class="p-1 rounded-md text-blue-400 hover:bg-blue-500/10 transition-colors">
+                                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="handleToggleWatchPause(${w.id}, '${w.status}')" title="${pauseToggleTitle}" class="p-1 rounded-md ${pauseToggleColor} transition-colors">
+                                    <i data-lucide="${pauseToggleIcon}" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="handleRunWatch(${w.id})" title="Chạy ngay" class="p-1 rounded-md text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="handleDeleteWatch(${w.id})" title="Xóa Watch" class="p-1 rounded-md text-rose-400 hover:bg-rose-500/10 transition-colors">
+                                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        async function viewWatchDetail(id) {
+            try {
+                const res = await fetch(`/api/watch/${id}`);
+                if (!res.ok) {
+                    alert('Không thể tải chi tiết Watch #' + id);
+                    return;
+                }
+                const data = await res.json();
+                const w = data.watch;
+                currentModalWatchId = w.id;
+
+                document.getElementById('watch-modal-title').textContent = `Chi tiết Watch: ${w.title}`;
+                document.getElementById('watch-modal-subtitle').textContent = `ID #${w.id} • Chủ sở hữu: ${w.owner_user_id} • Server: ${w.guild_id || 'DM'} • Kênh: #${w.channel_id}`;
+                document.getElementById('watch-modal-query').textContent = w.search_query;
+                document.getElementById('watch-modal-condition').textContent = w.condition_prompt || '(Không có điều kiện cụ thể - theo dõi tổng quan)';
+                document.getElementById('watch-modal-cadence').innerHTML = `${w.cadence_hours}h / lần • ${getWatchStatusBadge(w.status)}`;
+
+                const state = w.state || {};
+                document.getElementById('watch-modal-last-evaluated').textContent = state.last_evaluated_at ? `Đánh giá gần nhất: ${state.last_evaluated_at}` : 'Chưa có đánh giá AI';
+                document.getElementById('watch-modal-state-summary').textContent = state.summary || 'Chưa xây dựng bối cảnh tóm tắt.';
+
+                const factsEl = document.getElementById('watch-modal-state-facts');
+                const facts = state.known_facts || [];
+                if (facts.length > 0) {
+                    factsEl.innerHTML = facts.map(f => `<div>• ${escapeHtml(f)}</div>`).join('');
+                } else {
+                    factsEl.innerHTML = '<span class="text-slate-500 italic">Chưa có thông tin sự kiện ghi nhận.</span>';
+                }
+
+                const resultsEl = document.getElementById('watch-modal-results-list');
+                const results = data.recent_results || [];
+                if (results.length > 0) {
+                    resultsEl.innerHTML = results.map(r => `
+                        <div class="p-2 rounded-lg bg-dark-surface/60 border border-dark-border text-xs flex flex-col gap-0.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <a href="${escapeHtml(r.url)}" target="_blank" class="font-semibold text-blue-400 hover:underline truncate max-w-[70%]">
+                                    ${escapeHtml(r.title || r.url)}
+                                </a>
+                                <span class="px-1.5 py-0.2 rounded text-[10px] font-mono ${r.evaluation_status === 'evaluated_meaningful' ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-700 text-slate-300'}">
+                                    ${escapeHtml(r.evaluation_status)}
+                                </span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 line-clamp-2">${escapeHtml(r.snippet || '')}</div>
+                            <div class="text-[10px] text-slate-500 font-mono mt-0.5">Phát hiện: ${escapeHtml(r.discovered_at)} • Nguồn: ${escapeHtml(r.source_domain || 'Web')}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    resultsEl.innerHTML = '<div class="py-4 text-center text-slate-500 italic text-xs">Chưa có kết quả tìm kiếm nào được lưu.</div>';
+                }
+
+                const runsEl = document.getElementById('watch-modal-runs-list');
+                const runs = data.recent_runs || [];
+                if (runs.length > 0) {
+                    runsEl.innerHTML = runs.map(run => `
+                        <div class="p-1.5 rounded bg-dark-surface/40 border border-dark-border flex items-center justify-between">
+                            <span>${escapeHtml(run.started_at.slice(0, 16))} • Status: <strong>${escapeHtml(run.status)}</strong></span>
+                            <span>Brave: ${run.search_performed ? 'Yes' : 'No'} | Cache: ${run.cache_hit ? 'Hit' : 'Miss'} | Mới: ${run.new_result_count} | AI: ${run.ai_called ? 'Yes' : 'No'} | Biến: ${run.meaningful_change ? '🔥' : '—'}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    runsEl.innerHTML = '<div class="py-4 text-center text-slate-500 italic text-xs">Chưa có lịch sử chạy.</div>';
+                }
+
+                const modal = document.getElementById('watch-detail-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                lucide.createIcons();
+            } catch (err) {
+                console.error('Error viewing watch detail:', err);
+            }
+        }
+
+        function closeWatchDetailModal() {
+            const modal = document.getElementById('watch-detail-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            currentModalWatchId = null;
+        }
+
+        async function handleToggleWatchPause(id, currentStatus) {
+            try {
+                const action = currentStatus === 'paused' ? 'resume' : 'pause';
+                const res = await fetch(`/api/watch/${id}/${action}`, { method: 'POST' });
+                if (res.ok) {
+                    fetchWatchData();
+                } else {
+                    const err = await res.json();
+                    alert('Thao tác thất bại: ' + (err.error || 'Lỗi không xác định'));
+                }
+            } catch (err) {
+                console.error('Error toggling watch pause:', err);
+            }
+        }
+
+        async function handleRunWatch(id) {
+            try {
+                const res = await fetch(`/api/watch/${id}/run`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Đã khởi chạy Watch #${id} thành công: ${data.message || 'Đang thực thi trong nền'}`);
+                    fetchWatchData();
+                } else {
+                    alert('Lỗi: ' + (data.error || 'Không thể chạy Watch'));
+                }
+            } catch (err) {
+                console.error('Error running watch:', err);
+            }
+        }
+
+        async function handleRunWatchFromModal() {
+            if (currentModalWatchId) {
+                await handleRunWatch(currentModalWatchId);
+                viewWatchDetail(currentModalWatchId);
+            }
+        }
+
+        async function handleDeleteWatch(id) {
+            if (!confirm(`Bạn có chắc chắn muốn xóa Watch #${id} không? Thao tác này không thể hoàn tác.`)) {
+                return;
+            }
+            try {
+                const res = await fetch(`/api/watch/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    fetchWatchData();
+                } else {
+                    const err = await res.json();
+                    alert('Không thể xóa Watch: ' + (err.error || 'Lỗi'));
+                }
+            } catch (err) {
+                console.error('Error deleting watch:', err);
+            }
+        }
+
         // Initialize
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
@@ -2874,6 +3344,7 @@
             fetchPresenceData();
             fetchVersionData();
             fetchCabinData();
+            fetchWatchData();
             setInterval(fetchDashboardData, 3000);
         });
     </script>

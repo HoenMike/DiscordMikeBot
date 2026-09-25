@@ -847,4 +847,239 @@ def api_version():
     })
 
 
+# ==========================================
+# 12. ASUMI WATCH ENGINE APIS (ADMIN ONLY)
+# ==========================================
+@app.route('/api/watch/stats', methods=['GET'])
+@login_required
+def api_watch_stats():
+    from features.watch.manager import watch_manager
+    try:
+        stats = run_coroutine_safe(watch_manager.get_dashboard_stats())
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/watch/budget', methods=['GET'])
+@login_required
+def api_watch_budget():
+    from features.watch.manager import watch_manager
+    try:
+        stats = run_coroutine_safe(watch_manager.get_dashboard_stats())
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/watch/list', methods=['GET'])
+@login_required
+def api_watch_list():
+    from features.watch.manager import watch_manager
+    try:
+        status_filter = request.args.get("status")
+        watches = run_coroutine_safe(watch_manager.list_all_watches(status=status_filter))
+        enriched = []
+        for w in watches:
+            owner_name = f"User {w.owner_user_id}"
+            guild_name = f"Server {w.guild_id}" if w.guild_id else "Direct Message"
+            channel_name = f"Channel {w.channel_id}"
+
+            if bot.is_ready():
+                u = bot.get_user(w.owner_user_id)
+                if u:
+                    owner_name = u.display_name
+                if w.guild_id:
+                    g = bot.get_guild(w.guild_id)
+                    if g:
+                        guild_name = g.name
+                        ch = g.get_channel(w.channel_id)
+                        if ch:
+                            channel_name = f"#{ch.name}"
+
+            enriched.append({
+                "id": w.id,
+                "owner_user_id": str(w.owner_user_id),
+                "owner_name": owner_name,
+                "guild_id": str(w.guild_id) if w.guild_id else None,
+                "guild_name": guild_name,
+                "channel_id": str(w.channel_id),
+                "channel_name": channel_name,
+                "title": w.title,
+                "search_query": w.search_query,
+                "condition_prompt": w.condition_prompt,
+                "status": w.status,
+                "cadence_hours": w.cadence_hours,
+                "next_run_at": w.next_run_at,
+                "last_checked_at": w.last_checked_at,
+                "last_notified_at": w.last_notified_at,
+                "failure_count": w.failure_count,
+                "last_error": w.last_error,
+                "created_at": w.created_at,
+            })
+        return jsonify({"total": len(enriched), "watches": enriched})
+    except Exception as e:
+        return jsonify({"total": 0, "watches": [], "error": str(e)}), 500
+
+
+@app.route('/api/watch/<int:watch_id>', methods=['GET'])
+@login_required
+def api_watch_detail(watch_id: int):
+    from features.watch.manager import watch_manager
+    from core.db import db_client
+    try:
+        watch = run_coroutine_safe(watch_manager.get_watch(watch_id))
+        if not watch:
+            return jsonify({"error": "Không tìm thấy Watch!"}), 404
+
+        async def fetch_detail():
+            runs = await watch_manager.get_recent_runs(watch_id=watch_id, limit=20)
+            async with db_client.execute(
+                """
+                SELECT id, fingerprint, url, canonical_url, title, snippet,
+                       source_domain, published_at, discovered_at, evaluation_status, event_fingerprint
+                FROM watch_results WHERE watch_id = ? ORDER BY id DESC LIMIT 30
+                """,
+                (watch_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                results = [
+                    {
+                        "id": r[0],
+                        "fingerprint": r[1],
+                        "url": r[2],
+                        "canonical_url": r[3],
+                        "title": r[4],
+                        "snippet": r[5] or "",
+                        "source_domain": r[6] or "",
+                        "published_at": r[7],
+                        "discovered_at": r[8],
+                        "evaluation_status": r[9],
+                        "event_fingerprint": r[10]
+                    }
+                    for r in rows
+                ]
+            return runs, results
+
+        runs, results = run_coroutine_safe(fetch_detail())
+
+        owner_name = f"User {watch.owner_user_id}"
+        guild_name = f"Server {watch.guild_id}" if watch.guild_id else "Direct Message"
+        channel_name = f"Channel {watch.channel_id}"
+
+        if bot.is_ready():
+            u = bot.get_user(watch.owner_user_id)
+            if u:
+                owner_name = u.display_name
+            if watch.guild_id:
+                g = bot.get_guild(watch.guild_id)
+                if g:
+                    guild_name = g.name
+                    ch = g.get_channel(watch.channel_id)
+                    if ch:
+                        channel_name = f"#{ch.name}"
+
+        return jsonify({
+            "watch": {
+                "id": watch.id,
+                "owner_user_id": str(watch.owner_user_id),
+                "owner_name": owner_name,
+                "guild_id": str(watch.guild_id) if watch.guild_id else None,
+                "guild_name": guild_name,
+                "channel_id": str(watch.channel_id),
+                "channel_name": channel_name,
+                "title": watch.title,
+                "search_query": watch.search_query,
+                "condition_prompt": watch.condition_prompt,
+                "status": watch.status,
+                "cadence_hours": watch.cadence_hours,
+                "next_run_at": watch.next_run_at,
+                "last_checked_at": watch.last_checked_at,
+                "last_notified_at": watch.last_notified_at,
+                "state": watch.get_state(),
+                "failure_count": watch.failure_count,
+                "last_error": watch.last_error,
+                "created_at": watch.created_at,
+            },
+            "recent_results": results,
+            "recent_runs": [
+                {
+                    "id": run.id,
+                    "started_at": run.started_at,
+                    "finished_at": run.finished_at,
+                    "status": run.status,
+                    "search_performed": run.search_performed,
+                    "cache_hit": run.cache_hit,
+                    "search_result_count": run.search_result_count,
+                    "new_result_count": run.new_result_count,
+                    "ai_called": run.ai_called,
+                    "meaningful_change": run.meaningful_change,
+                    "notification_sent": run.notification_sent,
+                    "duration_ms": run.duration_ms,
+                    "error_text": run.error_text,
+                }
+                for run in runs
+            ]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/watch/<int:watch_id>/pause', methods=['POST'])
+@login_required
+def api_watch_pause(watch_id: int):
+    from features.watch.manager import watch_manager
+    try:
+        success = run_coroutine_safe(watch_manager.pause_watch(watch_id, user_id=0, is_admin=True))
+        return jsonify({"success": success})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/watch/<int:watch_id>/resume', methods=['POST'])
+@login_required
+def api_watch_resume(watch_id: int):
+    from features.watch.manager import watch_manager
+    try:
+        success = run_coroutine_safe(watch_manager.resume_watch(watch_id, user_id=0, is_admin=True))
+        return jsonify({"success": success})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/watch/<int:watch_id>/run', methods=['POST'])
+@login_required
+def api_watch_run(watch_id: int):
+    from features.watch.manager import watch_manager
+    try:
+        watch = run_coroutine_safe(watch_manager.get_watch(watch_id))
+        if not watch:
+            return jsonify({"success": False, "error": "Không tìm thấy Watch!"}), 404
+
+        cog = bot.get_cog("Watch")
+        if not cog or not hasattr(cog, "scheduler"):
+            return jsonify({"success": False, "error": "Watch Cog chưa được nạp!"}), 500
+
+        run = run_coroutine_safe(cog.scheduler.execute_watch(watch, is_manual=True))
+        return jsonify({
+            "success": True,
+            "status": run.status,
+            "new_results": run.new_result_count,
+            "meaningful_change": bool(run.meaningful_change),
+            "notification_sent": bool(run.notification_sent),
+            "duration_ms": run.duration_ms,
+            "error_text": run.error_text
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/watch/<int:watch_id>', methods=['DELETE'])
+@login_required
+def api_watch_delete(watch_id: int):
+    from features.watch.manager import watch_manager
+    try:
+        success = run_coroutine_safe(watch_manager.delete_watch(watch_id, user_id=0, is_admin=True))
+        return jsonify({"success": success})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

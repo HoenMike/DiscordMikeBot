@@ -285,6 +285,7 @@ class ActivityLogger:
             "summary": sum(1 for a in self._activities if a["action_type"] == "summary"),
             "embed": sum(1 for a in self._activities if a["action_type"] == "embed"),
             "command": sum(1 for a in self._activities if a["action_type"] == "command"),
+            "watch": sum(1 for a in self._activities if a["action_type"] == "watch"),
         }
 
         return {

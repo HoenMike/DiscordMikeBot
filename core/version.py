@@ -12,12 +12,35 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.0"
+CURRENT_VERSION = "2.9.0"
 RELEASE_DATE = "2026-09-25"
-CODENAME = "Asumi - Verified Embeds & Unified Reader"
+CODENAME = "Asumi Watch - Persistent Web Monitoring & Smart Alerts"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.9.0",
+        "date": "2026-09-25",
+        "type": "minor",
+        "title": "Asumi Watch — Theo Dõi Web Thông Minh & Cảnh Báo Có Ý Nghĩa",
+        "summary": "Ra mắt hệ thống Asumi Watch: Cho phép người dùng đăng ký theo dõi các chủ đề hoặc điều kiện Web trong tương lai. Tích hợp Brave Search, cơ chế lập lịch theo chu kỳ, bộ lọc delta tiết kiệm quota, kiểm duyệt AI chống nhiễu/injection, và bảng điều khiển quản trị chuyên sâu.",
+        "changes": [
+            {
+                "category": "🔭 Asumi Watch Engine",
+                "items": [
+                    "Hệ thống giám sát Web bền vững (survives bot restarts) qua Brave Search API và lưu trữ SQLite/Turso.",
+                    "Chu kỳ linh hoạt (Nhanh 6h, Hàng ngày 24h mặc định, Thư thả 72h, Hàng tuần 168h); tối thiểu 4h; bảo vệ offline catch-up chỉ chạy 1 lần tránh bão request.",
+                    "Cơ chế First-run Silent Baseline: Thiết lập ngữ cảnh nền ban đầu cho Watch mới, không spam kết quả cũ.",
+                    "Đường ống Delta-first: Không có kết quả mới -> Không gọi AI Gemini -> Không gửi tin nhắn Discord, tiết kiệm tối đa chi phí.",
+                    "Phân tách trạng thái Discovered != Evaluated: Khi Gemini lỗi hoặc quá tải, ứng viên vẫn được bảo lưu để tái đánh giá lần sau mà không cần tìm kiếm lại.",
+                    "AI Evaluator với GEMINI_DATA_MODEL: Phân biệt URL mới với sự kiện mới thật sự (chống duplicate tin tổng hợp/SEO); phòng vệ prompt-injection nghiêm ngặt từ nội dung web; hỗ trợ điều kiện dừng (terminal condition).",
+                    "Quản lý ngân sách tìm kiếm (Search Budget): Giới hạn cứng theo tháng (mặc định 900 request) kèm tính toán điều tiết mềm hàng ngày và bộ nhớ đệm (Search Cache TTL 6h) dùng chung giữa các Watch có cùng query.",
+                    "Bộ lệnh Discord Slash /watch hoàn chỉnh: /watch create (Modal UI trực quan), /watch list, /watch view, /watch pause, /watch resume, /watch delete, /watch run-now (cooldown 60s), /watch budget.",
+                    "Bảng điều khiển Admin Console: Tích hợp tab Watch chuyên sâu với 8 chỉ số tổng quan, danh sách theo dõi, modal chi tiết compact state và lịch sử thực thi watch_runs."
+                ]
+            }
+        ]
+    },
     {
         "version": "2.8.0",
         "date": "2026-09-25",
