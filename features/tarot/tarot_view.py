@@ -1214,14 +1214,18 @@ class TarotFlipView(discord.ui.View):
 
         cards_summary_lines = []
         for idx, drawn in enumerate(self.drawn_cards):
+            position_label = drawn.position_title
+            if position_label.upper().startswith("LÁ ") and ":" in position_label:
+                position_label = position_label.split(":", 1)[1].strip()
+
             if idx in self.revealed_indices:
                 orient = "[NGƯỢC]" if drawn.is_reversed else "[XUÔI]"
                 cards_summary_lines.append(
-                    f"• **{idx + 1}. {drawn.position_title}** — **{drawn.card.name_vi}** {orient}"
+                    f"• **{idx + 1}. {position_label}** — **{drawn.card.name_vi}** {orient}"
                 )
             else:
                 cards_summary_lines.append(
-                    f"• **{idx + 1}. {drawn.position_title}** — ▫️ *Chưa lật*"
+                    f"• **{idx + 1}. {position_label}** — ▫️ *Chưa lật*"
                 )
 
         desc_lines.append("**🃏 Trải bài:**\n" + "\n".join(cards_summary_lines))
