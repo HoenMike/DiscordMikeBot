@@ -51,7 +51,7 @@ class TarotSessionHelperTests(unittest.TestCase):
     def test_micro_reveal_uses_orientation_specific_keywords(self):
         card = drawn("major_18", 2, "LÁ 2: HIỆN TẠI", reversed_=True)
         text = build_micro_reveal(card, 2)
-        self.assertIn("2 · LÁ 2: HIỆN TẠI", text)
+        self.assertIn("2 · HIỆN TẠI", text)
         self.assertIn(card.card.name_vi, text)
         self.assertIn("Ngược", text)
         self.assertIn(card.card.keywords_reversed[0], text)
