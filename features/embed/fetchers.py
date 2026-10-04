@@ -202,7 +202,8 @@ async def fetch_instagram(session: aiohttp.ClientSession, url: str, match) -> Po
 
 
 async def fetch_facebook(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    # Facebook unauthenticated API không còn hỗ trợ, nhường cho Tier 1 (Proxy facebed) và Tier 2 (yt-dlp fallback)
+    # Facebook unauthenticated API không còn phù hợp: nhường cho Tier 1 raw proxy URL.
+    # Nếu preview proxy lỗi, người gửi chủ động roll sang proxy kế tiếp bằng Discord button.
     return None
 
 
