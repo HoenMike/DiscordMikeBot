@@ -222,6 +222,35 @@ def extract_question_mentions_context(
     return clean_q, mentions_context_str
 
 
+def _infer_auto_tone(question: Optional[str], context: Optional[str] = None) -> str:
+    """Cheap deterministic tone hint for the auto reader; never changes Tarot meaning."""
+    text = f"{question or ''} {context or ''}".casefold()
+
+    high_stakes = (
+        "tự tử", "tự hại", "muốn chết", "bệnh", "ung thư", "thuốc", "phẫu thuật",
+        "kiện", "pháp lý", "luật sư", "đầu tư", "vay nợ", "nợ nần",
+    )
+    decision = (
+        "có nên", "lựa chọn", "chọn", "hay là", "đổi việc", "nghỉ việc",
+        "quyết định", "phương án", "hướng nào",
+    )
+    emotional = (
+        "chia tay", "người yêu", "crush", "tình cảm", "tổn thương", "buồn",
+        "cãi nhau", "mối quan hệ", "tỏ tình",
+    )
+    playful = ("haha", "lol", "vui", "đùa", "meme", "game", "rank", "crush có")
+
+    if any(k in text for k in high_stakes):
+        return "Điềm tĩnh, thực tế, không đùa; nhấn mạnh giới hạn của Tarot và điều người hỏi có thể kiểm chứng ngoài đời."
+    if any(k in text for k in decision):
+        return "Rõ ràng và phân tích; tập trung trade-off, dữ kiện còn thiếu và điều kiện để ra quyết định thay vì chốt hộ."
+    if any(k in text for k in emotional):
+        return "Ấm nhưng trực diện; không phỏng đoán suy nghĩ người khác, không dùng văn chữa lành sáo rỗng."
+    if any(k in text for k in playful):
+        return "Có thể dí dỏm nhẹ và tự nhiên, nhưng vẫn bám vào lá bài và không biến thành meme bot."
+    return "Tự nhiên, gọn, quan sát tốt; ưu tiên câu chuyện giữa các lá và liên hệ thực tế."
+
+
 def _build_tarot_prompt(
     spread_key: str, spread_name: str, drawn_cards: List[DrawnCard],
     question: Optional[str], user_name: str, context: Optional[str] = None,
@@ -233,36 +262,112 @@ def _build_tarot_prompt(
         question, user_name, user_id, guild, bot_id, bot_name,
     )
     style_info = READER_STYLES.get(reader_style, READER_STYLES["auto"])
-    memory_text = ""
+    tone_hint = (
+        _infer_auto_tone(clean_question, context)
+        if reader_style == "auto"
+        else style_info["persona_prompt"]
+    )
+
+    memory_text = "Không có ngữ cảnh Tarot cũ cần dùng."
     if recent_context:
         memory_text = (
-            f"Lần trước người hỏi từng xem chủ đề {recent_context.get('topic_tag', 'chung')} "
-            f"với lá {recent_context.get('last_card_name', '')}. Chỉ liên hệ nếu thực sự liên quan; "
-            "không bịa chi tiết hay khẳng định tâm trạng cũ."
+            "THAM KHẢO NHẸ TỪ LẦN TRƯỚC (chỉ dùng nếu rõ ràng cùng chủ đề): "
+            f"topic={recent_context.get('topic_tag', 'general')}; "
+            f"lá gần nhất={recent_context.get('last_card_name', '')}; "
+            f"mood={recent_context.get('mood_tag', '')}. "
+            "Nếu câu hỏi mới không liên quan thì bỏ qua hoàn toàn; không dùng dữ kiện cũ để neo kết luận."
         )
+
     verdict = ""
     if spread_key == "yes_no" and drawn_cards:
-        badge, verdict_desc, _ = get_yes_no_verdict(drawn_cards[0].card, drawn_cards[0].is_reversed)
-        verdict = f"Phán quyết biểu tượng phải nhất quán: {badge} ({verdict_desc})."
+        badge, verdict_desc, _ = get_yes_no_verdict(
+            drawn_cards[0].card, drawn_cards[0].is_reversed
+        )
+        verdict = (
+            f"YES/NO CONTRACT: phán quyết biểu tượng phải nhất quán với {badge} "
+            f"({verdict_desc}); vẫn phải nêu điều kiện/độ bất định, không biến thành bảo đảm."
+        )
+
     spread_guidance = {
-        "daily": "Nhẹ, nhanh, có chút nét riêng.",
-        "single": "Ngắn, như một cuộc trò chuyện; không cần ba đề mục.",
-        "yes_no": "Nêu phán quyết biểu tượng trước, sau đó giải thích; không mâu thuẫn với phán quyết.",
-        "celtic": "Kể một câu chuyện nhất quán qua mười vị trí; có thể dài hơn.",
-    }.get(spread_key, "Nối ý nghĩa các lá thành một mạch, không liệt kê định nghĩa rời rạc.")
+        "daily": "Đọc như một điểm chú ý trong ngày: ngắn, có nét riêng, không tiên tri sự kiện.",
+        "single": "Tập trung một trục chính và một bước thực tế; tránh kéo dài bằng định nghĩa sách giáo khoa.",
+        "yes_no": "Đưa xu hướng biểu tượng lên sớm, rồi giải thích vì sao và điều gì có thể làm kết quả đổi hướng.",
+        "ppf": "Đọc chuyển động Quá khứ → Hiện tại → Tương lai như một tiến trình, không phải ba đoạn độc lập.",
+        "choices": "So sánh hai hướng theo trade-off và điểm mù; không chọn hộ người dùng nếu dữ kiện chưa đủ.",
+        "mbs": "Tìm chỗ đồng thuận hoặc lệch pha giữa Tâm trí - Cơ thể - Tinh thần.",
+        "horseshoe": "Nối hiện trạng, trở ngại, yếu tố ẩn và lời khuyên thành một bức tranh thống nhất.",
+        "two_paths": "So sánh hai hướng sâu hơn; làm rõ lợi ích, rủi ro và điều kiện khiến mỗi hướng hợp lý.",
+        "celtic": "Tổ chức mười vị trí thành vài cụm quan hệ lớn; không viết mười định nghĩa rời rạc.",
+    }.get(spread_key, "Nối ý nghĩa các lá thành một mạch và chỉ giữ những chi tiết phục vụ câu hỏi.")
+
     return f"""
-Bạn là Asumi, một cô gái thông minh, tinh ý, thân thiện, hơi bí ẩn và biết khi nào nên vui hay nghiêm túc. Dùng 'mình' tự nhiên, không tự xưng tên ở mỗi đoạn. Tarot là cách tự chiêm nghiệm, không phải tiên tri.
-Phong cách của Asumi: {style_info['persona_prompt']}
-Người hỏi: {user_name}. Câu hỏi: {clean_question or 'Tổng quan năng lượng ngày'}. Bối cảnh: {context or 'Không có'}.
+NHIỆM VỤ
+Đọc quẻ Tarot cho {user_name} như Asumi: quan sát tốt, tự nhiên, thực tế và hơi huyền bí vừa đủ.
+Đây là một bài tự chiêm nghiệm, không phải lời tiên tri.
+
+GIỌNG ĐỌC
+- Reader style: {reader_style}
+- Hướng giọng: {tone_hint}
+- Dùng "mình" tự nhiên khi cần, không tự xưng Asumi ở mỗi đoạn.
+- Không mở bằng "Chào bạn", "Cảm ơn bạn đã chia sẻ", hoặc lời dẫn nghi thức.
+- Không ép kết thúc tích cực.
+
+CÂU HỎI & BỐI CẢNH
+- Người hỏi: {user_name}
+- Câu hỏi: {clean_question or 'Tổng quan năng lượng ngày'}
+- Bối cảnh thực tế: {context or 'Không có'}
 {mentions_info}
-Trải bài: {spread_name} ({len(drawn_cards)} lá). {verdict}
-Lá bài và chiều/vị trí chính xác:
+
+SPREAD
+- Tên: {spread_name}
+- Số lá: {len(drawn_cards)}
+- Cách đọc riêng: {spread_guidance}
+{verdict}
+
+CÁC LÁ BÀI ĐƯỢC ENGINE CUNG CẤP
 {_format_cards_context(drawn_cards)}
+
+MEMORY
 {memory_text}
 
-Chỉ dùng dữ kiện được cung cấp. Gắn biểu tượng lá bài vào câu hỏi, đưa ra góc nhìn và bước thực tế; không đọc suy nghĩ hay bí mật của người khác. Nếu hỏi chuyện riêng tư của hai người thứ ba mà người hỏi không liên quan, từ chối ngắn gọn. Câu hỏi lành mạnh về người trong cuộc vẫn hợp lệ. Khủng hoảng hoặc vấn đề y tế, pháp lý, tài chính cần lời hỗ trợ thực tế, không đùa hay khẳng định chắc chắn.
-Cách trình bày: {spread_guidance} Dùng câu tự nhiên, tránh câu cửa miệng, biệt danh thân mật và văn mẫu. Không bắt buộc tiêu đề cố định.
-Trả JSON hợp lệ với các khóa is_valid, topic_tag, mood_tag, summary_headline, conclusion, cards_analysis, advice, full_reading. full_reading là lời giải hoàn chỉnh dạng Markdown tự nhiên; các trường còn lại là metadata ngắn để parser và giao diện hoạt động. Nếu is_valid=false, full_reading là lời từ chối phù hợp, không tiết lộ dữ liệu riêng tư.
+CÁCH SUY LUẬN NỘI BỘ
+1. OBSERVE: vị trí, chiều, motif, Major/Minor, suit nổi bật, điểm đối lập.
+2. CONNECT: tìm củng cố, mâu thuẫn, tiến triển, chuyển pha hoặc điểm nghẽn giữa các lá.
+3. INTERPRET: áp pattern đó vào đúng câu hỏi, không copy nghĩa từ điển.
+4. GROUND: nói nó có thể trông như thế nào ngoài đời và điều gì người hỏi có thể kiểm chứng/làm tiếp.
+5. UNCERTAINTY: tách điều quẻ nhấn mạnh khỏi điều chỉ là khả năng hoặc còn phụ thuộc lựa chọn.
+
+ANTI-ROBOT
+- Không cấu trúc bài theo kiểu "Lá A cho thấy... Lá B cho thấy... Lá C cho thấy..." trừ khi cần một insight ngắn.
+- Tránh lặp các câu "Điều này có nghĩa rằng", "Vũ trụ muốn nhắn nhủ", "Hãy tin tưởng vào hành trình".
+- Không dùng lời chữa lành chung chung thay cho phân tích.
+- Không bịa suy nghĩ/bí mật của người khác.
+- Không bịa lá, card id, position hay ký ức không có trong input.
+
+OUTPUT
+Trả JSON hợp lệ theo schema được yêu cầu:
+- is_valid, topic_tag, mood_tag
+- headline
+- core_message
+- card_insights[]
+- connections[]
+- dominant_theme
+- key_card
+- practical_takeaway[]
+- uncertainty
+- suggested_clarifier_targets[]
+- journey_tags[]
+- refusal_message
+
+YÊU CẦU CHẤT LƯỢNG
+- core_message: 2-3 câu, trực tiếp vào pattern chính.
+- connections: ưu tiên 1-3 mối liên hệ thực sự có ích; không bắt buộc đủ nếu spread 1 lá.
+- card_insights: ngắn, gắn đúng card_id/position; không biến thành bài đọc từng lá.
+- practical_takeaway: 1-3 ý có thể làm/kiểm chứng, không ra lệnh định mệnh.
+- uncertainty: luôn nói rõ phần còn chưa chắc hoặc phụ thuộc thực tế.
+- key_card phải là một lá thật trong input và có lý do; không tự động chọn Major/Outcome nếu không có căn cứ.
+- suggested_clarifier_targets: 0-2 vị trí đã tồn tại; chỉ đề xuất, KHÔNG rút thêm lá.
+- Nếu is_valid=false: refusal_message ngắn, tử tế, hướng người hỏi về phần họ có thể tự quyết định; các trường diễn giải khác có thể để ngắn/rỗng.
 """.strip()
 
 
@@ -285,7 +390,7 @@ def _clean_and_format_tarot_markdown(text: str) -> str:
     # 2. Xóa các dòng rác chỉ chứa dấu sao hoặc dấu cách
     t = re.sub(r"^\s*\*+\s*$", "", t, flags=re.MULTILINE)
 
-    icons = "🎯🃏💡🔮⚡📖🎭💖✨🏆⚖️⭐⚠️"
+    icons = "🎯🃏💡🔮⚡📖🎭💖✨🏆⚖️⭐⚠️📌🌫️"
 
     # 3a. Chèn 2 dòng trống trước các icon chính nếu chúng bị dính liền vào câu trước
     t = re.sub(rf"(?<!\A)(?<!\n)\s*([{icons}])", r"\n\n\1", t)
