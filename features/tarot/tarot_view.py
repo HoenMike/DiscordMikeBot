@@ -1570,6 +1570,7 @@ class TarotResultActionView(discord.ui.View):
             return
 
         self._recap_in_progress = True
+        image_buffer = None
         try:
             await interaction.response.defer(ephemeral=True)
             spread_title = self.spread_title or SPREAD_DEFINITIONS.get(
@@ -1605,8 +1606,22 @@ class TarotResultActionView(discord.ui.View):
                 except Exception:
                     pass
             self._sync_activity_logger()
+        except Exception as exc:
+            print(f"❌ [TarotRecap] Không tạo/gửi được recap: {type(exc).__name__}: {exc}", flush=True)
+            try:
+                await interaction.followup.send(
+                    "❌ Chưa tạo được Recap Card. Lượt recap **chưa bị khóa**; bạn có thể thử lại.",
+                    ephemeral=True,
+                )
+            except Exception:
+                pass
         finally:
             self._recap_in_progress = False
+            try:
+                if image_buffer is not None:
+                    image_buffer.close()
+            except Exception:
+                pass
 
     @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
     async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
