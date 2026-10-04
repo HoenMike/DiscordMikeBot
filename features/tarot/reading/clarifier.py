@@ -73,10 +73,20 @@ def target_insight(
     if not reading_result:
         return ""
 
+    target_title = _normalize(target.position_title)
     for insight in reading_result.card_insights:
         if insight.card_id and insight.card_id == target.card.id:
             return insight.insight.strip()
-        idx = _position_index_from_id(insight.position_id, [target])
-        if idx == 0:
+
+        raw_position = (insight.position_id or "").strip()
+        if raw_position == str(target.position_index):
+            return insight.insight.strip()
+
+        normalized_position = _normalize(raw_position)
+        if normalized_position and (
+            normalized_position == target_title
+            or normalized_position in target_title
+            or target_title in normalized_position
+        ):
             return insight.insight.strip()
     return ""
