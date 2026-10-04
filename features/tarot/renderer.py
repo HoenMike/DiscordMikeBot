@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import io
 import pathlib
-from typing import Iterable, List, Optional, Sequence, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -691,8 +691,12 @@ def _draw_celtic_center(canvas: Image.Image, state: ReadingBoardState) -> None:
         drawn = state.drawn_cards[idx]
         if state.is_revealed(idx):
             orientation = " · REV" if drawn.is_reversed else ""
-            text = f"{idx + 1}. {drawn.card.name_vi}{orientation}"
-            color = COLOR_REVERSED if drawn.is_reversed else COLOR_TEXT
+            _, state_tag = _state_accent(state, idx)
+            emphasis = f" · {state_tag}" if state_tag else ""
+            text = f"{idx + 1}. {drawn.card.name_vi}{orientation}{emphasis}"
+            color = COLOR_REVERSED if drawn.is_reversed else (
+                COLOR_GOLD_LIGHT if state.is_key_card(idx) else COLOR_TEXT
+            )
         else:
             text = f"{idx + 1}. CHƯA LẬT"
             color = COLOR_MUTED
