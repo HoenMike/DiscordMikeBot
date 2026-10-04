@@ -478,6 +478,31 @@ class TarotLauncherView(discord.ui.View):
             return
 
         self.selected_spread = interaction.data["values"][0]
+        self.selection_source = "manual"
+        self._build_components()
+        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_recommendation_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+        if not self._use_recommendation():
+            await interaction.response.send_message(
+                "⚠️ Chưa có đề xuất nào. Hãy nhập câu hỏi trước nhé.",
+                ephemeral=True,
+            )
+            return
+
+        self._build_components()
+        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_context_mode_select(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        value = interaction.data["values"][0]
+        self.reading_context_mode = "fresh" if value == "fresh" else "current"
         self._build_components()
         await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
 
@@ -500,6 +525,16 @@ class TarotLauncherView(discord.ui.View):
     async def _handle_start_button(self, interaction: discord.Interaction):
         if not self._check_author(interaction):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        if not self._can_start():
+            if not self.question and self.selection_source == "default":
+                await interaction.response.send_modal(TarotQuestionModal(self))
+            else:
+                await interaction.response.send_message(
+                    "✨ Hãy dùng đề xuất của Asumi hoặc tự chọn một kiểu trải bài trước khi bắt đầu.",
+                    ephemeral=True,
+                )
             return
 
         spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
@@ -561,8 +596,11 @@ class TarotLauncherView(discord.ui.View):
         except Exception:
             pass
 
-        # Lấy ngữ cảnh cũ (Trí nhớ bạn cũ) và danh sách lá bốc gần đây (Card Fatigue)
-        recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
+        # T20.2: when a repeated question is detected, the user can explicitly
+        # choose a fresh read that does not inject prior Tarot context.
+        recent_ctx = None
+        if self.reading_context_mode != "fresh":
+            recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
         fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
 
         drawn_cards = draw_spread(
