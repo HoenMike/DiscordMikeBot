@@ -151,8 +151,10 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(sent_kwargs["view"], EmbedActionView)
         self.assertIn("[facebed.com](https://facebed.com/post/1)", sent_kwargs["content"])
         self.assertNotIn("\nhttps://facebed.com/post/1", sent_kwargs["content"])
-        self.assertEqual(sent_kwargs["view"].reload_button.label, "Reload")
-        self.assertEqual(sent_kwargs["view"].remove_button.label, "Bỏ embed")
+        self.assertIsNone(sent_kwargs["view"].reload_button.label)
+        self.assertEqual(str(sent_kwargs["view"].reload_button.emoji), "🔄")
+        self.assertIsNone(sent_kwargs["view"].remove_button.label)
+        self.assertEqual(str(sent_kwargs["view"].remove_button.emoji), "❌")
         self.assertIn("facebed.com", sent_kwargs["view"].payload["tried_domains"])
 
     async def test_embed_action_buttons_are_owner_only_and_reload(self):
@@ -163,8 +165,10 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             tried_domains={"facebed.com"},
         )
         self.assertIsInstance(view, EmbedActionView)
-        self.assertEqual(view.reload_button.label, "Reload")
-        self.assertEqual(view.remove_button.label, "Bỏ embed")
+        self.assertIsNone(view.reload_button.label)
+        self.assertEqual(str(view.reload_button.emoji), "🔄")
+        self.assertIsNone(view.remove_button.label)
+        self.assertEqual(str(view.remove_button.emoji), "❌")
 
         denied = SimpleNamespace(
             user=SimpleNamespace(id=999),
@@ -211,8 +215,10 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsInstance(view, EmbedActionView)
         self.assertEqual(view.payload["platform"], "twitter")
-        self.assertEqual(view.reload_button.label, "Reload")
-        self.assertEqual(view.remove_button.label, "Bỏ embed")
+        self.assertIsNone(view.reload_button.label)
+        self.assertEqual(str(view.reload_button.emoji), "🔄")
+        self.assertIsNone(view.remove_button.label)
+        self.assertEqual(str(view.remove_button.emoji), "❌")
 
     async def test_facebook_does_not_auto_roll_after_first_proxy_is_sent(self):
         first = SimpleNamespace(id=40)
