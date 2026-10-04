@@ -1154,6 +1154,200 @@ class TarotResultActionView(discord.ui.View):
         )
         await interaction.response.send_modal(modal)
 
+    @discord.ui.button(label="🔎 Làm rõ 1 lá", style=discord.ButtonStyle.secondary, custom_id="tarot_clarifier", row=0)
+    async def clarifier_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "🔒 Chỉ người bốc quẻ mới có thể rút clarifier.",
+                ephemeral=True,
+            )
+            return
+        if not self.clarifier_allowed:
+            await interaction.response.send_message(
+                "⚠️ Quẻ này không mở clarifier.",
+                ephemeral=True,
+            )
+            return
+        if self.has_used_clarifier:
+            await interaction.response.send_message(
+                "✓ Quẻ này đã dùng clarifier rồi.",
+                ephemeral=True,
+            )
+            return
+        if self._clarifier_in_progress:
+            await interaction.response.send_message(
+                "⌛ Clarifier đang được xử lý.",
+                ephemeral=True,
+            )
+            return
+
+        picker = TarotClarifierTargetView(
+            result_view=self,
+            origin_message=interaction.message,
+        )
+        suggestions = resolve_clarifier_suggestions(self.reading_result, self.drawn_cards)
+        hint = (
+            "Các vị trí có dấu ✨ là nơi Asumi thấy còn đáng làm rõ nhất."
+            if suggestions else
+            "Chọn đúng **một vị trí** bạn muốn đào sâu. Quẻ gốc sẽ không bị thay đổi."
+        )
+        await interaction.response.send_message(
+            f"🔎 **Chọn vị trí cho clarifier**\n{hint}\n\n"
+            "Mỗi quẻ chỉ có **1 clarifier** để tránh biến nó thành reroll.",
+            view=picker,
+            ephemeral=True,
+        )
+
+    async def run_clarifier(
+        self,
+        interaction: discord.Interaction,
+        target_index: int,
+        origin_message: Optional[discord.Message],
+    ) -> bool:
+        """Draw, interpret and deliver one clarifier. Consume only after delivery."""
+        if (
+            self.has_used_clarifier
+            or self._clarifier_in_progress
+            or not self.clarifier_allowed
+            or not 0 <= target_index < len(self.drawn_cards)
+        ):
+            return False
+
+        self._clarifier_in_progress = True
+        ai_task = None
+        image_buffer = None
+        try:
+            target = self.drawn_cards[target_index]
+            try:
+                fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
+            except Exception:
+                fatigue_card_ids = []
+
+            clarifier = draw_clarifier(
+                original_cards=self.drawn_cards,
+                target_position_index=target_index,
+                user_id=self.author_id,
+                question=self.question,
+                fatigue_card_ids=fatigue_card_ids,
+            )
+            existing_insight = target_insight(self.reading_result, target)
+            key_card_id = None
+            if self.reading_result and self.reading_result.key_card:
+                key_card_id = self.reading_result.key_card.card_id or None
+
+            board_state = ClarifierBoardState(
+                spread_key=self.spread_key,
+                drawn_cards=tuple(self.drawn_cards),
+                target_position_index=target_index,
+                clarifier_card=clarifier,
+                key_card_id=key_card_id,
+            )
+
+            ai_task = self.tarot_manager.create_ai_task(
+                generate_clarifier_interpretation(
+                    spread_key=self.spread_key,
+                    original_question=self.question,
+                    context=self.context,
+                    original_reading=self.ai_reading,
+                    target_card=target,
+                    target_insight=existing_insight,
+                    clarifier_card=clarifier,
+                    reader_style=self.reader_style,
+                    user_name=self.author_name,
+                )
+            )
+            render_task = asyncio.to_thread(render_clarifier_board_to_bytes, board_state)
+            clarifier_result, image_buffer = await asyncio.gather(ai_task, render_task)
+
+            target_position = target.position_title
+            if target_position.upper().startswith("LÁ ") and ":" in target_position:
+                target_position = target_position.split(":", 1)[1].strip()
+
+            target_orient = "NGƯỢC" if target.is_reversed else "XUÔI"
+            clarifier_orient = "NGƯỢC" if clarifier.is_reversed else "XUÔI"
+            embed = discord.Embed(
+                title="🔎 TAROT CLARIFIER",
+                description=(
+                    f"**🎯 Vị trí làm rõ:** {target_index + 1}. {target_position}\n"
+                    f"**Lá gốc:** **{target.card.name_vi}** · {target_orient}\n"
+                    f"**Lá bổ sung:** **{clarifier.card.name_vi}** (*{clarifier.card.name_en}*) · {clarifier_orient}\n\n"
+                    f"{clarifier_result.full_reading}\n\n"
+                    "*Clarifier bổ sung ngữ cảnh cho vị trí đã chọn; nó không thay thế hay reroll quẻ gốc.*"
+                ),
+                color=0x8B5CF6,
+            )
+            embed.set_image(url="attachment://tarot_clarifier.png")
+            embed.set_footer(text=f"Clarifier của {self.author_name} • 1/1")
+
+            file = discord.File(fp=image_buffer, filename="tarot_clarifier.png")
+            delivered = False
+            try:
+                await interaction.followup.send(
+                    embed=embed,
+                    file=file,
+                    ephemeral=False,
+                )
+                delivered = True
+            except Exception:
+                # Attachment failure must not mutate the original reading or consume
+                # the clarifier. Try a text-only delivery once.
+                try:
+                    embed.set_image(url=None)
+                    await interaction.followup.send(
+                        embed=embed,
+                        ephemeral=False,
+                    )
+                    delivered = True
+                except Exception:
+                    delivered = False
+
+            if not delivered:
+                return False
+
+            # Delivery is the commit point. Everything below is best-effort metadata/UI.
+            self.has_used_clarifier = True
+            self.clarifier_target_index = target_index
+            self.clarifier_card = clarifier
+            self.clarifier_reading = clarifier_result.full_reading
+            self.clarifier_button.disabled = True
+            self.clarifier_button.label = "✓ Đã làm rõ"
+
+            try:
+                await self.tarot_manager.save_tarot_clarifier(
+                    user_id=self.author_id,
+                    guild_id=self.guild_id,
+                    channel_id=self.channel_id,
+                    spread_type=self.spread_key,
+                    question=self.question,
+                    target_position_index=target_index,
+                    target_card=target,
+                    clarifier_card=clarifier,
+                    interpretation=clarifier_result.full_reading,
+                )
+            except Exception as exc:
+                print(f"⚠️ [TarotClarifier] Không lưu được metadata clarifier: {exc}", flush=True)
+
+            try:
+                if origin_message:
+                    await origin_message.edit(view=self)
+            except Exception:
+                pass
+
+            self._sync_activity_logger()
+            return True
+        except Exception as exc:
+            print(f"❌ [TarotClarifier] Lỗi xử lý clarifier: {type(exc).__name__}: {exc}", flush=True)
+            if ai_task is not None and not ai_task.done():
+                await self.tarot_manager.cancel_ai_task(ai_task)
+            return False
+        finally:
+            self._clarifier_in_progress = False
+            try:
+                if image_buffer is not None:
+                    image_buffer.close()
+            except Exception:
+                pass
+
     @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
     async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = interaction.user.id
