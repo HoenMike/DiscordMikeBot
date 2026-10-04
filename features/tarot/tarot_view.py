@@ -1595,7 +1595,7 @@ class TarotFlipView(discord.ui.View):
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 if self.message:
                     try:
-                        await self.message.edit(content="⌛ *Quá lâu không nhận được luận giải từ AI. Quẻ bài của bạn đã được lưu nhưng không hiển thị bài giải đầy đủ.*", view=None)
+                        await self.message.edit(content="⌛ *Phiên đọc đã hết thời gian chờ AI trước khi có luận giải hoàn chỉnh. Bạn có thể bắt đầu lại khi sẵn sàng.*", view=None)
                     except Exception:
                         pass
                 return
