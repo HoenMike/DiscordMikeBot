@@ -1131,9 +1131,11 @@ class TarotFlipView(discord.ui.View):
         self.channel_id = channel_id
 
         self.revealed_indices: Set[int] = set()
+        self._last_revealed_indices: Set[int] = set()
         self._has_completed: bool = False
         self._flip_lock = asyncio.Lock()
         self._ai_cancelled = False
+        self._ai_ready_callback_attached = False
         self.message: Optional[discord.Message] = None
 
         # Màu embed theo phong cách hoặc Yes/No phán quyết
@@ -1150,6 +1152,119 @@ class TarotFlipView(discord.ui.View):
             return
         self._ai_cancelled = True
         await self.tarot_manager.cancel_ai_task(self.ai_task)
+
+    def _is_ai_ready(self) -> bool:
+        if not self.ai_task.done() or self.ai_task.cancelled():
+            return False
+        try:
+            return self.ai_task.exception() is None
+        except (asyncio.CancelledError, Exception):
+            return False
+
+    async def attach_message(self, message: Optional[discord.Message]) -> None:
+        """Attach the live Discord message and enable zero-extra-call AI-ready updates."""
+        self.message = message
+        if not message or self._ai_ready_callback_attached:
+            return
+
+        self._ai_ready_callback_attached = True
+        if self.ai_task.done():
+            await self._refresh_ai_ready_indicator()
+            return
+
+        def _done_callback(task: asyncio.Task) -> None:
+            if task.cancelled() or self._has_completed or self.is_finished():
+                return
+            try:
+                asyncio.get_running_loop().create_task(self._refresh_ai_ready_indicator())
+            except RuntimeError:
+                pass
+
+        self.ai_task.add_done_callback(_done_callback)
+
+    async def _refresh_ai_ready_indicator(self) -> None:
+        """Refresh only text/view state; preserve the already-rendered attachment."""
+        if not self.message or self._has_completed or self.is_finished() or not self._is_ai_ready():
+            return
+        async with self._flip_lock:
+            if not self.message or self._has_completed or self.is_finished():
+                return
+            try:
+                await self.message.edit(
+                    embed=self.build_session_embed(),
+                    view=self,
+                )
+            except Exception:
+                pass
+
+    def build_session_embed(self, last_revealed_indices: Optional[Set[int]] = None) -> discord.Embed:
+        """Build the FACE_DOWN/REVEALING session state for the single live message."""
+        last_revealed = (
+            set(last_revealed_indices)
+            if last_revealed_indices is not None
+            else set(self._last_revealed_indices)
+        )
+        total = len(self.drawn_cards)
+
+        desc_lines = []
+        if self.question:
+            desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
+        if self.context:
+            desc_lines.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
+        desc_lines.append(f"**🎭 Phong cách Asumi:** {self.style_info['name']}")
+        desc_lines.append("")
+        desc_lines.append(build_reveal_progress(self.revealed_indices, total))
+        desc_lines.append(build_ai_ready_status(self._is_ai_ready()))
+
+        if last_revealed:
+            if len(last_revealed) <= 3:
+                reveal_lines = [
+                    build_micro_reveal(self.drawn_cards[idx], idx + 1)
+                    for idx in sorted(last_revealed)
+                    if 0 <= idx < total
+                ]
+                if reveal_lines:
+                    desc_lines.extend([
+                        "",
+                        "**✨ Vừa lật**",
+                        "\n".join(reveal_lines),
+                    ])
+            else:
+                desc_lines.extend([
+                    "",
+                    f"✨ **Đã lật {len(last_revealed)} lá cùng lúc.**",
+                ])
+
+        desc_lines.extend(["", WIDE_DIVIDER])
+
+        cards_summary_lines = []
+        for idx, drawn in enumerate(self.drawn_cards):
+            if idx in self.revealed_indices:
+                orient = "[NGƯỢC]" if drawn.is_reversed else "[XUÔI]"
+                cards_summary_lines.append(
+                    f"• **{idx + 1}. {drawn.position_title}** — **{drawn.card.name_vi}** {orient}"
+                )
+            else:
+                cards_summary_lines.append(
+                    f"• **{idx + 1}. {drawn.position_title}** — ▫️ *Chưa lật*"
+                )
+
+        desc_lines.append("**🃏 Trải bài:**\n" + "\n".join(cards_summary_lines))
+        if len(self.revealed_indices) < total:
+            desc_lines.append("\n*Chọn số lá bên dưới hoặc dùng **Lật hết**.*")
+
+        state = "FACE DOWN" if not self.revealed_indices else "REVEALING"
+        embed = discord.Embed(
+            title=f"🔮 {self.spread_info['name'].upper()}",
+            description="\n".join(desc_lines),
+            color=self.embed_color,
+        )
+        embed.set_image(url="attachment://tarot_spread.png")
+        embed.set_footer(
+            text=f"Quẻ bài của {self.author_name} • {state} • {len(self.revealed_indices)}/{total}",
+            icon_url=self.author_avatar_url,
+        )
+        return embed
 
     def _build_buttons(self):
         """Khởi tạo và cập nhật trạng thái các nút bấm lật bài."""
