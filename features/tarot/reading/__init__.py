@@ -4,6 +4,12 @@ This package is introduced incrementally. Discord UI/renderer migrations remain 
 existing modules until their dedicated milestones.
 """
 
+from .recommendation import (
+    SpreadRecommendation,
+    find_similar_recent_question,
+    question_similarity,
+    recommend_spread,
+)
 from .schema import (
     TarotAIResponseSchema,
     TarotCardInsight,
@@ -14,6 +20,10 @@ from .schema import (
 )
 
 __all__ = [
+    "SpreadRecommendation",
+    "find_similar_recent_question",
+    "question_similarity",
+    "recommend_spread",
     "TarotAIResponseSchema",
     "TarotCardInsight",
     "TarotClarifierTarget",
