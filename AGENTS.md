@@ -34,7 +34,10 @@ Tarot 2.0 implementation is active and user-approved.
 - T20.1 — Prompt & Reading Engine 2.0: complete.
 - T20.2 — Question-first Launcher: complete.
 - T20.3 — Reading Session UX: complete.
-- **Next milestone: T20.4 — Renderer 2.0.**
+- T20.4 — Renderer 2.0: complete.
+- T20.5 — Clarifier: complete.
+- **Tarot 2.0 release boundary is complete in Asumi 2.9.0.**
+- **Next milestone: T20.6 — Multi-turn Reading Session.**
 - Continue milestone-by-milestone; do not skip ahead or bundle unrelated later milestones into one PR.
 
 ### Tarot milestone IDs
