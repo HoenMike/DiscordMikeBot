@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, patch
 from features.tarot.ai import (
     _build_tarot_prompt,
     _infer_auto_tone,
+    generate_tarot_reading,
+    generate_tarot_reading_result,
     generate_why_explanation,
     parse_tarot_ai_response,
     parse_tarot_ai_response_v2,
@@ -181,6 +183,58 @@ class TarotV2RecommendationTests(unittest.TestCase):
             "Cho tôi bức tranh toàn cảnh về sự nghiệp dài hạn"
         )
         self.assertEqual(spread_key, "celtic")
+
+
+class TarotV2GenerationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rich_result_and_legacy_adapter_share_same_reading(self):
+        cards = [drawn("major_02", 0, "Lời khuyên")]
+        payload = json.dumps({
+            "is_valid": True,
+            "topic_tag": "decision",
+            "mood_tag": "Chậm lại",
+            "headline": "Đừng ép câu trả lời",
+            "core_message": "Thông tin chưa đủ rõ để chốt ngay.",
+            "card_insights": [{
+                "position_id": "0",
+                "card_id": "major_02",
+                "card_name": "Nữ Tư Tế",
+                "insight": "Quan sát thêm trước khi hành động.",
+            }],
+            "connections": [],
+            "dominant_theme": "Khoảng dừng có ích hơn một quyết định vội.",
+            "key_card": {
+                "card_id": "major_02",
+                "card_name": "Nữ Tư Tế",
+                "reason": "Đây là lá duy nhất và trực tiếp nhấn mạnh việc quan sát.",
+            },
+            "practical_takeaway": ["Xác định một dữ kiện còn thiếu."],
+            "uncertainty": "Tarot không thể biết dữ kiện đó sẽ xuất hiện khi nào.",
+            "suggested_clarifier_targets": [],
+            "journey_tags": ["decision"],
+            "refusal_message": "",
+        }, ensure_ascii=False)
+        response = type("Response", (), {"text": payload})()
+
+        with patch("features.tarot.ai.bounded_ai_generate", new=AsyncMock(return_value=response)):
+            rich = await generate_tarot_reading_result(
+                "single",
+                cards,
+                question="Tôi có nên chốt ngay không?",
+                user_name="Mai",
+            )
+
+        self.assertEqual(rich.headline, "Đừng ép câu trả lời")
+        self.assertEqual(rich.key_card.card_id, "major_02")
+        self.assertIn("Khoảng dừng có ích", rich.full_reading)
+
+        with patch("features.tarot.ai.generate_tarot_reading_result", new=AsyncMock(return_value=rich)):
+            legacy = await generate_tarot_reading(
+                "single",
+                cards,
+                question="Tôi có nên chốt ngay không?",
+                user_name="Mai",
+            )
+        self.assertEqual(legacy, rich.as_legacy_tuple())
 
 
 class TarotV2WhyTests(unittest.IsolatedAsyncioTestCase):
