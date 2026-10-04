@@ -30,59 +30,76 @@ def create_platform_view(platform_key: str, original_url: str) -> discord.ui.Vie
 
 
 
-class FacebookFallbackView(discord.ui.View):
-    """Nút phụ để người gửi link tự chuyển sang proxy Facebook kế tiếp."""
+class EmbedControlView(discord.ui.View):
+    """Owner-only controls shared by every Asumi social preview."""
 
     def __init__(self, cog, payload: dict, timeout: float = 900):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.payload = dict(payload)
-        self.button = discord.ui.Button(
-            label="Proxy khác",
+        origin_id = self.payload.get("origin_id", 0)
+        platform = self.payload.get("platform", "social")
+
+        self.reload_button = discord.ui.Button(
+            label="Tải lại",
             emoji="🔄",
             style=discord.ButtonStyle.secondary,
-            custom_id=f"asumi:fb-proxy-roll:{self.payload.get('origin_id', 0)}",
+            custom_id=f"asumi:embed-reload:{origin_id}:{platform}",
         )
-        self.button.callback = self._roll_proxy
-        self.add_item(self.button)
+        self.reload_button.callback = self._reload_embed
+        self.add_item(self.reload_button)
+
+        self.remove_button = discord.ui.Button(
+            label="Bỏ embed",
+            emoji="🗑️",
+            style=discord.ButtonStyle.danger,
+            custom_id=f"asumi:embed-remove:{origin_id}:{platform}",
+        )
+        self.remove_button.callback = self._remove_embed
+        self.add_item(self.remove_button)
+
+        # Compatibility for older tests/code that referenced the single Facebook button.
+        self.button = self.reload_button
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         author_id = int(self.payload.get("author_id", 0) or 0)
         if interaction.user.id == author_id:
             return True
         await interaction.response.send_message(
-            "Chỉ người gửi link gốc mới có thể đổi proxy.",
+            "Chỉ người gửi link gốc mới có thể điều khiển preview này.",
             ephemeral=True,
         )
         return False
 
-    async def _roll_proxy(self, interaction: discord.Interaction):
-        self.button.disabled = True
+    async def _reload_embed(self, interaction: discord.Interaction):
+        self.reload_button.disabled = True
+        self.remove_button.disabled = True
         await interaction.response.edit_message(view=self)
 
         try:
-            result = await self.cog.roll_facebook_proxy(
+            result = await self.cog.reload_embed(
                 self.payload,
                 current_preview=interaction.message,
             )
         except Exception as exc:
             result = None
-            print(f"[EmbedCog] Facebook proxy roll lỗi: {exc}", flush=True)
+            print(f"[EmbedCog] Reload preview lỗi: {exc}", flush=True)
 
         if result is not None and result.success:
             self.stop()
             await interaction.followup.send(
-                f"Đã chuyển sang proxy khác: `{result.proxy_domain or 'proxy mới'}`.",
+                "Đã tải lại preview.",
                 ephemeral=True,
             )
             return
 
-        reason = getattr(result, "reason", "proxy_roll_failed")
+        reason = getattr(result, "reason", "reload_failed")
         if reason == "no_more_proxy":
-            self.button.label = "Hết proxy"
-            self.button.disabled = True
+            self.reload_button.label = "Hết proxy"
+            self.reload_button.disabled = True
         else:
-            self.button.disabled = False
+            self.reload_button.disabled = False
+        self.remove_button.disabled = False
 
         try:
             await interaction.message.edit(view=self)
@@ -90,11 +107,40 @@ class FacebookFallbackView(discord.ui.View):
             pass
 
         message = (
-            "Đã thử hết proxy Facebook khả dụng."
+            "Đã thử hết proxy khả dụng. Preview hiện tại vẫn được giữ."
             if reason == "no_more_proxy"
-            else f"Chưa đổi được proxy (`{reason}`). Preview hiện tại vẫn được giữ."
+            else f"Chưa tải lại được preview (`{reason}`). Preview hiện tại vẫn được giữ."
         )
         await interaction.followup.send(message, ephemeral=True)
+
+    async def _remove_embed(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            result = await self.cog.restore_original_embed(
+                self.payload,
+                current_preview=interaction.message,
+            )
+        except Exception as exc:
+            result = None
+            print(f"[EmbedCog] Restore original embed lỗi: {exc}", flush=True)
+
+        if result is not None and result.success:
+            self.stop()
+            await interaction.followup.send(
+                "Đã bỏ preview của Asumi và khôi phục embed gốc của Discord.",
+                ephemeral=True,
+            )
+            return
+
+        reason = getattr(result, "reason", "restore_failed")
+        await interaction.followup.send(
+            f"Chưa thể khôi phục embed gốc (`{reason}`).",
+            ephemeral=True,
+        )
+
+
+# Compatibility alias for code/tests from v2.8.2-v2.8.4.
+FacebookFallbackView = EmbedControlView
 
 
 class PlatformToggleSelect(discord.ui.Select):
