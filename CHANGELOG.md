@@ -7,6 +7,21 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.8.3] - 2026-10-04 — *Facebook Raw Proxy Embed & Manual Proxy Roll*
+
+### Fixed
+- **Khôi phục đúng cơ chế Discord unfurl**: Facebook proxy URL được gửi dưới dạng **raw URL trên một dòng riêng**. Masked markdown link không còn được dùng cho link tạo embed, vì Discord cần nhìn thấy URL trực tiếp để dựng native embed/video.
+- **Fallback đúng nghĩa là đổi proxy**: nút giờ là **🔄 Proxy khác**; bấm nút sẽ chuyển sang proxy Facebook kế tiếp trong cấu hình thay vì chạy yt-dlp.
+- **Không auto-roll sau khi đã gửi proxy**: server-side verify không còn tự quyết định thay proxy Facebook vừa gửi. Nếu preview hiện tại không ổn, chính người gửi link mới bấm đổi proxy.
+- **Không yt-dlp cho Facebook**: Facebook được loại khỏi yt-dlp fallback path. Khi đã thử hết proxy, Asumi chỉ báo hết proxy và giữ preview hiện tại.
+- **Replace an toàn**: proxy cũ chỉ bị xóa sau khi message chứa raw URL của proxy mới đã gửi thành công.
+
+### Changed
+- Nút vẫn owner-only: chỉ người gửi link gốc có thể đổi proxy; user khác nhận phản hồi ephemeral.
+- Trạng thái proxy đã thử được giữ theo `(origin_message_id, URL)`, nên mỗi lần bấm tiếp tục từ proxy kế tiếp và không quay lại proxy cũ.
+- Twitter/TikTok/Instagram/Reddit/Twitch vẫn giữ automatic yt-dlp fallback hiện tại.
+- Cập nhật README, docs pipeline và regression tests cho raw-unfurl + proxy-roll flow.
+
 ## [2.8.2] - 2026-10-04 — *Native Facebook Fallback Button*
 
 ### Fixed
