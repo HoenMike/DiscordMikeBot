@@ -20,7 +20,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.cog.session = object()
         self.channel = NS(id=2, is_nsfw=lambda: False, send=AsyncMock())
         self.message = NS(id=1, channel=self.channel, guild=NS(id=3, filesize_limit=1000),
-                          author=NS(display_name="A"), jump_url="https://discord.com/channels/3/2/1")
+                          author=NS(id=10, display_name="A"), jump_url="https://discord.com/channels/3/2/1")
         self.preview = NS(id=4, channel=self.channel, delete=AsyncMock())
         self.channel.send.return_value = self.preview
 
