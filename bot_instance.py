@@ -300,7 +300,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         color=0x9B59B6
     )
     embed.add_field(
-        name="🃏 9 KIỂU TRẢI BÀI CHUYÊN SÂU",
+        name="🃏 9 SPREAD CỐ ĐỊNH + SMART CUSTOM SPREAD",
         value=(
             "• `daily` : **🌟 Daily Card (1 lá)** — Năng lượng & thông điệp ngày (Reset 00:00 VN)\n"
             "• `yes_no` : **⚡ Yes / No (1 lá)** — Phán quyết Có / Không dứt khoát kèm phân tích\n"
@@ -331,6 +331,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
             "• `/tarot` hoặc `.m tarot` : Mở launcher **question-first** — nhập câu hỏi để Asumi gợi ý kiểu trải bài\n"
             "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `.m tarot yes_no Có nên đổi việc?`\n"
             "• `/tarot_history` hoặc `.m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
+            "• `/tarot_journey` hoặc `.m tarot journey` : Xem Tarot Journey 30 ngày từ lịch sử đã lưu\n"
             "• `/tarot_recommend [question]` hoặc `.m tarot recommend [câu hỏi]` : Gợi ý spread nhanh (launcher chính đã tích hợp sẵn)\n"
             "• `/tarot_memory [on/off]` hoặc `.m tarot memory [on/off]` : Bật / tắt trí nhớ ngữ cảnh bạn cũ\n"
             "• `/tarot_forget` hoặc `.m tarot forget` : Xóa sạch toàn bộ lịch sử bốc bài khỏi hệ thống\n"
@@ -344,10 +345,14 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
             "• **Reading Board 2.0**: Board responsive theo spread, progress reveal, nhãn vị trí và final key-card emphasis.\n"
             "• **Hạt Nhân Năng Lượng (Cosmic Seed)**: Khi hỏi cùng một câu hỏi trong vòng **1 tiếng**, "
             "vũ trụ sẽ giữ nguyên các lá bài rút ra để đảm bảo tính nhất quán (tránh vừa Có vừa Không).\n"
-            "• **Nút Hỏi Thêm Ý Nghĩa (❓)**: Mở modal cho phép đặt thêm câu hỏi đào sâu hoặc xin thêm lời khuyên chi tiết cho quẻ bài vừa bốc.\n"
+            "• **Follow-up 3 lượt (❓)**: Hỏi tiếp tối đa 3 lần trong cùng session; Asumi giữ context của quẻ, các câu trước và Clarifier đã dùng.\n"
+            "• **🔍 Vì sao?**: Giải thích quẻ dựa trên lá/vị trí nhìn thấy, không expose hidden reasoning.\n"
+            "• **🃏 Clarifier 1/1**: Chọn đúng một vị trí để rút một lá làm rõ, không reroll quẻ gốc.\n"
+            "• **📌 Recap**: Tạo card gọn để lưu/chia sẻ từ chính quẻ vừa đọc, không rút bài hay gọi AI thêm.\n"
             "• **Nút Đánh Giá (👍 Hữu ích / 👎 Chưa chuẩn)**: Góp ý phản hồi chất lượng luận giải của AI.\n"
-            "• **Smart Launcher**: Nhập câu hỏi trước; Asumi đề xuất spread, nhưng bạn vẫn có thể tự chọn kiểu khác.\n"
+            "• **Smart Launcher + Smart Custom Spread**: Asumi có thể đề xuất spread cố định hoặc tạo schema riêng 3–7 vị trí; deck engine vẫn tự rút lá.\n"
             "• **Reading Session**: Một message xuyên suốt việc lật bài, có progress, micro reveal và báo khi AI đã luận giải xong.\n"
+            "• **Tarot Journey**: Tổng hợp 30 ngày về suit, Major, lá lặp và chủ đề từ lịch sử đã lưu; dùng để tự nhìn lại, không phải dự đoán định mệnh.\n"
             "• **Mobile Reveal Controls**: Nút lá đánh số compact, kể cả Celtic Cross 10 lá vẫn gọn.\n"
             "• **Nhận diện câu hỏi gần giống**: Nếu bạn vừa hỏi chuyện tương tự, launcher cho chọn dùng ngữ cảnh cũ nhẹ hoặc xem như câu hỏi mới.\n"
             "• **Trí Nhớ Bạn Cũ (Memory)**: AI có khả năng liên kết nhẹ nhàng ngữ cảnh từ các quẻ bài trước.\n"
@@ -356,7 +361,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Tarot Engine v2.0",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Tarot Engine v2.1",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
