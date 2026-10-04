@@ -14,6 +14,7 @@ from features.tarot.reading.schema import (
     TarotReadingResult,
 )
 from features.tarot.reading.recommendation import recommend_spread
+from features.tarot.reading.custom_spread import CustomSpreadSchema, validate_custom_spread_payload
 
 # Semaphore giới hạn tối đa 3 request AI đồng thời để tránh 429 Rate Limit
 AI_SEMAPHORE = asyncio.Semaphore(3)
@@ -86,6 +87,13 @@ TAROT_CLARIFIER_CONFIG_FALLBACK = types.GenerateContentConfig(
     temperature=0.55,
     system_instruction=TAROT_SYSTEM_INSTRUCTION,
     response_mime_type="application/json",
+)
+
+TAROT_CUSTOM_SPREAD_CONFIG = types.GenerateContentConfig(
+    temperature=0.45,
+    system_instruction=TAROT_SYSTEM_INSTRUCTION,
+    response_mime_type="application/json",
+    thinking_config=types.ThinkingConfig(thinking_budget=768),
 )
 
 
@@ -752,6 +760,98 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
 
 
 
+async def generate_custom_spread_schema(
+    question: str,
+    context: Optional[str] = None,
+    user_name: str = "Bạn",
+    user_id: Optional[int] = None,
+    guild: Optional[Any] = None,
+    bot_id: Optional[int] = None,
+    bot_name: str = BOT_BRAND_NAME,
+) -> Optional[CustomSpreadSchema]:
+    """Generate only a validated 3-7 position schema; never card identities."""
+    clean_question, mentions_context = extract_question_mentions_context(
+        question=question,
+        user_name=user_name,
+        user_id=user_id,
+        guild=guild,
+        bot_id=bot_id,
+        bot_name=bot_name,
+    )
+    if not clean_question.strip():
+        return None
+
+    prompt = f"""
+Thiết kế một Smart Custom Spread Tarot cho câu hỏi của {user_name}.
+
+CÂU HỎI
+{clean_question}
+
+BỐI CẢNH
+{context or 'Không có thêm bối cảnh.'}
+
+THÔNG TIN ĐỐI TƯỢNG
+{mentions_context}
+
+CHỈ ĐƯỢC THIẾT KẾ SCHEMA VỊ TRÍ
+- 3 đến 7 vị trí.
+- Mỗi vị trí gồm: id, title, description.
+- id ngắn, duy nhất, snake_case tiếng Anh.
+- title ngắn, tự nhiên; description nói vị trí đó giúp người hỏi tự xem xét điều gì.
+- Không đưa tên lá bài, card_id, chiều xuôi/ngược hay bất kỳ kết quả rút bài nào.
+- Nếu câu hỏi có người khác, chỉ tạo góc nhìn về lựa chọn, ranh giới, dữ kiện và hành động phía {user_name}.
+- Không dùng Tarot để chẩn đoán hay chốt quyết định y tế/pháp lý/tài chính.
+- Các vị trí phải khác nhau về chức năng, không lặp lại cùng một câu hỏi bằng từ khác.
+
+OUTPUT JSON DUY NHẤT
+{{
+  "title": "Tên spread ngắn",
+  "intent": "Spread này giúp khám phá điều gì",
+  "reason": "Vì sao cấu trúc này hợp với câu hỏi",
+  "positions": [
+    {{"id": "current_state", "title": "Hiện trạng", "description": "Mô tả chức năng vị trí"}}
+  ]
+}}
+""".strip()
+
+    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
+        config.GEMINI_TAROT_MODEL,
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.5-flash-lite",
+    ])
+    seen = set()
+    ordered_models = []
+    for model_name in models_to_try:
+        if model_name and model_name not in seen:
+            seen.add(model_name)
+            ordered_models.append(model_name)
+
+    async with AI_SEMAPHORE:
+        for model_name in ordered_models:
+            try:
+                response = await bounded_ai_generate(
+                    model=model_name,
+                    contents=prompt,
+                    config=TAROT_CUSTOM_SPREAD_CONFIG,
+                    timeout_sec=12.0,
+                    label="Tarot Custom Spread",
+                )
+                if not response or not response.text:
+                    continue
+                raw = response.text.strip()
+                fence = chr(96) * 3
+                if raw.startswith(fence):
+                    raw = re.sub(r"^.{3}[a-zA-Z]*\s*", "", raw)
+                    raw = re.sub(r"\s*.{3}$", "", raw).strip()
+                schema = validate_custom_spread_payload(json.loads(raw))
+                if schema:
+                    return schema
+            except Exception:
+                continue
+    return None
+
+
 async def generate_tarot_reading_result(
     spread_key: str,
     drawn_cards: List[DrawnCard],
@@ -763,11 +863,12 @@ async def generate_tarot_reading_result(
     user_id: Optional[int] = None,
     guild: Optional[Any] = None,
     bot_id: Optional[int] = None,
-    bot_name: str = BOT_BRAND_NAME
+    bot_name: str = BOT_BRAND_NAME,
+    spread_name_override: Optional[str] = None,
 ) -> TarotReadingResult:
     """Generate a rich Tarot 2.0 reading result while preserving model fallback behavior."""
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
-    spread_name = spread_info["name"]
+    spread_name = spread_name_override or spread_info["name"]
     prompt = _build_tarot_prompt(
         spread_key=spread_key,
         spread_name=spread_name,
