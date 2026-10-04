@@ -1,6 +1,6 @@
 # Tarot 2.0 — Prompt & Reading Intelligence Spec
 
-> **Status:** design spec only; implementation not started.  
+> **Status:** T20.1 implementation complete; this remains the behavior contract for future prompt changes.  
 > **Parent plan:** `docs/TAROT_V2_MASTER_PLAN.md`  
 > **Current AI implementation:** `features/tarot/ai.py`
 
@@ -467,6 +467,24 @@ A reading should fail review if it:
 - ignores position meaning;
 - contradicts Yes/No verdict logic;
 - acts certain where the spread is ambiguous.
+
+---
+
+## 17.1 Implemented in T20.1
+
+The current implementation now includes:
+
+- V2 system instruction in `features/tarot/ai.py`;
+- structured schema models in `features/tarot/reading/schema.py`;
+- `parse_tarot_ai_response_v2(...)` returning `TarotReadingResult`;
+- `generate_tarot_reading_result(...)` for structured future consumers;
+- backward-compatible `generate_tarot_reading(...)` tuple adapter;
+- adaptive `auto` tone hinting;
+- natural follow-up prompt;
+- evidence-based `generate_why_explanation(...)`;
+- legacy JSON/plain-text fallback compatibility.
+
+The Discord final-reading UI still consumes the legacy tuple/text representation until later UX milestones, but the richer result is now available without another AI call.
 
 ---
 
