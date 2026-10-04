@@ -184,11 +184,15 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
         clean_q = self.question_input.value.strip() if self.question_input.value else None
         clean_ctx = self.context_input.value.strip() if self.context_input.value else None
         previous_question = self.launcher_view.question
+        previous_context = self.launcher_view.context
 
         self.launcher_view.question = clean_q if clean_q else None
         self.launcher_view.context = clean_ctx if clean_ctx else None
 
-        if previous_question != self.launcher_view.question:
+        if (
+            previous_question != self.launcher_view.question
+            or previous_context != self.launcher_view.context
+        ):
             if self.launcher_view.selection_source in {"recommendation", "custom"}:
                 self.launcher_view.selection_source = "default"
             self.launcher_view.custom_spread_schema = None
@@ -773,7 +777,10 @@ class TarotLauncherView(discord.ui.View):
         if self.selection_source == "custom" and self.custom_spread_schema:
             spread_info = self.custom_spread_schema.as_spread_info()
             drawn_cards = draw_custom_spread(
-                positions=spread_info["positions"],
+                positions=[
+                    (position.title, position.description)
+                    for position in self.custom_spread_schema.positions
+                ],
                 user_id=self.author_id,
                 question=self.question,
                 schema_title=self.custom_spread_schema.title,
