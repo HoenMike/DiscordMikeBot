@@ -105,6 +105,8 @@ features/tarot/
 │   ├── schema.py    # Structured Reading Result V2
 │   ├── recommendation.py # Smart launcher recommendation + repeated-question helper
 │   └── session.py   # Progress, micro reveal, compact controls & AI-ready presentation helpers
+├── rendering/
+│   └── state.py     # ReadingBoardState: reveal/final/key/target state independent from Discord UI
 ├── manager.py       # Quản lý Turso Cloud LibSQL / SQLite DB, Lịch sử, Cooldown, Ratings & Preferences
 ├── cog.py           # Điều phối Slash commands, Prefix commands, Memory/Forget & Weekly Card Loop
 └── assets/          # Thư mục chứa tài nguyên ảnh bài & font chữ Unicode
@@ -129,21 +131,33 @@ features/tarot/
 
 ---
 
-### 3.2. Module Sinh Ảnh & Vẽ Quẻ (`renderer.py`)
-Sử dụng thư viện **Pillow (PIL)** để tạo ảnh chất lượng cao mà không phụ thuộc vào trình duyệt ngoài:
-- **Tự động sinh ảnh Procedural Card**:
-  - Vẽ khung viền mạ vàng phong cách cổ điển huyền bí.
-  - Vẽ họa tiết hoa văn góc, biểu tượng nguyên tố trung tâm (Gậy, Cốc, Kiếm, Tiền, Mặt Trời, Mặt Trăng...).
-  - Render tên tiếng Việt & tiếng Anh của lá bài với font chữ nghệ thuật.
-  - Tự động xoay $180^\circ$ khi lá bài ở trạng thái **[NGƯỢC]** kèm dải băng thông báo trực quan.
-- **Mặt lưng bài (Card Back)**:
-  - Mặt lưng huyền bí với họa tiết hình học thiên văn (Sacred Geometry) khi lá bài chưa được lật.
-- **Hỗ trợ đa dạng Layout trải bài**:
-  - **1 Lá (Daily / Yes-No / Single)**: Căn giữa khung hình cân đối.
-  - **3 Lá (Past-Present-Future / Two Choices / Mind-Body-Spirit)**: Xếp ngang tỷ lệ vàng.
-  - **5 Lá (Horseshoe / Two Paths)**: Bố cục lưới, móng ngựa hoặc đối xứng quan hệ tùy spread.
-  - **10 Lá (Celtic Cross)**: Layout chữ thập lồng ghép bên trái (Lá 1-6) + Cột 4 lá dọc bên phải (Lá 7-10) chuẩn xác theo sách cổ Tarot.
-- **Xuất ảnh siêu tốc**: Kết xuất dưới dạng `io.BytesIO()` chuẩn định dạng PNG và gửi qua Discord Attachment (`attachment://tarot_spread.png`).
+### 3.2. Module Sinh Ảnh & Reading Board 2.0 (`renderer.py`, `rendering/state.py`)
+Sử dụng **Pillow (PIL)** nhưng từ T20.4 renderer không còn chỉ ghép card; nó nhận một `ReadingBoardState` độc lập với Discord UI.
+
+- **Visual direction**: dark celestial + muted violet + warm gold + blue-grey; card art là focal point, decoration bị tiết chế để đọc tốt trên mobile.
+- **State contract**:
+  - face-down / revealed;
+  - just revealed (`NEW`);
+  - AI-selected key card (`KEY`);
+  - target position (`TARGET`) cho Clarifier sau này;
+  - final board.
+- **Accessibility**:
+  - vị trí luôn nằm trực tiếp trên board;
+  - progress có cả số lượng và dots khi đang reveal;
+  - lá ngược vẫn xoay 180° nhưng đồng thời có marker `REV` / text `NGƯỢC`;
+  - Major Arcana có marker `MAJOR`;
+  - state quan trọng không chỉ phụ thuộc màu.
+- **Responsive fixed layouts**:
+  - **1 lá**: portrait `1080×1350`;
+  - **3 lá**: horizontal `1400×900`;
+  - **Two Paths 5 lá**: dedicated branch board `1400×1100`;
+  - **Horseshoe 5 lá**: dedicated arc board `1500×1100`;
+  - **Celtic 10 lá**: `1600×1350`, giữ cross + staff structure.
+- **Generic dynamic layouts** đã chuẩn bị cho Smart Custom Spread: 4-card diamond, generic 5-card cross, 6-card 2×3, 7-card arc và bounded grid cho count khác.
+- **Final Board**: sau khi AI structured result sẵn sàng, board được render lại với `FINAL SPREAD` và highlight key card do AI chọn, không đổi card order/outcome.
+- **Fallback**: nếu composition lỗi, renderer sinh text-first fallback board từ đúng các lá đã rút thay vì làm fail toàn reading.
+- **Cache**: card face/card back resized variants vẫn được cache in-memory.
+- API cũ `render_spread_to_bytes(...)` được giữ để tương thích; internally nó chuyển thành `ReadingBoardState`.
 
 ---
 
@@ -159,7 +173,7 @@ Sử dụng SDK Google `google-genai` và từ T20.1 đã chuyển sang **Tarot 
 - Prompt dùng contract `OBSERVE → CONNECT → INTERPRET → GROUND → UNCERTAINTY`: ưu tiên quan hệ giữa các lá thay vì đọc từng lá như mục từ điển.
 - Anti-robot rules hạn chế lời chào mặc định, văn chữa lành chung chung và các câu lặp kiểu "Lá bài này cho thấy...".
 - Model chính trả structured JSON qua `TarotAIResponseSchema`: core message, card insights, connections, dominant theme, key card, practical takeaway, uncertainty, clarifier targets và Journey tags.
-- `TarotReadingResult` là rich application contract cho các milestone UI sau. Hàm `generate_tarot_reading(...)` vẫn trả tuple cũ để `tarot_view.py`/ `cog.py` chưa cần đổi ngay.
+- `TarotReadingResult` là rich application contract. Từ T20.4, interactive Tarot flow dùng `generate_tarot_reading_result(...)` trực tiếp để final board có thể lấy `key_card`; adapter `generate_tarot_reading(...)` vẫn giữ cho weekly/legacy callers.
 - Parser vẫn chấp nhận JSON schema cũ và plain Markdown của fallback model, đồng thời không để JSON lỗi rò ra Discord.
 - Existing follow-up prompt tiếp tục cùng quẻ, không giả vờ rút thêm lá và không kể lại toàn bộ reading.
 - `generate_why_explanation(...)` đã sẵn sàng cho nút **Why?** ở milestone UX sau; output chỉ giải thích dựa trên lá/vị trí nhìn thấy, không expose hidden chain-of-thought.

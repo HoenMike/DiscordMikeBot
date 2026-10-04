@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.3 implemented; T20.4 Renderer 2.0 is next.  
+> **Status:** T20.4 Renderer 2.0 implemented; T20.5 Clarifier is next.  
 > **Last updated:** 2026-10-04.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -46,7 +46,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **T20.1 — Prompt & Reading Engine 2.0 has been implemented.**
 - **T20.2 — Question-first Launcher has been implemented.**
 - **T20.3 — Reading Session UX has been implemented.**
-- **Next milestone: T20.4 — Renderer 2.0.**
+- **T20.4 — Renderer 2.0 has been implemented.**
+- **Next milestone: T20.5 — Clarifier.**
 
 ---
 
@@ -62,6 +63,7 @@ Baseline at planning time:
 - planning baseline main commit: `560637145b8a96980bcca66b051491e34eb7bc8d`
 - T20.1 merged main commit: `c755fa89e194fa15d92fd64d5212ae2f6e29883b`
 - T20.2 merged main commit: `46857dbdcaff502579e504a3de09ae34b6e6eb8b`
+- T20.3 merged main commit: `8b150ac6823d956445c55d3b2fc5cd311b5b9586`
 - codename: `Asumi - Compact Facebook Proxy Link`
 
 Always re-check current main before work starts.
@@ -228,8 +230,8 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.1 | COMPLETE | V2 system prompt, structured schema/parser, adaptive auto tone, natural follow-up and evidence-based Why support |
 | T20.2 | COMPLETE | Question-first launcher, deterministic smart recommendation, manual override, repeated-question awareness |
 | T20.3 | COMPLETE | Shuffling/face-down/revealing/finalizing lifecycle, compact controls, progress, micro reveal, AI-ready indicator |
-| T20.4 | NEXT | Reading Board renderer, responsive layouts and visual hierarchy |
-| T20.5 | NOT STARTED | Wait for explicit approval |
+| T20.4 | COMPLETE | Reading Board state contract, responsive layouts, position/progress labels, REV/Major/key/new/target states, dynamic 4/6/7 layouts, final board and fallback |
+| T20.5 | NEXT | Clarifier target picker, one-card draw, Clarifier Board and bounded interpretation |
 | T20.6 | NOT STARTED | Later |
 | T20.7 | NOT STARTED | Later |
 | T20.8 | NOT STARTED | Later |
@@ -300,6 +302,40 @@ Implemented:
 - dedicated regression coverage added in `tests/test_tarot_v2_session.py`.
 
 Scope intentionally left for T20.4+: Reading Board visual redesign, responsive canvas overhaul, key-card/just-revealed visual states inside the image, clarifier, multi-turn continuation and Journey.
+
+---
+
+## 10.4 T20.4 implementation notes
+
+Implemented:
+
+- replaced the legacy card-collage renderer with a **Reading Board 2.0** renderer while keeping `render_spread_to_bytes(...)` backward-compatible;
+- introduced `features/tarot/rendering/state.py` with the UI-independent `ReadingBoardState` contract;
+- visual direction now follows dark celestial / muted violet / warm gold / blue-grey with restrained framing instead of heavy ornament;
+- responsive fixed layouts:
+  - 1 card — portrait `1080×1350`;
+  - 3 cards — `1400×900`;
+  - 5-card Two Paths — dedicated `1400×1100`;
+  - 5-card Horseshoe — dedicated `1500×1100`;
+  - Celtic — `1600×1350`;
+- generic layouts are ready for later Smart Custom Spread:
+  - 4 cards — diamond;
+  - 5 cards — generic cross;
+  - 6 cards — 2×3;
+  - 7 cards — arc/horseshoe;
+  - other counts fall back to a bounded grid;
+- board position labels are always visible for face-up and face-down cards;
+- progress appears on the board during reveal and is removed/replaced by **FINAL SPREAD** in final state;
+- reversed cards keep their 180° rotation **and** receive explicit `REV`/orientation text;
+- Major Arcana receive a subtle `MAJOR` marker;
+- `NEW`, `KEY` and `TARGET` emphasis states exist in the renderer contract; T20.3 live reveal now passes the just-revealed state;
+- interactive Tarot now uses the rich T20.1 `TarotReadingResult`, allowing the final board to highlight the AI-selected key card without an extra AI request;
+- final board is rerendered after the AI result is available; card draw/order is never changed by rendering;
+- renderer failures fall back to a text-first board image so the reading outcome is preserved instead of failing the session;
+- procedural card fallback and resized card/back caches remain available;
+- renderer regression coverage added in `tests/test_tarot_v2_renderer.py`, plus rich key-card handoff coverage in `tests/test_tarot_v2_session.py`.
+
+Scope intentionally left for T20.5+: Clarifier target UX/draw/interpretation. The renderer already exposes `target_position_index` so Clarifier can build on the same visual state contract without another renderer rewrite.
 
 ---
 

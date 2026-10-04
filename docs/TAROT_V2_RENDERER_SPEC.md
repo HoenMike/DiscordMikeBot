@@ -1,6 +1,6 @@
 # Tarot 2.0 — Renderer & Presentation Spec
 
-> **Status:** design spec only; implementation not started.  
+> **Status:** T20.4 implementation complete; this remains the renderer/presentation behavior contract.  
 > **Parent plan:** `docs/TAROT_V2_MASTER_PLAN.md`  
 > **Current renderer:** `features/tarot/renderer.py`
 
@@ -580,6 +580,26 @@ Suggested order:
 11. add Clarifier support when T20.5 begins.
 
 Do not start with Recap/Journey renderers before the core Reading Board is stable.
+
+---
+
+## 27.1 Implemented in T20.4
+
+Current runtime implementation now includes:
+
+- `ReadingBoardState` in `features/tarot/rendering/state.py`;
+- a new responsive Reading Board renderer in `features/tarot/renderer.py`;
+- fixed 1/3/Two Paths/Horseshoe/Celtic layouts;
+- generic 4/5/6/7 layouts for future dynamic spreads;
+- progress/final board states;
+- explicit reversed marker;
+- subtle Major marker;
+- just-revealed, key-card and target emphasis states;
+- rich-reading integration so final boards can use the AI-selected key card;
+- text-first renderer fallback that preserves the original cards;
+- regression tests in `tests/test_tarot_v2_renderer.py`.
+
+Clarifier rendering itself remains T20.5. The target-state primitive is intentionally present now so T20.5 can add a clarifier card without replacing the board architecture.
 
 ---
 

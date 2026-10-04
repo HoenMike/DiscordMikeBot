@@ -240,7 +240,7 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
     embed.add_field(
         name="🔮 1. BỐC BÀI TAROT (CHIÊM TINH)",
         value=(
-            "• Rút bài 78 lá Rider-Waite với hình ảnh Canvas trực quan độ phân giải cao.\n"
+            "• Rút bài 78 lá Rider-Waite trên **Reading Board 2.0** responsive, rõ vị trí/REV/key-card trên mobile.\n"
             "• Một Asumi với bốn phong cách: Tự động, Tĩnh, Dịu và Tinh quái.\n"
             "• Hạt nhân năng lượng vũ trụ theo khung giờ (1 tiếng/khung) & Nút đánh giá phản hồi.\n"
             "👉 **Lệnh:** `/tarot`, `.m tarot` | **Xem chi tiết:** Chọn mục `🔮 Tarot` bên dưới."
@@ -341,6 +341,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
     embed.add_field(
         name="🌌 CÁC TÍNH NĂNG & CƠ CHẾ QOL NỔI BẬT",
         value=(
+            "• **Reading Board 2.0**: Board responsive theo spread, progress reveal, nhãn vị trí và final key-card emphasis.\n"
             "• **Hạt Nhân Năng Lượng (Cosmic Seed)**: Khi hỏi cùng một câu hỏi trong vòng **1 tiếng**, "
             "vũ trụ sẽ giữ nguyên các lá bài rút ra để đảm bảo tính nhất quán (tránh vừa Có vừa Không).\n"
             "• **Nút Hỏi Thêm Ý Nghĩa (❓)**: Mở modal cho phép đặt thêm câu hỏi đào sâu hoặc xin thêm lời khuyên chi tiết cho quẻ bài vừa bốc.\n"

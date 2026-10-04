@@ -14,7 +14,7 @@ from features.tarot.deck import (
     READER_STYLES
 )
 from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading, recommend_spread_for_question
+from features.tarot.ai import generate_tarot_reading, generate_tarot_reading_result, recommend_spread_for_question
 from features.tarot.manager import TarotManager
 from features.tarot.tarot_view import (
     TarotFlipView,
@@ -245,7 +245,7 @@ class TarotCog(commands.Cog):
             bot_user = self.bot.user or (interaction.client.user if interaction and interaction.client else None)
             guild_obj = interaction.guild if interaction else (ctx.guild if ctx else None)
             ai_task = self.tarot_manager.create_ai_task(
-                generate_tarot_reading(
+                generate_tarot_reading_result(
                     spread_key=spread_key,
                     drawn_cards=drawn_cards,
                     question=clean_question if clean_question else None,
