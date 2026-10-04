@@ -144,15 +144,23 @@ Sử dụng thư viện **Pillow (PIL)** để tạo ảnh chất lượng cao m
 ---
 
 ### 3.3. Module Trí Tuệ Nhân Tạo & Fallback Cascade (`ai.py`)
-Sử dụng SDK mới nhất của Google (`google-genai`):
+Sử dụng SDK Google `google-genai` và từ T20.1 đã chuyển sang **Tarot Reading Engine 2.0**.
 
-#### Model Fallback Cascade:
-`features/tarot/ai.py` dùng `config.TAROT_FALLBACK_MODELS` (hoặc danh sách mặc định trong module), bỏ model trùng và thử tuần tự. Timeout là 16 giây cho bài dưới 5 lá, 26 giây cho bài dài; follow-up dùng 12 giây.
-- **Prompt Engineering chuyên sâu**:
-  - Một Asumi với `auto` mặc định; các ID `neutral`, `healer`, `chaos` tương ứng Tĩnh, Dịu, Tinh quái để giữ tương thích dữ liệu.
-  - Gợi mở câu hỏi người dùng đặt ra kết hợp với bối cảnh cuộc sống.
-  - Phân tích tương quan giữa các lá bài, sự chuyển dịch từ Quá khứ sang Tương lai hoặc mâu thuẫn giữa 2 lựa chọn.
-  - Dọn dẹp lời chào rườm rà qua Regex, trả về văn bản mạch lạc, bố cục rõ ràng với emoji tinh tế.
+#### Model Fallback Cascade
+`features/tarot/ai.py` dùng `config.TAROT_FALLBACK_MODELS` (hoặc danh sách mặc định trong module), bỏ model trùng và thử tuần tự. Timeout là 16 giây cho bài dưới 5 lá, 26 giây cho bài dài; follow-up/Why dùng 12 giây.
+
+#### Prompt & structured reading V2
+- **Asumi là reader duy nhất**; `auto`, `neutral`, `healer`, `chaos` vẫn giữ stable ID để tương thích dữ liệu/UI.
+- `auto` có deterministic tone hint theo loại câu hỏi (quyết định, cảm xúc, vui, high-stakes), nhưng tone không thay đổi ý nghĩa lá bài.
+- Prompt dùng contract `OBSERVE → CONNECT → INTERPRET → GROUND → UNCERTAINTY`: ưu tiên quan hệ giữa các lá thay vì đọc từng lá như mục từ điển.
+- Anti-robot rules hạn chế lời chào mặc định, văn chữa lành chung chung và các câu lặp kiểu "Lá bài này cho thấy...".
+- Model chính trả structured JSON qua `TarotAIResponseSchema`: core message, card insights, connections, dominant theme, key card, practical takeaway, uncertainty, clarifier targets và Journey tags.
+- `TarotReadingResult` là rich application contract cho các milestone UI sau. Hàm `generate_tarot_reading(...)` vẫn trả tuple cũ để `tarot_view.py`/ `cog.py` chưa cần đổi ngay.
+- Parser vẫn chấp nhận JSON schema cũ và plain Markdown của fallback model, đồng thời không để JSON lỗi rò ra Discord.
+- Existing follow-up prompt tiếp tục cùng quẻ, không giả vờ rút thêm lá và không kể lại toàn bộ reading.
+- `generate_why_explanation(...)` đã sẵn sàng cho nút **Why?** ở milestone UX sau; output chỉ giải thích dựa trên lá/vị trí nhìn thấy, không expose hidden chain-of-thought.
+
+Schema V2 nằm tại `features/tarot/reading/schema.py`.
 
 ---
 
