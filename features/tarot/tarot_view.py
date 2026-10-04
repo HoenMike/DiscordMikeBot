@@ -1338,8 +1338,12 @@ class TarotFlipView(discord.ui.View):
 
     async def _process_flip(self, interaction: discord.Interaction):
         custom_id = interaction.data.get("custom_id", "")
+        newly_revealed: Set[int] = set()
+
         if custom_id == "flip_all":
-            self.revealed_indices = set(range(len(self.drawn_cards)))
+            all_indices = set(range(len(self.drawn_cards)))
+            newly_revealed = all_indices - self.revealed_indices
+            self.revealed_indices = all_indices
         elif custom_id.startswith("flip_"):
             try:
                 idx = int(custom_id.split("_")[1])
@@ -1347,10 +1351,12 @@ class TarotFlipView(discord.ui.View):
                 return
             if not 0 <= idx < len(self.drawn_cards) or idx in self.revealed_indices:
                 return
+            newly_revealed = {idx}
             self.revealed_indices.add(idx)
         else:
             return
 
+        self._last_revealed_indices = newly_revealed
         is_completed = len(self.revealed_indices) == len(self.drawn_cards)
         if is_completed:
             self._has_completed = True
@@ -1403,31 +1409,37 @@ class TarotFlipView(discord.ui.View):
             )
             embed_cards.set_image(url="attachment://tarot_spread.png")
 
-            sent_image_already = False
-            # Nếu luận giải chưa sẵn sàng: CẬP NHẬT NGAY để người dùng thấy ảnh bài đã lật tức thì (Instant Visual Flip)
+            # If the user finishes revealing before AI is ready, keep the same
+            # session message and show a clear finalizing state.
             if not self.ai_task.done():
                 embed_loading = discord.Embed(
-                    title=self.style_info.get("loading_title", "✨ ĐANG ĐÓN NHẬN THÔNG ĐIỆP..."),
-                    description=self.style_info.get("loading_desc", "🌌 *Đang kết nối năng lượng và giải mã tín hiệu từ vũ trụ, xin chờ trong giây lát...*"),
-                    color=self.embed_color
+                    title="✨ TẤT CẢ LÁ ĐÃ LẬT",
+                    description=(
+                        f"{build_reveal_progress(self.revealed_indices, len(self.drawn_cards))}\n\n"
+                        "Asumi đang hoàn tất việc nối các lá thành một câu chuyện. "
+                        "Ảnh trải bài đã được khóa, chỉ còn chờ phần luận giải."
+                    ),
+                    color=self.embed_color,
                 )
                 embed_loading.set_footer(
-                    text=f"Quẻ bài của {self.author_name}",
-                    icon_url=self.author_avatar_url
+                    text=f"Quẻ bài của {self.author_name} • READING",
+                    icon_url=self.author_avatar_url,
                 )
 
                 try:
                     await interaction.edit_original_response(
                         embeds=[embed_cards, embed_loading],
                         attachments=[file],
-                        view=None
+                        view=None,
                     )
-                    sent_image_already = True
                 except Exception:
                     if self.message:
                         try:
-                            await self.message.edit(embeds=[embed_cards, embed_loading], attachments=[file], view=None)
-                            sent_image_already = True
+                            await self.message.edit(
+                                embeds=[embed_cards, embed_loading],
+                                attachments=[file],
+                                view=None,
+                            )
                         except Exception:
                             pass
 
@@ -1558,54 +1570,24 @@ class TarotFlipView(discord.ui.View):
             self.stop()
 
         else:
-            # Chưa lật hết: Hiển thị giao diện chờ lật bài
-            desc_lines = []
-            if self.question:
-                desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
-            if self.context:
-                desc_lines.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-
-            desc_lines.append(WIDE_DIVIDER)
-
-            cards_summary_lines = []
-            for idx, drawn in enumerate(self.drawn_cards):
-                if idx in self.revealed_indices:
-                    orient = "`[NGƯỢC]`" if drawn.is_reversed else "`[XUÔI]`"
-                    kw = drawn.card.keywords_reversed if drawn.is_reversed else drawn.card.keywords_upright
-                    kw_text = ", ".join(kw[:3]) if kw else ""
-                    kw_part = f"\n  ↳ ✨ *Từ khóa:* `{kw_text}`" if kw_text else ""
-                    cards_summary_lines.append(
-                        f"• **{drawn.position_title}**: **{drawn.card.name_vi}** (*{drawn.card.name_en}*) {orient}{kw_part}"
-                    )
-                else:
-                    cards_summary_lines.append(
-                        f"• **{drawn.position_title}**: ⏳ *(Chờ lật)*"
-                    )
-
-            desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
-            desc_lines.append("⏳ *Hãy bấm vào các nút bên dưới để lật mở từng lá bài...*")
-
-            emb = discord.Embed(
-                title=f"🔮 TRẢI BÀI TAROT: {self.spread_info['name'].upper()}",
-                description="\n".join(desc_lines),
-                color=self.embed_color
-            )
-            emb.set_image(url="attachment://tarot_spread.png")
-            emb.set_footer(
-                text=f"Quẻ bài của {self.author_name} (Đang bốc bài...)",
-                icon_url=self.author_avatar_url
-            )
+            # Still revealing: edit the same session message with progress,
+            # micro-reveal and current AI readiness.
+            emb = self.build_session_embed(self._last_revealed_indices)
 
             try:
                 await interaction.edit_original_response(
                     embed=emb,
                     attachments=[file],
-                    view=self
+                    view=self,
                 )
             except Exception:
                 if self.message:
                     try:
-                        await self.message.edit(embed=emb, attachments=[file], view=self)
+                        await self.message.edit(
+                            embed=emb,
+                            attachments=[file],
+                            view=self,
+                        )
                     except Exception as ex:
                         print(f"⚠️ [TarotFlipView] Message edit fallback lỗi: {ex}", flush=True)
 
