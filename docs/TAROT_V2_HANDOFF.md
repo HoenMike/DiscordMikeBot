@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.2 implemented; T20.3 Reading Session UX is next.  
+> **Status:** T20.3 implemented; T20.4 Renderer 2.0 is next.  
 > **Last updated:** 2026-10-04.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -45,7 +45,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - The user explicitly approved starting Tarot 2.0 implementation.
 - **T20.1 — Prompt & Reading Engine 2.0 has been implemented.**
 - **T20.2 — Question-first Launcher has been implemented.**
-- **Next milestone: T20.3 — Reading Session UX.**
+- **T20.3 — Reading Session UX has been implemented.**
+- **Next milestone: T20.4 — Renderer 2.0.**
 
 ---
 
@@ -60,6 +61,7 @@ Baseline at planning time:
 - bot version: `2.8.4`
 - planning baseline main commit: `560637145b8a96980bcca66b051491e34eb7bc8d`
 - T20.1 merged main commit: `c755fa89e194fa15d92fd64d5212ae2f6e29883b`
+- T20.2 merged main commit: `46857dbdcaff502579e504a3de09ae34b6e6eb8b`
 - codename: `Asumi - Compact Facebook Proxy Link`
 
 Always re-check current main before work starts.
@@ -225,8 +227,8 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.0 | COMPLETE | Master plan, handoff, prompt spec, renderer spec and agent entry-point added |
 | T20.1 | COMPLETE | V2 system prompt, structured schema/parser, adaptive auto tone, natural follow-up and evidence-based Why support |
 | T20.2 | COMPLETE | Question-first launcher, deterministic smart recommendation, manual override, repeated-question awareness |
-| T20.3 | NEXT | Single-message reading lifecycle, reveal progress and micro reveal |
-| T20.4 | NOT STARTED | Wait for explicit approval |
+| T20.3 | COMPLETE | Shuffling/face-down/revealing/finalizing lifecycle, compact controls, progress, micro reveal, AI-ready indicator |
+| T20.4 | NEXT | Reading Board renderer, responsive layouts and visual hierarchy |
 | T20.5 | NOT STARTED | Wait for explicit approval |
 | T20.6 | NOT STARTED | Later |
 | T20.7 | NOT STARTED | Later |
@@ -278,6 +280,26 @@ Implemented:
 - tests added in `tests/test_tarot_v2_launcher.py`.
 
 T20.2 does **not** yet implement one-message reveal lifecycle, micro-reveal, renderer redesign, clarifier or multi-turn continuation. Those belong to later milestones.
+
+---
+
+## 10.3 T20.3 implementation notes
+
+Implemented:
+
+- launcher transitions through a visible **Đang xáo bài** state before the reading board appears;
+- `TarotFlipView` now owns a reusable live session embed for FACE-DOWN / REVEALING states;
+- progress is always visible as both dots and numeric count (for example `● ○ ○   1 / 3 lá đã lật`);
+- card buttons are compact numeric controls (`1`, `2`, …, `✓ 2`) so 10-card spreads remain manageable on mobile;
+- each single-card reveal gets deterministic **micro reveal** feedback using the actual card, orientation and top keywords; this does not spend another AI call;
+- AI generation continues in parallel with card reveal;
+- when AI finishes before the user finishes flipping, the **same Discord message** updates to `Luận giải đã sẵn sàng` without creating another message or rerendering the image;
+- when the user finishes flipping before AI finishes, the same message enters a clear **ĐANG LUẬN GIẢI** finalizing state and then becomes the final reading;
+- launcher flow, direct slash flow and prefix flow now initialize from the same session-embed builder;
+- session presentation helpers live in `features/tarot/reading/session.py`;
+- dedicated regression coverage added in `tests/test_tarot_v2_session.py`.
+
+Scope intentionally left for T20.4+: Reading Board visual redesign, responsive canvas overhaul, key-card/just-revealed visual states inside the image, clarifier, multi-turn continuation and Journey.
 
 ---
 
