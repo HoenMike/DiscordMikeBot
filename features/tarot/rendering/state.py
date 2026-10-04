@@ -79,3 +79,33 @@ class ReadingBoardState:
             final=final,
             spread_title=spread_title,
         )
+
+
+
+@dataclass(frozen=True)
+class ClarifierBoardState:
+    """Visual contract for one bounded clarifier addition."""
+
+    spread_key: str
+    drawn_cards: Sequence[DrawnCard]
+    target_position_index: int
+    clarifier_card: DrawnCard
+    key_card_id: Optional[str] = None
+    spread_title: Optional[str] = None
+
+    @property
+    def target_card(self) -> DrawnCard:
+        if not 0 <= self.target_position_index < len(self.drawn_cards):
+            raise ValueError("Clarifier target is outside the original spread")
+        return self.drawn_cards[self.target_position_index]
+
+    def original_board_state(self) -> ReadingBoardState:
+        return ReadingBoardState(
+            spread_key=self.spread_key,
+            drawn_cards=tuple(self.drawn_cards),
+            revealed_indices=frozenset(range(len(self.drawn_cards))),
+            key_card_id=self.key_card_id,
+            target_position_index=self.target_position_index,
+            final=True,
+            spread_title=self.spread_title,
+        )
