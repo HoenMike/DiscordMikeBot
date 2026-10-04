@@ -15,7 +15,7 @@ from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
 from features.embed.ui import PlatformToggleView, FacebookFallbackView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
-from features.embed.validator import find_valid_proxy
+from features.embed.validator import find_valid_proxy, build_proxy_url
 from features.embed.validator import is_generic_or_login_preview
 from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
@@ -93,8 +93,8 @@ class EmbedCog(commands.Cog):
         # Lock quản lý đồng bộ reaction theo từng tin nhắn để tránh race condition khi nhiều người tương tác cùng lúc
         self._reaction_locks = BoundedDict(max_size=1000)
         self._pending_sends = BoundedDict(max_size=3000)
-        self._manual_fallback_done = BoundedDict(max_size=3000)
         self._manual_fallback_previews = BoundedDict(max_size=3000)
+        self._facebook_proxy_roll_state = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -110,6 +110,7 @@ class EmbedCog(commands.Cog):
         url: str,
         *,
         is_spoiler: bool = False,
+        tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
     ) -> dict | None:
         if platform_key != "facebook":
             return None
@@ -120,6 +121,7 @@ class EmbedCog(commands.Cog):
             "platform": platform_key,
             "url": url,
             "is_spoiler": is_spoiler,
+            "tried_domains": sorted(set(tried_domains or [])),
         }
 
     def _manual_fallback_view(
@@ -129,9 +131,14 @@ class EmbedCog(commands.Cog):
         url: str,
         *,
         is_spoiler: bool = False,
+        tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
     ) -> FacebookFallbackView | None:
         payload = self._manual_fallback_payload(
-            message, platform_key, url, is_spoiler=is_spoiler
+            message,
+            platform_key,
+            url,
+            is_spoiler=is_spoiler,
+            tried_domains=tried_domains,
         )
         return FacebookFallbackView(self, payload) if payload else None
 
@@ -150,6 +157,14 @@ class EmbedCog(commands.Cog):
         target = (channel_id, preview_id)
         if target not in targets:
             targets.append(target)
+
+    def _set_facebook_proxy_state(
+        self,
+        origin_id: int,
+        url: str,
+        tried_domains: set[str] | list[str] | tuple[str, ...],
+    ) -> None:
+        self._facebook_proxy_roll_state[(origin_id, url)] = set(tried_domains)
 
     async def _offer_manual_fallback(
         self,
