@@ -17,6 +17,9 @@ class FakeTarotManager:
     async def get_user_history(self, user_id: int, limit: int = 5):
         return self.history[:limit]
 
+    async def is_user_memory_enabled(self, user_id: int):
+        return True
+
 
 def component(view: TarotLauncherView, custom_id: str):
     return next(
@@ -116,6 +119,30 @@ class TarotV2LauncherTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(view._can_start())
         self.assertFalse(component(view, "launcher_btn_start").disabled)
+
+    async def test_repeated_question_awareness_respects_memory_preference(self):
+        class MemoryOffManager(FakeTarotManager):
+            async def is_user_memory_enabled(self, user_id: int):
+                return False
+
+        view = TarotLauncherView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            tarot_manager=MemoryOffManager(history=[{
+                "question": "Tôi đang phân vân đổi việc hay ở lại công ty",
+                "created_at": "2026-10-03",
+                "spread_type": "two_paths",
+            }]),
+            question="Tôi có nên đổi việc hay ở lại?",
+        )
+        await view.prepare()
+
+        self.assertIsNone(view.similar_question_hint)
+        self.assertFalse(any(
+            getattr(item, "custom_id", None) == "launcher_context_mode_select"
+            for item in view.children
+        ))
 
     async def test_similar_question_shows_context_mode_control(self):
         manager = FakeTarotManager(history=[{
