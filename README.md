@@ -150,12 +150,14 @@ Khôi phục danh sách proxy domain của nền tảng về mặc định toàn
 
 ### `/tarot`
 
-Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài trực quan.
+Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài trực quan. Launcher mặc định theo **question-first**: nhập điều đang băn khoăn → Asumi đề xuất spread → bạn chấp nhận hoặc tự chọn kiểu khác.
 
 | Tham số    | Mô tả                                                                                              | Mặc định | Bắt buộc |
 |------------|----------------------------------------------------------------------------------------------------|----------|----------|
-| `spread`   | Chọn 1 trong 9 kiểu trải bài (`daily`, `yes_no`, `single`, `ppf`, `choices`, `mbs`, `horseshoe`, `two_paths`, `celtic`)     | —        | **Có**   |
-| `question` | Câu hỏi hoặc chủ đề muốn xem (Bắt buộc cho mọi kiểu trải bài ngoại trừ `daily`)                    | Không    | Tuỳ kiểu |
+| `spread`   | Tuỳ chọn: chọn sẵn 1 trong 9 kiểu trải bài; bỏ trống để launcher gợi ý từ câu hỏi | Asumi gợi ý | Không |
+| `question` | Điều bạn đang băn khoăn; launcher dùng để đề xuất spread phù hợp | Không | Tuỳ flow |
+| `context` | Bối cảnh thực tế giúp recommendation/reading bám sát tình huống hơn | Không | Không |
+| `reader` | Phong cách Asumi: Tự động / Tĩnh / Dịu / Tinh quái | Tự động | Không |
 
 - **9 kiểu trải bài phong phú & giải thích mục đích rõ ràng**:
   - `daily`: **Daily Card** (1 lá - Cooldown 1 lần/ngày) - Năng lượng & thông điệp ngày mới.
