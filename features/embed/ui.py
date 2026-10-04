@@ -84,14 +84,9 @@ class EmbedActionView(discord.ui.View):
             result = None
             print(f"[EmbedCog] Reload preview lỗi: {exc}", flush=True)
 
-        if result is not None and (result.success or result.status == "action_required"):
+        if result is not None and result.success:
             self.stop()
-            message = (
-                "Đã reload preview."
-                if result.success
-                else "Đã thử reload; hiện không còn proxy khả dụng. Preview hiện tại vẫn được giữ."
-            )
-            await interaction.followup.send(message, ephemeral=True)
+            await interaction.followup.send("Đã reload preview.", ephemeral=True)
             return
 
         reason = getattr(result, "reason", "reload_failed")
@@ -99,6 +94,13 @@ class EmbedActionView(discord.ui.View):
         if reason == "no_more_proxy":
             self.reload_button.label = "Hết proxy"
             self.reload_button.disabled = True
+        elif result is not None and result.status == "action_required" and result.preview_message_id is not None:
+            self.stop()
+            await interaction.followup.send(
+                "Đã tạo lại preview và giữ quyền điều khiển trên preview mới.",
+                ephemeral=True,
+            )
+            return
 
         try:
             await interaction.message.edit(view=self)
