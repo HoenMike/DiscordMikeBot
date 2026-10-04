@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1 COMPLETE. T20.2 NEXT.** The user explicitly approved starting Tarot 2.0 implementation.  
+> **Implementation status:** **T20.1–T20.2 COMPLETE. T20.3 NEXT.** The user explicitly approved starting Tarot 2.0 implementation.  
 > **Last planning update:** 2026-10-04  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -1151,9 +1151,9 @@ Implementation notes are recorded in `docs/TAROT_V2_HANDOFF.md` and `docs/TAROT_
 
 ---
 
-## T20.2 — Question-first Launcher — NEXT
+## T20.2 — Question-first Launcher — COMPLETE
 
-Implement:
+Implemented:
 
 - primary question entry;
 - integrated spread recommendation;
@@ -1167,9 +1167,11 @@ Acceptance:
 
 A new user can start a suitable reading without knowing Tarot spread names.
 
+Implementation keeps manual spread selection and direct-command compatibility, while the launcher requires an explicit recommendation acceptance or manual spread selection before starting.
+
 ---
 
-## T20.3 — Reading Session UX
+## T20.3 — Reading Session UX — NEXT
 
 Implement:
 

@@ -28,12 +28,13 @@ Before any Tarot 2.0 work, read:
 
 ### Important Tarot status
 
-At the time these instructions were added:
+Tarot 2.0 implementation is active and user-approved.
 
-- Tarot 2.0 planning context has been written into the repo.
-- Feature implementation has **not started**.
-- Do **not** implement T20.1+ merely because the plan exists.
-- Wait for the user to approve implementation or name a milestone to start.
+- T20.0 — baseline/docs: complete.
+- T20.1 — Prompt & Reading Engine 2.0: complete.
+- T20.2 — Question-first Launcher: complete.
+- **Next milestone: T20.3 — Reading Session UX.**
+- Continue milestone-by-milestone; do not skip ahead or bundle unrelated later milestones into one PR.
 
 ### Tarot milestone IDs
 

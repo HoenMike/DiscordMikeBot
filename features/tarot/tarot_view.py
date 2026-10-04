@@ -13,7 +13,8 @@ from features.tarot.deck import (
     draw_spread
 )
 from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading, generate_followup_answer
+from features.tarot.ai import generate_tarot_reading, generate_followup_answer, recommend_spread_for_question
+from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.flavor import detect_spread_flavor
 from features.tarot.manager import TarotManager
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
@@ -144,9 +145,17 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
     async def on_submit(self, interaction: discord.Interaction):
         clean_q = self.question_input.value.strip() if self.question_input.value else None
         clean_ctx = self.context_input.value.strip() if self.context_input.value else None
+        previous_question = self.launcher_view.question
 
         self.launcher_view.question = clean_q if clean_q else None
         self.launcher_view.context = clean_ctx if clean_ctx else None
+
+        if previous_question != self.launcher_view.question and self.launcher_view.selection_source == "recommendation":
+            self.launcher_view.selection_source = "default"
+
+        self.launcher_view.refresh_recommendation()
+        await self.launcher_view.refresh_similar_question_hint()
+        self.launcher_view._build_components()
 
         embed = self.launcher_view.build_launcher_embed()
         await interaction.response.edit_message(embed=embed, view=self.launcher_view)
@@ -177,24 +186,104 @@ class TarotLauncherView(discord.ui.View):
         self.author_name = author_name
         self.author_avatar_url = author_avatar_url
         self.tarot_manager = tarot_manager
-        self.selected_spread = selected_spread
-        self.selected_reader = selected_reader
-        self.question = question
-        self.context = context
+        self.selected_spread = selected_spread if selected_spread in SPREAD_DEFINITIONS else "daily"
+        self.selected_reader = selected_reader if selected_reader in READER_STYLES else "auto"
+        self.question = question.strip() if question else None
+        self.context = context.strip() if context else None
         self.trigger_message = trigger_message
+
+        # T20.2 launcher state. "default" means the user has not accepted or
+        # manually chosen a spread yet; this prevents the old Daily default
+        # from looking like a recommendation.
+        self.selection_source = "default"
+        self.recommended_spread: Optional[str] = None
+        self.recommended_name: Optional[str] = None
+        self.recommendation_reason: Optional[str] = None
+        self.similar_question_hint: Optional[dict] = None
+        self.reading_context_mode = "current"
+
         self._starting = False
         self._pending_ai_task = None
         self._pending_flip = None
         self.message: Optional[discord.Message] = None
 
+        self.refresh_recommendation()
         self._build_components()
+
+    def refresh_recommendation(self) -> None:
+        """Refresh the zero-latency spread recommendation from current question/context."""
+        if not self.question:
+            self.recommended_spread = None
+            self.recommended_name = None
+            self.recommendation_reason = None
+            if self.selection_source == "recommendation":
+                self.selection_source = "default"
+            return
+
+        query = self.question
+        if self.context:
+            query = f"{query} {self.context}"
+        spread_key, spread_name, reason = recommend_spread_for_question(query)
+        new_recommendation = spread_key if spread_key in SPREAD_DEFINITIONS else "ppf"
+        if (
+            self.selection_source == "recommendation"
+            and self.selected_spread != new_recommendation
+        ):
+            # Question/context changed enough that the previously accepted
+            # recommendation is no longer the current recommendation.
+            self.selection_source = "default"
+        self.recommended_spread = new_recommendation
+        self.recommended_name = spread_name
+        self.recommendation_reason = reason
+
+    async def refresh_similar_question_hint(self) -> None:
+        """Detect a similar recent reading without blocking or forcing the user."""
+        self.similar_question_hint = None
+        if not self.question:
+            self.reading_context_mode = "current"
+            return
+        try:
+            memory_enabled = await self.tarot_manager.is_user_memory_enabled(self.author_id)
+            if not memory_enabled:
+                self.reading_context_mode = "current"
+                return
+            history = await self.tarot_manager.get_user_history(self.author_id, limit=5)
+        except Exception:
+            self.reading_context_mode = "current"
+            return
+        self.similar_question_hint = find_similar_recent_question(history, self.question)
+        if not self.similar_question_hint:
+            self.reading_context_mode = "current"
+
+    async def prepare(self) -> "TarotLauncherView":
+        """Async preparation hook used before the launcher is first shown."""
+        self.refresh_recommendation()
+        await self.refresh_similar_question_hint()
+        self._build_components()
+        return self
+
+    def _can_start(self) -> bool:
+        if self.selection_source == "default":
+            return False
+        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread)
+        if not spread_info:
+            return False
+        if spread_info.get("requires_question", True) and not self.question:
+            return False
+        return True
+
+    def _use_recommendation(self) -> bool:
+        if not self.recommended_spread:
+            return False
+        self.selected_spread = self.recommended_spread
+        self.selection_source = "recommendation"
+        return True
 
     def _check_author(self, interaction: discord.Interaction) -> bool:
         return interaction.user.id == self.author_id
 
     def build_launcher_embed(self) -> discord.Embed:
-        """Xây dựng Embed hiển thị thông tin và trạng thái lựa chọn hiện tại."""
-        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        """Question-first Tarot 2.0 launcher."""
         if self.selected_reader == "random" or self.selected_reader not in READER_STYLES:
             reader_display = "✨ **Tự động**"
             embed_color = 0x7851A9
@@ -203,110 +292,201 @@ class TarotLauncherView(discord.ui.View):
             reader_display = f"**{reader_info['name']}**"
             embed_color = reader_info.get("color", 0x7851A9)
 
-        q_status = f"*{self.question}*" if self.question else ("⚠️ *Chưa nhập (Bắt buộc)*" if spread_info.get("requires_question", True) else "*(Không bắt buộc)*")
-        ctx_status = f"*{self.context}*" if self.context else "*(Không có)*"
+        lines = []
+        if not self.question:
+            lines.extend([
+                "**Bạn đang muốn hỏi điều gì?**",
+                "Nhập câu hỏi trước; Asumi sẽ đề xuất kiểu trải phù hợp để bạn không cần biết tên các spread.",
+                "",
+                "Nếu chỉ muốn xem năng lượng hôm nay, bạn có thể tự chọn **Daily Card** ở menu bên dưới.",
+            ])
+        else:
+            lines.extend([
+                "**❓ Câu hỏi của bạn**",
+                f"*{self.question}*",
+            ])
+            if self.context:
+                lines.extend(["", f"**📝 Bối cảnh:** *{self.context}*"])
 
-        lines = [
-            f"Chào mừng **{self.author_name}** đến với không gian chiêm tinh học Tarot!\n",
-            f"**🔮 THIẾT LẬP QUẺ BÀI:**",
-            f"• 🃏 **Kiểu trải bài:** **{spread_info['name']}**",
-            f"• 🎭 **Phong cách của Asumi:** {reader_display}",
-            f"• ❓ **Câu hỏi / Chủ đề:** {q_status}",
-            f"• 📝 **Bối cảnh:** {ctx_status}",
-            WIDE_DIVIDER,
-            "💡 **Hướng dẫn thao tác:**",
-            "1. Chọn kiểu trải bài & phong cách từ **2 Menu thả xuống** bên dưới.",
-            "2. Nhấn nút **✏️ Đặt Câu Hỏi** để nhập câu hỏi / bối cảnh cụ thể.",
-            "3. Nhấn **🎴 Bắt Đầu Bốc Bài** để trải bài ra kênh chat!",
-            "⚠️ *Lưu ý: Tarot chỉ giải quẻ cho chính bạn hoặc mối quan hệ bạn là người trong cuộc cần lời khuyên. Câu hỏi bốc bài thay/soi mói đời tư người thứ ba sẽ bị từ chối.*"
-        ]
+            if self.recommended_spread:
+                canonical_name = SPREAD_DEFINITIONS.get(self.recommended_spread, {}).get(
+                    "name", self.recommended_name or self.recommended_spread
+                )
+                lines.extend([
+                    "",
+                    f"✨ **Asumi đề xuất: {canonical_name}**",
+                    self.recommendation_reason or "Kiểu trải này phù hợp nhất với cách câu hỏi đang được đặt.",
+                ])
+
+        lines.append("")
+        lines.append(WIDE_DIVIDER)
+
+        if self.selection_source == "default":
+            selection_text = "*(Chưa chọn — dùng đề xuất hoặc tự chọn spread bên dưới)*"
+        else:
+            spread_name = SPREAD_DEFINITIONS.get(self.selected_spread, {}).get(
+                "name", self.selected_spread
+            )
+            source_label = "đề xuất của Asumi" if self.selection_source == "recommendation" else "tự chọn"
+            selection_text = f"**{spread_name}** · {source_label}"
+
+        lines.extend([
+            f"🃏 **Trải bài sẽ dùng:** {selection_text}",
+            f"🎭 **Phong cách Asumi:** {reader_display}",
+        ])
+
+        if self.similar_question_hint:
+            old_question = str(self.similar_question_hint.get("question") or "").strip()
+            created_at = str(self.similar_question_hint.get("created_at") or "").strip()
+            score = float(self.similar_question_hint.get("similarity") or 0.0)
+            suffix = f" · {created_at}" if created_at else ""
+            lines.extend([
+                "",
+                "↩️ **Có vẻ bạn từng hỏi một câu khá gần đây**",
+                f"*{old_question[:220]}*{suffix}",
+                (
+                    "Mặc định Asumi sẽ xem đây là **tình hình hiện tại** và chỉ dùng quẻ cũ như ngữ cảnh nhẹ. "
+                    "Bạn có thể đổi sang **xem như câu hỏi mới** ở menu bên dưới."
+                ),
+            ])
+            if score >= 0.75:
+                lines.append("*Độ giống khá cao; nếu vẫn là cùng tình huống, hãy xem quẻ mới như một snapshot mới thay vì một cách reset câu trả lời.*")
+
+        lines.extend([
+            "",
+            "💡 **Flow mới:** Nhập câu hỏi → dùng đề xuất hoặc tự chọn → bắt đầu trải bài.",
+            "Tarot dùng để tự chiêm nghiệm; Asumi không soi bí mật của người ngoài cuộc hay chốt thay quyết định thực tế.",
+        ])
 
         embed = discord.Embed(
-            title="🔮 BẢNG THIẾT LẬP TRẢI BÀI TAROT",
+            title="🔮 ASUMI TAROT — BẮT ĐẦU TỪ CÂU HỎI",
             description="\n".join(lines),
-            color=embed_color
+            color=embed_color,
         )
         embed.set_footer(
             text=f"Quẻ bài của {self.author_name} • {BOT_BRAND_NAME} Tarot",
-            icon_url=self.author_avatar_url
+            icon_url=self.author_avatar_url,
         )
         return embed
 
     def _build_components(self):
         self.clear_items()
 
-        # 1. Select Menu: Chọn kiểu trải bài (Row 0)
+        # Manual spread override remains available, but is visually secondary to question-first.
         spread_select = discord.ui.Select(
-            placeholder="🔮 Chọn kiểu trải bài Tarot...",
+            placeholder="🃏 Tự chọn kiểu trải bài...",
             options=[
                 discord.SelectOption(
                     label=opt.label,
                     value=opt.value,
                     description=opt.description,
-                    default=(opt.value == self.selected_spread)
+                    default=(
+                        self.selection_source != "default"
+                        and opt.value == self.selected_spread
+                    ),
                 )
                 for opt in SPREAD_SELECT_OPTIONS
             ],
             row=0,
-            custom_id="launcher_spread_select"
+            custom_id="launcher_spread_select",
         )
         spread_select.callback = self._handle_spread_select
         self.add_item(spread_select)
 
-        # 2. Select Menu: Chọn người giải bài (Row 1)
         reader_select = discord.ui.Select(
-            placeholder="🎭 Phong cách của Asumi...",
+            placeholder="🎭 Phong cách Asumi (tuỳ chọn)...",
             options=[
                 discord.SelectOption(
                     label=opt.label,
                     value=opt.value,
                     description=opt.description,
-                    default=(opt.value == self.selected_reader)
+                    default=(opt.value == self.selected_reader),
                 )
                 for opt in READER_SELECT_OPTIONS
             ],
             row=1,
-            custom_id="launcher_reader_select"
+            custom_id="launcher_reader_select",
         )
         reader_select.callback = self._handle_reader_select
         self.add_item(reader_select)
 
-        # 3. Action Buttons (Row 2)
         btn_question = discord.ui.Button(
-            label="✏️ Đặt Câu Hỏi",
+            label="✏️ Sửa câu hỏi" if self.question else "✏️ Nhập câu hỏi",
             style=discord.ButtonStyle.primary,
             custom_id="launcher_btn_question",
-            row=2
+            row=2,
         )
         btn_question.callback = self._handle_question_button
         self.add_item(btn_question)
 
+        if self.recommended_spread:
+            recommendation_active = (
+                self.selection_source == "recommendation"
+                and self.selected_spread == self.recommended_spread
+            )
+            btn_recommend = discord.ui.Button(
+                label="✓ Đang dùng đề xuất" if recommendation_active else "✨ Dùng đề xuất",
+                style=discord.ButtonStyle.secondary if recommendation_active else discord.ButtonStyle.primary,
+                custom_id="launcher_btn_recommend",
+                row=2,
+                disabled=recommendation_active,
+            )
+            btn_recommend.callback = self._handle_recommendation_button
+            self.add_item(btn_recommend)
+
         btn_start = discord.ui.Button(
-            label="🎴 Bắt Đầu Bốc Bài",
+            label="🎴 Bắt đầu",
             style=discord.ButtonStyle.success,
             custom_id="launcher_btn_start",
-            row=2
+            row=2,
+            disabled=not self._can_start(),
         )
         btn_start.callback = self._handle_start_button
         self.add_item(btn_start)
 
         btn_history = discord.ui.Button(
-            label="📜 Lịch Sử",
+            label="📜 Lịch sử",
             style=discord.ButtonStyle.secondary,
             custom_id="launcher_btn_history",
-            row=2
+            row=2,
         )
         btn_history.callback = self._handle_history_button
         self.add_item(btn_history)
 
+        # Discord allows max 5 components per row. When recommendation is present,
+        # close moves to its own compact row with same-question controls.
+        close_row = 3 if self.recommended_spread else 2
         btn_cancel = discord.ui.Button(
             label="❌ Đóng",
             style=discord.ButtonStyle.danger,
             custom_id="launcher_btn_cancel",
-            row=2
+            row=close_row,
         )
         btn_cancel.callback = self._handle_cancel_button
         self.add_item(btn_cancel)
+
+        if self.similar_question_hint:
+            context_select = discord.ui.Select(
+                placeholder="↩️ Cách dùng quẻ gần đây...",
+                options=[
+                    discord.SelectOption(
+                        label="🔄 Xem tình hình hiện tại",
+                        value="current",
+                        description="Cho phép Asumi dùng quẻ gần đây như ngữ cảnh nhẹ",
+                        default=(self.reading_context_mode == "current"),
+                    ),
+                    discord.SelectOption(
+                        label="🆕 Xem như câu hỏi mới",
+                        value="fresh",
+                        description="Không đưa ngữ cảnh Tarot cũ vào bài đọc lần này",
+                        default=(self.reading_context_mode == "fresh"),
+                    ),
+                ],
+                row=4,
+                custom_id="launcher_context_mode_select",
+            )
+            context_select.callback = self._handle_context_mode_select
+            self.add_item(context_select)
 
     async def _handle_spread_select(self, interaction: discord.Interaction):
         if not self._check_author(interaction):
@@ -314,6 +494,31 @@ class TarotLauncherView(discord.ui.View):
             return
 
         self.selected_spread = interaction.data["values"][0]
+        self.selection_source = "manual"
+        self._build_components()
+        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_recommendation_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+        if not self._use_recommendation():
+            await interaction.response.send_message(
+                "⚠️ Chưa có đề xuất nào. Hãy nhập câu hỏi trước nhé.",
+                ephemeral=True,
+            )
+            return
+
+        self._build_components()
+        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_context_mode_select(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        value = interaction.data["values"][0]
+        self.reading_context_mode = "fresh" if value == "fresh" else "current"
         self._build_components()
         await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
 
@@ -339,6 +544,15 @@ class TarotLauncherView(discord.ui.View):
             return
 
         spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        if not self._can_start():
+            if spread_info.get("requires_question", True) and not self.question:
+                await interaction.response.send_modal(TarotQuestionModal(self))
+            else:
+                await interaction.response.send_message(
+                    "✨ Hãy dùng đề xuất của Asumi hoặc tự chọn một kiểu trải bài trước khi bắt đầu.",
+                    ephemeral=True,
+                )
+            return
 
         # Kiểm tra câu hỏi nếu trải bài yêu cầu
         if spread_info.get("requires_question", True) and not self.question:
@@ -397,8 +611,11 @@ class TarotLauncherView(discord.ui.View):
         except Exception:
             pass
 
-        # Lấy ngữ cảnh cũ (Trí nhớ bạn cũ) và danh sách lá bốc gần đây (Card Fatigue)
-        recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
+        # T20.2: when a repeated question is detected, the user can explicitly
+        # choose a fresh read that does not inject prior Tarot context.
+        recent_ctx = None
+        if self.reading_context_mode != "fresh":
+            recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
         fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
 
         drawn_cards = draw_spread(

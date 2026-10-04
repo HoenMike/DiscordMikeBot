@@ -8,6 +8,7 @@ from core.ai import bounded_ai_generate
 from core.branding import BOT_BRAND_NAME, LEGACY_BOT_ALIASES
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict, READER_STYLES
 from features.tarot.reading.schema import TarotAIResponseSchema, TarotReadingResult
+from features.tarot.reading.recommendation import recommend_spread
 
 # Semaphore giới hạn tối đa 3 request AI đồng thời để tránh 429 Rate Limit
 AI_SEMAPHORE = asyncio.Semaphore(3)
@@ -1083,22 +1084,6 @@ Chỉ trả 1 đoạn dưới 700 ký tự:
     )
 
 def recommend_spread_for_question(question: str) -> Tuple[str, str, str]:
-    """
-    Phân tích từ khóa câu hỏi để gợi ý kiểu trải bài phù hợp nhất.
-    Trả về Tuple: (spread_key, spread_name, lý_do_gợi_ý)
-    """
-    q = (question or "").lower()
-
-    if any(kw in q for kw in ["chọn", "lựa chọn", "a hay b", "hay là", "hoặc", "ngã ba", "đổi việc hay ở lại"]):
-        return ("choices", "Trải 2 Lựa Chọn (3 lá)", "Câu hỏi của bạn mang tính chất phân vân giữa 2 ngã rẽ. Trải 2 Lựa Chọn sẽ so sánh trực quan ưu/nhược điểm của từng hướng đi.")
-
-    if any(kw in q for kw in ["có nên", "được không", "thành công không", "yes no", "có hay không", "liệu có"]):
-        return ("yes_no", "Trải Bài Yes / No (1 lá)", "Câu hỏi đóng cần một phán quyết dứt khoát. Trải Yes/No sẽ cho bạn câu trả lời nhanh và lời khuyên then chốt.")
-
-    if any(kw in q for kw in ["tình cảm", "crush", "người yêu", "chia tay", "quay lại", "hôn nhân", "tình duyên", "tỏ tình"]):
-        return ("ppf", "Quá Khứ - Hiện Tại - Tương Lai (3 lá)", "Vấn đề tình cảm luôn có dòng chảy thời gian và nguồn gốc tâm lý. Trải 3 lá giúp soi chiếu lại hành trình và xu hướng tương lai.")
-
-    if any(kw in q for kw in ["tổng quan", "năm nay", "cuộc đời", "sự nghiệp dài hạn", "vận mệnh", "bức tranh toàn cảnh"]):
-        return ("celtic", "Celtic Cross - Thập Tự Celtic (10 lá)", "Vấn đề phức tạp và mang tính bước ngoặt. Celtic Cross là trải bài kinh điển 10 lá phân tích toàn diện mọi khía cạnh ẩn sâu.")
-
-    return ("ppf", "Quá Khứ - Hiện Tại - Tương Lai (3 lá)", "Trải bài 3 lá cổ điển, linh hoạt và phù hợp nhất để xem xét tiến trình của hầu hết mọi vấn đề trong cuộc sống.")
+    """Backward-compatible tuple wrapper around the Tarot 2.0 launcher recommender."""
+    rec = recommend_spread(question)
+    return rec.spread_key, rec.spread_name, rec.reason

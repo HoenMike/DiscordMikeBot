@@ -167,10 +167,13 @@ Schema V2 nằm tại `features/tarot/reading/schema.py`.
 ### 3.4. Module Giao Diện Tương Tác Gamification (`tarot_view.py`)
 
 Gồm 2 tầng View Discord UI:
-1. **`TarotLauncherView`**:
-   - Menu Dropdown chọn trải bài (`Select Spread`).
-   - Menu Dropdown chọn phong cách bốc bài (`Select Reader Style`).
-   - Nút *"🔮 Bắt đầu bốc bài"* & Nút *"📜 Lịch sử bốc bài"*.
+1. **`TarotLauncherView` — Question-first từ T20.2**:
+   - Mở bằng câu hỏi/bối cảnh thay vì giả định người dùng đã biết spread.
+   - `features/tarot/reading/recommendation.py` đề xuất spread tức thì, không gọi AI.
+   - User phải bấm **Dùng đề xuất** hoặc tự chọn spread trước khi **Bắt đầu** được bật.
+   - Menu spread vẫn giữ làm manual override; Reader Style là tuỳ chọn thứ cấp.
+   - Daily Card vẫn có thể tự chọn và bắt đầu mà không cần câu hỏi.
+   - Nếu phát hiện câu hỏi gần giống lịch sử gần đây, launcher hiện cảnh báo nhẹ và cho chọn dùng ngữ cảnh cũ hoặc xem như câu hỏi mới.
 2. **`TarotFlipView` (Interactive Flipping)**:
    - Sinh động với các nút bấm đại diện cho từng vị trí lá bài: `[🃏 Lá 1]`, `[🃏 Lá 2]`, `[🃏 Lá 3]`...
    - **Realtime Flip Update**: Mỗi khi người dùng bấm nút:

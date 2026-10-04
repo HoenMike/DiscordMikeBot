@@ -370,11 +370,11 @@ class TarotCog(commands.Cog):
     # =========================================================================
     @app_commands.command(
         name="tarot",
-        description="Bốc và luận giải bài Tarot huyền bí bằng AI với ảnh trải bài trực quan"
+        description="Kể điều bạn đang băn khoăn để Asumi gợi ý và trải bài Tarot phù hợp"
     )
     @app_commands.describe(
-        spread="Kiểu trải bài Tarot bạn muốn thực hiện",
-        question="Câu hỏi hoặc chủ đề bạn muốn hỏi bài (Bắt buộc với hầu hết các trải bài)",
+        spread="Tuỳ chọn: chọn sẵn kiểu trải bài; bỏ trống để Asumi gợi ý từ câu hỏi",
+        question="Điều bạn đang băn khoăn; Asumi có thể dùng nó để gợi ý kiểu trải bài",
         context="Bối cảnh/hoàn cảnh hiện tại (Ví dụ: đang có crush, sắp chuyển việc...) để bài giải chuẩn xác hơn",
         reader="Phong cách của Asumi (Tự động, Tĩnh, Dịu hoặc Tinh quái)"
     )
@@ -418,6 +418,7 @@ class TarotCog(commands.Cog):
                 question=question,
                 context=context
             )
+            await launcher.prepare()
             embed = launcher.build_launcher_embed()
             await interaction.response.send_message(embed=embed, view=launcher, ephemeral=True)
             return
@@ -541,6 +542,7 @@ class TarotCog(commands.Cog):
                 selected_reader="auto",
                 question=None
             )
+            await launcher.prepare()
             embed = launcher.build_launcher_embed()
             sent_msg = await ctx.reply(
                 embed=embed,
@@ -632,6 +634,7 @@ class TarotCog(commands.Cog):
             selected_reader="auto",
             question=full_query
         )
+        await launcher.prepare()
         embed = launcher.build_launcher_embed()
         sent_msg = await ctx.reply(
             embed=embed,

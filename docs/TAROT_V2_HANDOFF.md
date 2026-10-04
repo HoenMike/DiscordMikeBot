@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.1 implemented on the active Tarot 2.0 branch; T20.2 is next.  
+> **Status:** T20.2 implemented; T20.3 Reading Session UX is next.  
 > **Last updated:** 2026-10-04.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -44,7 +44,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - Repository-preparation work is complete.
 - The user explicitly approved starting Tarot 2.0 implementation.
 - **T20.1 — Prompt & Reading Engine 2.0 has been implemented.**
-- **Next milestone: T20.2 — Question-first Launcher.**
+- **T20.2 — Question-first Launcher has been implemented.**
+- **Next milestone: T20.3 — Reading Session UX.**
 
 ---
 
@@ -57,7 +58,8 @@ Repository:
 Baseline at planning time:
 
 - bot version: `2.8.4`
-- main commit: `560637145b8a96980bcca66b051491e34eb7bc8d`
+- planning baseline main commit: `560637145b8a96980bcca66b051491e34eb7bc8d`
+- T20.1 merged main commit: `c755fa89e194fa15d92fd64d5212ae2f6e29883b`
 - codename: `Asumi - Compact Facebook Proxy Link`
 
 Always re-check current main before work starts.
@@ -222,8 +224,8 @@ Avoid implementing all V2 milestones in one giant branch.
 |---|---|---|
 | T20.0 | COMPLETE | Master plan, handoff, prompt spec, renderer spec and agent entry-point added |
 | T20.1 | COMPLETE | V2 system prompt, structured schema/parser, adaptive auto tone, natural follow-up and evidence-based Why support |
-| T20.2 | NEXT | Question-first launcher + integrated smart spread recommendation |
-| T20.3 | NOT STARTED | Wait for explicit approval |
+| T20.2 | COMPLETE | Question-first launcher, deterministic smart recommendation, manual override, repeated-question awareness |
+| T20.3 | NEXT | Single-message reading lifecycle, reveal progress and micro reveal |
 | T20.4 | NOT STARTED | Wait for explicit approval |
 | T20.5 | NOT STARTED | Wait for explicit approval |
 | T20.6 | NOT STARTED | Later |
@@ -252,6 +254,30 @@ Implemented in the T20.1 branch:
 - added dedicated regression coverage in `tests/test_tarot_v2_reading.py`.
 
 No renderer/session/clarifier UI work is part of T20.1.
+
+---
+
+## 10.2 T20.2 implementation notes
+
+Implemented:
+
+- launcher now opens **question-first** instead of presenting Daily as if it were the default recommendation;
+- user enters/edits question and optional real-world context first;
+- deterministic zero-latency recommendation lives in `features/tarot/reading/recommendation.py`;
+- recommendation can choose among existing spread keys, including `two_paths` for deeper A/B trade-offs;
+- user must explicitly **use Asumi's recommendation** or manually select another spread before Start enables;
+- Daily remains available manually with no question;
+- reader style remains a secondary option;
+- direct slash/prefix spread syntax still bypasses the launcher for backward compatibility;
+- launcher detects sufficiently similar recent Tarot questions using local token-overlap logic, without an extra AI call; this awareness is disabled when the user has Tarot memory turned off;
+- when a similar question is found, the user can choose:
+  - **Xem tình hình hiện tại** — prior Tarot context may be used lightly;
+  - **Xem như câu hỏi mới** — prior Tarot context is not injected into this reading;
+- card-fatigue behavior remains independent from the context-memory choice;
+- standalone `/tarot_recommend` and prefix recommendation commands remain available and now use the same V2 recommender;
+- tests added in `tests/test_tarot_v2_launcher.py`.
+
+T20.2 does **not** yet implement one-message reveal lifecycle, micro-reveal, renderer redesign, clarifier or multi-turn continuation. Those belong to later milestones.
 
 ---
 
