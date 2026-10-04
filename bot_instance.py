@@ -340,23 +340,24 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.add_field(
-        name="🌌 CÁC TÍNH NĂNG & CƠ CHẾ QOL NỔI BẬT",
+        name="✨ TAROT 2.1 — SAU KHI QUẺ HOÀN TẤT",
         value=(
-            "• **Reading Board 2.0**: Board responsive theo spread, progress reveal, nhãn vị trí và final key-card emphasis.\n"
-            "• **Hạt Nhân Năng Lượng (Cosmic Seed)**: Khi hỏi cùng một câu hỏi trong vòng **1 tiếng**, "
-            "vũ trụ sẽ giữ nguyên các lá bài rút ra để đảm bảo tính nhất quán (tránh vừa Có vừa Không).\n"
-            "• **Follow-up 3 lượt (❓)**: Hỏi tiếp tối đa 3 lần trong cùng session; Asumi giữ context của quẻ, các câu trước và Clarifier đã dùng.\n"
-            "• **🔍 Vì sao?**: Giải thích quẻ dựa trên lá/vị trí nhìn thấy, không expose hidden reasoning.\n"
-            "• **🃏 Clarifier 1/1**: Chọn đúng một vị trí để rút một lá làm rõ, không reroll quẻ gốc.\n"
-            "• **📌 Recap**: Tạo card gọn để lưu/chia sẻ từ chính quẻ vừa đọc, không rút bài hay gọi AI thêm.\n"
-            "• **Nút Đánh Giá (👍 Hữu ích / 👎 Chưa chuẩn)**: Góp ý phản hồi chất lượng luận giải của AI.\n"
-            "• **Smart Launcher + Smart Custom Spread**: Asumi có thể đề xuất spread cố định hoặc tạo schema riêng 3–7 vị trí; deck engine vẫn tự rút lá.\n"
-            "• **Reading Session**: Một message xuyên suốt việc lật bài, có progress, micro reveal và báo khi AI đã luận giải xong.\n"
-            "• **Tarot Journey**: Tổng hợp 30 ngày về suit, Major, lá lặp và chủ đề từ lịch sử đã lưu; dùng để tự nhìn lại, không phải dự đoán định mệnh.\n"
-            "• **Mobile Reveal Controls**: Nút lá đánh số compact, kể cả Celtic Cross 10 lá vẫn gọn.\n"
-            "• **Nhận diện câu hỏi gần giống**: Nếu bạn vừa hỏi chuyện tương tự, launcher cho chọn dùng ngữ cảnh cũ nhẹ hoặc xem như câu hỏi mới.\n"
-            "• **Trí Nhớ Bạn Cũ (Memory)**: AI có khả năng liên kết nhẹ nhàng ngữ cảnh từ các quẻ bài trước.\n"
-            "• **Cooldown An Toàn**: **30 giây** giữa 2 lần bốc bài liên tiếp để giữ không gian tĩnh tâm."
+            "• **Follow-up 3 lượt (❓)**: Hỏi tiếp trong cùng session, giữ context quẻ/câu trước/Clarifier.\n"
+            "• **🔍 Vì sao?**: Giải thích dựa trên lá và vị trí đang hiển thị, không expose hidden reasoning.\n"
+            "• **🃏 Clarifier 1/1**: Rút đúng một lá làm rõ cho một vị trí, không reroll quẻ gốc.\n"
+            "• **📌 Recap**: Card gọn để lưu/chia sẻ từ quẻ đã đọc; không rút bài hay gọi AI thêm.\n"
+            "• **👍/👎 Đánh giá**: Gửi phản hồi chất lượng luận giải."
+        ),
+        inline=False
+    )
+    embed.add_field(
+        name="🧭 SMART UX & HÀNH TRÌNH",
+        value=(
+            "• **Smart Launcher + Custom Spread**: đề xuất spread cố định hoặc schema riêng 3–7 vị trí; deck engine vẫn tự rút lá.\n"
+            "• **Reading Board/Session 2.0**: một message, progress, micro reveal, key-card và controls gọn cho mobile.\n"
+            "• **Tarot Journey**: summary 30 ngày về suit, Major, lá lặp và chủ đề; dùng để tự nhìn lại, không phải dự đoán định mệnh.\n"
+            "• **Memory + câu hỏi gần giống**: liên kết nhẹ lịch sử khi bật memory; `/tarot_forget` xóa nguồn dữ liệu.\n"
+            "• **Cooldown**: 30 giây giữa hai lần bốc bài; Daily reset theo giờ Việt Nam."
         ),
         inline=False
     )
