@@ -1406,11 +1406,16 @@ class TarotResultActionView(discord.ui.View):
         if self.activity_id:
             try:
                 from core.activity_logger import activity_logger
+                details = {
+                    "likes": len(self.liked_user_ids),
+                    "dislikes": len(self.disliked_user_ids),
+                    "clarifier_used": self.has_used_clarifier,
+                }
+                if self.has_used_clarifier and self.clarifier_card is not None:
+                    details["clarifier_target_index"] = self.clarifier_target_index
+                    details["clarifier_card"] = self.clarifier_card.card.name_vi
                 activity_logger.update_activity(self.activity_id, {
-                    "details": {
-                        "likes": len(self.liked_user_ids),
-                        "dislikes": len(self.disliked_user_ids)
-                    }
+                    "details": details
                 })
             except Exception as e:
                 print(f"⚠️ [TarotResultActionView] Lỗi đồng bộ rating vào ActivityLogger: {e}", flush=True)
@@ -1779,6 +1784,7 @@ class TarotFlipView(discord.ui.View):
 
             # Await bài luận giải thông điệp
             ai_res = await self.ai_task
+            reading_result = ai_res if isinstance(ai_res, TarotReadingResult) else None
             (
                 ai_reading,
                 topic_tag,
@@ -1890,12 +1896,16 @@ class TarotFlipView(discord.ui.View):
                 author_name=self.author_name,
                 drawn_cards=self.drawn_cards,
                 question=self.question,
+                context=self.context,
                 ai_reading=ai_reading,
                 reader_style=self.reader_style,
                 spread_key=self.spread_key,
                 tarot_manager=self.tarot_manager,
                 guild_id=self.guild_id,
-                activity_id=act_id
+                channel_id=self.channel_id,
+                activity_id=act_id,
+                reading_result=reading_result,
+                clarifier_allowed=is_valid_question,
             )
 
             file.reset()
@@ -1964,6 +1974,7 @@ class TarotFlipView(discord.ui.View):
                     except Exception:
                         pass
                 return
+            reading_result = ai_res if isinstance(ai_res, TarotReadingResult) else None
             (
                 ai_reading,
                 topic_tag,
@@ -2090,12 +2101,16 @@ class TarotFlipView(discord.ui.View):
                 author_name=self.author_name,
                 drawn_cards=self.drawn_cards,
                 question=self.question,
+                context=self.context,
                 ai_reading=ai_reading,
                 reader_style=self.reader_style,
                 spread_key=self.spread_key,
                 tarot_manager=self.tarot_manager,
                 guild_id=self.guild_id,
-                activity_id=act_id
+                channel_id=self.channel_id,
+                activity_id=act_id,
+                reading_result=reading_result,
+                clarifier_allowed=_is_valid_question,
             )
 
             if self.message:
