@@ -232,6 +232,7 @@ class EmbedCog(commands.Cog):
 
     async def _verify_proxy_unfurl(self, origin_id: int, preview: discord.Message, platform_key: str) -> tuple[bool, str]:
         """Fetch the rendered message over a bounded grace window; send acceptance is not preview acceptance."""
+        saw_generic_or_login = False
         for delay in _UNFURL_DELAYS:
             await asyncio.sleep(delay)
             if origin_id in self._deleted_message_ids:
@@ -249,12 +250,15 @@ class EmbedCog(commands.Cog):
                     meta_tags={"og:image": getattr(embed.image, "url", "") or getattr(embed.thumbnail, "url", "") or "",
                                "og:video": getattr(embed.video, "url", "") or ""},
                 ):
-                    return False, "generic_or_login_card"
+                    # Discord có thể dựng generic card trước rồi mới thay bằng video/card thật.
+                    # Không fail-fast ở poll đầu tiên; tiếp tục hết grace window để tránh fallback giả.
+                    saw_generic_or_login = True
+                    continue
                 if embed.video or embed.image or embed.thumbnail or (
                     embed.title and embed.title.casefold() not in {"facebook", "instagram", "tiktok", "twitter", "x"}
                 ) or (embed.description and len(embed.description.strip()) > 20):
                     return True, "usable_embed"
-        return False, "unfurl_timeout"
+        return False, "generic_or_login_card" if saw_generic_or_login else "unfurl_timeout"
 
 
     def _detect_urls(self, content: str) -> list[tuple[str, str, object, bool]]:
