@@ -40,7 +40,7 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertFalse(is_generic_or_login_preview("Facebook", "Mai wrote about her trip today", platform_key="facebook"))
 
     def test_brand_and_legacy_mentions(self):
-        self.assertEqual(CURRENT_VERSION, "2.8.2")
+        self.assertEqual(CURRENT_VERSION, "2.8.3")
         self.assertEqual(runtime_bot_name(None), BOT_BRAND_NAME)
         for query in ("@Asumi nghĩ sao?", "Asumi nghĩ sao?", "MikeDaBot nghĩ sao?"):
             clean, context = extract_question_mentions_context(query, "Mai")
@@ -132,24 +132,34 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("features.embed.cog._UNFURL_DELAYS", (0, 0)):
             self.assertEqual(await self.cog._verify_proxy_unfurl(10, preview, "facebook"), (False, "unfurl_timeout"))
 
-    async def test_facebook_unfurl_timeout_keeps_preview_with_manual_button(self):
+    async def test_facebook_proxy_sends_raw_url_and_button_without_auto_verify(self):
         preview = SimpleNamespace(id=40)
         self.cog._send_embed_preview = AsyncMock(return_value=preview)
-        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(False, "unfurl_timeout"))
+        self.cog._verify_proxy_unfurl = AsyncMock()
         self.cog._discard_preview = AsyncMock()
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))):
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))) as find_proxy:
             result = await self.cog._try_proxy_chain(self.msg, "facebook", "https://facebook.com/post/1", {})
-        self.assertEqual(result.status, "action_required")
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.proxy_domain, "facebed.com")
         self.assertEqual(result.preview_message_id, 40)
+        find_proxy.assert_awaited_once()
+        self.cog._verify_proxy_unfurl.assert_not_awaited()
         self.cog._discard_preview.assert_not_awaited()
+
         sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
         self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
-        self.assertNotIn("[fallback]", sent_kwargs["content"])
-        self.assertEqual(sent_kwargs["view"].button.label, "Fallback")
+        self.assertIn("\nhttps://facebed.com/post/1", sent_kwargs["content"])
+        self.assertNotIn("[Xem bài viết gốc]", sent_kwargs["content"])
+        self.assertEqual(sent_kwargs["view"].button.label, "Proxy khác")
+        self.assertIn("facebed.com", sent_kwargs["view"].payload["tried_domains"])
 
-    async def test_facebook_fallback_button_is_owner_only_and_runs_manual_fallback(self):
+    async def test_facebook_fallback_button_is_owner_only_and_rolls_proxy(self):
         view = self.cog._manual_fallback_view(
-            self.msg, "facebook", "https://facebook.com/post/1"
+            self.msg,
+            "facebook",
+            "https://facebook.com/post/1",
+            tried_domains={"facebed.com"},
         )
         self.assertIsInstance(view, FacebookFallbackView)
 
@@ -161,39 +171,114 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         denied.response.send_message.assert_awaited_once()
         self.assertTrue(denied.response.send_message.await_args.kwargs["ephemeral"])
 
+        current_preview = SimpleNamespace(id=40, edit=AsyncMock())
         allowed = SimpleNamespace(
             user=SimpleNamespace(id=50),
             response=SimpleNamespace(send_message=AsyncMock(), edit_message=AsyncMock()),
             followup=SimpleNamespace(send=AsyncMock()),
-            message=SimpleNamespace(edit=AsyncMock()),
+            message=current_preview,
         )
         self.assertTrue(await view.interaction_check(allowed))
 
-        self.cog.run_manual_fallback = AsyncMock(return_value=PreviewResult(
-            "success", "ytdlp", "manual_fallback_sent", "facebook",
-            origin_message_id=10, preview_message_id=41, used_fallback=True,
+        self.cog.roll_facebook_proxy = AsyncMock(return_value=PreviewResult(
+            "success",
+            "proxy",
+            "proxy_rolled",
+            "facebook",
+            proxy_domain="facebed.seria.moe",
+            origin_message_id=10,
+            preview_message_id=41,
+            used_fallback=True,
+            fallback_reason="manual_proxy_roll",
         ))
-        await view._run_fallback(allowed)
-        self.cog.run_manual_fallback.assert_awaited_once()
+        await view._roll_proxy(allowed)
+        self.cog.roll_facebook_proxy.assert_awaited_once_with(
+            view.payload,
+            current_preview=current_preview,
+        )
         allowed.response.edit_message.assert_awaited_once()
         allowed.followup.send.assert_awaited_once()
         self.assertTrue(allowed.followup.send.await_args.kwargs["ephemeral"])
 
-    async def test_second_proxy_can_win_after_first_unusable(self):
+    async def test_facebook_does_not_auto_roll_after_first_proxy_is_sent(self):
         first = SimpleNamespace(id=40)
-        second = SimpleNamespace(id=41)
-        self.cog._send_embed_preview = AsyncMock(side_effect=[first, second])
-        self.cog._verify_proxy_unfurl = AsyncMock(side_effect=[(False, "generic_or_login_card"), (True, "usable_embed")])
+        self.cog._send_embed_preview = AsyncMock(return_value=first)
+        self.cog._verify_proxy_unfurl = AsyncMock()
         self.cog._discard_preview = AsyncMock()
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(side_effect=[
+        find_proxy = AsyncMock(side_effect=[
             ("https://facebed.com/post/1", False),
             ("https://facebed.seria.moe/post/1", False),
-        ])):
+        ])
+        with patch("features.embed.cog.find_valid_proxy", new=find_proxy):
             result = await self.cog._try_proxy_chain(self.msg, "facebook", "https://facebook.com/post/1", {})
+
         self.assertTrue(result.success)
+        self.assertEqual(result.proxy_domain, "facebed.com")
+        self.assertEqual(find_proxy.await_count, 1)
+        self.cog._verify_proxy_unfurl.assert_not_awaited()
+        self.cog._discard_preview.assert_not_awaited()
+
+    async def test_manual_proxy_roll_moves_to_next_proxy_without_ytdlp(self):
+        channel = SimpleNamespace(id=20, is_nsfw=lambda: False)
+        origin = SimpleNamespace(
+            id=10,
+            guild=SimpleNamespace(id=30, name="Server"),
+            channel=channel,
+            author=SimpleNamespace(
+                id=50,
+                display_name="Mai",
+                display_avatar=SimpleNamespace(url="avatar"),
+            ),
+            jump_url="https://discord.com/channels/30/20/10",
+            content="https://facebook.com/post/1",
+        )
+        channel.fetch_message = AsyncMock(return_value=origin)
+        self.cog.bot.get_channel = lambda _: channel
+        self.cog.bot.fetch_channel = AsyncMock(return_value=channel)
+
+        current_preview = SimpleNamespace(id=40, channel=channel)
+        new_preview = SimpleNamespace(id=41, channel=channel)
+        self.cog._send_embed_preview = AsyncMock(return_value=new_preview)
+        self.cog._discard_preview = AsyncMock(return_value=True)
+        self.cog._try_ytdlp_fallback = AsyncMock()
+
+        payload = {
+            "origin_id": 10,
+            "channel_id": 20,
+            "author_id": 50,
+            "platform": "facebook",
+            "url": "https://facebook.com/post/1",
+            "is_spoiler": False,
+            "tried_domains": ["facebed.com"],
+        }
+        with patch(
+            "features.embed.cog.find_valid_proxy",
+            new=AsyncMock(return_value=("https://facebed.seria.moe/post/1", False)),
+        ) as find_proxy:
+            result = await self.cog.roll_facebook_proxy(
+                payload,
+                current_preview=current_preview,
+            )
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.tier, "proxy")
         self.assertEqual(result.proxy_domain, "facebed.seria.moe")
-        self.assertTrue(result.unfurl_verified)
-        self.cog._discard_preview.assert_awaited_once_with(10, first)
+        self.cog._try_ytdlp_fallback.assert_not_awaited()
+        self.cog._discard_preview.assert_awaited_once_with(10, current_preview)
+        sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIn("\nhttps://facebed.seria.moe/post/1", sent_kwargs["content"])
+        self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
+        self.assertIn("facebed.com", find_proxy.await_args.kwargs["excluded_domains"])
+        self.assertIn("facebed.seria.moe", sent_kwargs["view"].payload["tried_domains"])
+
+    async def test_facebook_is_not_supported_by_ytdlp_fallback_anymore(self):
+        result = await self.cog._try_ytdlp_fallback(
+            self.msg,
+            "facebook",
+            "https://facebook.com/post/1",
+            {},
+        )
+        self.assertFalse(result)
 
     async def test_facebook_proxy_failure_offers_manual_fallback_without_auto_ytdlp(self):
         self.cog._try_api_fetcher = AsyncMock(return_value=False)
@@ -266,8 +351,8 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
 
         self.cog._verify_proxy_unfurl = verify
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))):
-            task = asyncio.create_task(self.cog._try_proxy_chain(self.msg, "facebook", "url", {}))
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://fxtwitter.com/post/1", False))):
+            task = asyncio.create_task(self.cog._try_proxy_chain(self.msg, "twitter", "url", {}))
             await waiting.wait()
             task.cancel()
             with self.assertRaises(asyncio.CancelledError):
@@ -289,9 +374,9 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
 
         self.cog._verify_proxy_unfurl = verify
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))), \
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://fxtwitter.com/post/1", False))), \
              patch("core.activity_logger.activity_logger.log", MagicMock()):
-            task = asyncio.create_task(self.cog._run_fallback_chain(self.msg, "facebook", "url", None, {}))
+            task = asyncio.create_task(self.cog._run_fallback_chain(self.msg, "twitter", "url", None, {}))
             self.cog._in_flight_tasks[10] = task
             await waiting.wait()
             await self.cog.on_raw_message_delete(SimpleNamespace(message_id=10, channel_id=20, guild_id=30))
