@@ -243,6 +243,10 @@ class TarotLauncherView(discord.ui.View):
             self.reading_context_mode = "current"
             return
         try:
+            memory_enabled = await self.tarot_manager.is_user_memory_enabled(self.author_id)
+            if not memory_enabled:
+                self.reading_context_mode = "current"
+                return
             history = await self.tarot_manager.get_user_history(self.author_id, limit=5)
         except Exception:
             self.reading_context_mode = "current"
@@ -346,7 +350,7 @@ class TarotLauncherView(discord.ui.View):
                 ),
             ])
             if score >= 0.75:
-                lines.append("*Độ giống khá cao; tránh rút lại chỉ để tìm một kết quả dễ chịu hơn.*")
+                lines.append("*Độ giống khá cao; nếu vẫn là cùng tình huống, hãy xem quẻ mới như một snapshot mới thay vì một cách reset câu trả lời.*")
 
         lines.extend([
             "",
