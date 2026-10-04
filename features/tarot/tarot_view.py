@@ -680,7 +680,11 @@ class TarotLauncherView(discord.ui.View):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
             return
 
-        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        spread_info = (
+            self.custom_spread_schema.as_spread_info()
+            if self.selection_source == "custom" and self.custom_spread_schema
+            else SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        )
         if not self._can_start():
             if spread_info.get("requires_question", True) and not self.question:
                 await interaction.response.send_modal(TarotQuestionModal(self))
@@ -766,13 +770,23 @@ class TarotLauncherView(discord.ui.View):
             recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
         fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
 
-        drawn_cards = draw_spread(
-            spread_key=self.selected_spread,
-            user_id=self.author_id,
-            question=self.question,
-            fatigue_card_ids=fatigue_card_ids
-        )
-        spread_info = SPREAD_DEFINITIONS[self.selected_spread]
+        if self.selection_source == "custom" and self.custom_spread_schema:
+            spread_info = self.custom_spread_schema.as_spread_info()
+            drawn_cards = draw_custom_spread(
+                positions=spread_info["positions"],
+                user_id=self.author_id,
+                question=self.question,
+                schema_title=self.custom_spread_schema.title,
+                fatigue_card_ids=fatigue_card_ids,
+            )
+        else:
+            drawn_cards = draw_spread(
+                spread_key=self.selected_spread,
+                user_id=self.author_id,
+                question=self.question,
+                fatigue_card_ids=fatigue_card_ids
+            )
+            spread_info = SPREAD_DEFINITIONS[self.selected_spread]
 
         # Legacy random choice now resolves to Asumi's adaptive mood.
         actual_reader = self.selected_reader
@@ -792,7 +806,8 @@ class TarotLauncherView(discord.ui.View):
                 user_id=self.author_id,
                 guild=interaction.guild if interaction else None,
                 bot_id=bot_user.id if bot_user else None,
-                bot_name=runtime_bot_name(bot_user)
+                bot_name=runtime_bot_name(bot_user),
+                spread_name_override=spread_info["name"] if self.selected_spread == "custom" else None,
             )
         )
 
@@ -818,7 +833,8 @@ class TarotLauncherView(discord.ui.View):
             render_spread_to_bytes,
             self.selected_spread,
             drawn_cards,
-            set()
+            set(),
+            spread_title=spread_info["name"],
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
@@ -1202,6 +1218,7 @@ class TarotResultActionView(discord.ui.View):
         context: Optional[str] = None,
         reading_result: Optional[TarotReadingResult] = None,
         clarifier_allowed: bool = True,
+        spread_title: Optional[str] = None,
         timeout: float = 600.0
     ):
         super().__init__(timeout=timeout)
@@ -1219,6 +1236,7 @@ class TarotResultActionView(discord.ui.View):
         self.activity_id = activity_id
         self.reading_result = reading_result
         self.clarifier_allowed = clarifier_allowed
+        self.spread_title = spread_title
         self.session_state = TarotSessionState(max_followups=3, timeout_seconds=float(timeout))
         self.has_asked_followup = False  # compatibility: true only when all 3 turns are consumed
         self.has_used_clarifier = False
@@ -1390,6 +1408,7 @@ class TarotResultActionView(discord.ui.View):
                 target_position_index=target_index,
                 clarifier_card=clarifier,
                 key_card_id=key_card_id,
+                spread_title=self.spread_title,
             )
 
             ai_task = self.tarot_manager.create_ai_task(
@@ -1626,6 +1645,7 @@ class TarotFlipView(discord.ui.View):
         self.author_avatar_url = author_avatar_url
         self.spread_key = spread_key
         self.spread_info = spread_info
+        self.spread_title = spread_info.get("name", spread_key)
         self.drawn_cards = drawn_cards
         self.question = question
         self.context = context
@@ -1885,6 +1905,7 @@ class TarotFlipView(discord.ui.View):
             self.revealed_indices,
             just_revealed_indices=(newly_revealed if len(newly_revealed) <= 3 else set()),
             final=is_completed,
+            spread_title=self.spread_title,
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
@@ -1982,6 +2003,7 @@ class TarotFlipView(discord.ui.View):
                 self.revealed_indices,
                 key_card_id=key_card_id,
                 final=True,
+                spread_title=self.spread_title,
             )
             file = discord.File(fp=final_image_buffer, filename="tarot_spread.png")
 
@@ -2082,6 +2104,7 @@ class TarotFlipView(discord.ui.View):
                 activity_id=act_id,
                 reading_result=reading_result,
                 clarifier_allowed=is_valid_question,
+                spread_title=self.spread_title,
             )
 
             action_view.message = self.message or interaction.message
