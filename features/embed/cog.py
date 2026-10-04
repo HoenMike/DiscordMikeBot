@@ -19,7 +19,7 @@ from features.embed.validator import find_valid_proxy
 from features.embed.validator import is_generic_or_login_preview
 from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
-from features.embed.manual_fallback import build_manual_fallback_url
+from features.embed.manual_fallback import build_manual_fallback_url, verify_manual_fallback_token
 from core.webhook_sender import BoundedDict
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
@@ -1123,15 +1123,24 @@ class EmbedCog(commands.Cog):
 
             self._manual_fallback_done[origin_id] = True
 
-            # Chỉ sau khi fallback mới gửi thành công mới dọn preview/prompt cũ.
+            # Chỉ sau khi fallback mới gửi thành công mới dọn preview/prompt cũ
+            # của đúng URL này. Một origin message có thể chứa nhiều social links.
             targets = list(self._origin_to_preview_map.get(origin_id, []))
             for old_channel_id, preview_id in targets:
                 if preview_id == result.preview_message_id:
                     continue
                 try:
                     old_channel = self.bot.get_channel(old_channel_id) or channel
-                    partial = old_channel.get_partial_message(preview_id)
-                    await self._discard_preview(origin_id, partial)
+                    old_preview = await old_channel.fetch_message(preview_id)
+                    token_match = re.search(r"/embed/fallback/([A-Za-z0-9._-]+)", old_preview.content or "")
+                    if not token_match:
+                        continue
+                    old_payload = verify_manual_fallback_token(token_match.group(1))
+                    if not old_payload:
+                        continue
+                    if old_payload.get("origin_id") != origin_id or old_payload.get("url") != url:
+                        continue
+                    await self._discard_preview(origin_id, old_preview)
                 except Exception:
                     pass
 
