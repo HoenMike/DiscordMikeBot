@@ -945,6 +945,66 @@ def draw_spread(
     return drawn
 
 
+def draw_clarifier(
+    original_cards: List[DrawnCard],
+    target_position_index: int,
+    user_id: Optional[int] = None,
+    question: Optional[str] = None,
+    seed: Optional[int] = None,
+    fatigue_card_ids: Optional[List[str]] = None,
+) -> DrawnCard:
+    """Draw exactly one clarifier without mutating or repeating the original spread.
+
+    When user_id is available the clarifier is deterministic within the same hourly
+    Tarot seed window. This means a delivery retry does not silently reroll a new card.
+    """
+    if not original_cards:
+        raise ValueError("Clarifier requires an existing spread")
+    if not 0 <= target_position_index < len(original_cards):
+        raise ValueError("Clarifier target is outside the original spread")
+
+    target = original_cards[target_position_index]
+    original_ids = {item.card.id for item in original_cards}
+    pool = [card for card in TAROT_DECK.values() if card.id not in original_ids]
+    if not pool:
+        raise RuntimeError("No Tarot cards remain for clarifier draw")
+
+    if seed is None and user_id is not None:
+        base_seed = compute_tarot_seed(
+            user_id=user_id,
+            spread_key=f"clarifier_{target.position_index}",
+            question=question,
+        )
+        original_signature = ",".join(item.card.id for item in original_cards)
+        raw = f"{base_seed}|{target.card.id}|{original_signature}"
+        seed = int(hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16], 16)
+
+    rng = random.Random(seed) if seed is not None else random.Random()
+
+    if fatigue_card_ids:
+        fatigue_set = set(fatigue_card_ids)
+        weights = [0.3 if card.id in fatigue_set else 1.0 for card in pool]
+        picked = rng.choices(pool, weights=weights, k=1)[0]
+    else:
+        picked = rng.choice(pool)
+
+    is_reversed = rng.choice([True, False])
+    target_label = target.position_title
+    if target_label.upper().startswith("LÁ ") and ":" in target_label:
+        target_label = target_label.split(":", 1)[1].strip()
+
+    return DrawnCard(
+        card=picked,
+        is_reversed=is_reversed,
+        position_index=len(original_cards) + 1,
+        position_title=f"LÀM RÕ: {target_label}",
+        position_description=(
+            f"Lá bổ sung duy nhất để làm rõ vị trí {target.position_index}: "
+            f"{target.position_title}. Không thay thế lá gốc."
+        ),
+    )
+
+
 def get_yes_no_verdict(card: TarotCard, is_reversed: bool) -> Tuple[str, str, int]:
     """
     Trả về phán quyết Yes/No chuẩn xác theo biểu tượng Tarot:
