@@ -10,7 +10,7 @@ from core.version import CURRENT_VERSION
 from features.embed.cog import EmbedCog
 from features.embed.builder import PostData, NSFWFilter, build_embed
 from features.embed.result import PreviewResult
-from features.embed.manual_fallback import build_manual_fallback_url, verify_manual_fallback_token
+from features.embed.ui import FacebookFallbackView
 from features.embed.validator import is_generic_or_login_preview, validate_via_og_metadata, find_valid_proxy
 from features.tarot.ai import extract_question_mentions_context, _build_tarot_prompt, parse_tarot_ai_response
 from features.tarot.deck import READER_STYLES
@@ -40,7 +40,7 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertFalse(is_generic_or_login_preview("Facebook", "Mai wrote about her trip today", platform_key="facebook"))
 
     def test_brand_and_legacy_mentions(self):
-        self.assertEqual(CURRENT_VERSION, "2.8.1")
+        self.assertEqual(CURRENT_VERSION, "2.8.2")
         self.assertEqual(runtime_bot_name(None), BOT_BRAND_NAME)
         for query in ("@Asumi nghĩ sao?", "Asumi nghĩ sao?", "MikeDaBot nghĩ sao?"):
             clean, context = extract_question_mentions_context(query, "Mai")
@@ -66,24 +66,6 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertIsNotNone(attachment)
         self.assertLessEqual(sum(len(item) for item in embeds), 6000)
         attachment.close()
-
-    def test_manual_fallback_link_is_signed_and_round_trips(self):
-        with patch("config.PUBLIC_BASE_URL", "https://asumi.example"):
-            url = build_manual_fallback_url(
-                origin_message_id=10,
-                channel_id=20,
-                author_id=50,
-                platform_key="facebook",
-                original_url="https://facebook.com/share/r/example",
-            )
-        self.assertIsNotNone(url)
-        token = url.rsplit("/", 1)[-1]
-        payload = verify_manual_fallback_token(token)
-        self.assertEqual(payload["origin_id"], 10)
-        self.assertEqual(payload["channel_id"], 20)
-        self.assertEqual(payload["author_id"], 50)
-        self.assertEqual(payload["platform"], "facebook")
-
 
 class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -150,19 +132,52 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("features.embed.cog._UNFURL_DELAYS", (0, 0)):
             self.assertEqual(await self.cog._verify_proxy_unfurl(10, preview, "facebook"), (False, "unfurl_timeout"))
 
-    async def test_facebook_unfurl_timeout_keeps_preview_and_waits_for_manual_fallback(self):
+    async def test_facebook_unfurl_timeout_keeps_preview_with_manual_button(self):
         preview = SimpleNamespace(id=40)
         self.cog._send_embed_preview = AsyncMock(return_value=preview)
         self.cog._verify_proxy_unfurl = AsyncMock(return_value=(False, "unfurl_timeout"))
         self.cog._discard_preview = AsyncMock()
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))), \
-             patch("features.embed.cog.build_manual_fallback_url", return_value="https://asumi.example/embed/fallback/token"):
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))):
             result = await self.cog._try_proxy_chain(self.msg, "facebook", "https://facebook.com/post/1", {})
         self.assertEqual(result.status, "action_required")
         self.assertEqual(result.preview_message_id, 40)
         self.cog._discard_preview.assert_not_awaited()
-        sent_content = self.cog._send_embed_preview.await_args.kwargs["content"]
-        self.assertIn("[fallback](https://asumi.example/embed/fallback/token)", sent_content)
+        sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
+        self.assertNotIn("[fallback]", sent_kwargs["content"])
+        self.assertEqual(sent_kwargs["view"].button.label, "Fallback")
+
+    async def test_facebook_fallback_button_is_owner_only_and_runs_manual_fallback(self):
+        view = self.cog._manual_fallback_view(
+            self.msg, "facebook", "https://facebook.com/post/1"
+        )
+        self.assertIsInstance(view, FacebookFallbackView)
+
+        denied = SimpleNamespace(
+            user=SimpleNamespace(id=999),
+            response=SimpleNamespace(send_message=AsyncMock()),
+        )
+        self.assertFalse(await view.interaction_check(denied))
+        denied.response.send_message.assert_awaited_once()
+        self.assertTrue(denied.response.send_message.await_args.kwargs["ephemeral"])
+
+        allowed = SimpleNamespace(
+            user=SimpleNamespace(id=50),
+            response=SimpleNamespace(send_message=AsyncMock(), edit_message=AsyncMock()),
+            followup=SimpleNamespace(send=AsyncMock()),
+            message=SimpleNamespace(edit=AsyncMock()),
+        )
+        self.assertTrue(await view.interaction_check(allowed))
+
+        self.cog.run_manual_fallback = AsyncMock(return_value=PreviewResult(
+            "success", "ytdlp", "manual_fallback_sent", "facebook",
+            origin_message_id=10, preview_message_id=41, used_fallback=True,
+        ))
+        await view._run_fallback(allowed)
+        self.cog.run_manual_fallback.assert_awaited_once()
+        allowed.response.edit_message.assert_awaited_once()
+        allowed.followup.send.assert_awaited_once()
+        self.assertTrue(allowed.followup.send.await_args.kwargs["ephemeral"])
 
     async def test_second_proxy_can_win_after_first_unusable(self):
         first = SimpleNamespace(id=40)
