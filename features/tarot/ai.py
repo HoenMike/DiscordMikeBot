@@ -96,6 +96,12 @@ TAROT_CUSTOM_SPREAD_CONFIG = types.GenerateContentConfig(
     thinking_config=types.ThinkingConfig(thinking_budget=768),
 )
 
+TAROT_CUSTOM_SPREAD_CONFIG_FALLBACK = types.GenerateContentConfig(
+    temperature=0.45,
+    system_instruction=TAROT_SYSTEM_INSTRUCTION,
+    response_mime_type="application/json",
+)
+
 
 def _format_cards_context(drawn_cards: List[DrawnCard]) -> str:
     """Tạo văn bản mô tả danh sách lá bài rút được cô đọng, giàu dữ kiện chuẩn Tarot."""
@@ -829,26 +835,27 @@ OUTPUT JSON DUY NHẤT
 
     async with AI_SEMAPHORE:
         for model_name in ordered_models:
-            try:
-                response = await bounded_ai_generate(
-                    model=model_name,
-                    contents=prompt,
-                    config=TAROT_CUSTOM_SPREAD_CONFIG,
-                    timeout_sec=12.0,
-                    label="Tarot Custom Spread",
-                )
-                if not response or not response.text:
+            for gen_config in (TAROT_CUSTOM_SPREAD_CONFIG, TAROT_CUSTOM_SPREAD_CONFIG_FALLBACK):
+                try:
+                    response = await bounded_ai_generate(
+                        model=model_name,
+                        contents=prompt,
+                        config=gen_config,
+                        timeout_sec=12.0,
+                        label="Tarot Custom Spread",
+                    )
+                    if not response or not response.text:
+                        continue
+                    raw = response.text.strip()
+                    fence = chr(96) * 3
+                    if raw.startswith(fence):
+                        raw = re.sub(r"^.{3}[a-zA-Z]*\s*", "", raw)
+                        raw = re.sub(r"\s*.{3}$", "", raw).strip()
+                    schema = validate_custom_spread_payload(json.loads(raw))
+                    if schema:
+                        return schema
+                except Exception:
                     continue
-                raw = response.text.strip()
-                fence = chr(96) * 3
-                if raw.startswith(fence):
-                    raw = re.sub(r"^.{3}[a-zA-Z]*\s*", "", raw)
-                    raw = re.sub(r"\s*.{3}$", "", raw).strip()
-                schema = validate_custom_spread_payload(json.loads(raw))
-                if schema:
-                    return schema
-            except Exception:
-                continue
     return None
 
 
