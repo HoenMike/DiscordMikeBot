@@ -30,6 +30,62 @@ def create_platform_view(platform_key: str, original_url: str) -> discord.ui.Vie
 
 
 
+class FacebookFallbackView(discord.ui.View):
+    """Nút fallback thủ công cho Facebook, chỉ người gửi link gốc được dùng."""
+
+    def __init__(self, cog, payload: dict, timeout: float = 900):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.payload = dict(payload)
+        self.button = discord.ui.Button(
+            label="Fallback",
+            emoji="↪️",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"asumi:fb-fallback:{self.payload.get('origin_id', 0)}",
+        )
+        self.button.callback = self._run_fallback
+        self.add_item(self.button)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        author_id = int(self.payload.get("author_id", 0) or 0)
+        if interaction.user.id == author_id:
+            return True
+        await interaction.response.send_message(
+            "Chỉ người gửi link gốc mới có thể dùng fallback này.",
+            ephemeral=True,
+        )
+        return False
+
+    async def _run_fallback(self, interaction: discord.Interaction):
+        self.button.disabled = True
+        await interaction.response.edit_message(view=self)
+
+        try:
+            result = await self.cog.run_manual_fallback(self.payload)
+        except Exception as exc:
+            result = None
+            print(f"[EmbedCog] Manual fallback button lỗi: {exc}", flush=True)
+
+        if result is not None and result.success:
+            self.stop()
+            await interaction.followup.send(
+                "Đã chạy fallback cho link Facebook này.",
+                ephemeral=True,
+            )
+            return
+
+        self.button.disabled = False
+        try:
+            await interaction.message.edit(view=self)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+        reason = getattr(result, "reason", "manual_fallback_failed")
+        await interaction.followup.send(
+            f"Fallback chưa tạo được preview mới (`{reason}`). Preview hiện tại vẫn được giữ.",
+            ephemeral=True,
+        )
+
 
 class PlatformToggleSelect(discord.ui.Select):
     """Dropdown multi-select để bật/tắt các nền tảng mạng xã hội."""
