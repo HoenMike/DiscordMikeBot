@@ -12,12 +12,32 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.1"
+CURRENT_VERSION = "2.8.2"
 RELEASE_DATE = "2026-10-04"
-CODENAME = "Asumi - Manual Facebook Fallback"
+CODENAME = "Asumi - Native Facebook Fallback Button"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.8.2",
+        "date": "2026-10-04",
+        "type": "bugfix",
+        "title": "Facebook fallback bằng Discord Button",
+        "summary": "Thay hyperlink fallback v2.8.1 bằng nút Discord native để fallback hoạt động trực tiếp trong chat, chỉ người gửi link gốc được kích hoạt và không còn phụ thuộc public web route.",
+        "changes": [
+            {"category": "🪝 Facebook Embed", "items": [
+                "Thay hyperlink [fallback] bằng nút ↪️ Fallback trên preview Facebook.",
+                "Chỉ Discord user đã gửi link gốc được bấm; người khác nhận phản hồi ephemeral và không kích hoạt yt-dlp.",
+                "Nút disable ngay khi xử lý, được bật lại nếu fallback thất bại; preview cũ chỉ bị dọn sau khi replacement gửi thành công.",
+                "Giữ nguyên fix chống false fallback: Facebook không auto yt-dlp và generic card sớm vẫn được chờ hết grace window.",
+            ]},
+            {"category": "🧹 Dọn hạ tầng hyperlink", "items": [
+                "Xóa signed-token helper, web fallback routes và ASUMI_PUBLIC_URL/PUBLIC_BASE_URL vì không còn cần.",
+                "Cleanup manual fallback được track trực tiếp theo (origin message, URL), an toàn khi một message có nhiều link.",
+                "Cập nhật regression tests, README và docs/EMBED_PIPELINE.md.",
+            ]},
+        ],
+    },
     {
         "version": "2.8.1",
         "date": "2026-10-04",
