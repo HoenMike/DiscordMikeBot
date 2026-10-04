@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
-> **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1–T20.8 COMPLETE — Tarot 2.0 released; post-release expansion continues. T20.9 NEXT.** The user approved continuing through T20.9 without per-milestone approval.  
+> **Status:** IMPLEMENTED roadmap / maintenance reference.  
+> **Implementation status:** **T20.1–T20.9 COMPLETE — Asumi 2.10.0 / Tarot 2.1 release complete.** Treat this document as the shipped baseline until a new roadmap is requested.  
 > **Last planning update:** 2026-10-05  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -836,6 +836,17 @@ Visual 30-day summary with:
 - current theme.
 
 ---
+
+## T20.9 implementation status — COMPLETE
+
+Implemented 2026-10-05:
+
+- deterministic owner-only Recap Card with no additional draw or AI call;
+- hero card sourced from structured key-card evidence when available;
+- portrait save/share layout containing only headline, one takeaway, spread and date;
+- timeout/one-use integration with the existing result action view;
+- user help, README, runtime docs, handoff, version and changelog polish;
+- Asumi bumped once to **2.10.0 — Tarot 2.1** for the completed T20.6–T20.9 post-2.0 expansion.
 
 # 19. System Prompt 2.0
 
