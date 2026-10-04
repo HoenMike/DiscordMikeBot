@@ -1,6 +1,6 @@
 # Social Embed Pipeline
 
-Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v2.8.3 (2026-10-04)**.
+Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v2.8.4 (2026-10-04)**.
 
 ## Mục tiêu
 
@@ -22,24 +22,23 @@ Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl
    - Dùng cho Twitter/X, TikTok, Instagram, Reddit và Twitch khi các tầng trước thất bại.
    - **Facebook không nằm trong yt-dlp fallback path từ v2.8.3.**
 
-## Facebook: raw URL là phần tạo embed
+## Facebook: compact masked proxy link
 
-Discord chỉ tự dựng native link embed đáng tin cậy khi message thực sự chứa URL cần unfurl. Vì vậy Facebook preview phải có raw proxy URL, ví dụ:
-
-```text
-Trả lời @user • facebed.com
-https://facebed.com/share/r/...
-```
-
-Không dùng masked markdown kiểu:
+Facebook preview hiện dùng masked markdown link để tránh lộ URL dài trong chat:
 
 ```text
-[Xem bài viết gốc](https://facebed.com/...)
+Trả lời @user • [facebed.seria.moe](https://facebed.seria.moe/share/r/...)
 ```
 
-cho URL chịu trách nhiệm tạo embed. Button Discord chỉ là component phụ; bản thân button không tạo link preview.
+Điểm quan trọng là URL đích **không** được bọc bằng `<...>`. Discord dùng dạng `[label](url)` cho masked link, còn `[label](<url>)` là dạng suppress preview. Vì vậy Asumi giữ URL proxy trực tiếp trong target của masked link để Discord vẫn có thể unfurl, nhưng phần người dùng nhìn thấy chỉ còn domain proxy.
 
-Nếu nội dung phải spoiler, raw URL được bọc spoiler thay vì đổi thành masked hyperlink.
+Nếu nội dung cần spoiler, Asumi bọc **toàn bộ masked link** trong spoiler:
+
+```text
+||[facebed.seria.moe](https://facebed.seria.moe/share/r/...)||
+```
+
+Button **🔄 Proxy khác** vẫn chỉ là component phụ; nó không chịu trách nhiệm tạo embed.
 
 ## Facebook proxy roll
 
@@ -61,7 +60,7 @@ Preview Facebook gắn `FacebookFallbackView` với button **🔄 Proxy khác**.
 3. Ghép danh sách `tried_domains` từ payload với state server theo `(origin_message_id, URL)`.
 4. `find_valid_proxy(... excluded_domains=tried)` tìm candidate kế tiếp.
 5. Nếu có candidate:
-   - gửi **message mới chứa raw proxy URL** và một button mới mang state đã cập nhật;
+   - gửi **message mới chứa masked proxy link** và một button mới mang state đã cập nhật;
    - chỉ sau khi gửi mới thành công mới xóa preview proxy cũ;
    - log `manual_proxy_roll`.
 6. Nếu không còn candidate:
@@ -75,7 +74,7 @@ Discord client có thể render/unfurl khác thời điểm với polling của 
 
 v2.8.3 vì vậy dùng quy tắc đơn giản:
 
-- **send raw proxy URL**;
+- **send compact masked proxy link**;
 - **không auto-roll sau send**;
 - **user quyết định khi nào cần proxy khác**.
 
@@ -93,7 +92,7 @@ Các helper verify unfurl vẫn còn cho flow của nền tảng khác và regre
 
 Các case cần giữ khi chỉnh pipeline:
 
-- Facebook proxy message phải chứa raw `https://...` URL, không phải chỉ masked hyperlink.
+- Facebook proxy message phải chứa masked link `[domain](proxy-url)` và không bọc URL đích bằng `<...>`, để tránh suppress unfurl.
 - Sau khi proxy Facebook đầu tiên đã gửi, `_verify_proxy_unfurl` không được tự kích hoạt rotation.
 - Preview Facebook phải có `FacebookFallbackView` / button **Proxy khác**.
 - User khác origin author không được roll proxy.
