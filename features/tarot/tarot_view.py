@@ -643,6 +643,17 @@ class TarotLauncherView(discord.ui.View):
         except Exception:
             pass
 
+        # T20.3: give the launcher a visible lifecycle transition instead of
+        # leaving users on a static setup screen while draw/render work starts.
+        try:
+            shuffling_embed = self.build_shuffling_embed()
+            if self.message:
+                await self.message.edit(embed=shuffling_embed, view=None)
+            else:
+                await interaction.edit_original_response(embed=shuffling_embed, view=None)
+        except Exception:
+            pass
+
         # T20.2: when a repeated question is detected, the user can explicitly
         # choose a fresh read that does not inject prior Tarot context.
         recent_ctx = None
