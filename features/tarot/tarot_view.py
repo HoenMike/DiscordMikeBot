@@ -13,8 +13,9 @@ from features.tarot.deck import (
     draw_spread
 )
 from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading, generate_followup_answer, recommend_spread_for_question
+from features.tarot.ai import generate_tarot_reading_result, generate_followup_answer, recommend_spread_for_question
 from features.tarot.reading.recommendation import find_similar_recent_question
+from features.tarot.reading.schema import TarotReadingResult
 from features.tarot.reading.session import (
     build_ai_ready_status,
     build_micro_reveal,
@@ -26,6 +27,31 @@ from features.tarot.manager import TarotManager
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
 
 WIDE_DIVIDER = "---"
+
+
+def _unpack_tarot_result(ai_res):
+    """Normalize rich V2 and legacy Tarot AI results for existing session code."""
+    if isinstance(ai_res, TarotReadingResult):
+        return (
+            ai_res.full_reading,
+            ai_res.topic_tag,
+            ai_res.mood_tag,
+            ai_res.headline,
+            ai_res.is_valid,
+            ai_res.key_card.card_id if ai_res.key_card else None,
+        )
+
+    if isinstance(ai_res, tuple):
+        if len(ai_res) >= 5:
+            return ai_res[0], ai_res[1], ai_res[2], ai_res[3], ai_res[4], None
+        if len(ai_res) >= 4:
+            return ai_res[0], ai_res[1], ai_res[2], ai_res[3], True, None
+        if len(ai_res) == 2:
+            return ai_res[0], ai_res[1], "", "", True, None
+        if ai_res:
+            return ai_res[0], "general", "", "", True, None
+
+    return str(ai_res), "general", "", "", True, None
 
 
 def build_reading_payload(embed_cards, ai_reading, title, footer, avatar_url=None):
@@ -676,7 +702,7 @@ class TarotLauncherView(discord.ui.View):
 
         bot_user = interaction.client.user if interaction and interaction.client else None
         ai_task = self.tarot_manager.create_ai_task(
-            generate_tarot_reading(
+            generate_tarot_reading_result(
                 spread_key=self.selected_spread,
                 drawn_cards=drawn_cards,
                 question=self.question,
