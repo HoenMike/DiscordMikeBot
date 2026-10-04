@@ -1267,60 +1267,43 @@ class TarotFlipView(discord.ui.View):
         return embed
 
     def _build_buttons(self):
-        """Khởi tạo và cập nhật trạng thái các nút bấm lật bài."""
+        """Build compact mobile-friendly reveal controls."""
         self.clear_items()
         card_count = len(self.drawn_cards)
 
         if card_count == 1:
             is_opened = 0 in self.revealed_indices
-            label = "✅ Đã Lật Bài" if is_opened else "🎴 Lật Mở Quẻ Bài"
             btn = discord.ui.Button(
-                label=label,
+                label="✓ Đã lật" if is_opened else "🎴 Lật lá",
                 style=discord.ButtonStyle.success if is_opened else discord.ButtonStyle.primary,
                 custom_id="flip_0",
                 disabled=is_opened,
-                row=0
+                row=0,
             )
             btn.callback = self._handle_button_click
             self.add_item(btn)
             return
 
-        # Với 3, 5, 10 lá: Tạo nút cho từng lá + nút Lật Tất Cả
-        for idx, card in enumerate(self.drawn_cards):
+        for idx, _card in enumerate(self.drawn_cards):
             is_opened = idx in self.revealed_indices
-            pos_title = card.position_title
-
-            # Rút ngắn nhãn nút để vừa giao diện Discord
-            short_label = pos_title.split(":")[0].strip() if ":" in pos_title else f"Lá {idx + 1}"
-            if is_opened:
-                btn_label = f"✅ {short_label}"
-                btn_style = discord.ButtonStyle.secondary
-            else:
-                btn_label = f"🎴 {short_label}"
-                btn_style = discord.ButtonStyle.primary
-
-            # Tính row: tối đa 5 nút / hàng
-            row = idx // 5
-
             btn = discord.ui.Button(
-                label=btn_label,
-                style=btn_style,
+                label=compact_flip_label(idx, is_opened),
+                style=discord.ButtonStyle.secondary if is_opened else discord.ButtonStyle.primary,
                 custom_id=f"flip_{idx}",
                 disabled=is_opened,
-                row=row
+                row=idx // 5,
             )
             btn.callback = self._handle_button_click
             self.add_item(btn)
 
-        # Nút "Lật Tất Cả"
         all_opened = len(self.revealed_indices) == card_count
-        row_for_all = (card_count // 5) if (card_count % 5 != 0) else (card_count // 5)
+        row_for_all = (card_count + 4) // 5
         btn_all = discord.ui.Button(
-            label="✨ Lật Tất Cả",
-            style=discord.ButtonStyle.success if not all_opened else discord.ButtonStyle.secondary,
+            label="✓ Đã lật hết" if all_opened else "✨ Lật hết",
+            style=discord.ButtonStyle.secondary if all_opened else discord.ButtonStyle.success,
             custom_id="flip_all",
             disabled=all_opened,
-            row=min(4, row_for_all)
+            row=min(4, row_for_all),
         )
         btn_all.callback = self._handle_button_click
         self.add_item(btn_all)
