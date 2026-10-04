@@ -21,8 +21,10 @@ Before any Tarot 2.0 work, read:
 
 1. `docs/TAROT_V2_MASTER_PLAN.md`
 2. `docs/TAROT_V2_HANDOFF.md`
-3. `docs/TAROT_SYSTEM.md`
-4. current `features/tarot/` code
+3. `docs/TAROT_V2_PROMPT_SPEC.md` when touching AI/prompt/reading schema
+4. `docs/TAROT_V2_RENDERER_SPEC.md` when touching renderer/presentation
+5. `docs/TAROT_SYSTEM.md`
+6. current `features/tarot/` code
 
 ### Important Tarot status
 
@@ -60,3 +62,5 @@ If you start, complete, reject or materially change a Tarot milestone, update `d
 - Current Tarot system: `docs/TAROT_SYSTEM.md`
 - Tarot 2.0 master plan: `docs/TAROT_V2_MASTER_PLAN.md`
 - Tarot 2.0 handoff: `docs/TAROT_V2_HANDOFF.md`
+- Tarot 2.0 prompt spec: `docs/TAROT_V2_PROMPT_SPEC.md`
+- Tarot 2.0 renderer spec: `docs/TAROT_V2_RENDERER_SPEC.md`
