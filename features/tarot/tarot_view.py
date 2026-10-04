@@ -10,12 +10,15 @@ from features.tarot.deck import (
     get_yes_no_verdict,
     READER_STYLES,
     SPREAD_DEFINITIONS,
+    draw_clarifier,
     draw_spread
 )
-from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading_result, generate_followup_answer, recommend_spread_for_question
+from features.tarot.renderer import render_clarifier_board_to_bytes, render_spread_to_bytes
+from features.tarot.ai import generate_clarifier_interpretation, generate_tarot_reading_result, generate_followup_answer, recommend_spread_for_question
+from features.tarot.reading.clarifier import resolve_clarifier_suggestions, target_insight
 from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.reading.schema import TarotReadingResult
+from features.tarot.rendering.state import ClarifierBoardState
 from features.tarot.reading.session import (
     build_ai_ready_status,
     build_micro_reveal,
