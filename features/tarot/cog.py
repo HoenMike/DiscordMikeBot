@@ -13,9 +13,10 @@ from features.tarot.deck import (
     get_yes_no_verdict,
     READER_STYLES
 )
-from features.tarot.renderer import render_spread_to_bytes
+from features.tarot.renderer import render_journey_card_to_bytes, render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading, generate_tarot_reading_result, recommend_spread_for_question
 from features.tarot.manager import TarotManager
+from features.tarot.reading.journey import summarize_journey
 from features.tarot.tarot_view import (
     TarotFlipView,
     TarotLauncherView,
@@ -145,6 +146,85 @@ class TarotCog(commands.Cog):
             icon_url=target_user.display_avatar.url if target_user.display_avatar else None
         )
         await sender(embed=embed, ephemeral=is_ephemeral)
+
+    async def _show_journey(
+        self,
+        target_user: Union[discord.User, discord.Member],
+        sender: callable,
+        is_ephemeral: bool = True,
+    ):
+        """Show a factual 30-day Tarot Journey derived from stored history."""
+        history = await self.tarot_manager.get_user_journey_history(
+            target_user.id,
+            days=30,
+            limit=200,
+        )
+        summary = summarize_journey(history, days=30)
+        if not summary.has_data:
+            await sender(
+                "🌙 Chưa đủ dữ liệu cho Tarot Journey 30 ngày. Hãy bốc vài quẻ rồi quay lại nhé.",
+                ephemeral=is_ephemeral,
+            )
+            return
+
+        spread_name = SPREAD_DEFINITIONS.get(summary.most_used_spread, {}).get(
+            "name",
+            "Smart Custom Spread" if summary.most_used_spread == "custom" else summary.most_used_spread,
+        )
+        suits = summary.suit_percentages
+        repeat_text = (
+            ", ".join(f"{item.name} ×{item.count}" for item in summary.repeated_cards[:3])
+            if summary.repeated_cards else "Chưa có lá nào lặp từ 2 lần."
+        )
+        reversed_text = (
+            ", ".join(f"{item.name} ×{item.count}" for item in summary.repeated_reversed_cards[:3])
+            if summary.repeated_reversed_cards else "Chưa có lá ngược nào lặp từ 2 lần."
+        )
+        progression = " → ".join(summary.theme_progression) if summary.theme_progression else "Chưa đủ dữ liệu"
+        top_topics = ", ".join(
+            f"{topic} ×{count}" for topic, count in list(summary.topic_counts.items())[:4]
+        ) or "general"
+
+        embed = discord.Embed(
+            title=f"🧭 TAROT JOURNEY — {target_user.display_name.upper()}",
+            description=(
+                f"**{summary.reading_count} quẻ · {summary.days} ngày gần nhất**\n"
+                "Đây là pattern thống kê từ lịch sử đã lưu, không phải dự đoán số phận hay chẩn đoán."
+            ),
+            color=0x7851A9,
+        )
+        embed.add_field(
+            name="🃏 Cấu trúc lá",
+            value=(
+                f"Major Arcana: **{summary.major_ratio}%** ({summary.major_count}/{summary.total_cards})\n"
+                f"Cups **{suits.get('cups', 0)}%** · Swords **{suits.get('swords', 0)}%** · "
+                f"Wands **{suits.get('wands', 0)}%** · Pentacles **{suits.get('pentacles', 0)}%**"
+            ),
+            inline=False,
+        )
+        embed.add_field(name="🔁 Lá lặp", value=repeat_text[:1024], inline=False)
+        embed.add_field(name="↩️ Lá ngược lặp", value=reversed_text[:1024], inline=False)
+        embed.add_field(
+            name="🧩 Chủ đề & thói quen",
+            value=(
+                f"Progression: **{progression}**\n"
+                f"Topic nổi bật: {top_topics}\n"
+                f"Spread dùng nhiều: **{spread_name or '—'}**"
+            )[:1024],
+            inline=False,
+        )
+        image_buffer = await asyncio.to_thread(
+            render_journey_card_to_bytes,
+            summary,
+            target_user.display_name,
+        )
+        file = discord.File(fp=image_buffer, filename="tarot_journey.png")
+        embed.set_image(url="attachment://tarot_journey.png")
+        embed.set_footer(
+            text="Tarot Journey · dữ liệu 30 ngày gần nhất",
+            icon_url=target_user.display_avatar.url if target_user.display_avatar else None,
+        )
+        await sender(embed=embed, file=file, ephemeral=is_ephemeral)
 
     async def _execute_tarot_flow(
         self,
@@ -418,6 +498,16 @@ class TarotCog(commands.Cog):
         await self._show_history(interaction.user, send_response, is_ephemeral=True)
 
     @app_commands.command(
+        name="tarot_journey",
+        description="Xem Tarot Journey 30 ngày từ lịch sử quẻ của bạn"
+    )
+    @app_commands.checks.cooldown(1, 30.0, key=lambda i: i.user.id)
+    async def tarot_journey_slash(self, interaction: discord.Interaction):
+        async def send_response(*args, **kwargs):
+            await interaction.response.send_message(*args, **kwargs)
+        await self._show_journey(interaction.user, send_response, is_ephemeral=True)
+
+    @app_commands.command(
         name="tarot_recommend",
         description="Gợi ý kiểu trải bài phù hợp nhất dựa trên câu hỏi của bạn"
     )
@@ -524,6 +614,14 @@ class TarotCog(commands.Cog):
                 mention_author=False
             )
             launcher.message = sent_msg
+            return
+
+        # 2. Tarot Journey 30 ngày
+        if spread_arg.lower() in ["journey", "hanhtrinh", "journal"]:
+            async def send_journey(*args, **kwargs):
+                kwargs.pop("ephemeral", None)
+                await ctx.reply(*args, mention_author=False, **kwargs)
+            await self._show_journey(ctx.author, send_journey, is_ephemeral=False)
             return
 
         # 2. Xem lịch sử

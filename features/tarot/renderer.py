@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, TarotCard, ensure_card_asset
 from features.tarot.rendering.state import ClarifierBoardState, ReadingBoardState
+from features.tarot.reading.journey import TarotJourneySummary
 
 
 # Restrained Tarot 2.0 palette: dark celestial, muted violet, warm gold, blue-grey.
@@ -1014,6 +1015,106 @@ def render_clarifier_board_to_bytes(state: ClarifierBoardState) -> io.BytesIO:
     image.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
     buffer.seek(0)
     return buffer
+
+
+def render_journey_card_to_bytes(
+    summary: TarotJourneySummary,
+    user_name: str = "Bạn",
+) -> io.BytesIO:
+    """Render a compact 30-day Journey summary from stored statistics only."""
+    width, height = 1400, 900
+    canvas = _gradient_background(width, height)
+    draw = ImageDraw.Draw(canvas)
+
+    title_font = _get_font(42, bold=True)
+    sub_font = _get_font(22)
+    metric_font = _get_font(30, bold=True)
+    body_font = _get_font(22, bold=True)
+    small_font = _get_font(18)
+
+    _draw_centered_text(draw, "TAROT JOURNEY", width // 2, 45, title_font, COLOR_GOLD_LIGHT)
+    _draw_centered_text(
+        draw,
+        f"{user_name} · {summary.reading_count} readings · {summary.days} ngày gần nhất",
+        width // 2,
+        103,
+        sub_font,
+        COLOR_MUTED,
+    )
+
+    panels = [
+        (70, 170, 660, 420),
+        (740, 170, 1330, 420),
+        (70, 465, 660, 820),
+        (740, 465, 1330, 820),
+    ]
+    for panel in panels:
+        draw.rounded_rectangle(panel, radius=26, fill=COLOR_PANEL, outline=COLOR_GOLD_DARK, width=2)
+
+    draw.text((110, 205), "NHỊP ĐỌC", font=body_font, fill=COLOR_GOLD_LIGHT)
+    draw.text((110, 255), str(summary.reading_count), font=metric_font, fill=COLOR_TEXT)
+    draw.text((190, 264), "quẻ", font=small_font, fill=COLOR_MUTED)
+    draw.text((110, 320), f"Major Arcana: {summary.major_ratio}% ({summary.major_count}/{summary.total_cards})", font=small_font, fill=COLOR_TEXT)
+    spread_text = summary.most_used_spread or "—"
+    draw.text((110, 360), f"Spread dùng nhiều: {spread_text[:36]}", font=small_font, fill=COLOR_MUTED)
+
+    draw.text((780, 205), "BỘ ẨN PHỤ", font=body_font, fill=COLOR_GOLD_LIGHT)
+    suit_labels = {
+        "cups": "Cups",
+        "swords": "Swords",
+        "wands": "Wands",
+        "pentacles": "Pentacles",
+    }
+    y = 258
+    for suit in ("cups", "swords", "wands", "pentacles"):
+        pct = summary.suit_percentages.get(suit, 0)
+        count = summary.suit_counts.get(suit, 0)
+        draw.text((790, y), f"{suit_labels[suit]:<10} {pct:>3}%  ·  {count} lá", font=small_font, fill=COLOR_TEXT)
+        y += 36
+
+    draw.text((110, 500), "LÁ LẶP LẠI", font=body_font, fill=COLOR_GOLD_LIGHT)
+    y = 555
+    repeats = summary.repeated_cards[:4]
+    if repeats:
+        for item in repeats:
+            draw.text((110, y), f"• {item.name[:34]}  ×{item.count}", font=small_font, fill=COLOR_TEXT)
+            y += 42
+    else:
+        draw.text((110, y), "Chưa có lá nào lặp đủ 2 lần.", font=small_font, fill=COLOR_MUTED)
+        y += 42
+
+    if summary.repeated_reversed_cards:
+        draw.text((110, y + 12), "Ngược lặp:", font=small_font, fill=COLOR_VIOLET_LIGHT)
+        y += 50
+        for item in summary.repeated_reversed_cards[:2]:
+            draw.text((130, y), f"{item.name[:30]} ×{item.count}", font=small_font, fill=COLOR_MUTED)
+            y += 34
+
+    draw.text((780, 500), "CHỦ ĐỀ GẦN ĐÂY", font=body_font, fill=COLOR_GOLD_LIGHT)
+    progression = "  →  ".join(summary.theme_progression) if summary.theme_progression else "Chưa đủ dữ liệu"
+    if len(progression) > 58:
+        progression = progression[:55].rstrip() + "..."
+    draw.text((790, 560), progression, font=small_font, fill=COLOR_TEXT)
+
+    y = 625
+    for topic, count in list(summary.topic_counts.items())[:4]:
+        draw.text((790, y), f"• {topic[:28]}  ×{count}", font=small_font, fill=COLOR_MUTED)
+        y += 38
+
+    _draw_centered_text(
+        draw,
+        "Pattern thống kê để tự nhìn lại · không phải dự đoán số phận hay chẩn đoán",
+        width // 2,
+        852,
+        small_font,
+        COLOR_MUTED,
+    )
+
+    buffer = io.BytesIO()
+    canvas.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
+    buffer.seek(0)
+    return buffer
+
 
 
 def render_spread_to_bytes(
