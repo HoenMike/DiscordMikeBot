@@ -108,8 +108,24 @@ def _gradient_background(width: int, height: int) -> Image.Image:
 
 def _safe_title(spread_key: str, custom_title: Optional[str] = None) -> str:
     if custom_title:
-        return custom_title
-    return SPREAD_DEFINITIONS.get(spread_key, {}).get("name", "Tarot Spread")
+        title = " ".join(custom_title.split())
+        return title if len(title) <= 44 else title[:41].rstrip() + "..."
+
+    compact = {
+        "daily": "Daily Card",
+        "yes_no": "Yes / No",
+        "single": "Single Card",
+        "ppf": "Past · Present · Future",
+        "choices": "Two Choices",
+        "mbs": "Mind · Body · Spirit",
+        "horseshoe": "Horseshoe",
+        "two_paths": "Two Paths",
+        "celtic": "Celtic Cross",
+    }
+    return compact.get(
+        spread_key,
+        SPREAD_DEFINITIONS.get(spread_key, {}).get("name", "Tarot Spread"),
+    )
 
 
 def _short_position_title(raw: str, fallback_index: int) -> str:
@@ -358,6 +374,9 @@ def _draw_card_slot(
     revealed = state.is_revealed(index)
     draw = ImageDraw.Draw(canvas)
     label = _short_position_title(position_title or drawn.position_title, index)
+    max_label_chars = 16 if card_w < 160 else (20 if card_w < 190 else 25)
+    if len(label) > max_label_chars:
+        label = label[:max_label_chars - 3].rstrip() + "..."
 
     label_font = _get_font(max(15, card_w // 10), bold=True)
     name_font = _get_font(max(14, card_w // 11), bold=True)
@@ -502,10 +521,10 @@ def _layout_4(state: ReadingBoardState) -> Image.Image:
     canvas = _gradient_background(width, height)
     _draw_header(canvas, state)
     positions = (
-        (650, 335),
-        (365, 620),
-        (935, 620),
-        (650, 840),
+        (650, 420),
+        (365, 655),
+        (935, 655),
+        (650, 875),
     )
     for idx, (x, y) in enumerate(positions):
         _draw_card_slot(canvas, state, idx, x, y, 190, 327)
@@ -519,19 +538,19 @@ def _layout_two_paths(state: ReadingBoardState) -> Image.Image:
     draw = ImageDraw.Draw(canvas)
     branch_font = _get_font(25, bold=True)
 
-    _draw_card_slot(canvas, state, 0, 700, 375, 230, 395, position_title="BỐI CẢNH CHUNG")
+    _draw_card_slot(canvas, state, 0, 700, 385, 190, 327, position_title="BỐI CẢNH CHUNG")
 
-    _draw_pill(draw, "HƯỚNG A", 390, 560, branch_font, fill=(35, 42, 54), outline=COLOR_BLUEGREY, text_color=COLOR_BLUEGREY_LIGHT, pad_x=26)
-    _draw_pill(draw, "HƯỚNG B", 1010, 560, branch_font, fill=(43, 36, 54), outline=COLOR_VIOLET, text_color=COLOR_VIOLET_LIGHT, pad_x=26)
+    _draw_pill(draw, "HƯỚNG A", 390, 585, branch_font, fill=(35, 42, 54), outline=COLOR_BLUEGREY, text_color=COLOR_BLUEGREY_LIGHT, pad_x=26)
+    _draw_pill(draw, "HƯỚNG B", 1010, 585, branch_font, fill=(43, 36, 54), outline=COLOR_VIOLET, text_color=COLOR_VIOLET_LIGHT, pad_x=26)
 
     slots = (
-        (1, 245, 800, "THUẬN LỢI A"),
-        (2, 535, 800, "RỦI RO A"),
-        (3, 865, 800, "THUẬN LỢI B"),
-        (4, 1155, 800, "RỦI RO B"),
+        (1, 245, 820, "THUẬN LỢI A"),
+        (2, 535, 820, "RỦI RO A"),
+        (3, 865, 820, "THUẬN LỢI B"),
+        (4, 1155, 820, "RỦI RO B"),
     )
     for idx, x, y, title in slots:
-        _draw_card_slot(canvas, state, idx, x, y, 210, 361, position_title=title)
+        _draw_card_slot(canvas, state, idx, x, y, 170, 292, position_title=title)
     return canvas
 
 
@@ -556,11 +575,11 @@ def _layout_generic_5(state: ReadingBoardState) -> Image.Image:
     canvas = _gradient_background(width, height)
     _draw_header(canvas, state)
     positions = (
-        (650, 330),
-        (370, 570),
-        (650, 570),
-        (930, 570),
-        (650, 835),
+        (650, 395),
+        (370, 625),
+        (650, 625),
+        (930, 625),
+        (650, 875),
     )
     for idx, (x, y) in enumerate(positions):
         _draw_card_slot(canvas, state, idx, x, y, 180, 310)
@@ -572,11 +591,11 @@ def _layout_6(state: ReadingBoardState) -> Image.Image:
     canvas = _gradient_background(width, height)
     _draw_header(canvas, state)
     xs = (300, 750, 1200)
-    ys = (395, 850)
+    ys = (410, 830)
     idx = 0
     for y in ys:
         for x in xs:
-            _draw_card_slot(canvas, state, idx, x, y, 210, 361)
+            _draw_card_slot(canvas, state, idx, x, y, 190, 327)
             idx += 1
     return canvas
 
@@ -691,7 +710,7 @@ def _layout_celtic(state: ReadingBoardState) -> Image.Image:
     outer = (
         (2, 610, 1090, "GỐC RỄ"),
         (3, 315, 710, "QUÁ KHỨ"),
-        (4, 610, 325, "NHẬN THỨC"),
+        (4, 610, 380, "NHẬN THỨC"),
         (5, 905, 710, "TƯƠNG LAI GẦN"),
     )
     for idx, x, y, title in outer:
@@ -699,10 +718,10 @@ def _layout_celtic(state: ReadingBoardState) -> Image.Image:
 
     # Staff column.
     staff = (
-        (6, 1320, 1090, "BẢN THÂN"),
-        (7, 1320, 825, "MÔI TRƯỜNG"),
-        (8, 1320, 560, "HY VỌNG & NỖI SỢ"),
-        (9, 1320, 295, "KẾT QUẢ"),
+        (6, 1320, 1180, "BẢN THÂN"),
+        (7, 1320, 910, "MÔI TRƯỜNG"),
+        (8, 1320, 640, "HY VỌNG & NỖI SỢ"),
+        (9, 1320, 370, "KẾT QUẢ"),
     )
     for idx, x, y, title in staff:
         _draw_card_slot(canvas, state, idx, x, y, 145, 249, position_title=title)
