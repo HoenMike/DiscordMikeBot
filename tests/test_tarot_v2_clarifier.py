@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -116,6 +117,35 @@ class ClarifierAITests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(target.card.name_vi, result.full_reading)
         self.assertIn(clarifier.card.name_vi, result.full_reading)
         self.assertIn("không xác nhận", result.full_reading.lower())
+
+
+    async def test_ai_output_is_bounded_for_discord_embed(self):
+        target = drawn("major_18", 2, "LÁ 2: HIỆN TẠI", reversed_=True)
+        clarifier = drawn("major_09", 4, "LÀM RÕ: HIỆN TẠI")
+        oversized = json.dumps({
+            "relationship": "R" * 3000,
+            "clarity": "C" * 3000,
+            "effect": "E" * 3000,
+            "practical_implication": "P" * 3000,
+            "uncertainty": "U" * 3000,
+        })
+        with patch(
+            "features.tarot.ai.bounded_ai_generate",
+            new=AsyncMock(return_value=SimpleNamespace(text=oversized)),
+        ):
+            result = await generate_clarifier_interpretation(
+                spread_key="ppf",
+                original_question="Test",
+                context=None,
+                original_reading="Quẻ gốc.",
+                target_card=target,
+                target_insight="",
+                clarifier_card=clarifier,
+            )
+
+        self.assertLessEqual(len(result.full_reading), 2600)
+        self.assertLessEqual(len(result.relationship), 520)
+        self.assertLessEqual(len(result.effect), 220)
 
 
 class ClarifierRendererTests(unittest.TestCase):
@@ -261,6 +291,31 @@ class ClarifierActionTests(unittest.IsolatedAsyncioTestCase):
 
         second = await view.run_clarifier(interaction, 0, origin)
         self.assertFalse(second)
+        self.assertEqual(len(manager.saved), 1)
+
+    async def test_attachment_failure_falls_back_to_text_and_consumes_after_delivery(self):
+        manager = FakeManager()
+        view = self.make_view(manager)
+        interaction = SimpleNamespace(
+            followup=FakeFollowup(failures=1),
+        )
+        origin = FakeMessage()
+        ai_result = TarotClarifierResult(full_reading="Clarifier reading")
+
+        with patch(
+            "features.tarot.tarot_view.generate_clarifier_interpretation",
+            new=AsyncMock(return_value=ai_result),
+        ), patch(
+            "features.tarot.tarot_view.render_clarifier_board_to_bytes",
+            return_value=io.BytesIO(b"fake-png"),
+        ):
+            ok = await view.run_clarifier(interaction, 1, origin)
+
+        self.assertTrue(ok)
+        self.assertTrue(view.has_used_clarifier)
+        self.assertEqual(len(interaction.followup.calls), 2)
+        self.assertIn("file", interaction.followup.calls[0])
+        self.assertNotIn("file", interaction.followup.calls[1])
         self.assertEqual(len(manager.saved), 1)
 
     async def test_delivery_failure_does_not_consume_clarifier(self):
