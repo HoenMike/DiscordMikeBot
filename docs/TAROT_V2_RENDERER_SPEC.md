@@ -346,11 +346,11 @@ This final board may later be used as source material for recap.
 
 ## 16. Reading Recap Card
 
-Optional output, likely T20.9.
+**Implemented in T20.9.**
 
-Portrait target:
+Implemented portrait output:
 
-`1080×1350`
+`1200×1500`
 
 Content:
 
@@ -374,7 +374,7 @@ This is save/share-friendly presentation.
 
 ## 17. Journey Card
 
-Optional output, T20.8/T20.9.
+**Implemented in T20.8.**
 
 Potential layout:
 
