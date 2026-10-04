@@ -1016,6 +1016,166 @@ YÊU CẦU
 
 
 
+def _format_clarifier_result(payload: TarotClarifierAIResponseSchema) -> TarotClarifierResult:
+    parts = []
+    if payload.relationship:
+        parts.append(f"**🔗 Mối liên hệ:** {payload.relationship.strip()}")
+    if payload.clarity:
+        parts.append(f"**🔎 Điều rõ hơn:** {payload.clarity.strip()}")
+    if payload.effect:
+        parts.append(f"**↪️ Tác động lên cách đọc cũ:** {payload.effect.strip()}")
+    if payload.practical_implication:
+        parts.append(f"**📌 Điều đáng kiểm tra/làm:** {payload.practical_implication.strip()}")
+    if payload.uncertainty:
+        parts.append(f"**🌫️ Vẫn còn chưa chắc:** {payload.uncertainty.strip()}")
+
+    return TarotClarifierResult(
+        relationship=payload.relationship.strip(),
+        clarity=payload.clarity.strip(),
+        effect=payload.effect.strip(),
+        practical_implication=payload.practical_implication.strip(),
+        uncertainty=payload.uncertainty.strip(),
+        full_reading="\n\n".join(parts).strip(),
+    )
+
+
+async def generate_clarifier_interpretation(
+    *,
+    spread_key: str,
+    original_question: Optional[str],
+    context: Optional[str],
+    original_reading: str,
+    target_card: DrawnCard,
+    target_insight: str,
+    clarifier_card: DrawnCard,
+    reader_style: str = "auto",
+    user_name: str = "Bạn",
+) -> TarotClarifierResult:
+    """Interpret one bounded clarifier card against exactly one original position."""
+    spread_name = SPREAD_DEFINITIONS.get(spread_key, {}).get("name", spread_key)
+    style_info = READER_STYLES.get(reader_style, READER_STYLES["auto"])
+    tone_hint = (
+        _infer_auto_tone(original_question, context)
+        if reader_style == "auto"
+        else style_info["persona_prompt"]
+    )
+
+    target_orientation = "Ngược" if target_card.is_reversed else "Xuôi"
+    clarifier_orientation = "Ngược" if clarifier_card.is_reversed else "Xuôi"
+    target_keywords = ", ".join(target_card.current_keywords[:5])
+    clarifier_keywords = ", ".join(clarifier_card.current_keywords[:5])
+
+    prompt = f"""
+Bạn là Asumi đang bổ sung ĐÚNG MỘT lá clarifier cho một quẻ đã hoàn tất của {user_name}.
+Đây KHÔNG phải quẻ mới và KHÔNG được reroll hay diễn giải lại toàn bộ spread.
+
+GIỌNG
+- {tone_hint}
+- Tự nhiên, trực diện, không mở đầu/chào lại.
+- Không dùng văn mẫu huyền bí chung chung.
+
+QUẺ GỐC
+- Spread: {spread_name} ({spread_key})
+- Câu hỏi: {original_question or 'Tổng quan'}
+- Bối cảnh: {context or 'Không có thêm bối cảnh'}
+- Bài đọc trước (chỉ để giữ mạch, không được viết lại): {original_reading[:1100]}
+
+VỊ TRÍ ĐANG LÀM RÕ
+- position_id={target_card.position_index}
+- Vị trí: {target_card.position_title}
+- Lá gốc: [card_id={target_card.card.id}] {target_card.card.name_vi} ({target_card.card.name_en})
+- Chiều: {target_orientation}
+- Từ khóa: {target_keywords}
+- Insight trước đó ở vị trí này: {target_insight or 'Không có insight riêng; dựa vào bài đọc gốc.'}
+
+LÁ CLARIFIER DUY NHẤT ĐÃ ĐƯỢC ENGINE RÚT
+- [card_id={clarifier_card.card.id}] {clarifier_card.card.name_vi} ({clarifier_card.card.name_en})
+- Chiều: {clarifier_orientation}
+- Từ khóa: {clarifier_keywords}
+- Ý nghĩa nền: {clarifier_card.card.description}
+
+YÊU CẦU
+- Chỉ giải quan hệ giữa lá gốc + clarifier trong đúng câu hỏi hiện tại.
+- Nói rõ clarifier: củng cố, làm dịu, chuyển hướng hay pha trộn cách đọc trước.
+- Nêu điều gì trở nên rõ hơn và một hệ quả thực tế cần kiểm tra/suy ngẫm.
+- Nói điều vẫn chưa thể biết chắc.
+- Không bịa thêm lá, không dự đoán chắc chắn, không biến clarifier thành quyết định thay người dùng.
+- Nếu chủ đề là y tế/pháp lý/tài chính/high-stakes, giữ giới hạn thực tế của Tarot.
+- Output JSON đúng 5 field: relationship, clarity, effect, practical_implication, uncertainty.
+""".strip()
+
+    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
+        config.GEMINI_TAROT_MODEL,
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemma-4-31b-it",
+    ])
+    seen = set()
+    ordered_models = []
+    for model_name in models_to_try:
+        if model_name and model_name not in seen:
+            seen.add(model_name)
+            ordered_models.append(model_name)
+
+    async with AI_SEMAPHORE:
+        for model_name in ordered_models:
+            for gen_config in (TAROT_CLARIFIER_CONFIG, TAROT_CLARIFIER_CONFIG_FALLBACK):
+                try:
+                    response = await bounded_ai_generate(
+                        model=model_name,
+                        contents=prompt,
+                        config=gen_config,
+                        timeout_sec=12.0,
+                        label="Tarot Clarifier",
+                    )
+                    if not response or not response.text:
+                        continue
+
+                    raw = response.text.strip()
+                    if raw.startswith("```"):
+                        raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
+                        raw = re.sub(r"\s*```$", "", raw).strip()
+                    data = json.loads(raw)
+                    parsed = TarotClarifierAIResponseSchema.model_validate(data)
+                    result = _format_clarifier_result(parsed)
+                    if result.full_reading:
+                        return result
+                except asyncio.TimeoutError:
+                    break
+                except Exception as exc:
+                    err = str(exc).lower()
+                    if "response_schema" in err or "schema" in err:
+                        continue
+                    if "503" in err or "unavailable" in err or "429" in err or "quota" in err:
+                        break
+                    continue
+
+    target_kw = target_card.current_keywords[0] if target_card.current_keywords else target_card.card.description
+    clarifier_kw = clarifier_card.current_keywords[0] if clarifier_card.current_keywords else clarifier_card.card.description
+    fallback = TarotClarifierAIResponseSchema(
+        relationship=(
+            f"{target_card.card.name_vi} đặt trọng tâm ở ‘{target_kw}’, còn "
+            f"{clarifier_card.card.name_vi} bổ sung lớp ‘{clarifier_kw}’."
+        ),
+        clarity=(
+            "Lá bổ sung giúp thu hẹp góc nhìn vào mối liên hệ giữa hai chủ đề này "
+            "thay vì thay thế kết luận của quẻ gốc."
+        ),
+        effect="Pha trộn / cần đối chiếu thêm với tình huống thực tế.",
+        practical_implication=(
+            "Đối chiếu hai từ khóa trên với dữ kiện bạn đang có trước khi đổi hướng hoặc chốt quyết định."
+        ),
+        uncertainty=(
+            "Clarifier không xác nhận một kết quả cố định; phần còn lại vẫn phụ thuộc vào thông tin mới và lựa chọn của bạn."
+        ),
+    )
+    return _format_clarifier_result(fallback)
+
+
 async def generate_why_explanation(
     drawn_cards: List[DrawnCard],
     original_question: Optional[str],
