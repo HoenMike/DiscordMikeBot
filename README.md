@@ -159,6 +159,7 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 | `context` | Bối cảnh thực tế giúp recommendation/reading bám sát tình huống hơn | Không | Không |
 | `reader` | Phong cách Asumi: Tự động / Tĩnh / Dịu / Tinh quái | Tự động | Không |
 
+- **Reading Board 2.0**: layout responsive theo số lá, nhãn vị trí ngay trên board, progress reveal, REV/Major/key-card states và fallback giữ nguyên kết quả.
 - **9 kiểu trải bài phong phú & giải thích mục đích rõ ràng**:
   - `daily`: **Daily Card** (1 lá - Cooldown 1 lần/ngày) - Năng lượng & thông điệp ngày mới.
   - `yes_no`: **Yes / No** (1 lá) - Trả lời dứt khoát câu hỏi Có/Không kèm Badge 🟢 CÓ / 🔴 KHÔNG / 🟡 TÙY THUỘC.
