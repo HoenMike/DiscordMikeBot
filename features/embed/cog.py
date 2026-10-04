@@ -1174,7 +1174,6 @@ class EmbedCog(commands.Cog):
 
             # Chỉ sau khi fallback mới gửi thành công mới dọn preview/prompt cũ
             # của đúng URL này. Một origin message có thể chứa nhiều social links.
-            fallback_key = (origin_id, url)
             targets = list(self._manual_fallback_previews.get(fallback_key, []))
             for old_channel_id, preview_id in targets:
                 if preview_id == result.preview_message_id:
