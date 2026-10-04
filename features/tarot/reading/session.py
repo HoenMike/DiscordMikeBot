@@ -6,6 +6,7 @@ unit tested without a live bot connection.
 
 from __future__ import annotations
 
+import re
 from typing import Iterable, Sequence
 
 from features.tarot.deck import DrawnCard
@@ -37,7 +38,12 @@ def build_micro_reveal(drawn: DrawnCard, display_index: int) -> str:
     )
     keyword_text = " · ".join(str(item).strip() for item in keywords[:3] if str(item).strip())
 
-    position = drawn.position_title
+    position = re.sub(
+        r"^LÁ\s+\d+\s*:\s*",
+        "",
+        drawn.position_title,
+        flags=re.IGNORECASE,
+    ).strip()
     prefix = f"**{display_index} · {position} — {drawn.card.name_vi} · {orient}**"
     if keyword_text:
         return f"{prefix}\n\`{keyword_text}\`"
