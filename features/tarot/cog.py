@@ -19,7 +19,6 @@ from features.tarot.manager import TarotManager
 from features.tarot.tarot_view import (
     TarotFlipView,
     TarotLauncherView,
-    WIDE_DIVIDER
 )
 from core.ai import split_text
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
@@ -224,7 +223,7 @@ class TarotCog(commands.Cog):
         if interaction:
             await interaction.response.defer(thinking=True)
         elif ctx:
-            initial_msg = await ctx.reply("🔮 Đang kết nối năng lượng và trải bài Tarot...", mention_author=False)
+            initial_msg = await ctx.reply("🔀 Asumi đang xáo bài và chuẩn bị trải bài...", mention_author=False)
 
         ai_task = None
         view = None
