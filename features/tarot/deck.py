@@ -955,8 +955,8 @@ def draw_clarifier(
 ) -> DrawnCard:
     """Draw exactly one clarifier without mutating or repeating the original spread.
 
-    When user_id is available the clarifier is deterministic within the same hourly
-    Tarot seed window. This means a delivery retry does not silently reroll a new card.
+    When user_id is available the clarifier is deterministically bound to the exact
+    original spread. A delivery retry therefore cannot silently reroll a new card.
     """
     if not original_cards:
         raise ValueError("Clarifier requires an existing spread")
@@ -970,13 +970,18 @@ def draw_clarifier(
         raise RuntimeError("No Tarot cards remain for clarifier draw")
 
     if seed is None and user_id is not None:
-        base_seed = compute_tarot_seed(
-            user_id=user_id,
-            spread_key=f"clarifier_{target.position_index}",
-            question=question,
+        # Bind the draw to this exact original spread rather than the current clock.
+        # A failed Discord delivery can therefore retry later without silently
+        # producing a different clarifier card.
+        original_signature = ",".join(
+            f"{item.card.id}:{int(item.is_reversed)}"
+            for item in original_cards
         )
-        original_signature = ",".join(item.card.id for item in original_cards)
-        raw = f"{base_seed}|{target.card.id}|{original_signature}"
+        normalized_question = re.sub(r"\s+", " ", (question or "").strip().casefold())
+        raw = (
+            f"clarifier|{user_id}|{target.position_index}|{target.card.id}|"
+            f"{original_signature}|{normalized_question}"
+        )
         seed = int(hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16], 16)
 
     rng = random.Random(seed) if seed is not None else random.Random()
