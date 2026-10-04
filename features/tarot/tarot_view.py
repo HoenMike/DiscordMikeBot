@@ -224,7 +224,15 @@ class TarotLauncherView(discord.ui.View):
         if self.context:
             query = f"{query} {self.context}"
         spread_key, spread_name, reason = recommend_spread_for_question(query)
-        self.recommended_spread = spread_key if spread_key in SPREAD_DEFINITIONS else "ppf"
+        new_recommendation = spread_key if spread_key in SPREAD_DEFINITIONS else "ppf"
+        if (
+            self.selection_source == "recommendation"
+            and self.selected_spread != new_recommendation
+        ):
+            # Question/context changed enough that the previously accepted
+            # recommendation is no longer the current recommendation.
+            self.selection_source = "default"
+        self.recommended_spread = new_recommendation
         self.recommended_name = spread_name
         self.recommendation_reason = reason
 
