@@ -132,6 +132,18 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("features.embed.cog._UNFURL_DELAYS", (0,)):
             self.assertEqual(await self.cog._verify_proxy_unfurl(10, preview, "facebook"), (False, "generic_or_login_card"))
 
+    async def test_transient_generic_card_can_become_usable_before_grace_window_ends(self):
+        generic = discord.Embed(title="Facebook", description="See posts, photos and more on Facebook.", url="https://facebook.com/post/1")
+        usable = discord.Embed(title="Mai posted a reel", description="Video preview ready", url="https://facebed.com/post/1")
+        usable.set_image(url="https://cdn.example/video-thumb.jpg")
+        channel = SimpleNamespace(fetch_message=AsyncMock(side_effect=[
+            SimpleNamespace(embeds=[generic]),
+            SimpleNamespace(embeds=[usable]),
+        ]))
+        preview = SimpleNamespace(id=40, channel=channel)
+        with patch("features.embed.cog._UNFURL_DELAYS", (0, 0)):
+            self.assertEqual(await self.cog._verify_proxy_unfurl(10, preview, "facebook"), (True, "usable_embed"))
+
     async def test_send_without_unfurl_is_not_success(self):
         channel = SimpleNamespace(fetch_message=AsyncMock(return_value=SimpleNamespace(embeds=[])))
         preview = SimpleNamespace(id=40, channel=channel)
