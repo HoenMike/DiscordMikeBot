@@ -160,8 +160,11 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 | `reader` | Phong cách Asumi: Tự động / Tĩnh / Dịu / Tinh quái | Tự động | Không |
 
 - **Reading Board 2.0**: layout responsive theo số lá, nhãn vị trí ngay trên board, progress reveal, REV/Major/key-card states và fallback giữ nguyên kết quả.
+- **Multi-turn Session**: sau quẻ có tối đa **3 follow-up** giữ context liên tục, thêm **🔍 Vì sao?** để giải thích evidence visible của quẻ.
 - **Clarifier 1/1**: sau khi quẻ hoàn tất, chủ quẻ có thể chọn một vị trí để rút đúng một lá bổ sung. Clarifier không thay/reroll lá gốc; board giữ original spread và hiển thị TARGET → CLARIFIER.
-- **9 kiểu trải bài phong phú & giải thích mục đích rõ ràng**:
+- **Smart Custom Spread**: trong launcher question-first, Asumi có thể thiết kế schema riêng **3–7 vị trí** cho câu hỏi; AI không chọn card, deck engine vẫn tự rút lá thật.
+- **📌 Recap Card**: tạo ảnh portrait gọn gồm hero/key card, headline, một takeaway, spread và ngày; không rút thêm bài và không gọi AI thêm.
+- **9 kiểu trải bài cố định phong phú & giải thích mục đích rõ ràng**:
   - `daily`: **Daily Card** (1 lá - Cooldown 1 lần/ngày) - Năng lượng & thông điệp ngày mới.
   - `yes_no`: **Yes / No** (1 lá) - Trả lời dứt khoát câu hỏi Có/Không kèm Badge 🟢 CÓ / 🔴 KHÔNG / 🟡 TÙY THUỘC.
   - `single`: **Single Card** (1 lá) - Lời khuyên & góc nhìn trọng tâm cho câu hỏi cụ thể.
@@ -179,6 +182,12 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 
 Xem lại danh sách tối đa 5 lượt bốc bài gần nhất của bản thân (gửi dưới dạng tin nhắn riêng ephemeral).
 
+### `/tarot_journey`
+
+Xem **Tarot Journey 30 ngày** từ chính lịch sử đã lưu: số quẻ, tỷ lệ Major Arcana, phân bố 4 suit, lá lặp/lá ngược lặp, chủ đề gần đây và spread dùng nhiều nhất. Journey là thống kê để tự nhìn lại, không phải dự đoán số phận hay chẩn đoán.
+
+Prefix tương đương: `.m tarot journey`.
+
 ---
 
 ## Tài liệu phát triển & handoff
@@ -193,7 +202,7 @@ Repository có tài liệu để các session/agent khác tiếp tục công vi�
 - `docs/TAROT_V2_PROMPT_SPEC.md` — persona, system-prompt direction, reading schema và tiêu chí chống văn phong máy móc.
 - `docs/TAROT_V2_RENDERER_SPEC.md` — Reading Board, visual direction, responsive layout và contract renderer.
 
-> **Tarot 2.0 đã đạt release boundary T20.1–T20.5 trong Asumi 2.9.0.** T20.6+ tiếp tục theo từng milestone; xem handoff để biết mốc hiện tại.
+> **Tarot 2.1 đã hoàn tất T20.6–T20.9 trong Asumi 2.10.0.** Toàn bộ roadmap T20.1–T20.9 hiện đã được triển khai; xem handoff để bảo trì hoặc mở roadmap mới.
 
 ---
 
@@ -215,11 +224,12 @@ DiscordMikeBot/
     summary_cog.py        # Lệnh /tomtat và /test_tomtat tóm tắt AI
   features/
     tarot/                # Module trọn gói tính năng Tarot AI
-      tarot_cog.py        # Slash Commands /tarot & /tarot_history
-      deck.py             # Dữ liệu 78 lá Rider-Waite, metadata, keywords & Yes/No logic
-      renderer.py         # Engine Canvas Pillow ghép ảnh trải bài (1 lá, 3 lá, 10 lá)
-      ai.py               # Module gọi Gemini AI luận giải trải bài
-      manager.py          # Quản lý SQLite history & Daily Cooldown
+      cog.py              # Slash/prefix Tarot, Journey, History, Memory/Forget
+      tarot_view.py       # Launcher, live session, follow-up/Why/Clarifier/Recap actions
+      deck.py             # Dữ liệu 78 lá, fixed/custom draw, Clarifier draw
+      renderer.py         # Reading Board, Clarifier Board, Journey Card, Recap Card
+      ai.py               # Reading Engine, follow-up/Why/Clarifier/custom-schema AI
+      manager.py          # SQLite history, Journey query, Clarifier persistence, cooldown
       assets/cards/       # Lưu trữ hình ảnh 78 lá bài
   services/
     ai_service.py         # Xử lý AI: Single-Pass, MapReduce, QA Evaluator
