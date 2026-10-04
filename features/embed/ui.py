@@ -47,7 +47,7 @@ class EmbedActionView(discord.ui.View):
         )
         self.remove_button = discord.ui.Button(
             emoji="❌",
-            style=discord.ButtonStyle.danger,
+            style=discord.ButtonStyle.secondary,
             custom_id=f"asumi:embed-remove:{platform}:{origin_id}",
         )
         self.reload_button.callback = self._reload
