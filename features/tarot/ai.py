@@ -1140,7 +1140,7 @@ YÊU CẦU
                         raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
                         raw = re.sub(r"\s*```$", "", raw).strip()
                     data = json.loads(raw)
-                    parsed = TarotClarifierAIResponseSchema.model_validate(data)
+                    parsed = TarotClarifierAIResponseSchema(**data)
                     result = _format_clarifier_result(parsed)
                     if result.full_reading:
                         return result
