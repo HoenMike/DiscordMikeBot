@@ -10,6 +10,7 @@ from core.version import CURRENT_VERSION
 from features.embed.cog import EmbedCog
 from features.embed.builder import PostData, NSFWFilter, build_embed
 from features.embed.result import PreviewResult
+from features.embed.manual_fallback import build_manual_fallback_url, verify_manual_fallback_token
 from features.embed.validator import is_generic_or_login_preview, validate_via_og_metadata, find_valid_proxy
 from features.tarot.ai import extract_question_mentions_context, _build_tarot_prompt, parse_tarot_ai_response
 from features.tarot.deck import READER_STYLES
@@ -20,7 +21,7 @@ def message():
     channel = SimpleNamespace(id=20, is_nsfw=lambda: False)
     return SimpleNamespace(
         id=10, guild=SimpleNamespace(id=30), channel=channel,
-        author=SimpleNamespace(display_name="Mai"), jump_url="https://discord.com/channels/30/20/10",
+        author=SimpleNamespace(id=50, display_name="Mai"), jump_url="https://discord.com/channels/30/20/10",
     )
 
 
@@ -65,6 +66,23 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertIsNotNone(attachment)
         self.assertLessEqual(sum(len(item) for item in embeds), 6000)
         attachment.close()
+
+    def test_manual_fallback_link_is_signed_and_round_trips(self):
+        with patch("config.PUBLIC_BASE_URL", "https://asumi.example"):
+            url = build_manual_fallback_url(
+                origin_message_id=10,
+                channel_id=20,
+                author_id=50,
+                platform_key="facebook",
+                original_url="https://facebook.com/share/r/example",
+            )
+        self.assertIsNotNone(url)
+        token = url.rsplit("/", 1)[-1]
+        payload = verify_manual_fallback_token(token)
+        self.assertEqual(payload["origin_id"], 10)
+        self.assertEqual(payload["channel_id"], 20)
+        self.assertEqual(payload["author_id"], 50)
+        self.assertEqual(payload["platform"], "facebook")
 
 
 class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
@@ -120,6 +138,20 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("features.embed.cog._UNFURL_DELAYS", (0, 0)):
             self.assertEqual(await self.cog._verify_proxy_unfurl(10, preview, "facebook"), (False, "unfurl_timeout"))
 
+    async def test_facebook_unfurl_timeout_keeps_preview_and_waits_for_manual_fallback(self):
+        preview = SimpleNamespace(id=40)
+        self.cog._send_embed_preview = AsyncMock(return_value=preview)
+        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(False, "unfurl_timeout"))
+        self.cog._discard_preview = AsyncMock()
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))), \
+             patch("features.embed.cog.build_manual_fallback_url", return_value="https://asumi.example/embed/fallback/token"):
+            result = await self.cog._try_proxy_chain(self.msg, "facebook", "https://facebook.com/post/1", {})
+        self.assertEqual(result.status, "action_required")
+        self.assertEqual(result.preview_message_id, 40)
+        self.cog._discard_preview.assert_not_awaited()
+        sent_content = self.cog._send_embed_preview.await_args.kwargs["content"]
+        self.assertIn("[fallback](https://asumi.example/embed/fallback/token)", sent_content)
+
     async def test_second_proxy_can_win_after_first_unusable(self):
         first = SimpleNamespace(id=40)
         second = SimpleNamespace(id=41)
@@ -136,11 +168,24 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.unfurl_verified)
         self.cog._discard_preview.assert_awaited_once_with(10, first)
 
-    async def test_all_proxies_fail_then_ytdlp_succeeds(self):
+    async def test_facebook_proxy_failure_offers_manual_fallback_without_auto_ytdlp(self):
+        self.cog._try_api_fetcher = AsyncMock(return_value=False)
+        self.cog._try_proxy_chain = AsyncMock(return_value=PreviewResult(reason="unfurl_timeout"))
+        self.cog._try_ytdlp_fallback = AsyncMock()
+        self.cog._offer_manual_fallback = AsyncMock(return_value=PreviewResult(
+            "action_required", "manual", "manual_fallback_offered", "facebook",
+            origin_message_id=10, fallback_reason="unfurl_timeout",
+        ))
+        result = await self.cog._run_fallback_chain(self.msg, "facebook", "url", None, {})
+        self.assertEqual(result.status, "action_required")
+        self.assertEqual(result.tier, "manual")
+        self.cog._try_ytdlp_fallback.assert_not_awaited()
+
+    async def test_non_facebook_proxy_failure_still_uses_auto_ytdlp(self):
         self.cog._try_api_fetcher = AsyncMock(return_value=False)
         self.cog._try_proxy_chain = AsyncMock(return_value=PreviewResult(reason="unfurl_timeout"))
         self.cog._try_ytdlp_fallback = AsyncMock(return_value=True)
-        result = await self.cog._run_fallback_chain(self.msg, "facebook", "url", None, {})
+        result = await self.cog._run_fallback_chain(self.msg, "twitter", "url", None, {})
         self.assertEqual(result.tier, "ytdlp")
         self.assertTrue(result.success and result.used_fallback)
         self.assertEqual(result.fallback_reason, "unfurl_timeout")
@@ -174,6 +219,12 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             msg.edit.assert_not_awaited()
             msg.edit.reset_mock()
             self.cog._process_url_with_fallback.return_value = PreviewResult("blocked", "api", "nsfw_blocked")
+            await self.cog.on_message(msg)
+            msg.edit.assert_awaited_once_with(suppress=True)
+            msg.edit.reset_mock()
+            self.cog._process_url_with_fallback.return_value = PreviewResult(
+                "action_required", "proxy", "unfurl_timeout", "facebook", origin_message_id=10
+            )
             await self.cog.on_message(msg)
             msg.edit.assert_awaited_once_with(suppress=True)
 
