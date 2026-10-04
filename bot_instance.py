@@ -441,7 +441,7 @@ def build_embed_help_embed(user: Union[discord.User, discord.Member]) -> discord
         name="✨ CÁC CƠ CHẾ QOL & TRẢI NGHIỆM ĐỘC QUYỀN",
         value=(
             "• 🛡️ **Bảo toàn tin nhắn & ảnh gốc (Suppress Mode)**: Bot không xóa tin nhắn của bạn, giữ nguyên 100% ảnh/tệp đính kèm. Khi người khác reply tin nhắn của bạn, Discord vẫn **tự động tô vàng dòng chat (Yellow Highlight)** và gửi thông báo native.\n"
-            "• 🏷️ **Jump Link + Native Unfurl**: Giữ dòng `Trả lời [Tên](link)` để quay về tin gốc. Riêng Facebook, bot cố ý gửi **raw proxy URL** để Discord tự dựng native embed/video; nút **🔄 Proxy khác** cho phép chính người gửi đổi sang proxy kế tiếp nếu preview hiện tại lỗi.\n"
+            "• 🏷️ **Jump Link + Native Unfurl**: Giữ dòng `Trả lời [Tên](link)` để quay về tin gốc. Riêng Facebook, bot hiển thị **domain proxy dạng hyperlink gọn** (ví dụ `facebed.seria.moe`) để giữ link preview mà không lộ URL dài; nút **🔄 Proxy khác** cho phép chính người gửi đổi sang proxy kế tiếp nếu preview hiện tại lỗi.\n"
             "• 🗑️ **Tự động xóa Embed đồng bộ**: Khi bạn xóa tin nhắn gốc chứa link, Bot sẽ **tự động dọn sạch Embed tương ứng** (không để lại rác trong chat).\n"
             "• 🔞 **Force Spoiler & Nhận diện NSFW**: Tự động che mờ khi bọc trong `||link||` hoặc khi tin nhắn có từ khóa (`nsfw`, `18+`, `r18`, `spoiler`, `nhạy cảm`...)."
         ),

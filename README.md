@@ -36,9 +36,9 @@ Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và t�
 
 #### Pipeline xử lý URL 3 tầng (Multi-tier Pipeline):
 1. **Tier 0 (API Fetchers)**: Gọi API JSON/oEmbed để trích xuất dữ liệu có cấu trúc và dựng Discord Embed giàu thông tin.
-2. **Tier 1 (Proxy URL Chain)**: Nếu API thất bại, thử proxy theo thứ tự cấu hình. Với **Facebook**, Asumi gửi **raw proxy URL** trên một dòng riêng để Discord tự unfurl thành native embed/video; sau khi đã gửi một proxy thì bot không tự roll tiếp.
+2. **Tier 1 (Proxy URL Chain)**: Nếu API thất bại, thử proxy theo thứ tự cấu hình. Với **Facebook**, Asumi dùng masked link dạng **[facebed.domain](proxy-url)** để dòng chat gọn hơn nhưng vẫn giữ URL proxy làm link unfurl; sau khi đã gửi một proxy thì bot không tự roll tiếp.
 3. **Tier 2 (yt-dlp Fallback)**: Twitter/TikTok/Instagram/Reddit/Twitch vẫn tự động dùng `yt-dlp` khi proxy thất bại. **Facebook không dùng yt-dlp fallback**.
-4. **Manual Facebook proxy roll**: preview Facebook có nút Discord **🔄 Proxy khác**. Chỉ người gửi link gốc bấm được; mỗi lần bấm Asumi chuyển sang proxy Facebook kế tiếp. Proxy cũ chỉ bị dọn sau khi raw URL của proxy mới đã gửi thành công.
+4. **Manual Facebook proxy roll**: preview Facebook có nút Discord **🔄 Proxy khác**. Chỉ người gửi link gốc bấm được; mỗi lần bấm Asumi chuyển sang proxy Facebook kế tiếp. Proxy cũ chỉ bị dọn sau khi masked proxy link mới đã gửi thành công.
 
 ### Bộ lọc NSFW / Spoiler
 

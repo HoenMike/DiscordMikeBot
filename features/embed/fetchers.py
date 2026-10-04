@@ -202,7 +202,7 @@ async def fetch_instagram(session: aiohttp.ClientSession, url: str, match) -> Po
 
 
 async def fetch_facebook(session: aiohttp.ClientSession, url: str, match) -> PostData | None:
-    # Facebook unauthenticated API không còn phù hợp: nhường cho Tier 1 raw proxy URL.
+    # Facebook unauthenticated API không còn phù hợp: nhường cho Tier 1 proxy link/unfurl.
     # Nếu preview proxy lỗi, người gửi chủ động roll sang proxy kế tiếp bằng Discord button.
     return None
 

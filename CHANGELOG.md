@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.8.4] - 2026-10-04 — *Compact Facebook Proxy Hyperlink*
+
+### Fixed
+- **Dòng preview gọn hơn**: URL proxy dài không còn hiện thành một dòng riêng. Asumi hiển thị domain như **facebed.seria.moe** và gắn URL proxy trực tiếp vào chữ đó bằng masked link.
+- **Giữ link preview**: masked link dùng dạng `[domain](url)`, không dùng `[domain](<url>)` vì angle brackets sẽ suppress preview.
+- **Spoiler đúng cú pháp**: spoiler bọc toàn bộ masked link, không chèn `||` vào URL target.
+- **Áp dụng nhất quán**: cả preview Facebook ban đầu và preview mới sau khi bấm **🔄 Proxy khác** đều dùng compact link.
+
+### Unchanged
+- Chỉ người gửi link gốc được bấm **Proxy khác**.
+- Facebook vẫn roll proxy thủ công, không auto-roll và không dùng yt-dlp fallback.
+- Proxy cũ chỉ bị dọn sau khi proxy mới gửi thành công.
+
 ## [2.8.3] - 2026-10-04 — *Facebook Raw Proxy Embed & Manual Proxy Roll*
 
 ### Fixed

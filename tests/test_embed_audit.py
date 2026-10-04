@@ -102,7 +102,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.success)
         self.assertTrue(safety.is_nsfw)
         sent = self.cog._send_embed_preview.await_args.kwargs
-        self.assertIn("||https://facebed.com/p||", sent["content"])
+        self.assertIn("||[facebed.com](https://facebed.com/p)||", sent["content"])
         self.cog._verify_proxy_unfurl.assert_not_awaited()
 
         with patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock()) as ytdlp:

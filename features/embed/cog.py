@@ -981,12 +981,13 @@ class EmbedCog(commands.Cog):
                 author_name = _clean_markdown_label(message.author.display_name)
                 author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
 
-                # Facebook cần URL proxy ở dạng raw text để Discord tự unfurl thành native embed.
+                # Facebook giữ URL proxy trong masked markdown link để dòng chat gọn hơn.
+                # Không bọc URL đích bằng <...>, vì dạng đó sẽ suppress Discord unfurl.
                 # Button chỉ là điều khiển phụ để người gửi chủ động chuyển sang proxy kế tiếp.
                 if platform_key == "facebook":
-                    raw_link = proxy_url
+                    proxy_link = f"[{domain}]({proxy_url})"
                     if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
-                        raw_link = f"||{raw_link}||"
+                        proxy_link = f"||{proxy_link}||"
                     fallback_view = self._manual_fallback_view(
                         message,
                         platform_key,
@@ -996,7 +997,7 @@ class EmbedCog(commands.Cog):
                     )
                     sent_msg = await self._send_embed_preview(
                         message=message,
-                        content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                        content=f"-# {author_jump} • {proxy_link}",
                         view=fallback_view,
                     )
                     if not sent_msg:
@@ -1262,12 +1263,12 @@ class EmbedCog(commands.Cog):
                     origin_id,
                 )
 
-            raw_link = proxy_url
+            proxy_link = f"[{domain}]({proxy_url})"
             if is_spoiler or (
                 is_effective_nsfw
                 and config.get("nsfw_mode", "spoiler") == "spoiler"
             ):
-                raw_link = f"||{raw_link}||"
+                proxy_link = f"||{proxy_link}||"
 
             author_name = _clean_markdown_label(origin_message.author.display_name)
             author_jump = f"[Trả lời]({origin_message.jump_url}) **{author_name}**"
@@ -1280,7 +1281,7 @@ class EmbedCog(commands.Cog):
             )
             sent_msg = await self._send_embed_preview(
                 message=origin_message,
-                content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                content=f"-# {author_jump} • {proxy_link}",
                 view=next_view,
             )
             if not sent_msg:
