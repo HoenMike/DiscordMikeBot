@@ -48,14 +48,14 @@ T20.1  Prompt & Reading Engine 2.0
 T20.2  Question-first Launcher
 T20.3  Reading Session UX
 T20.4  Renderer 2.0
-T20.5  Clarifier
-T20.6  Multi-turn Reading Session
-T20.7  Smart Custom Spread
+T20.5  Clarifier — COMPLETE
+T20.6  Multi-turn Reading Session — COMPLETE
+T20.7  Smart Custom Spread — NEXT
 T20.8  Tarot Journey
 T20.9  Recap & Polish
 ```
 
-Tarot 2.0 release target is T20.1–T20.5. Later milestones are expected to follow incrementally.
+Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0. T20.6 is also complete; continue with T20.7, then T20.8 and T20.9 without waiting for per-milestone approval unless a real blocker appears.
 
 ### Tarot continuity rule
 
