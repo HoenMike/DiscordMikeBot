@@ -1,10 +1,10 @@
 # Social Embed Pipeline
 
-Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v2.8.4 (2026-10-04)**.
+Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v2.8.5 (2026-10-04)**.
 
 ## Mục tiêu
 
-Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Với Facebook, bot không cố đoán thay người dùng xem proxy hiện tại có "đủ tốt" hay không: bot gửi đúng raw proxy URL, còn việc đổi proxy là thao tác thủ công qua button.
+Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Mọi preview do Asumi tạo đều có cùng bộ điều khiển owner-only **🔄 Reload** và **🗑️ Bỏ embed**. Với Facebook, Reload vẫn là thao tác roll proxy thủ công; bot không tự đoán thay người dùng xem proxy hiện tại có "đủ tốt" hay không.
 
 ## Pipeline chung
 
@@ -38,19 +38,32 @@ Nếu nội dung cần spoiler, Asumi bọc **toàn bộ masked link** trong spo
 ||[facebed.seria.moe](https://facebed.seria.moe/share/r/...)||
 ```
 
-Button **🔄 Proxy khác** vẫn chỉ là component phụ; nó không chịu trách nhiệm tạo embed.
+Buttons **🔄 Reload** và **🗑️ Bỏ embed** chỉ là component điều khiển; chúng không chịu trách nhiệm tạo unfurl.
+
+## Universal preview actions (v2.8.5)
+
+Mọi preview từ Tier 0, Tier 1 và Tier 2 gắn `EmbedActionView` với hai button:
+
+- **🔄 Reload**: chỉ người gửi link gốc được dùng.
+  - Facebook: thử proxy kế tiếp theo state `tried_domains`, không nhảy yt-dlp.
+  - Provider khác: chạy lại pipeline cho đúng URL; preview hiện tại chỉ bị xóa sau khi replacement tạo thành công.
+- **🗑️ Bỏ embed**: chỉ người gửi link gốc được dùng. Asumi unsuppress message gốc để Discord dựng native embed rồi dọn toàn bộ preview Asumi thuộc origin message.
+
+Discord chỉ cho suppress/unsuppress ở cấp **message**, không theo từng URL. Vì vậy với message chứa nhiều social URL, Bỏ embed revert toàn bộ origin message thay vì chỉ xóa một preview; cách này tránh native preview và Asumi preview bị trùng nhau.
+
+Cả interaction layer và server-side handler đều kiểm tra lại `author_id`, origin message và original URL trước khi thay đổi trạng thái.
 
 ## Facebook proxy roll
 
-Preview Facebook gắn `FacebookFallbackView` với button **🔄 Proxy khác**.
+Preview Facebook gắn `EmbedActionView`. Nút **🔄 Reload** gọi manual proxy roll hiện có; nút **🗑️ Bỏ embed** dùng universal native-revert flow.
 
 ### Quyền sử dụng
 
 - Payload giữ `origin_id`, `channel_id`, `author_id`, original URL, spoiler state và danh sách proxy đã thử.
-- `interaction_check` chỉ cho đúng `author_id` của origin message dùng button.
+- `interaction_check` chỉ cho đúng `author_id` của origin message dùng Reload/Bỏ embed.
 - User khác nhận phản hồi ephemeral và không thay đổi preview.
 
-### Khi bấm Proxy khác
+### Khi bấm Reload trên Facebook
 
 1. Button hiện tại disable ngay để hạn chế double-click.
 2. Asumi fetch lại origin message và xác minh:
@@ -66,7 +79,8 @@ Preview Facebook gắn `FacebookFallbackView` với button **🔄 Proxy khác**.
 6. Nếu không còn candidate:
    - không gọi yt-dlp;
    - giữ preview hiện tại;
-   - button đổi thành trạng thái **Hết proxy** và user nhận thông báo ephemeral.
+   - Reload đổi thành trạng thái **Hết proxy** và bị khóa;
+   - **Bỏ embed** vẫn hoạt động để user quay về native Discord embed.
 
 ## Vì sao không server-side auto-roll Facebook
 
@@ -94,9 +108,10 @@ Các case cần giữ khi chỉnh pipeline:
 
 - Facebook proxy message phải chứa masked link `[domain](proxy-url)` và không bọc URL đích bằng `<...>`, để tránh suppress unfurl.
 - Sau khi proxy Facebook đầu tiên đã gửi, `_verify_proxy_unfurl` không được tự kích hoạt rotation.
-- Preview Facebook phải có `FacebookFallbackView` / button **Proxy khác**.
-- User khác origin author không được roll proxy.
-- Origin author bấm button phải tìm proxy kế tiếp bằng excluded/tried state.
+- Preview mọi provider phải có `EmbedActionView` với **Reload** + **Bỏ embed**.
+- User khác origin author không được dùng cả hai action.
+- Reload Facebook phải tìm proxy kế tiếp bằng excluded/tried state; Reload provider khác phải re-run đúng URL và giữ preview cũ nếu replacement thất bại.
+- Bỏ embed phải unsuppress origin message và cleanup preview Asumi của origin để không tạo duplicate.
 - Manual proxy roll không được gọi `_try_ytdlp_fallback`.
 - Facebook phải bị loại khỏi supported platform list của yt-dlp fallback.
 - Proxy cũ chỉ bị cleanup sau khi proxy mới gửi thành công.

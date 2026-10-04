@@ -10,7 +10,7 @@ from core.version import CURRENT_VERSION
 from features.embed.cog import EmbedCog
 from features.embed.builder import PostData, NSFWFilter, build_embed
 from features.embed.result import PreviewResult
-from features.embed.ui import FacebookFallbackView
+from features.embed.ui import EmbedActionView
 from features.embed.validator import is_generic_or_login_preview, validate_via_og_metadata, find_valid_proxy
 from features.tarot.ai import extract_question_mentions_context, _build_tarot_prompt, parse_tarot_ai_response
 from features.tarot.deck import READER_STYLES
@@ -40,7 +40,7 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertFalse(is_generic_or_login_preview("Facebook", "Mai wrote about her trip today", platform_key="facebook"))
 
     def test_brand_and_legacy_mentions(self):
-        self.assertEqual(CURRENT_VERSION, "2.8.4")
+        self.assertEqual(CURRENT_VERSION, "2.8.5")
         self.assertEqual(runtime_bot_name(None), BOT_BRAND_NAME)
         for query in ("@Asumi nghĩ sao?", "Asumi nghĩ sao?", "MikeDaBot nghĩ sao?"):
             clean, context = extract_question_mentions_context(query, "Mai")
@@ -148,20 +148,23 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._discard_preview.assert_not_awaited()
 
         sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
-        self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
+        self.assertIsInstance(sent_kwargs["view"], EmbedActionView)
         self.assertIn("[facebed.com](https://facebed.com/post/1)", sent_kwargs["content"])
         self.assertNotIn("\nhttps://facebed.com/post/1", sent_kwargs["content"])
-        self.assertEqual(sent_kwargs["view"].button.label, "Proxy khác")
+        self.assertEqual(sent_kwargs["view"].reload_button.label, "Reload")
+        self.assertEqual(sent_kwargs["view"].remove_button.label, "Bỏ embed")
         self.assertIn("facebed.com", sent_kwargs["view"].payload["tried_domains"])
 
-    async def test_facebook_fallback_button_is_owner_only_and_rolls_proxy(self):
+    async def test_embed_action_buttons_are_owner_only_and_reload(self):
         view = self.cog._manual_fallback_view(
             self.msg,
             "facebook",
             "https://facebook.com/post/1",
             tried_domains={"facebed.com"},
         )
-        self.assertIsInstance(view, FacebookFallbackView)
+        self.assertIsInstance(view, EmbedActionView)
+        self.assertEqual(view.reload_button.label, "Reload")
+        self.assertEqual(view.remove_button.label, "Bỏ embed")
 
         denied = SimpleNamespace(
             user=SimpleNamespace(id=999),
@@ -180,7 +183,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(await view.interaction_check(allowed))
 
-        self.cog.roll_facebook_proxy = AsyncMock(return_value=PreviewResult(
+        self.cog.reload_embed = AsyncMock(return_value=PreviewResult(
             "success",
             "proxy",
             "proxy_rolled",
@@ -191,14 +194,25 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             used_fallback=True,
             fallback_reason="manual_proxy_roll",
         ))
-        await view._roll_proxy(allowed)
-        self.cog.roll_facebook_proxy.assert_awaited_once_with(
+        await view._reload(allowed)
+        self.cog.reload_embed.assert_awaited_once_with(
             view.payload,
             current_preview=current_preview,
         )
         allowed.response.edit_message.assert_awaited_once()
         allowed.followup.send.assert_awaited_once()
         self.assertTrue(allowed.followup.send.await_args.kwargs["ephemeral"])
+
+    async def test_action_view_is_available_for_non_facebook_provider(self):
+        view = self.cog._manual_fallback_view(
+            self.msg,
+            "twitter",
+            "https://x.com/example/status/123",
+        )
+        self.assertIsInstance(view, EmbedActionView)
+        self.assertEqual(view.payload["platform"], "twitter")
+        self.assertEqual(view.reload_button.label, "Reload")
+        self.assertEqual(view.remove_button.label, "Bỏ embed")
 
     async def test_facebook_does_not_auto_roll_after_first_proxy_is_sent(self):
         first = SimpleNamespace(id=40)
@@ -267,7 +281,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._discard_preview.assert_awaited_once_with(10, current_preview)
         sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
         self.assertIn("[facebed.seria.moe](https://facebed.seria.moe/post/1)", sent_kwargs["content"])
-        self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
+        self.assertIsInstance(sent_kwargs["view"], EmbedActionView)
         self.assertIn("facebed.com", find_proxy.await_args.kwargs["excluded_domains"])
         self.assertIn("facebed.seria.moe", sent_kwargs["view"].payload["tried_domains"])
 
@@ -325,6 +339,108 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._send_embed_preview.assert_not_awaited()
         self.cog._discard_preview.assert_not_awaited()
         self.cog._try_ytdlp_fallback.assert_not_awaited()
+
+    async def test_non_facebook_proxy_success_includes_action_view(self):
+        preview = SimpleNamespace(id=40)
+        self.cog._send_embed_preview = AsyncMock(return_value=preview)
+        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(True, "usable_embed"))
+        with patch(
+            "features.embed.cog.find_valid_proxy",
+            new=AsyncMock(return_value=("https://fxtwitter.com/example/status/123", False)),
+        ):
+            result = await self.cog._try_proxy_chain(
+                self.msg,
+                "twitter",
+                "https://x.com/example/status/123",
+                {},
+            )
+
+        self.assertTrue(result.success)
+        sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIsInstance(sent_kwargs["view"], EmbedActionView)
+        self.assertEqual(sent_kwargs["view"].payload["platform"], "twitter")
+
+    async def test_reload_non_facebook_reprocesses_and_replaces_current_preview(self):
+        channel = SimpleNamespace(id=20, is_nsfw=lambda: False)
+        origin = SimpleNamespace(
+            id=10,
+            guild=SimpleNamespace(id=30, name="Server"),
+            channel=channel,
+            author=SimpleNamespace(
+                id=50,
+                display_name="Mai",
+                display_avatar=SimpleNamespace(url="avatar"),
+            ),
+            jump_url="https://discord.com/channels/30/20/10",
+            content="https://x.com/example/status/123",
+        )
+        channel.fetch_message = AsyncMock(return_value=origin)
+        self.cog.bot.get_channel = lambda _: channel
+        self.cog.bot.fetch_channel = AsyncMock(return_value=channel)
+        self.cog._run_fallback_chain = AsyncMock(return_value=PreviewResult(
+            "success",
+            "proxy",
+            "usable_embed",
+            "twitter",
+            proxy_domain="fxtwitter.com",
+            origin_message_id=10,
+            preview_message_id=41,
+            unfurl_verified=True,
+        ))
+        self.cog._discard_preview = AsyncMock(return_value=True)
+        current_preview = SimpleNamespace(id=40, channel=channel)
+
+        result = await self.cog.reload_embed(
+            {
+                "origin_id": 10,
+                "channel_id": 20,
+                "author_id": 50,
+                "platform": "twitter",
+                "url": "https://x.com/example/status/123",
+                "is_spoiler": False,
+            },
+            current_preview=current_preview,
+        )
+
+        self.assertTrue(result.success)
+        self.cog._run_fallback_chain.assert_awaited_once()
+        self.cog._discard_preview.assert_awaited_once_with(10, current_preview)
+
+    async def test_remove_embed_restores_native_and_cleans_asumi_previews(self):
+        origin = SimpleNamespace(
+            id=10,
+            guild=SimpleNamespace(id=30, name="Server"),
+            author=SimpleNamespace(
+                id=50,
+                display_name="Mai",
+                display_avatar=SimpleNamespace(url="avatar"),
+            ),
+            content="https://x.com/example/status/123",
+            edit=AsyncMock(),
+        )
+        channel = SimpleNamespace(
+            id=20,
+            name="channel",
+            fetch_message=AsyncMock(return_value=origin),
+            get_partial_message=lambda preview_id: SimpleNamespace(id=preview_id),
+        )
+        origin.channel = channel
+        self.cog.bot.get_channel = lambda _: channel
+        self.cog.bot.fetch_channel = AsyncMock(return_value=channel)
+        self.cog._origin_to_preview_map[10] = [(20, 40), (20, 41)]
+        self.cog._discard_preview = AsyncMock(return_value=True)
+
+        result = await self.cog.revert_embed({
+            "origin_id": 10,
+            "channel_id": 20,
+            "author_id": 50,
+            "platform": "twitter",
+            "url": "https://x.com/example/status/123",
+        })
+
+        self.assertTrue(result.success)
+        origin.edit.assert_awaited_once_with(suppress=False)
+        self.assertEqual(self.cog._discard_preview.await_count, 2)
 
     async def test_facebook_proxy_failure_offers_manual_fallback_without_auto_ytdlp(self):
         self.cog._try_api_fetcher = AsyncMock(return_value=False)

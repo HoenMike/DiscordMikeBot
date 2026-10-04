@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.8.5] - 2026-10-04 — *Universal Embed Controls*
+
+### Added
+- **Hai action cho toàn bộ social preview**: mọi preview Asumi từ API, proxy và yt-dlp đều có **🔄 Reload** và **🗑️ Bỏ embed**.
+- **Owner-only**: chỉ người đã gửi link gốc được thao tác hai nút; user khác chỉ nhận cảnh báo ephemeral.
+- **Native revert**: **Bỏ embed** bật lại native embed trên message gốc (`suppress=False`) rồi dọn các preview Asumi của message đó.
+- **Reload an toàn**: provider ngoài Facebook chạy lại pipeline cho đúng URL và chỉ thay preview cũ khi replacement thành công; thất bại giữ nguyên preview hiện tại.
+
+### Preserved
+- Facebook **Reload** tiếp tục mang semantics manual proxy roll của v2.8.3/v2.8.4: thử proxy kế tiếp, không tự nhảy yt-dlp.
+- Khi Facebook hết proxy, Reload bị khóa nhưng **Bỏ embed** vẫn dùng được để quay về native Discord embed.
+- NSFW guards, deletion lifecycle và automatic yt-dlp fallback của các provider được hỗ trợ vẫn giữ nguyên.
+
 ## [2.8.4] - 2026-10-04 — *Compact Facebook Proxy Hyperlink*
 
 ### Fixed
