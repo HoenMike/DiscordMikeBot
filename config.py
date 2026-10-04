@@ -144,6 +144,14 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 
+# Public base URL dùng cho các hyperlink action ngắn gọn trong Discord.
+# Render tự cấp RENDER_EXTERNAL_URL; môi trường khác có thể đặt ASUMI_PUBLIC_URL.
+PUBLIC_BASE_URL = (
+    os.getenv("ASUMI_PUBLIC_URL")
+    or os.getenv("RENDER_EXTERNAL_URL")
+    or ""
+).rstrip("/")
+
 _missing_secrets = [
     name for name, value in [("ADMIN_PASSWORD", ADMIN_PASSWORD), ("FLASK_SECRET_KEY", FLASK_SECRET_KEY)] if not value
 ]

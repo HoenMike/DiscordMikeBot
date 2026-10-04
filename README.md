@@ -37,8 +37,8 @@ Bot tự động phát hiện các URL mạng xã hội trong tin nhắn và t�
 #### Pipeline xử lý URL 3 tầng (Multi-tier Pipeline):
 1. **Tier 0 (API Fetchers)**: Gọi API JSON/oEmbed để trích xuất dữ liệu có cấu trúc và dựng Discord Embed giàu thông tin.
 2. **Tier 1 (Proxy URL Chain)**: Nếu API thất bại, tự động duyệt chuỗi Proxy domain theo thứ tự ưu tiên (xác thực trước qua API / OpenGraph metadata).
-3. **Tier 2 (yt-dlp Fallback)**: Nếu tất cả API và Proxy đều không khả dụng, sử dụng `yt-dlp` bóc tách media trực tiếp trong background thread.
-4. **Webhook Emulation**: Tự động gửi bài viết qua Discord Webhook giả lập đúng avatar và tên người gửi gốc, đồng thời xoá tin nhắn thô ban đầu.
+3. **Tier 2 (yt-dlp Fallback)**: Twitter/TikTok/Instagram/Reddit/Twitch vẫn tự động dùng `yt-dlp` khi các tầng trên thất bại. Riêng **Facebook không auto-fallback**: preview Facebed được giữ nếu Discord unfurl còn chưa chắc chắn và Asumi hiển thị hyperlink **[fallback]** nhỏ gọn để người dùng tự kích hoạt khi thật sự cần.
+4. **Manual Facebook fallback**: hyperlink được ký bằng `FLASK_SECRET_KEY`, hết hạn sau 15 phút và trỏ tới web route của chính Asumi. GET chỉ mở trang trung gian; JavaScript mới gửi POST để tránh crawler/link preview vô tình kích hoạt fallback. Preview cũ chỉ bị dọn sau khi fallback mới đã gửi thành công.
 
 ### Bộ lọc NSFW / Spoiler
 
@@ -247,6 +247,9 @@ pip install -r requirements.txt
 DISCORD_TOKEN=your_discord_bot_token
 GEMINI_API_KEY=your_gemini_api_key
 PORT=8080
+
+# Optional outside Render; used by the compact Facebook manual-fallback hyperlink.
+ASUMI_PUBLIC_URL=https://your-public-asumi-host.example
 ```
 
 4. Khởi chạy:

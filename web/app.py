@@ -69,6 +69,79 @@ def health_check():
     }), 200
 
 
+@app.route('/embed/fallback/<token>', methods=['GET'])
+def embed_manual_fallback_page(token: str):
+    """Public one-click landing page. GET never mutates Discord state; JS performs the signed POST."""
+    from features.embed.manual_fallback import verify_manual_fallback_token
+
+    payload = verify_manual_fallback_token(token)
+    if payload is None:
+        return Response(
+            "<!doctype html><meta charset='utf-8'><title>Fallback hết hạn</title>"
+            "<body style='font-family:system-ui;background:#18191c;color:#eee;padding:32px'>"
+            "<h3>Liên kết fallback không hợp lệ hoặc đã hết hạn.</h3>"
+            "<p>Hãy gửi lại link Facebook trong Discord để Asumi tạo liên kết mới.</p></body>",
+            status=410,
+            mimetype="text/html",
+        )
+
+    endpoint = url_for("api_embed_manual_fallback", token=token)
+    page = f"""<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Asumi fallback</title>
+</head>
+<body style="font-family:system-ui;background:#18191c;color:#eee;padding:32px;max-width:560px;margin:auto">
+  <h3 id="title">Đang yêu cầu fallback…</h3>
+  <p id="status">Asumi sẽ thử yt-dlp và chỉ thay preview cũ nếu fallback gửi thành công.</p>
+  <script>
+    fetch({endpoint!r}, {{method: "POST", headers: {{"X-Asumi-Manual-Fallback": "1"}}}})
+      .then(async (res) => {{
+        const data = await res.json().catch(() => ({{}}));
+        if (!res.ok || !data.success) throw new Error(data.error || "Không thể gửi yêu cầu fallback.");
+        document.getElementById("title").textContent = "Đã gửi yêu cầu fallback";
+        document.getElementById("status").textContent = "Quay lại Discord. Preview cũ vẫn được giữ nếu fallback thất bại.";
+      }})
+      .catch((err) => {{
+        document.getElementById("title").textContent = "Fallback chưa chạy được";
+        document.getElementById("status").textContent = err.message;
+      }});
+  </script>
+  <noscript>Bật JavaScript rồi mở lại liên kết để kích hoạt fallback.</noscript>
+</body>
+</html>"""
+    response = Response(page, mimetype="text/html")
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.route('/api/embed/fallback/<token>', methods=['POST'])
+def api_embed_manual_fallback(token: str):
+    """Queue a signed Facebook manual fallback without exposing a state-changing GET endpoint."""
+    from features.embed.manual_fallback import verify_manual_fallback_token
+
+    payload = verify_manual_fallback_token(token)
+    if payload is None:
+        return jsonify({"success": False, "error": "Liên kết fallback không hợp lệ hoặc đã hết hạn."}), 410
+    if request.headers.get("X-Asumi-Manual-Fallback") != "1":
+        return jsonify({"success": False, "error": "Yêu cầu fallback không hợp lệ."}), 400
+
+    cog = bot.get_cog("EmbedCog") if bot.is_ready() else None
+    if cog is None or not hasattr(cog, "run_manual_fallback"):
+        return jsonify({"success": False, "error": "Embed service hiện chưa sẵn sàng."}), 503
+
+    try:
+        schedule_coroutine_safe(cog.run_manual_fallback(payload))
+        return jsonify({"success": True, "queued": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 503
+
+
 # ==========================================
 # 1. AUTHENTICATION ROUTES
 # ==========================================
@@ -380,6 +453,34 @@ def run_coroutine_safe(coro):
                 except Exception:
                     pass
         return asyncio.run(_run_and_cleanup())
+
+
+def schedule_coroutine_safe(coro):
+    """Queue a coroutine on the Discord loop without blocking the Flask request."""
+    loop = None
+    try:
+        if hasattr(bot, "loop") and bot.loop and bot.loop.is_running():
+            loop = bot.loop
+    except Exception:
+        loop = None
+
+    if not loop or not loop.is_running():
+        try:
+            coro.close()
+        except Exception:
+            pass
+        raise RuntimeError("Discord event loop chưa sẵn sàng.")
+
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+
+    def _report_done(done_future):
+        try:
+            done_future.result()
+        except Exception as exc:
+            print(f"⚠️ [ManualFallback] Tác vụ fallback nền thất bại: {exc}", flush=True)
+
+    future.add_done_callback(_report_done)
+    return future
 
 
 @app.route('/api/guilds/suspend', methods=['POST'])
