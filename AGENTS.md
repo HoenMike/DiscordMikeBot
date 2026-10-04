@@ -37,7 +37,9 @@ Tarot 2.0 implementation is active and user-approved.
 - T20.4 — Renderer 2.0: complete.
 - T20.5 — Clarifier: complete.
 - **Tarot 2.0 release boundary is complete in Asumi 2.9.0.**
-- **Next milestone: T20.6 — Multi-turn Reading Session.**
+- **T20.6 — Multi-turn Reading Session: complete.**
+- **T20.7 — Smart Custom Spread: complete.**
+- **Next milestone: T20.8 — Tarot Journey.**
 - Continue milestone-by-milestone; do not skip ahead or bundle unrelated later milestones into one PR.
 
 ### Tarot milestone IDs
@@ -50,12 +52,12 @@ T20.3  Reading Session UX
 T20.4  Renderer 2.0
 T20.5  Clarifier — COMPLETE
 T20.6  Multi-turn Reading Session — COMPLETE
-T20.7  Smart Custom Spread — NEXT
-T20.8  Tarot Journey
+T20.7  Smart Custom Spread — COMPLETE
+T20.8  Tarot Journey — NEXT
 T20.9  Recap & Polish
 ```
 
-Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0. T20.6 is also complete; continue with T20.7, then T20.8 and T20.9 without waiting for per-milestone approval unless a real blocker appears.
+Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0. T20.6 and T20.7 are also complete; continue with T20.8 then T20.9 without waiting for per-milestone approval unless a real blocker appears.
 
 ### Tarot continuity rule
 
