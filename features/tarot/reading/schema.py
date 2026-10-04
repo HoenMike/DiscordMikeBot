@@ -95,6 +95,45 @@ class TarotAIResponseSchema(BaseModel):
     )
 
 
+class TarotClarifierAIResponseSchema(BaseModel):
+    """Structured one-card clarifier interpretation.
+
+    The clarifier supplements one existing position. It must not rewrite or reroll the
+    original reading.
+    """
+
+    relationship: str = Field(
+        default="",
+        description="How the clarifier relates to the selected target card/position.",
+    )
+    clarity: str = Field(
+        default="",
+        description="What becomes clearer after adding this clarifier.",
+    )
+    effect: str = Field(
+        default="",
+        description="Short label/phrase: strengthens, softens, redirects or mixes the original interpretation.",
+    )
+    practical_implication: str = Field(
+        default="",
+        description="Grounded implication or reflection step based on target + clarifier.",
+    )
+    uncertainty: str = Field(
+        default="",
+        description="What remains uncertain after the clarifier.",
+    )
+
+
+class TarotClarifierResult(BaseModel):
+    relationship: str = ""
+    clarity: str = ""
+    effect: str = ""
+    practical_implication: str = ""
+    uncertainty: str = ""
+    full_reading: str = ""
+
+
+
 class TarotReadingResult(BaseModel):
     """Normalized application result while legacy callers still consume a tuple."""
 

@@ -160,6 +160,7 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 | `reader` | Phong cách Asumi: Tự động / Tĩnh / Dịu / Tinh quái | Tự động | Không |
 
 - **Reading Board 2.0**: layout responsive theo số lá, nhãn vị trí ngay trên board, progress reveal, REV/Major/key-card states và fallback giữ nguyên kết quả.
+- **Clarifier 1/1**: sau khi quẻ hoàn tất, chủ quẻ có thể chọn một vị trí để rút đúng một lá bổ sung. Clarifier không thay/reroll lá gốc; board giữ original spread và hiển thị TARGET → CLARIFIER.
 - **9 kiểu trải bài phong phú & giải thích mục đích rõ ràng**:
   - `daily`: **Daily Card** (1 lá - Cooldown 1 lần/ngày) - Năng lượng & thông điệp ngày mới.
   - `yes_no`: **Yes / No** (1 lá) - Trả lời dứt khoát câu hỏi Có/Không kèm Badge 🟢 CÓ / 🔴 KHÔNG / 🟡 TÙY THUỘC.
@@ -192,7 +193,7 @@ Repository có tài liệu để các session/agent khác tiếp tục công vi�
 - `docs/TAROT_V2_PROMPT_SPEC.md` — persona, system-prompt direction, reading schema và tiêu chí chống văn phong máy móc.
 - `docs/TAROT_V2_RENDERER_SPEC.md` — Reading Board, visual direction, responsive layout và contract renderer.
 
-> **Tarot 2.0 hiện mới ở giai đoạn planning/documentation.** Không coi các milestone V2 là đã implementation nếu handoff chưa đánh dấu hoàn tất.
+> **Tarot 2.0 đã đạt release boundary T20.1–T20.5 trong Asumi 2.9.0.** T20.6+ tiếp tục theo từng milestone; xem handoff để biết mốc hiện tại.
 
 ---
 

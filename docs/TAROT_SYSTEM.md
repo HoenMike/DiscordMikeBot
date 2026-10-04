@@ -2,9 +2,11 @@
 
 Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).
 
-> **Tarot 2.0 đang ở giai đoạn planning, chưa implementation.** Khi làm V2, đọc `docs/TAROT_V2_MASTER_PLAN.md` và `docs/TAROT_V2_HANDOFF.md` trước. Tài liệu này vẫn là baseline của runtime hiện tại và phải được cập nhật cùng code khi behavior/architecture thay đổi.
+> **Tarot 2.0 runtime (T20.1–T20.5) đã hoàn tất trong Asumi 2.9.0.** Khi làm T20.6+, đọc `docs/TAROT_V2_MASTER_PLAN.md` và `docs/TAROT_V2_HANDOFF.md` trước. Tài liệu này mô tả runtime hiện tại và phải được cập nhật cùng code khi behavior/architecture thay đổi.
 
 > v2.8.0: Asumi là nhân vật Tarot duy nhất. `auto` là mặc định; `neutral`, `healer`, `chaos` là các style ID tương thích dữ liệu cũ, nay hiển thị lần lượt là Tĩnh, Dịu, Tinh quái. Prompt mới điều chỉnh cách nói theo câu hỏi, vẫn dùng schema JSON và các ranh giới an toàn hiện có.
+
+> v2.9.0 / T20.5: kết quả cuối có action **🃏 Làm rõ**. Chủ quẻ chọn một vị trí thật trong spread; engine rút đúng một lá mới không trùng bất kỳ lá gốc nào, render Clarifier Board giữ nguyên original spread và chỉ diễn giải quan hệ TARGET → CLARIFIER. Mỗi reading mặc định tối đa 1 clarifier và chỉ tiêu lượt sau delivery thành công.
 
 ---
 
@@ -104,6 +106,7 @@ features/tarot/
 ├── reading/
 │   ├── schema.py    # Structured Reading Result V2
 │   ├── recommendation.py # Smart launcher recommendation + repeated-question helper
+│   ├── clarifier.py # Resolve AI-suggested targets + existing target insight
 │   └── session.py   # Progress, micro reveal, compact controls & AI-ready presentation helpers
 ├── rendering/
 │   └── state.py     # ReadingBoardState: reveal/final/key/target state independent from Discord UI
@@ -207,7 +210,20 @@ Gồm 2 tầng View Discord UI:
 
 ---
 
+#### Clarifier action — T20.5
+
+- `TarotResultActionView` có nút **🃏 Làm rõ** owner-only.
+- Picker ephemeral đưa tối đa hai target do structured reading gợi ý lên đầu, nhưng user vẫn có thể chọn bất kỳ vị trí thật nào.
+- `draw_clarifier(...)` loại toàn bộ card id của spread gốc và seed theo exact original spread + target + question để retry không âm thầm reroll.
+- AI chỉ nhận original reading + target evidence + clarifier đã được engine rút; output bị giới hạn để nằm an toàn trong Discord embed.
+- Clarifier Board giữ nguyên spread bên trái, target được đánh dấu và panel riêng hiển thị TARGET → CLARIFIER.
+- **Delivery là commit point**: lỗi trước/sau render hoặc cả attachment/text delivery đều không tiêu lượt; khi public output đã gửi thành công thì action chuyển sang **✓ Đã làm rõ** và persistence/logging chạy best-effort.
+
 ### 3.5. Module Quản Lý Cơ Sở Dữ Liệu SQLite (`manager.py`)
+
+T20.5 bổ sung bảng `tarot_clarifiers` cho **Clarifier đã delivery thành công**. Record lưu user/guild/channel, spread/question, target position/card + orientation, clarifier card + orientation và interpretation. Dữ liệu này tách khỏi `tarot_history` để quẻ gốc không bị mutation.
+
+
 - **Chế độ WAL (Write-Ahead Logging)**: Cho phép đọc/ghi đồng thời với hiệu năng cực cao.
 - **Quản lý Daily Cooldown (Giờ Việt Nam GMT+7)**:
   - Mỗi người dùng chỉ được rút 1 lá Daily mỗi ngày.

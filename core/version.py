@@ -12,12 +12,37 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.5"
+CURRENT_VERSION = "2.9.0"
 RELEASE_DATE = "2026-10-04"
-CODENAME = "Asumi - Universal Embed Controls"
+CODENAME = "Asumi - Tarot 2.0"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.9.0",
+        "date": "2026-10-04",
+        "type": "minor",
+        "title": "Tarot 2.0",
+        "summary": "Hoàn tất release boundary T20.1–T20.5: Asumi đọc quẻ tự nhiên hơn, launcher question-first, live reading session, Reading Board 2.0 và Clarifier 1/1 không reroll quẻ gốc.",
+        "changes": [
+            {"category": "🔮 Tarot 2.0", "items": [
+                "Reading Engine 2.0 nối ý giữa các lá, giữ uncertainty rõ ràng và dùng structured result để UI/renderer tái sử dụng an toàn.",
+                "Launcher question-first đề xuất spread theo câu hỏi nhưng vẫn giữ manual override và tương thích slash/prefix hiện có.",
+                "Live Reading Session dùng một message chính, progress/micro-reveal, AI-ready state và Reading Board responsive cho 1/3/5/10 lá cùng dynamic layouts.",
+            ]},
+            {"category": "🃏 Clarifier", "items": [
+                "Sau quẻ hoàn tất, chủ quẻ có thể chọn đúng một vị trí để rút một lá Clarifier; target AI gợi ý được ưu tiên trong picker.",
+                "Clarifier loại toàn bộ lá gốc khỏi pool, không thay đổi order/chiều/kết quả spread cũ và được bind deterministic để retry không âm thầm reroll.",
+                "Clarifier Board giữ nguyên original spread, đánh dấu TARGET và hiển thị quan hệ TARGET → CLARIFIER; AI chỉ giải lớp bổ sung thay vì viết lại toàn quẻ.",
+                "Lượt 1/1 chỉ bị tiêu sau khi Discord nhận được Clarifier; lỗi render/AI/delivery giữ nguyên quẻ gốc và cho phép thử lại.",
+            ]},
+            {"category": "🧪 Reliability & compatibility", "items": [
+                "Persist Clarifier đã giao thành công riêng khỏi tarot_history; metadata gốc không bị mutation.",
+                "Giới hạn output Clarifier để không vượt Discord embed và fallback text khi attachment gửi thất bại.",
+                "Giữ nguyên 9 spread keys, Daily cooldown, history/memory, card fatigue, follow-up hiện có và toàn bộ social-embed v2.8.5.",
+            ]},
+        ],
+    },
     {
         "version": "2.8.5",
         "date": "2026-10-04",
