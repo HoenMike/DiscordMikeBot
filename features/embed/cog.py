@@ -12,14 +12,13 @@ from discord import app_commands
 from discord.ext import commands
 
 from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
-from features.embed.ui import PlatformToggleView
+from features.embed.ui import PlatformToggleView, FacebookFallbackView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy
 from features.embed.validator import is_generic_or_login_preview
 from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
-from features.embed.manual_fallback import build_manual_fallback_url, verify_manual_fallback_token
 from core.webhook_sender import BoundedDict
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
@@ -95,6 +94,7 @@ class EmbedCog(commands.Cog):
         self._reaction_locks = BoundedDict(max_size=1000)
         self._pending_sends = BoundedDict(max_size=3000)
         self._manual_fallback_done = BoundedDict(max_size=3000)
+        self._manual_fallback_previews = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -103,26 +103,53 @@ class EmbedCog(commands.Cog):
             self._reaction_locks[msg_id] = lock
         return lock
 
-    def _manual_fallback_markdown(
+    def _manual_fallback_payload(
         self,
         message: discord.Message,
         platform_key: str,
         url: str,
         *,
         is_spoiler: bool = False,
-    ) -> str:
-        """Return a compact signed hyperlink for Facebook manual fallback."""
+    ) -> dict | None:
         if platform_key != "facebook":
-            return ""
-        fallback_url = build_manual_fallback_url(
-            origin_message_id=message.id,
-            channel_id=message.channel.id,
-            author_id=message.author.id,
-            platform_key=platform_key,
-            original_url=url,
-            is_spoiler=is_spoiler,
+            return None
+        return {
+            "origin_id": message.id,
+            "channel_id": message.channel.id,
+            "author_id": message.author.id,
+            "platform": platform_key,
+            "url": url,
+            "is_spoiler": is_spoiler,
+        }
+
+    def _manual_fallback_view(
+        self,
+        message: discord.Message,
+        platform_key: str,
+        url: str,
+        *,
+        is_spoiler: bool = False,
+    ) -> FacebookFallbackView | None:
+        payload = self._manual_fallback_payload(
+            message, platform_key, url, is_spoiler=is_spoiler
         )
-        return f" • [fallback]({fallback_url})" if fallback_url else ""
+        return FacebookFallbackView(self, payload) if payload else None
+
+    def _register_manual_fallback_preview(
+        self,
+        origin_id: int,
+        url: str,
+        channel_id: int,
+        preview_id: int,
+    ) -> None:
+        key = (origin_id, url)
+        targets = self._manual_fallback_previews.get(key)
+        if targets is None:
+            targets = []
+            self._manual_fallback_previews[key] = targets
+        target = (channel_id, preview_id)
+        if target not in targets:
+            targets.append(target)
 
     async def _offer_manual_fallback(
         self,
@@ -133,10 +160,10 @@ class EmbedCog(commands.Cog):
         reason: str,
         is_spoiler: bool = False,
     ) -> PreviewResult:
-        suffix = self._manual_fallback_markdown(
+        view = self._manual_fallback_view(
             message, platform_key, url, is_spoiler=is_spoiler
         )
-        if not suffix:
+        if not view:
             return PreviewResult(
                 reason=reason,
                 platform=platform_key,
@@ -146,7 +173,8 @@ class EmbedCog(commands.Cog):
         author_name = _clean_markdown_label(message.author.display_name)
         sent_msg = await self._send_embed_preview(
             message=message,
-            content=f"-# [Trả lời]({message.jump_url}) **{author_name}**{suffix}",
+            content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • Preview lỗi?",
+            view=view,
         )
         if not sent_msg:
             return PreviewResult(
@@ -154,6 +182,9 @@ class EmbedCog(commands.Cog):
                 platform=platform_key,
                 origin_message_id=message.id,
             )
+        self._register_manual_fallback_preview(
+            message.id, url, message.channel.id, sent_msg.id
+        )
         return PreviewResult(
             status="action_required",
             tier="manual",
@@ -632,6 +663,7 @@ class EmbedCog(commands.Cog):
         content: str | None = None,
         embeds: list[discord.Embed] | None = None,
         file: discord.File | None = None,
+        view: discord.ui.View | None = None,
     ) -> discord.Message | None:
         """Gửi bản xem trước trực tiếp vào kênh chat (không dùng native reply để tránh thanh quote lặp text)."""
         # Nếu tin nhắn gốc đã bị xóa trong lúc bot đang tải video hoặc gọi proxy, không gửi nữa!
@@ -652,6 +684,8 @@ class EmbedCog(commands.Cog):
             kwargs["embeds"] = embeds
         if file:
             kwargs["file"] = file
+        if view:
+            kwargs["view"] = view
 
         cancelled = False
         nonce = secrets.token_hex(12)
@@ -848,17 +882,22 @@ class EmbedCog(commands.Cog):
                 file = await self._download_video_file(post_data.media_urls, platform_key, max_bytes=message.guild.filesize_limit)
 
             author_name = _clean_markdown_label(message.author.display_name)
-            manual_suffix = self._manual_fallback_markdown(
+            fallback_view = self._manual_fallback_view(
                 message, platform_key, url, is_spoiler=is_spoiler
             )
-            header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**{manual_suffix}"
+            header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
             sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
                 embeds=embeds,
                 file=file,
+                view=fallback_view,
             )
+            if sent_msg and fallback_view:
+                self._register_manual_fallback_preview(
+                    message.id, url, message.channel.id, sent_msg.id
+                )
             return (PreviewResult("success", "api", "api_preview_sent", platform_key,
                                   origin_message_id=message.id, preview_message_id=sent_msg.id)
                     if sent_msg else False)
@@ -921,12 +960,13 @@ class EmbedCog(commands.Cog):
                 link = f"[Xem bài viết gốc]({proxy_url})"
                 if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
                     link = f"||{link}||"
-                manual_suffix = self._manual_fallback_markdown(
+                fallback_view = self._manual_fallback_view(
                     message, platform_key, url, is_spoiler=is_spoiler
                 )
                 sent_msg = await self._send_embed_preview(
                     message=message,
-                    content=f"-# {author_jump} • {link}{manual_suffix}",
+                    content=f"-# {author_jump} • {link}",
+                    view=fallback_view,
                 )
                 if not sent_msg:
                     last_reason = "proxy_send_failed"
@@ -937,6 +977,10 @@ class EmbedCog(commands.Cog):
                 try:
                     verified, last_reason = await self._verify_proxy_unfurl(message.id, sent_msg, platform_key)
                     if verified and message.id not in self._deleted_message_ids:
+                        if fallback_view:
+                            self._register_manual_fallback_preview(
+                                message.id, url, message.channel.id, sent_msg.id
+                            )
                         return PreviewResult("success", "proxy", "usable_embed", platform_key, domain, message.id, sent_msg.id, True)
                     if message.id in self._deleted_message_ids:
                         verified = False
@@ -951,6 +995,10 @@ class EmbedCog(commands.Cog):
                         removed = await self._discard_preview(message.id, sent_msg)
 
                 if preserve_unverified:
+                    if fallback_view:
+                        self._register_manual_fallback_preview(
+                            message.id, url, message.channel.id, sent_msg.id
+                        )
                     print(
                         f"[EmbedCog] Facebook unfurl chưa xác định; giữ preview {sent_msg.id} và chờ fallback thủ công.",
                         flush=True,
@@ -1054,7 +1102,7 @@ class EmbedCog(commands.Cog):
             return False
 
     async def run_manual_fallback(self, payload: dict) -> PreviewResult:
-        """Execute a signed Facebook fallback request triggered from the compact web hyperlink."""
+        """Execute an owner-authorized Facebook fallback triggered by the Discord button."""
         origin_id = int(payload.get("origin_id", 0) or 0)
         channel_id = int(payload.get("channel_id", 0) or 0)
         author_id = int(payload.get("author_id", 0) or 0)
@@ -1126,24 +1174,18 @@ class EmbedCog(commands.Cog):
 
             # Chỉ sau khi fallback mới gửi thành công mới dọn preview/prompt cũ
             # của đúng URL này. Một origin message có thể chứa nhiều social links.
-            targets = list(self._origin_to_preview_map.get(origin_id, []))
+            fallback_key = (origin_id, url)
+            targets = list(self._manual_fallback_previews.get(fallback_key, []))
             for old_channel_id, preview_id in targets:
                 if preview_id == result.preview_message_id:
                     continue
                 try:
                     old_channel = self.bot.get_channel(old_channel_id) or channel
                     old_preview = await old_channel.fetch_message(preview_id)
-                    token_match = re.search(r"/embed/fallback/([A-Za-z0-9._-]+)", old_preview.content or "")
-                    if not token_match:
-                        continue
-                    old_payload = verify_manual_fallback_token(token_match.group(1))
-                    if not old_payload:
-                        continue
-                    if old_payload.get("origin_id") != origin_id or old_payload.get("url") != url:
-                        continue
                     await self._discard_preview(origin_id, old_preview)
                 except Exception:
                     pass
+            self._manual_fallback_previews.pop(fallback_key, None)
 
             print(f"[EmbedCog] Manual fallback thành công cho Facebook origin={origin_id}.", flush=True)
             try:
