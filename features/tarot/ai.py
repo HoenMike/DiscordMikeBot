@@ -435,177 +435,306 @@ def _clean_and_format_tarot_markdown(text: str) -> str:
     return t.strip()
 
 
-def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
-    """
-    Phân tích và trích xuất dữ liệu an toàn từ phản hồi của Gemini AI.
-    Sử dụng cơ chế đa tầng (Direct JSON -> Regex Fallback -> Text Cleaning)
-    đảm bảo 100% không bao giờ làm lộ mã JSON thô ra giao diện người dùng Discord.
-    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline, is_valid)
-    """
-    if not raw_text:
-        return "", "general", "Năng lượng tích cực", "", True
-
-    text = raw_text.strip()
-
-    # Giá trị mặc định
-    topic_tag = "general"
-    mood_tag = "Năng lượng tích cực"
-    summary_headline = ""
-    full_reading = ""
-    is_valid = True
-
-    # Bước 1: Trích xuất khối JSON candidate nếu có
-    json_candidate = text
-    match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
+def _extract_tarot_json_payload(text: str) -> tuple[Optional[Dict[str, Any]], bool]:
+    """Parse structured Tarot output while never exposing malformed JSON to Discord."""
+    json_candidate = text.strip()
+    match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", json_candidate)
     if match:
         json_candidate = match.group(1).strip()
     else:
-        first_brace = text.find("{")
-        last_brace = text.rfind("}")
+        first_brace = json_candidate.find("{")
+        last_brace = json_candidate.rfind("}")
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            json_candidate = text[first_brace:last_brace + 1].strip()
+            json_candidate = json_candidate[first_brace:last_brace + 1].strip()
 
-    parsed_dict: Optional[Dict[str, Any]] = None
+    structured_output = bool(re.match(r'^\s*(?:```json|[\{\[])', text)) or bool(
+        re.search(
+            r'"(?:is_valid|topic_tag|full_reading|core_message|connections|practical_takeaway)"\s*:',
+            text,
+        )
+    )
 
-    # Bước 2: Thử parse trực tiếp bằng json.loads
     try:
         data = json.loads(json_candidate)
         if isinstance(data, dict):
-            parsed_dict = data
+            return data, structured_output
     except Exception:
         pass
 
-    # Bước 3: Fallback Regex Field Extraction nếu json.loads thất bại (do unescaped quotes hoặc format lỗi)
-    structured_output = bool(re.match(r'^\s*(?:```json|[\{\[])', text)) or bool(
-        re.search(r'"(?:is_valid|topic_tag|full_reading|cards_analysis)"\s*:', text)
+    if not structured_output:
+        return None, False
+
+    # Salvage scalar/list fields from partially malformed JSON when possible.
+    extracted: Dict[str, Any] = {}
+    decoder = json.JSONDecoder()
+    keys = (
+        "is_valid|topic_tag|mood_tag|headline|summary_headline|core_message|"
+        "card_insights|connections|dominant_theme|key_card|practical_takeaway|"
+        "uncertainty|suggested_clarifier_targets|journey_tags|refusal_message|"
+        "conclusion|cards_analysis|advice|full_reading"
     )
-    if parsed_dict is None and structured_output:
-        extracted = {}
-        decoder = json.JSONDecoder()
-        keys = "is_valid|topic_tag|mood_tag|summary_headline|conclusion|cards_analysis|advice|full_reading"
-        for field in re.finditer(rf'"({keys})"\s*:\s*', json_candidate):
-            try:
-                value, _ = decoder.raw_decode(json_candidate[field.end():])
-            except (ValueError, TypeError):
-                continue
-            extracted[field.group(1)] = value
-        parsed_dict = extracted
+    for field in re.finditer(rf'"({keys})"\s*:\s*', json_candidate):
+        try:
+            value, _ = decoder.raw_decode(json_candidate[field.end():])
+        except (ValueError, TypeError):
+            continue
+        extracted[field.group(1)] = value
 
-    # Bước 4: Chuyển đổi dữ liệu từ parsed_dict thành bài đọc và metadata
-    if parsed_dict:
-        # Xử lý is_valid
-        raw_is_valid = parsed_dict.get("is_valid", True)
-        if isinstance(raw_is_valid, bool):
-            is_valid = raw_is_valid
-        elif isinstance(raw_is_valid, str):
-            is_valid = raw_is_valid.strip().lower() not in ("false", "0", "no", "invalid", "vi_pham")
-        else:
-            is_valid = True
+    return (extracted or None), True
 
-        # Xử lý topic_tag
-        raw_topic = parsed_dict.get("topic_tag", "general")
-        topic_tag = str(raw_topic).strip().strip('"').strip() or "general"
 
-        # Xử lý mood_tag
-        raw_mood = parsed_dict.get("mood_tag", "Cân bằng & Tĩnh tại")
-        mood_tag = str(raw_mood).strip().strip('"').strip() or "Cân bằng & Tĩnh tại"
+def _to_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return "\n".join(str(item) for item in value if str(item).strip())
+    return str(value).strip()
 
-        # Xử lý summary_headline
-        raw_headline = parsed_dict.get("summary_headline", "")
-        summary_headline = str(raw_headline).strip().strip('"').strip()
 
-        # Xử lý full_reading
-        raw_full = (parsed_dict.get("full_reading") or "")
-        if isinstance(raw_full, list):
-            raw_full = "\n\n".join(str(item) for item in raw_full)
-        else:
-            raw_full = str(raw_full).strip()
-
-        # Tái tạo bài đọc có cấu trúc từ các trường thành phần
-        conc = parsed_dict.get("conclusion") or ""
-        if isinstance(conc, list):
-            conc = "\n".join(str(c) for c in conc)
-        conc = str(conc).strip()
-
-        cards_an = parsed_dict.get("cards_analysis") or ""
-        if isinstance(cards_an, list):
-            formatted_cards = []
-            for item in cards_an:
-                if isinstance(item, dict):
-                    c_name = item.get("card_name", item.get("name", ""))
-                    c_meaning = item.get("meaning", item.get("analysis", ""))
-                    formatted_cards.append(f"• **{c_name}**: {c_meaning}" if c_name else f"• {c_meaning}")
-                else:
-                    formatted_cards.append(f"• {item}")
-            cards_an = "\n".join(formatted_cards)
-        cards_an = str(cards_an).strip()
-
-        adv = parsed_dict.get("advice") or ""
-        if isinstance(adv, list):
-            adv = "\n".join(str(a) for a in adv)
-        adv = str(adv).strip()
-
-        # Dọn dẹp nếu Gemini vô tình chèn header vào trong các trường con
-        conc = re.sub(r"^(?:🎯|[#*_\s])*\s*(?:KẾT LUẬN|TỔNG QUAN)[^:\n]*[:\n]*", "", conc, flags=re.IGNORECASE).strip()
-        cards_an = re.sub(r"^(?:🃏|[#*_\s])*\s*(?:Ý NGHĨA CÁC LÁ BÀI|Ý NGHĨA CHI TIẾT|Ý NGHĨA LÁ BÀI|Ý NGHĨA)[^:\n]*[:\n]*", "", cards_an, flags=re.IGNORECASE).strip()
-        adv = re.sub(r"^(?:💡|[#*_\s])*\s*(?:LỜI KHUYÊN & ĐỊNH HƯỚNG|LỜI KHUYÊN|ĐỊNH HƯỚNG)[^:\n]*[:\n]*", "", adv, flags=re.IGNORECASE).strip()
-
-        header_cards = "Ý NGHĨA LÁ BÀI" if "\n•" not in cards_an and cards_an.count("•") <= 1 else "Ý NGHĨA CÁC LÁ BÀI"
-
-        if conc and cards_an:
-            # Tái tạo đầy đủ bài đọc chuẩn Markdown với các mục phân tách đẹp mắt
-            parts = [
-                f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}",
-                f"🃏 **{header_cards}:**\n{cards_an}"
-            ]
-            if adv:
-                parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
-            full_reading = "\n\n".join(parts)
-        elif len(raw_full) > 50:
-            full_reading = raw_full
-        else:
-            parts = []
-            if conc:
-                parts.append(f"🎯 **KẾT LUẬN & TỔNG QUAN:**\n{conc}")
-            if cards_an:
-                parts.append(f"🃏 **{header_cards}:**\n{cards_an}")
-            if adv:
-                parts.append(f"💡 **LỜI KHUYÊN & ĐỊNH HƯỚNG:**\n{adv}")
-            full_reading = "\n\n".join(parts) if parts else raw_full
-    elif structured_output:
-        full_reading = ""
+def _to_text_list(value: Any, limit: int = 6) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        items = [value]
+    elif isinstance(value, list):
+        items = value
     else:
-        # Nếu hoàn toàn không phát hiện cấu trúc JSON -> coi như phản hồi Markdown thông thường
-        cleaned = text
-        if cleaned.startswith("```json"):
-            cleaned = re.sub(r"^```json\s*", "", cleaned)
-            cleaned = re.sub(r"\s*```$", "", cleaned)
-        full_reading = cleaned
+        items = [value]
+    result = []
+    for item in items:
+        text = str(item).strip()
+        if text and text not in result:
+            result.append(text)
+        if len(result) >= limit:
+            break
+    return result
 
-    # Bước 5: Dọn dẹp câu chào mở đầu rườm rà nếu có
-    full_reading = re.sub(
-        r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|dưới đây là|đây là).*?\n+)+",
+
+def _coerce_v2_schema(data: Dict[str, Any]) -> TarotAIResponseSchema:
+    """Best-effort normalization for schema-capable and fallback models."""
+    allowed = {
+        "is_valid", "topic_tag", "mood_tag", "headline", "core_message",
+        "card_insights", "connections", "dominant_theme", "key_card",
+        "practical_takeaway", "uncertainty", "suggested_clarifier_targets",
+        "journey_tags", "refusal_message",
+    }
+    filtered = {key: value for key, value in data.items() if key in allowed}
+    try:
+        return TarotAIResponseSchema(**filtered)
+    except Exception:
+        # Repair common weak-model type mistakes before one final validation attempt.
+        repaired = dict(filtered)
+        for key in ("card_insights", "connections", "practical_takeaway", "suggested_clarifier_targets", "journey_tags"):
+            if key in repaired and not isinstance(repaired[key], list):
+                repaired[key] = [repaired[key]] if repaired[key] not in (None, "") else []
+        if "key_card" in repaired and not isinstance(repaired["key_card"], dict):
+            repaired["key_card"] = {}
+        try:
+            return TarotAIResponseSchema(**repaired)
+        except Exception:
+            return TarotAIResponseSchema(
+                is_valid=bool(data.get("is_valid", True)),
+                topic_tag=_to_text(data.get("topic_tag")) or "general",
+                mood_tag=_to_text(data.get("mood_tag")) or "Cân bằng & Tĩnh tại",
+                headline=_to_text(data.get("headline") or data.get("summary_headline")),
+                core_message=_to_text(data.get("core_message") or data.get("conclusion")),
+                practical_takeaway=_to_text_list(data.get("practical_takeaway") or data.get("advice"), 3),
+                uncertainty=_to_text(data.get("uncertainty")),
+                refusal_message=_to_text(data.get("refusal_message")),
+            )
+
+
+def _render_v2_reading(result: TarotReadingResult) -> str:
+    """Render structured meaning into current Discord Markdown without losing future reusability."""
+    if not result.is_valid:
+        return _clean_and_format_tarot_markdown(
+            result.full_reading or result.core_message or
+            "Mình không nên dùng Tarot để soi phần riêng tư đó. Nếu muốn, mình có thể đổi góc nhìn sang điều bạn có thể tự quyết định trong tình huống này."
+        )
+
+    parts: List[str] = []
+
+    if result.core_message:
+        parts.append(f"✨ **CỐT LÕI CỦA QUẺ:**\n{result.core_message}")
+
+    story_lines: List[str] = []
+    if result.dominant_theme:
+        story_lines.append(result.dominant_theme)
+
+    for connection in result.connections[:3]:
+        meaning = connection.meaning.strip()
+        if meaning:
+            story_lines.append(f"• {meaning}")
+
+    if not result.connections:
+        for insight in result.card_insights[:4]:
+            if insight.insight.strip():
+                label = insight.card_name.strip() or insight.position_id.strip()
+                prefix = f"**{label}:** " if label else ""
+                story_lines.append(f"• {prefix}{insight.insight.strip()}")
+
+    if story_lines:
+        parts.append("🃏 **CÂU CHUYỆN GIỮA CÁC LÁ:**\n" + "\n".join(story_lines))
+
+    if result.practical_takeaway:
+        parts.append(
+            "📌 **ĐIỀU ĐÁNG LÀM LÚC NÀY:**\n"
+            + "\n".join(f"• {item}" for item in result.practical_takeaway[:3])
+        )
+
+    if result.uncertainty:
+        parts.append(f"🌫️ **ĐIỀU QUẺ CHƯA THỂ NÓI CHẮC:**\n{result.uncertainty}")
+
+    if result.key_card and result.key_card.reason.strip():
+        card_name = result.key_card.card_name.strip() or result.key_card.card_id.strip() or "Lá chủ đạo"
+        parts.append(f"🔮 **LÁ CHỦ ĐẠO — {card_name}:**\n{result.key_card.reason.strip()}")
+
+    return _clean_and_format_tarot_markdown("\n\n".join(parts))
+
+
+def _parse_legacy_tarot_fields(data: Dict[str, Any]) -> str:
+    """Keep compatibility with pre-V2 model responses during fallback/model drift."""
+    raw_full = _to_text(data.get("full_reading"))
+    conclusion = _to_text(data.get("conclusion"))
+    cards_analysis = data.get("cards_analysis") or ""
+    advice = data.get("advice") or ""
+
+    if isinstance(cards_analysis, list):
+        lines = []
+        for item in cards_analysis:
+            if isinstance(item, dict):
+                name = _to_text(item.get("card_name") or item.get("name"))
+                meaning = _to_text(item.get("meaning") or item.get("analysis"))
+                if meaning:
+                    lines.append(f"• **{name}:** {meaning}" if name else f"• {meaning}")
+            else:
+                text = _to_text(item)
+                if text:
+                    lines.append(f"• {text}")
+        cards_analysis = "\n".join(lines)
+    else:
+        cards_analysis = _to_text(cards_analysis)
+
+    if isinstance(advice, list):
+        advice = "\n".join(f"• {_to_text(item)}" for item in advice if _to_text(item))
+    else:
+        advice = _to_text(advice)
+
+    if conclusion and cards_analysis:
+        parts = [
+            f"✨ **CỐT LÕI CỦA QUẺ:**\n{conclusion}",
+            f"🃏 **CÂU CHUYỆN GIỮA CÁC LÁ:**\n{cards_analysis}",
+        ]
+        if advice:
+            parts.append(f"📌 **ĐIỀU ĐÁNG LÀM LÚC NÀY:**\n{advice}")
+        return "\n\n".join(parts)
+
+    if len(raw_full) > 20:
+        return raw_full
+
+    parts = []
+    if conclusion:
+        parts.append(f"✨ **CỐT LÕI CỦA QUẺ:**\n{conclusion}")
+    if cards_analysis:
+        parts.append(f"🃏 **CÂU CHUYỆN GIỮA CÁC LÁ:**\n{cards_analysis}")
+    if advice:
+        parts.append(f"📌 **ĐIỀU ĐÁNG LÀM LÚC NÀY:**\n{advice}")
+    return "\n\n".join(parts)
+
+
+def parse_tarot_ai_response_v2(raw_text: str) -> TarotReadingResult:
+    """Normalize Gemini output into the Tarot 2.0 reading contract."""
+    if not raw_text:
+        return TarotReadingResult()
+
+    text = raw_text.strip()
+    data, structured_output = _extract_tarot_json_payload(text)
+
+    if data:
+        raw_is_valid = data.get("is_valid", True)
+        if isinstance(raw_is_valid, str):
+            is_valid = raw_is_valid.strip().casefold() not in {
+                "false", "0", "no", "invalid", "vi_pham"
+            }
+        else:
+            is_valid = bool(raw_is_valid)
+
+        is_v2 = any(
+            key in data
+            for key in (
+                "core_message", "connections", "dominant_theme", "key_card",
+                "practical_takeaway", "uncertainty", "suggested_clarifier_targets",
+            )
+        )
+
+        if is_v2:
+            schema = _coerce_v2_schema({**data, "is_valid": is_valid})
+            result = TarotReadingResult(
+                topic_tag=schema.topic_tag.strip() or "general",
+                mood_tag=schema.mood_tag.strip() or "Cân bằng & Tĩnh tại",
+                headline=schema.headline.strip(),
+                is_valid=schema.is_valid,
+                core_message=schema.core_message.strip(),
+                dominant_theme=schema.dominant_theme.strip(),
+                card_insights=schema.card_insights,
+                connections=schema.connections,
+                key_card=schema.key_card,
+                practical_takeaway=_to_text_list(schema.practical_takeaway, 3),
+                uncertainty=schema.uncertainty.strip(),
+                suggested_clarifier_targets=schema.suggested_clarifier_targets[:2],
+                journey_tags=_to_text_list(schema.journey_tags, 4),
+            )
+            if not result.is_valid:
+                result.full_reading = schema.refusal_message.strip() or result.core_message
+            result.full_reading = _render_v2_reading(result)
+        else:
+            headline = _to_text(data.get("summary_headline") or data.get("headline"))
+            full_reading = _parse_legacy_tarot_fields(data)
+            result = TarotReadingResult(
+                full_reading=_clean_and_format_tarot_markdown(full_reading),
+                topic_tag=_to_text(data.get("topic_tag")) or "general",
+                mood_tag=_to_text(data.get("mood_tag")) or "Cân bằng & Tĩnh tại",
+                headline=headline,
+                is_valid=is_valid,
+                core_message=_to_text(data.get("conclusion")),
+            )
+    elif structured_output:
+        # Malformed structured response: fail closed rather than leak raw JSON.
+        result = TarotReadingResult(full_reading="")
+    else:
+        clean = text
+        if clean.startswith("```"):
+            clean = re.sub(r"^```[a-zA-Z]*\s*", "", clean)
+            clean = re.sub(r"\s*```$", "", clean).strip()
+        result = TarotReadingResult(full_reading=_clean_and_format_tarot_markdown(clean))
+
+    # Remove mechanical greetings if a fallback model still emits them.
+    result.full_reading = re.sub(
+        r"^(.*?(thân mến|thân yêu|chào mừng|chào bạn|cảm ơn bạn|dưới đây là|đây là).*?\n+)+",
         "",
-        full_reading,
-        flags=re.IGNORECASE
+        result.full_reading,
+        flags=re.IGNORECASE,
     ).strip()
 
-    # Bước 6: Chặn tuyệt đối rò rỉ mã JSON thô ra giao diện người dùng
-    if full_reading.startswith("{") and '"topic_tag"' in full_reading:
-        full_reading = re.sub(r'^\s*\{\s*', '', full_reading)
-        full_reading = re.sub(r'\s*\}\s*$', '', full_reading)
-        full_reading = re.sub(r'"[a-zA-Z_]+":\s*"', '', full_reading)
-        full_reading = full_reading.replace('",', '\n\n').replace('\\n', '\n').strip()
+    # Metadata can still signal a refusal in older models.
+    check_meta = f"{result.topic_tag} {result.mood_tag} {result.headline}".casefold()
+    if any(k in check_meta for k in (
+        "ranh giới đạo đức", "từ chối trải bài", "từ chối giải quẻ", "không hợp lệ"
+    )):
+        result.is_valid = False
 
-    # Bước 7: Chuẩn hóa Markdown, đảm bảo xuống dòng các mục icon và gạch đầu dòng
-    full_reading = _clean_and_format_tarot_markdown(full_reading)
+    # Last guard: never display raw structured JSON.
+    if result.full_reading.startswith("{") and any(
+        key in result.full_reading for key in ('"topic_tag"', '"core_message"', '"full_reading"')
+    ):
+        result.full_reading = ""
 
-    # Hậu kiểm tra nếu AI đặt tag hoặc nội dung từ chối / vi phạm đạo đức
-    check_meta = f"{topic_tag} {mood_tag} {summary_headline}".lower()
-    if any(k in check_meta for k in ["ranh giới đạo đức", "từ chối trải bài", "từ chối giải quẻ", "không hợp lệ"]):
-        is_valid = False
+    return result
 
-    return full_reading, topic_tag, mood_tag, summary_headline, is_valid
+
+def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
+    """Backward-compatible tuple adapter used by existing Discord views."""
+    return parse_tarot_ai_response_v2(raw_text).as_legacy_tuple()
 
 
 
