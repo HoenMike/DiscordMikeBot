@@ -739,7 +739,7 @@ def parse_tarot_ai_response(raw_text: str) -> Tuple[str, str, str, str, bool]:
 
 
 
-async def generate_tarot_reading(
+async def generate_tarot_reading_result(
     spread_key: str,
     drawn_cards: List[DrawnCard],
     question: Optional[str] = None,
@@ -751,12 +751,8 @@ async def generate_tarot_reading(
     guild: Optional[Any] = None,
     bot_id: Optional[int] = None,
     bot_name: str = BOT_BRAND_NAME
-) -> Tuple[str, str, str, str, bool]:
-    """
-    Gọi AI phân tích quẻ bài với Concurrency Semaphore và Fallback Cascade:
-    gemini-3.8-flash ➔ gemini-3.7-flash ➔ gemini-3.6-flash ➔ gemini-3.5-flash ➔ gemini-3.5-flash-lite ➔ gemini-3.1-flash-lite ➔ gemma-4-31b-it.
-    Trả về Tuple: (full_reading_markdown, topic_tag, mood_tag, summary_headline, is_valid)
-    """
+) -> TarotReadingResult:
+    """Generate a rich Tarot 2.0 reading result while preserving model fallback behavior."""
     spread_info = SPREAD_DEFINITIONS.get(spread_key, SPREAD_DEFINITIONS["single"])
     spread_name = spread_info["name"]
     prompt = _build_tarot_prompt(
@@ -812,11 +808,15 @@ async def generate_tarot_reading(
                     )
                     if response and response.text:
                         raw_text = response.text.strip()
-                        full_reading, topic_tag, mood_tag, summary_headline, is_valid = parse_tarot_ai_response(raw_text)
+                        result = parse_tarot_ai_response_v2(raw_text)
 
-                        if full_reading:
-                            print(f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' (Tag: {topic_tag} | Mood: {mood_tag} | Valid: {is_valid}).", flush=True)
-                            return full_reading, topic_tag, mood_tag, summary_headline, is_valid
+                        if result.full_reading:
+                            print(
+                                f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' "
+                                f"(Tag: {result.topic_tag} | Mood: {result.mood_tag} | Valid: {result.is_valid}).",
+                                flush=True,
+                            )
+                            return result
 
                 except asyncio.TimeoutError:
                     print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>{timeout_duration}s), chuyển sang model tiếp theo...", flush=True)
@@ -852,7 +852,44 @@ async def generate_tarot_reading(
     fallback_parts.append(
         "📌 **Điều đáng làm lúc này:** Đối chiếu các từ khóa trên với tình huống thực tế của bạn và ưu tiên những dữ kiện có thể kiểm chứng trước khi quyết định."
     )
-    return "\n".join(fallback_parts), "general", "Chiêm nghiệm cổ điển", "Thông điệp chiêm tinh cổ điển từ điển Tarot", True
+    return TarotReadingResult(
+        full_reading="\n".join(fallback_parts),
+        topic_tag="general",
+        mood_tag="Chiêm nghiệm cổ điển",
+        headline="Bản đọc dự phòng từ dữ liệu lá bài",
+        is_valid=True,
+        uncertainty="AI đang tạm thời không phản hồi; phần này chỉ dùng nghĩa cơ bản của các lá đã rút.",
+    )
+
+
+async def generate_tarot_reading(
+    spread_key: str,
+    drawn_cards: List[DrawnCard],
+    question: Optional[str] = None,
+    context: Optional[str] = None,
+    reader_style: str = "auto",
+    user_name: str = "Bạn",
+    recent_context: Optional[Dict] = None,
+    user_id: Optional[int] = None,
+    guild: Optional[Any] = None,
+    bot_id: Optional[int] = None,
+    bot_name: str = BOT_BRAND_NAME,
+) -> Tuple[str, str, str, str, bool]:
+    """Backward-compatible adapter for existing Tarot Discord views."""
+    result = await generate_tarot_reading_result(
+        spread_key=spread_key,
+        drawn_cards=drawn_cards,
+        question=question,
+        context=context,
+        reader_style=reader_style,
+        user_name=user_name,
+        recent_context=recent_context,
+        user_id=user_id,
+        guild=guild,
+        bot_id=bot_id,
+        bot_name=bot_name,
+    )
+    return result.as_legacy_tuple()
 
 
 async def generate_followup_answer(
