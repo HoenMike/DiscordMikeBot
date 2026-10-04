@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** planning documented; **implementation has not started yet**.  
+> **Status:** T20.1 implemented on the active Tarot 2.0 branch; T20.2 is next.  
 > **Last updated:** 2026-10-04.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -41,9 +41,10 @@ The user wants a **Tarot 2.0** upgrade focused on:
 ### Important status
 
 - Master plan is documented.
-- Repository-preparation work is approved.
-- **Feature implementation is NOT yet approved/started.**
-- Do not begin T20.1+ until the user explicitly says to start or approves a milestone.
+- Repository-preparation work is complete.
+- The user explicitly approved starting Tarot 2.0 implementation.
+- **T20.1 — Prompt & Reading Engine 2.0 has been implemented.**
+- **Next milestone: T20.2 — Question-first Launcher.**
 
 ---
 
@@ -220,8 +221,8 @@ Avoid implementing all V2 milestones in one giant branch.
 | Milestone | Status | Notes |
 |---|---|---|
 | T20.0 | COMPLETE | Master plan, handoff, prompt spec, renderer spec and agent entry-point added |
-| T20.1 | NOT STARTED | Wait for explicit approval |
-| T20.2 | NOT STARTED | Wait for explicit approval |
+| T20.1 | COMPLETE | V2 system prompt, structured schema/parser, adaptive auto tone, natural follow-up and evidence-based Why support |
+| T20.2 | NEXT | Question-first launcher + integrated smart spread recommendation |
 | T20.3 | NOT STARTED | Wait for explicit approval |
 | T20.4 | NOT STARTED | Wait for explicit approval |
 | T20.5 | NOT STARTED | Wait for explicit approval |
@@ -231,6 +232,26 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.9 | NOT STARTED | Later |
 
 When a milestone starts or completes, update this table in the same PR.
+
+---
+
+## 10.1 T20.1 implementation notes
+
+Implemented in the T20.1 branch:
+
+- introduced `features/tarot/reading/` with reusable V2 Pydantic contracts;
+- added rich `TarotReadingResult` while keeping the existing tuple API through an adapter;
+- rewrote the main Tarot system instruction around natural Asumi voice and the `OBSERVE → CONNECT → INTERPRET → GROUND → UNCERTAINTY` contract;
+- added deterministic auto-tone hints for decision/emotional/playful/high-stakes questions;
+- changed model output from legacy `conclusion/cards_analysis/advice/full_reading` toward structured fields such as `core_message`, `connections`, `key_card`, `practical_takeaway`, `uncertainty`, Journey tags and clarifier targets;
+- kept a legacy parser path so weaker/fallback models and old-format responses still work;
+- added a rich-result generator for future UI milestones while preserving `generate_tarot_reading(...)` compatibility;
+- updated existing follow-up prompting to stay in the same reading and avoid re-explaining the whole spread;
+- added `generate_why_explanation(...)` for a later Discord **Why?** control;
+- corrected the stale recommendation key `celtic_cross` → `celtic`;
+- added dedicated regression coverage in `tests/test_tarot_v2_reading.py`.
+
+No renderer/session/clarifier UI work is part of T20.1.
 
 ---
 
