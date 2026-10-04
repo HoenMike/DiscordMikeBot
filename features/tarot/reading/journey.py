@@ -52,6 +52,24 @@ def _compress_progression(values: Iterable[str], limit: int = 4) -> tuple[str, .
     return tuple(compressed[-limit:])
 
 
+def _percentages_that_sum_to_100(counter: Counter[str], keys: tuple[str, ...]) -> dict[str, int]:
+    total = sum(counter.get(key, 0) for key in keys)
+    if not total:
+        return {key: 0 for key in keys}
+
+    raw = {key: counter.get(key, 0) * 100 / total for key in keys}
+    result = {key: int(value) for key, value in raw.items()}
+    remaining = 100 - sum(result.values())
+    order = sorted(
+        keys,
+        key=lambda key: raw[key] - result[key],
+        reverse=True,
+    )
+    for key in order[:remaining]:
+        result[key] += 1
+    return result
+
+
 def summarize_journey(history: list[dict], days: int = 30) -> TarotJourneySummary:
     """Aggregate stored history without inferring fate, diagnosis or hidden traits."""
     reading_count = len(history)
@@ -88,11 +106,7 @@ def summarize_journey(history: list[dict], days: int = 30) -> TarotJourneySummar
                         suit_counter[suit] += 1
                         break
 
-    minor_count = sum(suit_counter.values())
-    suit_percentages = {
-        suit: round(suit_counter.get(suit, 0) * 100 / minor_count) if minor_count else 0
-        for suit in SUITS
-    }
+    suit_percentages = _percentages_that_sum_to_100(suit_counter, SUITS)
     major_ratio = round(major_count * 100 / total_cards) if total_cards else 0
 
     repeated_cards = tuple(
