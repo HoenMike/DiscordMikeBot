@@ -717,32 +717,7 @@ class TarotLauncherView(discord.ui.View):
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
-        desc_lines = []
-        if self.question:
-            desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{self.question}*\n")
-        if self.context:
-            desc_lines.append(f"**📝 Bối cảnh:**\n*{self.context}*\n")
-        desc_lines.append(f"**🎭 Phong cách Asumi:** {flip_view.style_info['name']}\n")
-
-        desc_lines.append(WIDE_DIVIDER)
-
-        cards_summary_lines = []
-        for drawn in drawn_cards:
-            cards_summary_lines.append(f"• **{drawn.position_title}**: ⏳ *(Chờ lật)*")
-
-        desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
-        desc_lines.append("⏳ *Hãy bấm vào các nút bên dưới để lật mở từng lá bài...*")
-
-        embed = discord.Embed(
-            title=f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}",
-            description="\n".join(desc_lines),
-            color=flip_view.embed_color
-        )
-        embed.set_image(url="attachment://tarot_spread.png")
-        embed.set_footer(
-            text=f"Quẻ bài của {self.author_name} (Đang bốc bài...)",
-            icon_url=self.author_avatar_url
-        )
+        embed = flip_view.build_session_embed()
 
         sent_msg = None
         # 1. Nếu mở từ Prefix ($m tarot -> self.message tồn tại): Edit trực tiếp vào tin nhắn đó
@@ -800,7 +775,7 @@ class TarotLauncherView(discord.ui.View):
                 pass
             return
 
-        flip_view.message = sent_msg
+        await flip_view.attach_message(sent_msg)
         self._pending_ai_task = None
         self._pending_flip = None
         self.tarot_manager.record_user_action(self.author_id)
