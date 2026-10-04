@@ -12,12 +12,31 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.0"
-RELEASE_DATE = "2026-09-25"
-CODENAME = "Asumi - Verified Embeds & Unified Reader"
+CURRENT_VERSION = "2.8.1"
+RELEASE_DATE = "2026-10-04"
+CODENAME = "Asumi - Manual Facebook Fallback"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.8.1",
+        "date": "2026-10-04",
+        "type": "bugfix",
+        "title": "Facebook fallback thủ công bằng hyperlink",
+        "summary": "Facebook không còn tự chuyển sang yt-dlp khi Discord chưa kịp xác nhận Facebed. Preview proxy được giữ lại khi unfurl chưa chắc chắn và người dùng có hyperlink fallback nhỏ gọn để tự kích hoạt khi thật sự cần.",
+        "changes": [
+            {"category": "🪝 Facebook Embed", "items": [
+                "Không còn tự động chạy yt-dlp cho Facebook sau lỗi/timeout proxy; các nền tảng khác giữ nguyên fallback tự động.",
+                "Nếu Facebed đã gửi nhưng Discord chưa xác nhận unfurl kịp thời, Asumi giữ preview thay vì xóa nó và thay bằng card fallback kém chất lượng.",
+                "Thêm hyperlink [fallback] ngắn gọn trên preview Facebook; link dùng token ký, hết hạn sau 15 phút và chỉ POST mới kích hoạt thay đổi trạng thái.",
+                "Fallback thủ công chỉ dọn preview cũ sau khi yt-dlp đã gửi preview mới thành công; nếu thất bại thì preview hiện tại vẫn được giữ.",
+            ]},
+            {"category": "🧪 Kiểm thử & vận hành", "items": [
+                "Bổ sung test cho race condition unfurl Facebook, flow action_required, token ký và đảm bảo Twitter/các nền tảng khác vẫn auto-fallback như trước.",
+                "Hỗ trợ ASUMI_PUBLIC_URL; trên Render tự dùng RENDER_EXTERNAL_URL nếu có.",
+            ]},
+        ],
+    },
     {
         "version": "2.8.0",
         "date": "2026-09-25",
