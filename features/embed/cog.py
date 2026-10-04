@@ -1069,7 +1069,8 @@ class EmbedCog(commands.Cog):
 
         lock = self._get_reaction_lock(origin_id)
         async with lock:
-            if self._manual_fallback_done.get(origin_id):
+            fallback_key = (origin_id, url)
+            if self._manual_fallback_done.get(fallback_key):
                 return PreviewResult(
                     "success", "ytdlp", "manual_fallback_already_done", platform_key,
                     origin_message_id=origin_id, used_fallback=True,
@@ -1121,7 +1122,7 @@ class EmbedCog(commands.Cog):
                     origin_message_id=origin_id,
                 )
 
-            self._manual_fallback_done[origin_id] = True
+            self._manual_fallback_done[fallback_key] = True
 
             # Chỉ sau khi fallback mới gửi thành công mới dọn preview/prompt cũ
             # của đúng URL này. Một origin message có thể chứa nhiều social links.
