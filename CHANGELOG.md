@@ -10,7 +10,7 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [2.8.1] - 2026-10-04 — *Facebook Manual Fallback Link*
 
 ### Fixed
-- **Không auto-fallback Facebook khi Discord unfurl chậm**: nếu Facebed đã được gửi nhưng Discord chưa trả embed trong cửa sổ verify, Asumi giữ preview hiện tại thay vì xóa nó rồi tự thay bằng yt-dlp.
+- **Không auto-fallback Facebook khi Discord unfurl chậm**: generic/login card ở poll sớm không còn fail-fast; Asumi chờ hết grace window để Discord có cơ hội nâng cấp thành preview/video thật. Nếu vẫn chỉ là timeout, bot giữ preview hiện tại thay vì xóa nó rồi tự thay bằng yt-dlp.
 - **Không phá preview tốt bằng fallback kém hơn**: Facebook chỉ dùng yt-dlp khi người dùng chủ động kích hoạt; Twitter/TikTok/Instagram/Reddit/Twitch vẫn giữ cơ chế fallback tự động hiện có.
 - **Cleanup an toàn**: preview/prompt cũ chỉ bị xóa sau khi manual fallback đã gửi preview mới thành công. Nếu yt-dlp lỗi, preview hiện tại vẫn còn nguyên.
 
