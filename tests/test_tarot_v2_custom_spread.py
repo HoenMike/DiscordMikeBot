@@ -56,6 +56,11 @@ class CustomSpreadValidationTests(unittest.TestCase):
         payload["positions"][0]["card_id"] = "major_01"
         self.assertIsNone(validate_custom_spread_payload(payload))
 
+    def test_rejects_private_third_party_position(self):
+        payload = valid_payload(3)
+        payload["positions"][0]["title"] = "Người kia đang nghĩ gì"
+        self.assertIsNone(validate_custom_spread_payload(payload))
+
     def test_bounds_user_visible_text(self):
         payload = valid_payload(3)
         payload["title"] = "x" * 500
