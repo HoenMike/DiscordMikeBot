@@ -13,7 +13,8 @@ from features.tarot.deck import (
     draw_spread
 )
 from features.tarot.renderer import render_spread_to_bytes
-from features.tarot.ai import generate_tarot_reading, generate_followup_answer
+from features.tarot.ai import generate_tarot_reading, generate_followup_answer, recommend_spread_for_question
+from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.flavor import detect_spread_flavor
 from features.tarot.manager import TarotManager
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
