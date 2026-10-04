@@ -356,6 +356,44 @@ class TarotManager:
             })
         return results
 
+    async def get_user_journey_history(
+        self,
+        user_id: int,
+        days: int = 30,
+        limit: int = 200,
+    ) -> List[dict]:
+        """Return stored readings inside the requested Journey window."""
+        safe_days = max(1, min(int(days), 90))
+        safe_limit = max(1, min(int(limit), 500))
+        modifier = f"-{safe_days} days"
+        db = await self._get_db()
+        async with db.execute("""
+            SELECT id, spread_type, question, cards_json, ai_reading, topic_tag, mood_tag, created_at
+            FROM tarot_history
+            WHERE user_id = ? AND created_at >= datetime('now', ?)
+            ORDER BY id DESC
+            LIMIT ?
+        """, (user_id, modifier, safe_limit)) as cursor:
+            rows = await cursor.fetchall()
+
+        results = []
+        for row in rows:
+            try:
+                cards = json.loads(row[3])
+            except Exception:
+                cards = []
+            results.append({
+                "id": row[0],
+                "spread_type": row[1],
+                "question": row[2],
+                "cards": cards,
+                "ai_reading": row[4],
+                "topic_tag": row[5] or "general",
+                "mood_tag": row[6] or "",
+                "created_at": row[7] or "",
+            })
+        return results
+
     async def get_user_recent_context(self, user_id: int) -> Optional[dict]:
         """
         Lấy ngữ cảnh lần đọc trước gần nhất trong vòng 10 ngày (trừ khi user đã tắt memory).
