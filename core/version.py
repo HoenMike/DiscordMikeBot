@@ -12,12 +12,31 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.4"
+CURRENT_VERSION = "2.8.5"
 RELEASE_DATE = "2026-10-04"
-CODENAME = "Asumi - Compact Facebook Proxy Link"
+CODENAME = "Asumi - Universal Embed Controls"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.8.5",
+        "date": "2026-10-04",
+        "type": "bugfix",
+        "title": "Universal embed controls",
+        "summary": "Đưa bộ điều khiển Reload / Bỏ embed từ Facebook sang toàn bộ provider auto-embed; chỉ người gửi link gốc được thao tác và có thể quay về native Discord embed bất kỳ lúc nào.",
+        "changes": [
+            {"category": "🪝 Auto-Embed UX", "items": [
+                "Mọi preview do API, proxy hoặc yt-dlp tạo ra đều có hai nút 🔄 Reload và 🗑️ Bỏ embed.",
+                "Cả hai nút dùng owner-only interaction: user khác người gửi link gốc chỉ nhận cảnh báo ephemeral và không thể thay đổi preview.",
+                "Reload giữ preview hiện tại nếu lần tải lại thất bại; provider ngoài Facebook chạy lại pipeline đúng URL, còn Facebook tiếp tục roll sang proxy kế tiếp và không tự nhảy yt-dlp.",
+                "Bỏ embed unsuppress message gốc để Discord render native embed rồi dọn toàn bộ preview Asumi của message, tránh duplicate khi một message có nhiều social URL.",
+            ]},
+            {"category": "🧪 Regression", "items": [
+                "Thêm coverage cho action view ở provider ngoài Facebook, reload non-Facebook và native revert cleanup.",
+                "Giữ nguyên Facebook proxy rotation, NSFW guards, deletion lifecycle và fallback behavior hiện tại.",
+            ]},
+        ],
+    },
     {
         "version": "2.8.4",
         "date": "2026-10-04",
