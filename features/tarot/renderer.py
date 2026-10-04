@@ -14,7 +14,7 @@ from typing import List, Optional, Set, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, TarotCard, ensure_card_asset
-from features.tarot.rendering.state import ClarifierBoardState, ReadingBoardState
+from features.tarot.rendering.state import ClarifierBoardState, ReadingBoardState, RecapCardState
 from features.tarot.reading.journey import TarotJourneySummary
 
 
@@ -1015,6 +1015,124 @@ def render_clarifier_board_to_bytes(state: ClarifierBoardState) -> io.BytesIO:
     image.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
     buffer.seek(0)
     return buffer
+
+
+def _wrap_recap_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+    max_lines: int,
+) -> list[str]:
+    words = " ".join((text or "").split()).split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if current and bbox[2] - bbox[0] > max_width:
+            lines.append(current)
+            current = word
+            if len(lines) >= max_lines:
+                break
+        else:
+            current = candidate
+    if current and len(lines) < max_lines:
+        lines.append(current)
+    if words and len(lines) == max_lines:
+        consumed = " ".join(lines)
+        if len(consumed) < len(" ".join(words)):
+            lines[-1] = lines[-1].rstrip(" .") + "..."
+    return lines
+
+
+def render_recap_card_to_bytes(state: RecapCardState) -> io.BytesIO:
+    """Render a portrait recap card with one hero card and one grounded takeaway."""
+    width, height = 1200, 1500
+    canvas = _gradient_background(width, height)
+    draw = ImageDraw.Draw(canvas)
+
+    title_font = _get_font(38, bold=True)
+    meta_font = _get_font(21)
+    card_name_font = _get_font(29, bold=True)
+    headline_font = _get_font(34, bold=True)
+    body_font = _get_font(25)
+    label_font = _get_font(17, bold=True)
+
+    _draw_centered_text(draw, "TAROT RECAP", width // 2, 55, title_font, COLOR_GOLD_LIGHT)
+    _draw_centered_text(
+        draw,
+        f"{state.spread_title} · {state.date_label}",
+        width // 2,
+        112,
+        meta_font,
+        COLOR_MUTED,
+    )
+
+    hero = _load_and_prepare_card_image(state.hero_card, 360, 600)
+    hero_x = (width - hero.width) // 2
+    hero_y = 195
+    shadow = Image.new("RGBA", (hero.width + 28, hero.height + 28), (0, 0, 0, 0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    shadow_draw.rounded_rectangle(
+        (10, 12, hero.width + 18, hero.height + 20),
+        radius=22,
+        fill=(0, 0, 0, 115),
+    )
+    canvas.alpha_composite(shadow, (hero_x - 14, hero_y - 14))
+    canvas.alpha_composite(hero.convert("RGBA"), (hero_x, hero_y))
+
+    orient = "NGƯỢC" if state.hero_card.is_reversed else "XUÔI"
+    _draw_pill(
+        draw,
+        f"HERO · {orient}",
+        width // 2,
+        812,
+        label_font,
+        fill=COLOR_PANEL,
+        outline=COLOR_VIOLET,
+        text_color=COLOR_VIOLET_LIGHT,
+    )
+    _draw_centered_text(
+        draw,
+        state.hero_card.card.name_vi[:42],
+        width // 2,
+        862,
+        card_name_font,
+        COLOR_TEXT,
+    )
+
+    panel = (105, 930, width - 105, 1370)
+    draw.rounded_rectangle(panel, radius=30, fill=COLOR_PANEL, outline=COLOR_GOLD_DARK, width=2)
+
+    headline_lines = _wrap_recap_text(draw, state.headline, headline_font, 850, 3)
+    y = 985
+    for line in headline_lines:
+        _draw_centered_text(draw, line, width // 2, y, headline_font, COLOR_GOLD_LIGHT)
+        y += 48
+
+    y += 32
+    _draw_centered_text(draw, "MANG THEO TỪ QUẺ NÀY", width // 2, y, label_font, COLOR_BLUEGREY_LIGHT)
+    y += 42
+    takeaway_lines = _wrap_recap_text(draw, state.takeaway, body_font, 840, 4)
+    for line in takeaway_lines:
+        _draw_centered_text(draw, line, width // 2, y, body_font, COLOR_TEXT)
+        y += 38
+
+    _draw_centered_text(
+        draw,
+        f"{state.user_name} · Asumi Tarot",
+        width // 2,
+        1425,
+        meta_font,
+        COLOR_MUTED,
+    )
+
+    buffer = io.BytesIO()
+    canvas.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
+    buffer.seek(0)
+    return buffer
+
 
 
 def render_journey_card_to_bytes(
