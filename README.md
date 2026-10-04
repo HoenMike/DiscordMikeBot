@@ -184,6 +184,8 @@ Repository có tài liệu để các session/agent khác tiếp tục công vi�
 - `docs/TAROT_SYSTEM.md` — kiến trúc Tarot đang chạy hiện tại.
 - `docs/TAROT_V2_MASTER_PLAN.md` — master plan Tarot 2.0.
 - `docs/TAROT_V2_HANDOFF.md` — trạng thái/mốc tiếp tục Tarot 2.0 giữa các session.
+- `docs/TAROT_V2_PROMPT_SPEC.md` — persona, system-prompt direction, reading schema và tiêu chí chống văn phong máy móc.
+- `docs/TAROT_V2_RENDERER_SPEC.md` — Reading Board, visual direction, responsive layout và contract renderer.
 
 > **Tarot 2.0 hiện mới ở giai đoạn planning/documentation.** Không coi các milestone V2 là đã implementation nếu handoff chưa đánh dấu hoàn tất.
 
