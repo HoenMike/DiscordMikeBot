@@ -14,6 +14,19 @@ PROHIBITED_MODEL_FIELDS = {
     "orientation", "is_reversed", "upright", "reversed",
 }
 
+# Generated positions must stay on the user's observable choices/context rather than
+# claiming privileged access to another person's inner state.
+UNSAFE_POSITION_FRAGMENTS = (
+    "bí mật của",
+    "đang nghĩ gì",
+    "thực sự nghĩ gì",
+    "che giấu điều gì",
+    "secret of",
+    "what they think",
+    "what he thinks",
+    "what she thinks",
+)
+
 
 @dataclass(frozen=True)
 class CustomSpreadPosition:
@@ -59,6 +72,11 @@ def _position_id(value: Any) -> str:
     return raw[:32]
 
 
+def _has_unsafe_private_framing(*parts: str) -> bool:
+    text = " ".join(parts).casefold()
+    return any(fragment in text for fragment in UNSAFE_POSITION_FRAGMENTS)
+
+
 def validate_custom_spread_payload(payload: Any) -> Optional[CustomSpreadSchema]:
     """Accept only a bounded position schema; reject any model-supplied card data."""
     if not isinstance(payload, Mapping):
@@ -97,6 +115,8 @@ def validate_custom_spread_payload(payload: Any) -> Optional[CustomSpreadSchema]
         if not position_id or not position_title or not description:
             return None
         if position_id in seen_ids or normalized_title in seen_titles:
+            return None
+        if _has_unsafe_private_framing(position_title, description):
             return None
 
         seen_ids.add(position_id)
