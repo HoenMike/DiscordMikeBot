@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.8.1] - 2026-10-04 — *Facebook Manual Fallback Link*
+
+### Fixed
+- **Không auto-fallback Facebook khi Discord unfurl chậm**: nếu Facebed đã được gửi nhưng Discord chưa trả embed trong cửa sổ verify, Asumi giữ preview hiện tại thay vì xóa nó rồi tự thay bằng yt-dlp.
+- **Không phá preview tốt bằng fallback kém hơn**: Facebook chỉ dùng yt-dlp khi người dùng chủ động kích hoạt; Twitter/TikTok/Instagram/Reddit/Twitch vẫn giữ cơ chế fallback tự động hiện có.
+- **Cleanup an toàn**: preview/prompt cũ chỉ bị xóa sau khi manual fallback đã gửi preview mới thành công. Nếu yt-dlp lỗi, preview hiện tại vẫn còn nguyên.
+
+### Added
+- **Hyperlink `[fallback]` nhỏ gọn trên preview Facebook**: thay cho button Discord. Link ký bằng `FLASK_SECRET_KEY`, hết hạn sau 15 phút.
+- **Route manual fallback chống prefetch**: GET chỉ hiển thị trang trung gian; JavaScript mới POST yêu cầu chạy fallback, tránh crawler hoặc Discord link preview vô tình kích hoạt tác vụ.
+- **Public URL config**: hỗ trợ `ASUMI_PUBLIC_URL`; trên Render tự dùng `RENDER_EXTERNAL_URL`.
+- **Regression tests**: cover race condition `unfurl_timeout`, trạng thái `action_required`, signed token và bảo đảm các nền tảng ngoài Facebook vẫn auto-fallback.
+
 ## [2.8.0] - 2026-09-25 — *Asumi - Xác minh bản xem trước & Thống nhất phong cách Tarot*
 
 ### Tên gọi Asumi
