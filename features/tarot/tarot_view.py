@@ -396,7 +396,7 @@ class TarotLauncherView(discord.ui.View):
             color=READER_STYLES.get(self.selected_reader, READER_STYLES["auto"]).get("color", 0x7851A9),
         )
         embed.set_footer(
-            text=f"{self.author_name} • Shuffling",
+            text=f"{self.author_name} • Đang xáo bài",
             icon_url=self.author_avatar_url,
         )
         return embed
@@ -1232,7 +1232,7 @@ class TarotFlipView(discord.ui.View):
         if len(self.revealed_indices) < total:
             desc_lines.append("\n*Chọn số lá bên dưới hoặc dùng **Lật hết**.*")
 
-        state = "FACE DOWN" if not self.revealed_indices else "REVEALING"
+        state = "CHỜ LẬT" if not self.revealed_indices else "ĐANG LẬT"
         embed = discord.Embed(
             title=f"🔮 {self.spread_info['name'].upper()}",
             description="\n".join(desc_lines),
@@ -1401,7 +1401,7 @@ class TarotFlipView(discord.ui.View):
                     color=self.embed_color,
                 )
                 embed_loading.set_footer(
-                    text=f"Quẻ bài của {self.author_name} • READING",
+                    text=f"Quẻ bài của {self.author_name} • ĐANG LUẬN GIẢI",
                     icon_url=self.author_avatar_url,
                 )
 
