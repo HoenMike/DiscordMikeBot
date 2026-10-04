@@ -154,7 +154,7 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 
 | Tham số    | Mô tả                                                                                              | Mặc định | Bắt buộc |
 |------------|----------------------------------------------------------------------------------------------------|----------|----------|
-| `spread`   | Chọn 1 trong 7 kiểu trải bài (`daily`, `yes_no`, `single`, `choices`, `ppf`, `mbs`, `celtic`)     | —        | **Có**   |
+| `spread`   | Chọn 1 trong 9 kiểu trải bài (`daily`, `yes_no`, `single`, `ppf`, `choices`, `mbs`, `horseshoe`, `two_paths`, `celtic`)     | —        | **Có**   |
 | `question` | Câu hỏi hoặc chủ đề muốn xem (Bắt buộc cho mọi kiểu trải bài ngoại trừ `daily`)                    | Không    | Tuỳ kiểu |
 
 - **9 kiểu trải bài phong phú & giải thích mục đích rõ ràng**:
@@ -172,6 +172,22 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 ### `/tarot_history`
 
 Xem lại danh sách tối đa 5 lượt bốc bài gần nhất của bản thân (gửi dưới dạng tin nhắn riêng ephemeral).
+
+---
+
+## Tài liệu phát triển & handoff
+
+Repository có tài liệu để các session/agent khác tiếp tục công việc mà không cần dựa vào chat cũ:
+
+- `AGENTS.md` — quy tắc làm việc và entry point cho agent/session mới.
+- `docs/EMBED_PIPELINE.md` — contract của social embed pipeline.
+- `docs/TAROT_SYSTEM.md` — kiến trúc Tarot đang chạy hiện tại.
+- `docs/TAROT_V2_MASTER_PLAN.md` — master plan Tarot 2.0.
+- `docs/TAROT_V2_HANDOFF.md` — trạng thái/mốc tiếp tục Tarot 2.0 giữa các session.
+- `docs/TAROT_V2_PROMPT_SPEC.md` — persona, system-prompt direction, reading schema và tiêu chí chống văn phong máy móc.
+- `docs/TAROT_V2_RENDERER_SPEC.md` — Reading Board, visual direction, responsive layout và contract renderer.
+
+> **Tarot 2.0 hiện mới ở giai đoạn planning/documentation.** Không coi các milestone V2 là đã implementation nếu handoff chưa đánh dấu hoàn tất.
 
 ---
 

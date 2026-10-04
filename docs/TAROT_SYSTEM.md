@@ -1,6 +1,8 @@
 # 🔮 TÀI LIỆU HỆ THỐNG BỐC BÀI VÀ LUẬN GIẢI TAROT AI (TAROT SYSTEM ARCHITECTURE)
 
-Tài liệu này mô tả kiến trúc và luồng xử lý Tarot AI của **Asumi** (repository DiscordMikeBot).
+Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).
+
+> **Tarot 2.0 đang ở giai đoạn planning, chưa implementation.** Khi làm V2, đọc `docs/TAROT_V2_MASTER_PLAN.md` và `docs/TAROT_V2_HANDOFF.md` trước. Tài liệu này vẫn là baseline của runtime hiện tại và phải được cập nhật cùng code khi behavior/architecture thay đổi.
 
 > v2.8.0: Asumi là nhân vật Tarot duy nhất. `auto` là mặc định; `neutral`, `healer`, `chaos` là các style ID tương thích dữ liệu cũ, nay hiển thị lần lượt là Tĩnh, Dịu, Tinh quái. Prompt mới điều chỉnh cách nói theo câu hỏi, vẫn dùng schema JSON và các ranh giới an toàn hiện có.
 
@@ -134,8 +136,8 @@ Sử dụng thư viện **Pillow (PIL)** để tạo ảnh chất lượng cao m
   - Mặt lưng huyền bí với họa tiết hình học thiên văn (Sacred Geometry) khi lá bài chưa được lật.
 - **Hỗ trợ đa dạng Layout trải bài**:
   - **1 Lá (Daily / Yes-No / Single)**: Căn giữa khung hình cân đối.
-  - **3 Lá (Past-Present-Future / Mind-Body-Spirit)**: Xếp ngang tỷ lệ vàng.
-  - **4 & 5 Lá (Choices / Horseshoe / Two Paths)**: Bố cục lưới 2 hàng hoặc đối xứng quan hệ.
+  - **3 Lá (Past-Present-Future / Two Choices / Mind-Body-Spirit)**: Xếp ngang tỷ lệ vàng.
+  - **5 Lá (Horseshoe / Two Paths)**: Bố cục lưới, móng ngựa hoặc đối xứng quan hệ tùy spread.
   - **10 Lá (Celtic Cross)**: Layout chữ thập lồng ghép bên trái (Lá 1-6) + Cột 4 lá dọc bên phải (Lá 7-10) chuẩn xác theo sách cổ Tarot.
 - **Xuất ảnh siêu tốc**: Kết xuất dưới dạng `io.BytesIO()` chuẩn định dạng PNG và gửi qua Discord Attachment (`attachment://tarot_spread.png`).
 
@@ -194,7 +196,7 @@ Gồm 2 tầng View Discord UI:
 
 ## 4. 🎴 Các Loại Trải Bài & Phong Cách Luận Giải
 
-### 4.1. Danh Sách 8 Kiểu Trải Bài
+### 4.1. Danh Sách 9 Kiểu Trải Bài
 
 | Mã Trải Bài | Tên Trải Bài | Số Lá | Mục Đích Sử Dụng |
 | :--- | :--- | :---: | :--- |
@@ -203,8 +205,9 @@ Gồm 2 tầng View Discord UI:
 | `single` | **Single Card (Một lá chuyên sâu)** | 1 lá | Tập trung khai mở bản chất một vấn đề cụ thể. |
 | `ppf` | **Quá khứ - Hiện tại - Tương lai** | 3 lá | Dòng chảy thời gian của sự việc và diễn biến sắp tới. |
 | `mbs` | **Tâm trí - Cơ thể - Tinh thần** | 3 lá | Khám phá tình trạng sức khỏe tinh thần và năng lượng bên trong. |
-| `choices` | **Hai Ngã Rẽ / Lựa Chọn** | 5 lá | Phân tích 2 hướng đi A và B, so sánh rủi ro và kết quả. |
+| `choices` | **Two Choices (So Sánh Nhanh)** | 3 lá | So sánh nhanh 2 hướng A/B và lời khuyên trọng tâm. |
 | `horseshoe` | **Móng Ngựa (Horseshoe Spread)** | 5 lá | Đánh giá tổng quan sự việc, yếu tố ẩn giấu và lời khuyên then chốt. |
+| `two_paths` | **Two Paths (So Sánh Chuyên Sâu)** | 5 lá | Phân tích sâu lợi ích/rủi ro của hai hướng trước khi ưu tiên một lựa chọn. |
 | `celtic` | **Celtic Cross (Thập Tự Cổ Điển)** | 10 lá | Trải bài kinh điển và chi tiết nhất: Thực trạng, Trở ngại, Cội nguồn, Quá khứ, Tương lai gần, Tâm thế, Ngoại cảnh, Hy vọng/Nỗi sợ và Kết cục. |
 
 ---
