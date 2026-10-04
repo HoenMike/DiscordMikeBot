@@ -40,7 +40,7 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertFalse(is_generic_or_login_preview("Facebook", "Mai wrote about her trip today", platform_key="facebook"))
 
     def test_brand_and_legacy_mentions(self):
-        self.assertEqual(CURRENT_VERSION, "2.8.3")
+        self.assertEqual(CURRENT_VERSION, "2.8.4")
         self.assertEqual(runtime_bot_name(None), BOT_BRAND_NAME)
         for query in ("@Asumi nghĩ sao?", "Asumi nghĩ sao?", "MikeDaBot nghĩ sao?"):
             clean, context = extract_question_mentions_context(query, "Mai")
@@ -149,8 +149,8 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
 
         sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
         self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
-        self.assertIn("\nhttps://facebed.com/post/1", sent_kwargs["content"])
-        self.assertNotIn("[Xem bài viết gốc]", sent_kwargs["content"])
+        self.assertIn("[facebed.com](https://facebed.com/post/1)", sent_kwargs["content"])
+        self.assertNotIn("\nhttps://facebed.com/post/1", sent_kwargs["content"])
         self.assertEqual(sent_kwargs["view"].button.label, "Proxy khác")
         self.assertIn("facebed.com", sent_kwargs["view"].payload["tried_domains"])
 
@@ -266,7 +266,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._try_ytdlp_fallback.assert_not_awaited()
         self.cog._discard_preview.assert_awaited_once_with(10, current_preview)
         sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
-        self.assertIn("\nhttps://facebed.seria.moe/post/1", sent_kwargs["content"])
+        self.assertIn("[facebed.seria.moe](https://facebed.seria.moe/post/1)", sent_kwargs["content"])
         self.assertIsInstance(sent_kwargs["view"], FacebookFallbackView)
         self.assertIn("facebed.com", find_proxy.await_args.kwargs["excluded_domains"])
         self.assertIn("facebed.seria.moe", sent_kwargs["view"].payload["tried_domains"])
