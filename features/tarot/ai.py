@@ -7,7 +7,12 @@ import config
 from core.ai import bounded_ai_generate
 from core.branding import BOT_BRAND_NAME, LEGACY_BOT_ALIASES
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict, READER_STYLES
-from features.tarot.reading.schema import TarotAIResponseSchema, TarotReadingResult
+from features.tarot.reading.schema import (
+    TarotAIResponseSchema,
+    TarotClarifierAIResponseSchema,
+    TarotClarifierResult,
+    TarotReadingResult,
+)
 from features.tarot.reading.recommendation import recommend_spread
 
 # Semaphore giới hạn tối đa 3 request AI đồng thời để tránh 429 Rate Limit
@@ -67,6 +72,20 @@ TAROT_FOLLOWUP_CONFIG = types.GenerateContentConfig(
     temperature=0.65,
     system_instruction=TAROT_SYSTEM_INSTRUCTION,
     thinking_config=types.ThinkingConfig(thinking_budget=1024),
+)
+
+TAROT_CLARIFIER_CONFIG = types.GenerateContentConfig(
+    temperature=0.55,
+    system_instruction=TAROT_SYSTEM_INSTRUCTION,
+    response_mime_type="application/json",
+    response_schema=TarotClarifierAIResponseSchema,
+    thinking_config=types.ThinkingConfig(thinking_budget=768),
+)
+
+TAROT_CLARIFIER_CONFIG_FALLBACK = types.GenerateContentConfig(
+    temperature=0.55,
+    system_instruction=TAROT_SYSTEM_INSTRUCTION,
+    response_mime_type="application/json",
 )
 
 
