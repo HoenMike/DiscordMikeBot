@@ -6,7 +6,9 @@
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
 > **Current-system reference:** `docs/TAROT_SYSTEM.md`  
-> **Session handoff / resume checklist:** `docs/TAROT_V2_HANDOFF.md`
+> **Session handoff / resume checklist:** `docs/TAROT_V2_HANDOFF.md`  
+> **Prompt/reading intelligence spec:** `docs/TAROT_V2_PROMPT_SPEC.md`  
+> **Renderer/presentation spec:** `docs/TAROT_V2_RENDERER_SPEC.md`
 
 ---
 
@@ -1526,10 +1528,12 @@ If you are an AI/agent opening this repository in a fresh session:
 1. Read `AGENTS.md`.
 2. Read this file completely.
 3. Read `docs/TAROT_V2_HANDOFF.md`.
-4. Read `docs/TAROT_SYSTEM.md`.
-5. Inspect current `features/tarot/` code before making assumptions.
-6. Check `core/version.py` and latest commits because the code may have advanced beyond this baseline.
-7. Do **not** assume every milestone above has been approved or implemented.
-8. Update the handoff file whenever a milestone is started, completed, changed or rejected.
-9. Preserve current user-facing behavior unless the active milestone intentionally changes it.
-10. If implementation and documentation disagree, treat code as the current runtime truth and update the docs as part of the same change.
+4. Read `docs/TAROT_V2_PROMPT_SPEC.md` before T20.1/AI work.
+5. Read `docs/TAROT_V2_RENDERER_SPEC.md` before T20.4/presentation work.
+6. Read `docs/TAROT_SYSTEM.md`.
+7. Inspect current `features/tarot/` code before making assumptions.
+8. Check `core/version.py` and latest commits because the code may have advanced beyond this baseline.
+9. Do **not** assume every milestone above has been approved or implemented.
+10. Update the handoff file whenever a milestone is started, completed, changed or rejected.
+11. Preserve current user-facing behavior unless the active milestone intentionally changes it.
+12. If implementation and documentation disagree, treat code as the current runtime truth and update the docs as part of the same change.
