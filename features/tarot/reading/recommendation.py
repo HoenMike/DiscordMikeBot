@@ -45,12 +45,30 @@ def question_tokens(text: str) -> set[str]:
 
 
 def question_similarity(a: str, b: str) -> float:
-    """Token Jaccard similarity for lightweight recent-question awareness."""
+    """Lightweight semantic-ish overlap score for recent-question awareness.
+
+    Uses content-token overlap rather than raw string equality so short paraphrases
+    can still be recognized without an AI call.
+    """
     left = question_tokens(a)
     right = question_tokens(b)
     if not left or not right:
         return 0.0
-    return len(left & right) / len(left | right)
+
+    shared = len(left & right)
+    if shared == 0:
+        return 0.0
+
+    # Exact short questions should still match, while one coincidental shared word
+    # in two longer questions should not trigger the "same question" UX.
+    if left == right:
+        return 1.0
+    if shared < 2:
+        return 0.0
+
+    overlap = shared / min(len(left), len(right))
+    jaccard = shared / len(left | right)
+    return (0.7 * overlap) + (0.3 * jaccard)
 
 
 def find_similar_recent_question(
