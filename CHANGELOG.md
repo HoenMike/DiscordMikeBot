@@ -7,6 +7,28 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.9.0] - 2026-10-04 — *Tarot 2.0*
+
+### Added
+- **Clarifier 1/1**: sau quẻ hoàn tất, chủ quẻ có thể chọn một vị trí để rút đúng một lá bổ sung; target do Asumi gợi ý được đưa lên đầu picker.
+- **Clarifier Board**: giữ toàn bộ quẻ gốc, đánh dấu **TARGET** và hiển thị quan hệ **TARGET → CLARIFIER** thay vì thay/reroll lá cũ.
+- **Bounded clarifier interpretation**: AI chỉ giải quan hệ giữa vị trí gốc và lá bổ sung, nói rõ phần sáng tỏ, tác động, bước thực tế và uncertainty.
+- **Persistence riêng**: Clarifier đã giao thành công được lưu riêng để không mutate tarot_history.
+
+### Tarot 2.0 release boundary
+- T20.1 — Reading Engine 2.0: structured reading, natural Asumi prompt, card connections, key card, uncertainty.
+- T20.2 — Question-first Launcher: đề xuất spread theo câu hỏi, explicit accept/manual override, repeated-question awareness.
+- T20.3 — Live Reading Session: one-message flow, progress, micro reveal, AI-ready/finalizing states, compact controls.
+- T20.4 — Reading Board 2.0: responsive 1/3/5/10-card layouts, dynamic 4/6/7 layouts, REV/Major/KEY/NEW/TARGET states và visual fallback.
+- T20.5 — Clarifier: target picker, deterministic one-card draw, board, contextual interpretation, 1/1 limit và persistence.
+
+### Reliability
+- Clarifier không lấy lại bất kỳ lá nào của spread gốc và không thay đổi order/chiều/kết quả quẻ đã hoàn tất.
+- Retry Clarifier được bind vào đúng spread gốc để lỗi delivery không âm thầm đổi sang một lá khác.
+- Lượt Clarifier chỉ bị khóa sau khi Discord nhận được output; lỗi render/AI/delivery không làm mất quẻ gốc hoặc tiêu lượt.
+- Output AI được giới hạn để nằm an toàn trong Discord embed; nếu attachment lỗi, bot thử gửi bản text-only trước khi coi delivery thất bại.
+- Giữ nguyên toàn bộ social-embed behavior của v2.8.5 và các hotfix icon-only/neutral remove button trên main.
+
 ## [2.8.5] - 2026-10-04 — *Universal Embed Controls*
 
 ### Added
