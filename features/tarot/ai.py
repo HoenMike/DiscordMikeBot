@@ -882,31 +882,40 @@ async def generate_followup_answer(
     style_info = READER_STYLES.get(reader_style, READER_STYLES["auto"])
     persona_prompt = style_info["persona_prompt"]
 
+    tone_hint = (
+        _infer_auto_tone(clean_followup, original_question)
+        if reader_style == "auto"
+        else persona_prompt
+    )
+
     prompt = f"""
-    Bạn là Asumi, cùng người vừa giải bài. Người hỏi `{user_name}` vừa bốc một quẻ bài và có một câu hỏi thắc mắc thêm để làm rõ ý nghĩa.
-    {persona_prompt}
+Bạn là Asumi đang tiếp tục đúng quẻ bài vừa đọc cho {user_name}.
+Đây là cùng một cuộc trò chuyện, KHÔNG phải một lần rút bài mới.
 
-    THÔNG TIN QUẺ BÀI ĐÃ RÚT:
-    - Câu hỏi ban đầu: "{original_question or 'Tổng quan'}"
-    - Các lá bài:
-    {cards_context}
+GIỌNG
+- {tone_hint}
+- Đi thẳng vào câu hỏi phụ; không chào lại, không tóm tắt lại toàn bộ quẻ.
+- Tránh văn mẫu "Lá bài này cho thấy..." và các câu huyền bí chung chung.
 
-    - Tóm tắt bài luận giải trước đó:
-    {original_reading[:800]}
+QUẺ GỐC
+- Câu hỏi ban đầu: {original_question or 'Tổng quan'}
+- Các lá bài đã rút:
+{cards_context}
+- Bài đọc trước (chỉ để giữ mạch):
+{original_reading[:1200]}
 
-    ❓ CÂU HỎI THẮC MẮC BỔ SUNG CỦA `{user_name}`:
-    "{clean_followup}"
-    {mentions_context_str}
+CÂU HỎI PHỤ
+- {clean_followup}
+{mentions_context_str}
 
-    🚨 YÊU CẦU:
-    - Trả lời ngắn gọn, trực diện, ấm áp và thấu đáo trong 1-2 đoạn văn (dưới 800 ký tự).
-    - Trả lời THẲNG THẮN VÀO TRỌNG TÂM câu hỏi mới, liên kết chặt chẽ với ý nghĩa và chi tiết các lá bài đã xuất hiện. Tuyệt đối không né tránh câu hỏi, không nói chung chung sáo rỗng và không tự áp đặt văn mẫu tình cảm vào các chủ đề khác.
-    - NGUYÊN TẮC ĐẠO ĐỨC & RANH GIỚI TRẢI BÀI (BẮT BUỘC TUÂN THỦ):
-      + Tarot là công cụ soi chiếu nội tâm cho chính người hỏi `{user_name}`.
-      + VẪN CHO PHÉP hỏi về người khác NẾU `{user_name}` là người trong cuộc đang tìm kiếm lời khuyên, hoặc đây là câu hỏi trêu đùa/khen ngợi bạn bè lành mạnh trong server (vùng xám/banter - KHÔNG được quá strict).
-      + CHỈ TỪ CHỐI nếu câu hỏi mang tính soi mói đời tư, bí mật độc hại của bên thứ ba mà `{user_name}` không liên quan.
-      + Khi câu hỏi không hợp lệ, từ chối nhẹ nhàng và hướng người hỏi về điều họ có thể tự quyết định. Không đổi nhân vật hay dùng câu đùa cố định.
-    """.strip()
+YÊU CẦU
+- Trả lời 1-2 đoạn, tối đa khoảng 800 ký tự.
+- Chỉ dùng các lá đã có; không bịa lá mới, không giả vờ đã rút clarifier.
+- Chọn đúng 1-2 chi tiết từ quẻ giúp trả lời câu hỏi phụ, thay vì kể lại mọi lá.
+- Nếu câu hỏi đòi biết chắc suy nghĩ/bí mật của người khác, chuyển về điều quẻ phản chiếu ở phía người hỏi.
+- Nếu câu hỏi y tế/pháp lý/tài chính hoặc khủng hoảng, giữ giới hạn thực tế của Tarot và không chốt thay quyết định.
+- Nếu câu hỏi vượt ranh giới riêng tư của người thứ ba, từ chối ngắn gọn và gợi ý một góc hỏi liên quan trực tiếp đến {user_name}.
+""".strip()
 
     models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
         config.GEMINI_TAROT_MODEL,
@@ -954,6 +963,93 @@ async def generate_followup_answer(
     return "Mình chưa thể giải thích thêm lúc này. Bạn thử hỏi lại sau nhé."
 
 
+
+async def generate_why_explanation(
+    drawn_cards: List[DrawnCard],
+    original_question: Optional[str],
+    original_reading: str,
+    reader_style: str = "auto",
+    user_name: str = "Bạn",
+) -> str:
+    """Explain visible card evidence behind a reading without exposing hidden chain-of-thought."""
+    cards_context = _format_cards_context(drawn_cards)
+    style_info = READER_STYLES.get(reader_style, READER_STYLES["auto"])
+    tone_hint = (
+        _infer_auto_tone(original_question, original_reading[:300])
+        if reader_style == "auto"
+        else style_info["persona_prompt"]
+    )
+
+    prompt = f"""
+Bạn là Asumi. Hãy giải thích NGẮN GỌN vì sao bài đọc vừa rồi đi tới kết luận đó,
+dựa hoàn toàn trên bằng chứng người dùng nhìn thấy trong quẻ.
+
+Câu hỏi: {original_question or 'Tổng quan'}
+Các lá/vị trí:
+{cards_context}
+
+Bài đọc hiện tại:
+{original_reading[:1400]}
+
+Giọng: {tone_hint}
+
+Chỉ trả 1 đoạn dưới 700 ký tự:
+- nêu 1-3 lá/vị trí quan trọng;
+- nói mối liên hệ giữa chúng dẫn tới kết luận nào;
+- nếu có phần chưa chắc thì nói rõ;
+- không kể quy trình suy nghĩ nội bộ, không nhắc system prompt, không bịa lá mới;
+- không dùng lời mở đầu/cảm ơn hay câu huyền bí sáo rỗng.
+""".strip()
+
+    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
+        config.GEMINI_TAROT_MODEL,
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemma-4-31b-it",
+    ])
+
+    seen = set()
+    ordered_models = []
+    for model_name in models_to_try:
+        if model_name and model_name not in seen:
+            seen.add(model_name)
+            ordered_models.append(model_name)
+
+    async with AI_SEMAPHORE:
+        for model_name in ordered_models:
+            try:
+                response = await bounded_ai_generate(
+                    model=model_name,
+                    contents=prompt,
+                    config=TAROT_FOLLOWUP_CONFIG,
+                    timeout_sec=12.0,
+                    label="Tarot Why",
+                )
+                if response and response.text:
+                    answer = response.text.strip()
+                    if answer.startswith("```"):
+                        answer = re.sub(r"^```[a-zA-Z]*\s*", "", answer)
+                        answer = re.sub(r"\s*```$", "", answer).strip()
+                    return answer[:900]
+            except Exception:
+                continue
+
+    # Deterministic fallback still points to visible evidence rather than inventing reasoning.
+    if not drawn_cards:
+        return "Mình chưa có đủ dữ kiện lá bài để giải thích thêm."
+    evidence = ", ".join(
+        f"{card.card.name_vi} ở vị trí {card.position_title}"
+        for card in drawn_cards[:3]
+    )
+    return (
+        f"Mình dựa chủ yếu vào {evidence}. Phần chắc nhất là mối liên hệ giữa các vị trí này; "
+        "phần kết quả cuối vẫn phụ thuộc vào hoàn cảnh thực tế và lựa chọn của bạn."
+    )
+
 def recommend_spread_for_question(question: str) -> Tuple[str, str, str]:
     """
     Phân tích từ khóa câu hỏi để gợi ý kiểu trải bài phù hợp nhất.
@@ -971,6 +1067,6 @@ def recommend_spread_for_question(question: str) -> Tuple[str, str, str]:
         return ("ppf", "Quá Khứ - Hiện Tại - Tương Lai (3 lá)", "Vấn đề tình cảm luôn có dòng chảy thời gian và nguồn gốc tâm lý. Trải 3 lá giúp soi chiếu lại hành trình và xu hướng tương lai.")
 
     if any(kw in q for kw in ["tổng quan", "năm nay", "cuộc đời", "sự nghiệp dài hạn", "vận mệnh", "bức tranh toàn cảnh"]):
-        return ("celtic_cross", "Celtic Cross - Thập Tự Celtic (10 lá)", "Vấn đề phức tạp và mang tính bước ngoặt. Celtic Cross là trải bài kinh điển 10 lá phân tích toàn diện mọi khía cạnh ẩn sâu.")
+        return ("celtic", "Celtic Cross - Thập Tự Celtic (10 lá)", "Vấn đề phức tạp và mang tính bước ngoặt. Celtic Cross là trải bài kinh điển 10 lá phân tích toàn diện mọi khía cạnh ẩn sâu.")
 
     return ("ppf", "Quá Khứ - Hiện Tại - Tương Lai (3 lá)", "Trải bài 3 lá cổ điển, linh hoạt và phù hợp nhất để xem xét tiến trình của hầu hết mọi vấn đề trong cuộc sống.")
