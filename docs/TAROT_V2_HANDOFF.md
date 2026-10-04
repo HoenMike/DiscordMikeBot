@@ -14,10 +14,12 @@ In a fresh session, read in this order:
 
 1. `AGENTS.md`
 2. `docs/TAROT_V2_MASTER_PLAN.md`
-3. `docs/TAROT_SYSTEM.md`
-4. current `features/tarot/` code
-5. `core/version.py`
-6. latest Git history / open PRs
+3. `docs/TAROT_V2_PROMPT_SPEC.md`
+4. `docs/TAROT_V2_RENDERER_SPEC.md`
+5. `docs/TAROT_SYSTEM.md`
+6. current `features/tarot/` code
+7. `core/version.py`
+8. latest Git history / open PRs
 
 Do not rely only on this handoff because runtime code may have changed after it was written.
 
@@ -217,7 +219,7 @@ Avoid implementing all V2 milestones in one giant branch.
 
 | Milestone | Status | Notes |
 |---|---|---|
-| T20.0 | IN PROGRESS / docs prep | Master plan + handoff being added |
+| T20.0 | COMPLETE | Master plan, handoff, prompt spec, renderer spec and agent entry-point added |
 | T20.1 | NOT STARTED | Wait for explicit approval |
 | T20.2 | NOT STARTED | Wait for explicit approval |
 | T20.3 | NOT STARTED | Wait for explicit approval |
