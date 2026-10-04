@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1–T20.6 COMPLETE — Tarot 2.0 released; post-release expansion continues. T20.7 NEXT.** The user approved continuing through T20.9 without per-milestone approval.  
+> **Implementation status:** **T20.1–T20.7 COMPLETE — Tarot 2.0 released; post-release expansion continues. T20.8 NEXT.** The user approved continuing through T20.9 without per-milestone approval.  
 > **Last planning update:** 2026-10-05  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -617,6 +617,16 @@ Normal engine still performs:
 `schema → draw → render → interpretation`.
 
 ---
+
+## T20.7 implementation status — COMPLETE
+
+Implemented 2026-10-05:
+
+- schema-only AI generation with no card selection;
+- validated 3–7 unique positions with bounded text and privacy/card-field guards;
+- fixed-spread fallback when schema generation is invalid/unavailable;
+- deck-owned custom draw with existing fatigue behavior;
+- launcher integration plus existing dynamic Reading Board reuse.
 
 # 13. Tarot Journey
 

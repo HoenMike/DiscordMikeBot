@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.6 Multi-turn Reading Session implemented; T20.7 Smart Custom Spread is next.  
+> **Status:** T20.7 Smart Custom Spread implemented; T20.8 Tarot Journey is next.  
 > **Last updated:** 2026-10-05.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -50,7 +50,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **T20.5 — Clarifier has been implemented.**
 - **Tarot 2.0 release boundary (T20.1–T20.5) is complete in Asumi 2.9.0.**
 - **T20.6 — Multi-turn Reading Session has been implemented.**
-- **Next milestone: T20.7 — Smart Custom Spread.**
+- **T20.7 — Smart Custom Spread has been implemented.**
+- **Next milestone: T20.8 — Tarot Journey.**
 
 ---
 
@@ -236,9 +237,8 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.4 | COMPLETE | Reading Board state contract, responsive layouts, position/progress labels, REV/Major/key/new/target states, dynamic 4/6/7 layouts, final board and fallback |
 | T20.5 | COMPLETE | Owner-only target picker, deterministic non-reroll one-card draw, Clarifier Board, bounded interpretation, delivery-safe 1/1 limit and separate persistence |
 | T20.6 | COMPLETE | Up to 3 contextual follow-ups, shared session state, owner-only Why?, 10-minute inactivity expiry and delivery-safe consumption |
-| T20.7 | NEXT | Smart Custom Spread |
-
-| T20.8 | NOT STARTED | Later |
+| T20.7 | COMPLETE | Schema-only AI design, validated 3–7 positions, deck-owned draw, fixed-spread fallback |
+| T20.8 | NEXT | Tarot Journey |
 | T20.9 | NOT STARTED | Later |
 
 ### T20.5 implementation contract
@@ -261,6 +261,14 @@ Avoid implementing all V2 milestones in one giant branch.
 - Clarifier remains **1/1** and becomes context for later follow-ups; it is not converted into reroll behavior.
 - The result session inherits the Discord View timeout (10 minutes by default). Timeout closes the session actions and disables follow-up / clarifier / Why controls.
 - Activity details now track follow-up count and Why usage.
+
+### T20.7 implementation contract
+
+- Launcher exposes **🧩 Trải bài riêng** only after a question exists; fixed recommendation/manual spread remain available.
+- AI returns only `title`, `intent`, `reason` and 3–7 positions. Validator rejects duplicate IDs/titles, invalid counts, card/orientation fields and private third-party position framing.
+- `draw_custom_spread(...)` remains the sole card-draw authority for custom schemas and keeps no-repeat/fatigue behavior.
+- Existing dynamic Reading Board layouts are reused and custom titles flow through live/final/Clarifier boards.
+- Invalid or unavailable custom schema generation falls back to the known-spread recommendation instead of failing.
 
 When a milestone starts or completes, update this table in the same PR.
 

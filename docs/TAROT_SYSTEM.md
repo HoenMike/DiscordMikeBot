@@ -107,6 +107,7 @@ features/tarot/
 │   ├── schema.py    # Structured Reading Result V2
 │   ├── recommendation.py # Smart launcher recommendation + repeated-question helper
 │   ├── clarifier.py # Resolve AI-suggested targets + existing target insight
+│   ├── custom_spread.py # T20.7 schema-only Smart Custom Spread validation
 │   └── session.py   # Progress, micro reveal, compact controls & AI-ready presentation helpers
 ├── rendering/
 │   └── state.py     # ReadingBoardState: reveal/final/key/target state independent from Discord UI
@@ -190,7 +191,8 @@ Schema V2 nằm tại `features/tarot/reading/schema.py`.
 Gồm 2 tầng View Discord UI:
 1. **`TarotLauncherView` — Question-first từ T20.2**:
    - Mở bằng câu hỏi/bối cảnh thay vì giả định người dùng đã biết spread.
-   - `features/tarot/reading/recommendation.py` đề xuất spread tức thì, không gọi AI.
+   - `features/tarot/reading/recommendation.py` đề xuất spread cố định tức thì, không gọi AI.
+   - T20.7 thêm **🧩 Trải bài riêng**: AI chỉ thiết kế schema 3–7 vị trí; `reading/custom_spread.py` validate schema rồi `deck.py` mới rút bài.
    - User phải bấm **Dùng đề xuất** hoặc tự chọn spread trước khi **Bắt đầu** được bật.
    - Menu spread vẫn giữ làm manual override; Reader Style là tuỳ chọn thứ cấp.
    - Daily Card vẫn có thể tự chọn và bắt đầu mà không cần câu hỏi.
@@ -227,6 +229,14 @@ Gồm 2 tầng View Discord UI:
 - **🔍 Vì sao?** is owner-only and one-use; it calls the evidence-facing Why generator and never exposes hidden chain-of-thought.
 - The default result-view lifetime remains 600 seconds. On timeout, follow-up / clarifier / Why actions are disabled.
 - Clarifier remains one-card, one-use, and is attached to the same session only as context for subsequent questions.
+
+#### Smart Custom Spread — T20.7
+
+- Launcher có **🧩 Trải bài riêng** sau khi người dùng nhập câu hỏi.
+- AI chỉ tạo `title`, `intent`, `reason` và 3–7 vị trí; không được cấp card ID hay orientation.
+- `reading/custom_spread.py` validate count/uniqueness/text bounds/card fields/private framing trước khi draw.
+- `draw_custom_spread(...)` trong deck engine mới rút lá thật; schema lỗi sẽ fallback về spread chuẩn được recommendation chọn.
+- Renderer dynamic 3–7 lá hiện có được tái sử dụng và giữ custom title tới final/Clarifier Board.
 
 ### 3.5. Module Quản Lý Cơ Sở Dữ Liệu SQLite (`manager.py`)
 

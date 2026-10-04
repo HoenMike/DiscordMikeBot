@@ -11,11 +11,13 @@ from features.tarot.deck import (
     READER_STYLES,
     SPREAD_DEFINITIONS,
     draw_clarifier,
+    draw_custom_spread,
     draw_spread
 )
 from features.tarot.renderer import render_clarifier_board_to_bytes, render_spread_to_bytes
-from features.tarot.ai import generate_clarifier_interpretation, generate_tarot_reading_result, generate_followup_answer, generate_why_explanation, recommend_spread_for_question
+from features.tarot.ai import generate_clarifier_interpretation, generate_custom_spread_schema, generate_tarot_reading_result, generate_followup_answer, generate_why_explanation, recommend_spread_for_question
 from features.tarot.reading.clarifier import resolve_clarifier_suggestions, target_insight
+from features.tarot.reading.custom_spread import CustomSpreadSchema
 from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.reading.schema import TarotReadingResult
 from features.tarot.rendering.state import ClarifierBoardState
@@ -182,12 +184,19 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
         clean_q = self.question_input.value.strip() if self.question_input.value else None
         clean_ctx = self.context_input.value.strip() if self.context_input.value else None
         previous_question = self.launcher_view.question
+        previous_context = self.launcher_view.context
 
         self.launcher_view.question = clean_q if clean_q else None
         self.launcher_view.context = clean_ctx if clean_ctx else None
 
-        if previous_question != self.launcher_view.question and self.launcher_view.selection_source == "recommendation":
-            self.launcher_view.selection_source = "default"
+        if (
+            previous_question != self.launcher_view.question
+            or previous_context != self.launcher_view.context
+        ):
+            if self.launcher_view.selection_source in {"recommendation", "custom"}:
+                self.launcher_view.selection_source = "default"
+            self.launcher_view.custom_spread_schema = None
+            self.launcher_view.custom_spread_notice = None
 
         self.launcher_view.refresh_recommendation()
         await self.launcher_view.refresh_similar_question_hint()
@@ -235,6 +244,8 @@ class TarotLauncherView(discord.ui.View):
         self.recommended_spread: Optional[str] = None
         self.recommended_name: Optional[str] = None
         self.recommendation_reason: Optional[str] = None
+        self.custom_spread_schema: Optional[CustomSpreadSchema] = None
+        self.custom_spread_notice: Optional[str] = None
         self.similar_question_hint: Optional[dict] = None
         self.reading_context_mode = "current"
 
@@ -301,6 +312,8 @@ class TarotLauncherView(discord.ui.View):
     def _can_start(self) -> bool:
         if self.selection_source == "default":
             return False
+        if self.selection_source == "custom":
+            return bool(self.question and self.custom_spread_schema)
         spread_info = SPREAD_DEFINITIONS.get(self.selected_spread)
         if not spread_info:
             return False
@@ -313,6 +326,8 @@ class TarotLauncherView(discord.ui.View):
             return False
         self.selected_spread = self.recommended_spread
         self.selection_source = "recommendation"
+        self.custom_spread_schema = None
+        self.custom_spread_notice = None
         return True
 
     def _check_author(self, interaction: discord.Interaction) -> bool:
@@ -358,7 +373,9 @@ class TarotLauncherView(discord.ui.View):
         lines.append(WIDE_DIVIDER)
 
         if self.selection_source == "default":
-            selection_text = "*(Chưa chọn — dùng đề xuất hoặc tự chọn spread bên dưới)*"
+            selection_text = "*(Chưa chọn — dùng đề xuất, tạo spread riêng hoặc tự chọn bên dưới)*"
+        elif self.selection_source == "custom" and self.custom_spread_schema:
+            selection_text = f"**{self.custom_spread_schema.title}** · Smart Custom Spread"
         else:
             spread_name = SPREAD_DEFINITIONS.get(self.selected_spread, {}).get(
                 "name", self.selected_spread
@@ -370,6 +387,16 @@ class TarotLauncherView(discord.ui.View):
             f"🃏 **Trải bài sẽ dùng:** {selection_text}",
             f"🎭 **Phong cách Asumi:** {reader_display}",
         ])
+
+        if self.custom_spread_schema and self.selection_source == "custom":
+            positions = " · ".join(position.title for position in self.custom_spread_schema.positions)
+            lines.extend([
+                "",
+                f"🧩 **Cấu trúc riêng ({self.custom_spread_schema.card_count} lá):** {positions}",
+                f"*{self.custom_spread_schema.reason}*",
+            ])
+        if self.custom_spread_notice:
+            lines.extend(["", f"⚠️ *{self.custom_spread_notice}*"])
 
         if self.similar_question_hint:
             old_question = str(self.similar_question_hint.get("question") or "").strip()
@@ -390,7 +417,7 @@ class TarotLauncherView(discord.ui.View):
 
         lines.extend([
             "",
-            "💡 **Flow mới:** Nhập câu hỏi → dùng đề xuất hoặc tự chọn → bắt đầu trải bài.",
+            "💡 **Flow:** Nhập câu hỏi → dùng đề xuất / tạo spread riêng / tự chọn → bắt đầu.",
             "Tarot dùng để tự chiêm nghiệm; Asumi không soi bí mật của người ngoài cuộc hay chốt thay quyết định thực tế.",
         ])
 
@@ -407,8 +434,10 @@ class TarotLauncherView(discord.ui.View):
 
     def build_shuffling_embed(self) -> discord.Embed:
         """Short transition state between launcher setup and the face-down reading board."""
-        spread_name = SPREAD_DEFINITIONS.get(self.selected_spread, {}).get(
-            "name", self.selected_spread
+        spread_name = (
+            self.custom_spread_schema.title
+            if self.selection_source == "custom" and self.custom_spread_schema
+            else SPREAD_DEFINITIONS.get(self.selected_spread, {}).get("name", self.selected_spread)
         )
         lines = [
             f"**{spread_name}**",
@@ -515,6 +544,17 @@ class TarotLauncherView(discord.ui.View):
         btn_history.callback = self._handle_history_button
         self.add_item(btn_history)
 
+        if self.question:
+            btn_custom = discord.ui.Button(
+                label="✓ Spread riêng" if self.selection_source == "custom" else "🧩 Trải bài riêng",
+                style=discord.ButtonStyle.secondary if self.selection_source == "custom" else discord.ButtonStyle.primary,
+                custom_id="launcher_btn_custom",
+                row=3,
+                disabled=(self.selection_source == "custom"),
+            )
+            btn_custom.callback = self._handle_custom_spread_button
+            self.add_item(btn_custom)
+
         # Discord allows max 5 components per row. When recommendation is present,
         # close moves to its own compact row with same-question controls.
         close_row = 3 if self.recommended_spread else 2
@@ -557,6 +597,8 @@ class TarotLauncherView(discord.ui.View):
 
         self.selected_spread = interaction.data["values"][0]
         self.selection_source = "manual"
+        self.custom_spread_schema = None
+        self.custom_spread_notice = None
         self._build_components()
         await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
 
@@ -573,6 +615,43 @@ class TarotLauncherView(discord.ui.View):
 
         self._build_components()
         await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+
+    async def _handle_custom_spread_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+        if not self.question:
+            await interaction.response.send_message("✏️ Hãy nhập câu hỏi trước khi tạo spread riêng.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        bot_user = interaction.client.user if interaction and interaction.client else None
+        schema = await generate_custom_spread_schema(
+            question=self.question,
+            context=self.context,
+            user_name=self.author_name,
+            user_id=self.author_id,
+            guild=interaction.guild if interaction else None,
+            bot_id=bot_user.id if bot_user else None,
+            bot_name=runtime_bot_name(bot_user),
+        )
+
+        if schema:
+            self.custom_spread_schema = schema
+            self.custom_spread_notice = None
+            self.selected_spread = "custom"
+            self.selection_source = "custom"
+        else:
+            self.custom_spread_schema = None
+            fallback = self.recommended_spread if self.recommended_spread in SPREAD_DEFINITIONS else "ppf"
+            self.selected_spread = fallback
+            self.selection_source = "recommendation"
+            self.custom_spread_notice = (
+                "Asumi chưa tạo được cấu trúc riêng hợp lệ, nên đã fallback sang spread chuẩn phù hợp nhất."
+            )
+
+        self._build_components()
+        await interaction.edit_original_response(embed=self.build_launcher_embed(), view=self)
 
     async def _handle_context_mode_select(self, interaction: discord.Interaction):
         if not self._check_author(interaction):
@@ -605,7 +684,11 @@ class TarotLauncherView(discord.ui.View):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
             return
 
-        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        spread_info = (
+            self.custom_spread_schema.as_spread_info()
+            if self.selection_source == "custom" and self.custom_spread_schema
+            else SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
+        )
         if not self._can_start():
             if spread_info.get("requires_question", True) and not self.question:
                 await interaction.response.send_modal(TarotQuestionModal(self))
@@ -691,13 +774,26 @@ class TarotLauncherView(discord.ui.View):
             recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
         fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
 
-        drawn_cards = draw_spread(
-            spread_key=self.selected_spread,
-            user_id=self.author_id,
-            question=self.question,
-            fatigue_card_ids=fatigue_card_ids
-        )
-        spread_info = SPREAD_DEFINITIONS[self.selected_spread]
+        if self.selection_source == "custom" and self.custom_spread_schema:
+            spread_info = self.custom_spread_schema.as_spread_info()
+            drawn_cards = draw_custom_spread(
+                positions=[
+                    (position.title, position.description)
+                    for position in self.custom_spread_schema.positions
+                ],
+                user_id=self.author_id,
+                question=self.question,
+                schema_title=self.custom_spread_schema.title,
+                fatigue_card_ids=fatigue_card_ids,
+            )
+        else:
+            drawn_cards = draw_spread(
+                spread_key=self.selected_spread,
+                user_id=self.author_id,
+                question=self.question,
+                fatigue_card_ids=fatigue_card_ids
+            )
+            spread_info = SPREAD_DEFINITIONS[self.selected_spread]
 
         # Legacy random choice now resolves to Asumi's adaptive mood.
         actual_reader = self.selected_reader
@@ -717,7 +813,8 @@ class TarotLauncherView(discord.ui.View):
                 user_id=self.author_id,
                 guild=interaction.guild if interaction else None,
                 bot_id=bot_user.id if bot_user else None,
-                bot_name=runtime_bot_name(bot_user)
+                bot_name=runtime_bot_name(bot_user),
+                spread_name_override=spread_info["name"] if self.selected_spread == "custom" else None,
             )
         )
 
@@ -743,7 +840,8 @@ class TarotLauncherView(discord.ui.View):
             render_spread_to_bytes,
             self.selected_spread,
             drawn_cards,
-            set()
+            set(),
+            spread_title=spread_info["name"],
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
@@ -1127,6 +1225,7 @@ class TarotResultActionView(discord.ui.View):
         context: Optional[str] = None,
         reading_result: Optional[TarotReadingResult] = None,
         clarifier_allowed: bool = True,
+        spread_title: Optional[str] = None,
         timeout: float = 600.0
     ):
         super().__init__(timeout=timeout)
@@ -1144,6 +1243,7 @@ class TarotResultActionView(discord.ui.View):
         self.activity_id = activity_id
         self.reading_result = reading_result
         self.clarifier_allowed = clarifier_allowed
+        self.spread_title = spread_title
         self.session_state = TarotSessionState(max_followups=3, timeout_seconds=float(timeout))
         self.has_asked_followup = False  # compatibility: true only when all 3 turns are consumed
         self.has_used_clarifier = False
@@ -1315,6 +1415,7 @@ class TarotResultActionView(discord.ui.View):
                 target_position_index=target_index,
                 clarifier_card=clarifier,
                 key_card_id=key_card_id,
+                spread_title=self.spread_title,
             )
 
             ai_task = self.tarot_manager.create_ai_task(
@@ -1551,6 +1652,7 @@ class TarotFlipView(discord.ui.View):
         self.author_avatar_url = author_avatar_url
         self.spread_key = spread_key
         self.spread_info = spread_info
+        self.spread_title = spread_info.get("name", spread_key)
         self.drawn_cards = drawn_cards
         self.question = question
         self.context = context
@@ -1810,6 +1912,7 @@ class TarotFlipView(discord.ui.View):
             self.revealed_indices,
             just_revealed_indices=(newly_revealed if len(newly_revealed) <= 3 else set()),
             final=is_completed,
+            spread_title=self.spread_title,
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
@@ -1907,6 +2010,7 @@ class TarotFlipView(discord.ui.View):
                 self.revealed_indices,
                 key_card_id=key_card_id,
                 final=True,
+                spread_title=self.spread_title,
             )
             file = discord.File(fp=final_image_buffer, filename="tarot_spread.png")
 
@@ -2007,6 +2111,7 @@ class TarotFlipView(discord.ui.View):
                 activity_id=act_id,
                 reading_result=reading_result,
                 clarifier_allowed=is_valid_question,
+                spread_title=self.spread_title,
             )
 
             action_view.message = self.message or interaction.message
