@@ -1098,7 +1098,11 @@ class TarotResultActionView(discord.ui.View):
         spread_key: str,
         tarot_manager: TarotManager,
         guild_id: Optional[int] = None,
+        channel_id: Optional[int] = None,
         activity_id: Optional[int] = None,
+        context: Optional[str] = None,
+        reading_result: Optional[TarotReadingResult] = None,
+        clarifier_allowed: bool = True,
         timeout: float = 600.0
     ):
         super().__init__(timeout=timeout)
@@ -1106,15 +1110,27 @@ class TarotResultActionView(discord.ui.View):
         self.author_name = author_name
         self.drawn_cards = drawn_cards
         self.question = question
+        self.context = context
         self.ai_reading = ai_reading
         self.reader_style = reader_style
         self.spread_key = spread_key
         self.tarot_manager = tarot_manager
         self.guild_id = guild_id
+        self.channel_id = channel_id
         self.activity_id = activity_id
+        self.reading_result = reading_result
+        self.clarifier_allowed = clarifier_allowed
         self.has_asked_followup = False
+        self.has_used_clarifier = False
+        self._clarifier_in_progress = False
+        self.clarifier_target_index: Optional[int] = None
+        self.clarifier_card: Optional[DrawnCard] = None
+        self.clarifier_reading: Optional[str] = None
         self.liked_user_ids: set[int] = set()
         self.disliked_user_ids: set[int] = set()
+
+        if not clarifier_allowed or not drawn_cards:
+            self.clarifier_button.disabled = True
 
     @discord.ui.button(label="❓ Hỏi Thêm Ý Nghĩa", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
