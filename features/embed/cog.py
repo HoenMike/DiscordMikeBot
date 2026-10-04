@@ -972,63 +972,67 @@ class EmbedCog(commands.Cog):
 
                 author_name = _clean_markdown_label(message.author.display_name)
                 author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
+
+                # Facebook cần URL proxy ở dạng raw text để Discord tự unfurl thành native embed.
+                # Button chỉ là điều khiển phụ để người gửi chủ động chuyển sang proxy kế tiếp.
+                if platform_key == "facebook":
+                    raw_link = proxy_url
+                    if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
+                        raw_link = f"||{raw_link}||"
+                    fallback_view = self._manual_fallback_view(
+                        message,
+                        platform_key,
+                        url,
+                        is_spoiler=is_spoiler,
+                        tried_domains=tried,
+                    )
+                    sent_msg = await self._send_embed_preview(
+                        message=message,
+                        content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                        view=fallback_view,
+                    )
+                    if not sent_msg:
+                        last_reason = "proxy_send_failed"
+                        continue
+
+                    self._register_manual_fallback_preview(
+                        message.id, url, message.channel.id, sent_msg.id
+                    )
+                    self._set_facebook_proxy_state(message.id, url, tried)
+                    return PreviewResult(
+                        "success",
+                        "proxy",
+                        "proxy_link_sent",
+                        platform_key,
+                        domain,
+                        message.id,
+                        sent_msg.id,
+                        False,
+                    )
+
                 link = f"[Xem bài viết gốc]({proxy_url})"
                 if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
                     link = f"||{link}||"
-                fallback_view = self._manual_fallback_view(
-                    message, platform_key, url, is_spoiler=is_spoiler
-                )
                 sent_msg = await self._send_embed_preview(
                     message=message,
                     content=f"-# {author_jump} • {link}",
-                    view=fallback_view,
                 )
                 if not sent_msg:
                     last_reason = "proxy_send_failed"
                     continue
                 verified = False
                 removed = True
-                preserve_unverified = False
                 try:
                     verified, last_reason = await self._verify_proxy_unfurl(message.id, sent_msg, platform_key)
                     if verified and message.id not in self._deleted_message_ids:
-                        if fallback_view:
-                            self._register_manual_fallback_preview(
-                                message.id, url, message.channel.id, sent_msg.id
-                            )
                         return PreviewResult("success", "proxy", "usable_embed", platform_key, domain, message.id, sent_msg.id, True)
                     if message.id in self._deleted_message_ids:
                         verified = False
                         last_reason = "origin_deleted"
-                    preserve_unverified = (
-                        platform_key == "facebook"
-                        and last_reason == "unfurl_timeout"
-                        and message.id not in self._deleted_message_ids
-                    )
                 finally:
-                    if not verified and not preserve_unverified:
+                    if not verified:
                         removed = await self._discard_preview(message.id, sent_msg)
 
-                if preserve_unverified:
-                    if fallback_view:
-                        self._register_manual_fallback_preview(
-                            message.id, url, message.channel.id, sent_msg.id
-                        )
-                    print(
-                        f"[EmbedCog] Facebook unfurl chưa xác định; giữ preview {sent_msg.id} và chờ fallback thủ công.",
-                        flush=True,
-                    )
-                    return PreviewResult(
-                        status="action_required",
-                        tier="proxy",
-                        reason="unfurl_timeout",
-                        platform=platform_key,
-                        proxy_domain=domain,
-                        origin_message_id=message.id,
-                        preview_message_id=sent_msg.id,
-                        unfurl_verified=False,
-                        fallback_reason="unfurl_timeout",
-                    )
                 if not removed:
                     return PreviewResult("degraded", "proxy", "cleanup_failed", platform_key, domain, message.id, sent_msg.id)
             return PreviewResult(reason=last_reason, platform=platform_key, origin_message_id=message.id)
