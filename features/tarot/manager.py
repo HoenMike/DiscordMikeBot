@@ -111,6 +111,24 @@ class TarotManager:
                 updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS tarot_clarifiers (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id               INTEGER NOT NULL,
+                guild_id              INTEGER,
+                channel_id            INTEGER,
+                spread_type           TEXT NOT NULL,
+                question              TEXT,
+                target_position_index INTEGER NOT NULL,
+                target_position_title TEXT NOT NULL,
+                target_card_id        TEXT NOT NULL,
+                target_is_reversed    INTEGER NOT NULL,
+                clarifier_card_id     TEXT NOT NULL,
+                clarifier_is_reversed INTEGER NOT NULL,
+                interpretation        TEXT,
+                created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
         # Tự động cập nhật thêm cột topic_tag và mood_tag nếu bảng tarot_history đã tồn tại từ trước
         try:
             await db.execute("ALTER TABLE tarot_history ADD COLUMN topic_tag TEXT NOT NULL DEFAULT 'general'")
@@ -124,6 +142,10 @@ class TarotManager:
         # Tự động dọn dẹp các quẻ bài quá cũ (> 90 ngày) để tối ưu hóa lưu trữ DB
         try:
             await db.execute("DELETE FROM tarot_history WHERE created_at < datetime('now', '-90 days')")
+        except Exception:
+            pass
+        try:
+            await db.execute("DELETE FROM tarot_clarifiers WHERE created_at < datetime('now', '-90 days')")
         except Exception:
             pass
 
@@ -268,6 +290,46 @@ class TarotManager:
         """, (user_id, guild_id, channel_id, spread_type, question, cards_json, ai_reading, topic_tag or "general", mood_tag or ""))
         await db.commit()
 
+
+    async def save_tarot_clarifier(
+        self,
+        user_id: int,
+        guild_id: Optional[int],
+        channel_id: Optional[int],
+        spread_type: str,
+        question: Optional[str],
+        target_position_index: int,
+        target_card: DrawnCard,
+        clarifier_card: DrawnCard,
+        interpretation: str,
+    ) -> None:
+        """Persist a successfully delivered clarifier without modifying original history."""
+        db = await self._get_db()
+        await db.execute("""
+            INSERT INTO tarot_clarifiers (
+                user_id, guild_id, channel_id, spread_type, question,
+                target_position_index, target_position_title,
+                target_card_id, target_is_reversed,
+                clarifier_card_id, clarifier_is_reversed,
+                interpretation
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            guild_id,
+            channel_id,
+            spread_type,
+            question,
+            target_position_index,
+            target_card.position_title,
+            target_card.card.id,
+            1 if target_card.is_reversed else 0,
+            clarifier_card.card.id,
+            1 if clarifier_card.is_reversed else 0,
+            interpretation,
+        ))
+        await db.commit()
+
     async def get_user_history(self, user_id: int, limit: int = 5) -> List[dict]:
         """Lấy lịch sử các lượt bốc bài gần nhất của user."""
         db = await self._get_db()
@@ -381,6 +443,7 @@ class TarotManager:
         """Xóa toàn bộ lịch sử bốc bài và daily cooldown của user."""
         db = await self._get_db()
         await db.execute("DELETE FROM tarot_history WHERE user_id = ?", (user_id,))
+        await db.execute("DELETE FROM tarot_clarifiers WHERE user_id = ?", (user_id,))
         await db.execute("DELETE FROM tarot_daily_tracker WHERE user_id = ?", (user_id,))
         await db.commit()
 
