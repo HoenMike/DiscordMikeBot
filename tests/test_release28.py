@@ -280,6 +280,52 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(result)
 
+    async def test_manual_proxy_roll_stops_when_no_proxy_remains_and_keeps_preview(self):
+        channel = SimpleNamespace(id=20, is_nsfw=lambda: False)
+        origin = SimpleNamespace(
+            id=10,
+            guild=SimpleNamespace(id=30, name="Server"),
+            channel=channel,
+            author=SimpleNamespace(
+                id=50,
+                display_name="Mai",
+                display_avatar=SimpleNamespace(url="avatar"),
+            ),
+            jump_url="https://discord.com/channels/30/20/10",
+            content="https://facebook.com/post/1",
+        )
+        channel.fetch_message = AsyncMock(return_value=origin)
+        self.cog.bot.get_channel = lambda _: channel
+        self.cog.bot.fetch_channel = AsyncMock(return_value=channel)
+        current_preview = SimpleNamespace(id=40, channel=channel)
+        self.cog._discard_preview = AsyncMock(return_value=True)
+        self.cog._send_embed_preview = AsyncMock()
+        self.cog._try_ytdlp_fallback = AsyncMock()
+
+        payload = {
+            "origin_id": 10,
+            "channel_id": 20,
+            "author_id": 50,
+            "platform": "facebook",
+            "url": "https://facebook.com/post/1",
+            "is_spoiler": False,
+            "tried_domains": ["facebed.com", "facebed.seria.moe"],
+        }
+        with patch(
+            "features.embed.cog.find_valid_proxy",
+            new=AsyncMock(return_value=(None, False)),
+        ):
+            result = await self.cog.roll_facebook_proxy(
+                payload,
+                current_preview=current_preview,
+            )
+
+        self.assertEqual(result.status, "action_required")
+        self.assertEqual(result.reason, "no_more_proxy")
+        self.cog._send_embed_preview.assert_not_awaited()
+        self.cog._discard_preview.assert_not_awaited()
+        self.cog._try_ytdlp_fallback.assert_not_awaited()
+
     async def test_facebook_proxy_failure_offers_manual_fallback_without_auto_ytdlp(self):
         self.cog._try_api_fetcher = AsyncMock(return_value=False)
         self.cog._try_proxy_chain = AsyncMock(return_value=PreviewResult(reason="unfurl_timeout"))
