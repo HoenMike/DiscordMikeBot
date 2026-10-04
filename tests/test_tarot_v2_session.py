@@ -4,13 +4,14 @@ import unittest
 import discord
 
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, TAROT_DECK
+from features.tarot.reading.schema import TarotKeyCard, TarotReadingResult
 from features.tarot.reading.session import (
     build_ai_ready_status,
     build_micro_reveal,
     build_reveal_progress,
     compact_flip_label,
 )
-from features.tarot.tarot_view import TarotFlipView
+from features.tarot.tarot_view import TarotFlipView, _unpack_tarot_result
 
 
 def drawn(card_id: str, position_index: int, position_title: str, reversed_: bool = False) -> DrawnCard:
@@ -60,6 +61,25 @@ class TarotSessionHelperTests(unittest.TestCase):
         self.assertEqual(compact_flip_label(0, False), "1")
         self.assertEqual(compact_flip_label(9, True), "✓ 10")
         self.assertIn("Luận giải đã sẵn sàng", build_ai_ready_status(True))
+
+
+class TarotRichSessionResultTests(unittest.TestCase):
+    def test_rich_result_exposes_key_card_for_final_board(self):
+        result = TarotReadingResult(
+            full_reading="Reading",
+            topic_tag="decision",
+            mood_tag="Cân bằng",
+            headline="Chưa cần vội",
+            is_valid=True,
+            key_card=TarotKeyCard(
+                card_id="major_18",
+                card_name="Mặt Trăng",
+                reason="Lá chủ đạo",
+            ),
+        )
+        unpacked = _unpack_tarot_result(result)
+        self.assertEqual(unpacked[:5], ("Reading", "decision", "Cân bằng", "Chưa cần vội", True))
+        self.assertEqual(unpacked[5], "major_18")
 
 
 class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
