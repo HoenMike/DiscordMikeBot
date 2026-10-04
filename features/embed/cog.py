@@ -12,7 +12,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
-from features.embed.ui import PlatformToggleView, FacebookFallbackView
+from features.embed.ui import PlatformToggleView, EmbedActionView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy
@@ -112,7 +112,7 @@ class EmbedCog(commands.Cog):
         is_spoiler: bool = False,
         tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
     ) -> dict | None:
-        if platform_key != "facebook":
+        if platform_key not in PLATFORMS or not url:
             return None
         return {
             "origin_id": message.id,
@@ -132,7 +132,7 @@ class EmbedCog(commands.Cog):
         *,
         is_spoiler: bool = False,
         tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
-    ) -> FacebookFallbackView | None:
+    ) -> EmbedActionView | None:
         payload = self._manual_fallback_payload(
             message,
             platform_key,
@@ -140,7 +140,7 @@ class EmbedCog(commands.Cog):
             is_spoiler=is_spoiler,
             tried_domains=tried_domains,
         )
-        return FacebookFallbackView(self, payload) if payload else None
+        return EmbedActionView(self, payload) if payload else None
 
     def _register_manual_fallback_preview(
         self,
@@ -1022,13 +1022,25 @@ class EmbedCog(commands.Cog):
                 link = f"[Xem bài viết gốc]({proxy_url})"
                 if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
                     link = f"||{link}||"
+                action_view = self._manual_fallback_view(
+                    message,
+                    platform_key,
+                    url,
+                    is_spoiler=is_spoiler,
+                    tried_domains=tried,
+                )
                 sent_msg = await self._send_embed_preview(
                     message=message,
                     content=f"-# {author_jump} • {link}",
+                    view=action_view,
                 )
                 if not sent_msg:
                     last_reason = "proxy_send_failed"
                     continue
+                if action_view:
+                    self._register_manual_fallback_preview(
+                        message.id, url, message.channel.id, sent_msg.id
+                    )
                 verified = False
                 removed = True
                 try:
@@ -1113,12 +1125,23 @@ class EmbedCog(commands.Cog):
             )
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**{fallback_hint}"
 
+            action_view = self._manual_fallback_view(
+                message,
+                platform_key,
+                url,
+                is_spoiler=is_spoiler,
+            )
             sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
                 embeds=[single_embed],
                 file=file,
+                view=action_view,
             )
+            if sent_msg and action_view:
+                self._register_manual_fallback_preview(
+                    message.id, url, message.channel.id, sent_msg.id
+                )
             result_reason = "manual_fallback_sent" if manual else "fallback_sent"
             return (PreviewResult("success", "ytdlp", result_reason, platform_key,
                                   origin_message_id=message.id, preview_message_id=sent_msg.id, used_fallback=True)
@@ -1128,6 +1151,253 @@ class EmbedCog(commands.Cog):
         except Exception as e:
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
+
+    async def reload_embed(
+        self,
+        payload: dict,
+        *,
+        current_preview: discord.Message | None = None,
+    ) -> PreviewResult:
+        """Reload one social preview while keeping the current preview on failure."""
+        origin_id = int(payload.get("origin_id", 0) or 0)
+        channel_id = int(payload.get("channel_id", 0) or 0)
+        author_id = int(payload.get("author_id", 0) or 0)
+        platform_key = str(payload.get("platform", ""))
+        url = str(payload.get("url", ""))
+        is_spoiler = bool(payload.get("is_spoiler", False))
+
+        if platform_key not in PLATFORMS or not origin_id or not channel_id or not author_id or not url:
+            return PreviewResult(
+                reason="reload_invalid_payload",
+                platform=platform_key,
+                origin_message_id=origin_id or None,
+            )
+
+        # Facebook keeps its v2.8.3+ behavior: Reload means roll to the next
+        # configured proxy, never silently jump to yt-dlp.
+        if platform_key == "facebook":
+            return await self.roll_facebook_proxy(
+                payload,
+                current_preview=current_preview,
+            )
+
+        if origin_id in self._deleted_message_ids:
+            return PreviewResult(
+                status="cancelled",
+                reason="origin_deleted",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except Exception:
+                channel = None
+        if channel is None:
+            return PreviewResult(
+                reason="reload_channel_missing",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        try:
+            origin_message = await channel.fetch_message(origin_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return PreviewResult(
+                reason="reload_origin_missing",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        if origin_message.author.id != author_id:
+            return PreviewResult(
+                reason="reload_author_mismatch",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+        if url not in origin_message.content:
+            return PreviewResult(
+                reason="reload_url_mismatch",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        try:
+            if self.config_manager:
+                config = await self.config_manager.get_effective_config(
+                    origin_message.guild.id,
+                    origin_message.channel.id,
+                )
+            else:
+                config = {
+                    "auto_embed_enabled": True,
+                    "nsfw_mode": "spoiler",
+                    "suppress_original_embed": True,
+                }
+        except Exception:
+            config = {
+                "auto_embed_enabled": True,
+                "nsfw_mode": "spoiler",
+                "suppress_original_embed": True,
+            }
+
+        match = None
+        for pattern in PLATFORMS.get(platform_key, {}).get("patterns", []):
+            match = pattern.search(url)
+            if match:
+                break
+
+        result = await self._run_fallback_chain(
+            origin_message,
+            platform_key,
+            url,
+            match,
+            config,
+            is_spoiler=is_spoiler,
+        )
+
+        has_replacement = result.success or (
+            result.status == "action_required" and result.preview_message_id is not None
+        )
+        if has_replacement and current_preview is not None:
+            current_id = getattr(current_preview, "id", None)
+            if current_id and current_id != result.preview_message_id:
+                try:
+                    await self._discard_preview(origin_id, current_preview)
+                except Exception as exc:
+                    print(
+                        f"[EmbedCog] Reload đã tạo preview mới nhưng không dọn được preview {current_id}: {exc}",
+                        flush=True,
+                    )
+
+        return result
+
+    async def revert_embed(self, payload: dict) -> PreviewResult:
+        """Restore Discord's native embed and remove all Asumi previews for the origin message."""
+        origin_id = int(payload.get("origin_id", 0) or 0)
+        channel_id = int(payload.get("channel_id", 0) or 0)
+        author_id = int(payload.get("author_id", 0) or 0)
+        platform_key = str(payload.get("platform", ""))
+        url = str(payload.get("url", ""))
+
+        if platform_key not in PLATFORMS or not origin_id or not channel_id or not author_id or not url:
+            return PreviewResult(
+                reason="revert_invalid_payload",
+                platform=platform_key,
+                origin_message_id=origin_id or None,
+            )
+
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except Exception:
+                channel = None
+        if channel is None:
+            return PreviewResult(
+                reason="revert_channel_missing",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        try:
+            origin_message = await channel.fetch_message(origin_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return PreviewResult(
+                reason="revert_origin_missing",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        if origin_message.author.id != author_id:
+            return PreviewResult(
+                reason="revert_author_mismatch",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+        if url not in origin_message.content:
+            return PreviewResult(
+                reason="revert_url_mismatch",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        try:
+            await origin_message.edit(suppress=False)
+        except (discord.Forbidden, discord.HTTPException):
+            return PreviewResult(
+                reason="native_unsuppress_failed",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+
+        cleanup_ok = True
+        targets = list(self._origin_to_preview_map.get(origin_id, []))
+        for preview_channel_id, preview_id in targets:
+            target_channel = (
+                channel
+                if preview_channel_id == channel_id
+                else self.bot.get_channel(preview_channel_id)
+            )
+            if target_channel is None:
+                try:
+                    target_channel = await self.bot.fetch_channel(preview_channel_id)
+                except Exception:
+                    target_channel = None
+            if target_channel is None:
+                cleanup_ok = False
+                continue
+
+            try:
+                preview = target_channel.get_partial_message(preview_id)
+                if not await self._discard_preview(origin_id, preview):
+                    cleanup_ok = False
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                cleanup_ok = False
+            except Exception:
+                cleanup_ok = False
+
+        for state_key in list(self._facebook_proxy_roll_state.keys()):
+            if state_key[0] == origin_id:
+                self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._manual_fallback_previews.keys()):
+            if state_key[0] == origin_id:
+                self._manual_fallback_previews.pop(state_key, None)
+
+        try:
+            from core.activity_logger import activity_logger
+            activity_logger.log(
+                action_type="embed",
+                action_name="Embed: Revert to native",
+                user_id=author_id,
+                user_name=origin_message.author.display_name,
+                user_avatar=origin_message.author.display_avatar.url if origin_message.author.display_avatar else None,
+                guild_name=origin_message.guild.name if origin_message.guild else "Unknown Guild",
+                guild_id=origin_message.guild.id if origin_message.guild else None,
+                channel_name=getattr(origin_message.channel, "name", "Unknown"),
+                channel_id=channel_id,
+                prompt=url,
+                response="Người gửi link đã bỏ preview Asumi và khôi phục embed gốc của Discord.",
+                status="success" if cleanup_ok else "warning",
+                details={
+                    "platform": platform_key,
+                    "origin_message_id": origin_id,
+                    "native_embed_restored": True,
+                    "cleanup_complete": cleanup_ok,
+                },
+            )
+        except Exception:
+            pass
+
+        return PreviewResult(
+            "success",
+            "native",
+            "native_embed_restored" if cleanup_ok else "native_embed_restored_cleanup_partial",
+            platform_key,
+            origin_message_id=origin_id,
+        )
 
     async def roll_facebook_proxy(
         self,
