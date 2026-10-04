@@ -20,7 +20,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.cog.session = object()
         self.channel = NS(id=2, is_nsfw=lambda: False, send=AsyncMock())
         self.message = NS(id=1, channel=self.channel, guild=NS(id=3, filesize_limit=1000),
-                          author=NS(display_name="A"), jump_url="https://discord.com/channels/3/2/1")
+                          author=NS(id=10, display_name="A"), jump_url="https://discord.com/channels/3/2/1")
         self.preview = NS(id=4, channel=self.channel, delete=AsyncMock())
         self.channel.send.return_value = self.preview
 
@@ -87,28 +87,41 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(ok)
         self.assertEqual([c.args[0] for c in sleep.await_args_list], [1, 1.5, 1.5])
 
-    async def test_sticky_nsfw_between_proxies_and_fallback(self):
+    async def test_facebook_proxy_nsfw_is_spoiler_and_never_ytdlp(self):
         safety = PreviewSafety()
-        second = NS(id=5, delete=AsyncMock())
-        self.cog._send_embed_preview = AsyncMock(side_effect=[self.preview, second])
-        self.cog._verify_proxy_unfurl = AsyncMock(side_effect=[(False, "timeout"), (True, "usable")])
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(side_effect=[("https://facebed.com/p", True), ("https://facebed.seria.moe/p", False)])):
-            result = await self.cog._try_proxy_chain(self.message, "facebook", "url", {}, safety=safety)
-        self.assertTrue(result.success)
-        self.assertIn("||", self.cog._send_embed_preview.await_args_list[1].kwargs["content"])
-        post = PostData(platform="facebook", text="post", media_urls=["https://cdn/photo.jpg"])
-        self.cog._send_embed_preview = AsyncMock(return_value=second)
-        self.cog._create_spoiler_file = AsyncMock(return_value=None)
-        with patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock(return_value=post)):
-            await self.cog._try_ytdlp_fallback(self.message, "facebook", "url", {}, safety=safety)
-        self.assertTrue(post.is_nsfw)
-        self.cog._create_spoiler_file.assert_awaited_once()
+        self.cog._send_embed_preview = AsyncMock(return_value=self.preview)
+        self.cog._verify_proxy_unfurl = AsyncMock()
+        with patch(
+            "features.embed.cog.find_valid_proxy",
+            new=AsyncMock(return_value=("https://facebed.com/p", True)),
+        ):
+            result = await self.cog._try_proxy_chain(
+                self.message, "facebook", "url", {}, safety=safety
+            )
 
-    async def test_cleanup_failure_stops_next_candidate(self):
+        self.assertTrue(result.success)
+        self.assertTrue(safety.is_nsfw)
+        sent = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIn("||https://facebed.com/p||", sent["content"])
+        self.cog._verify_proxy_unfurl.assert_not_awaited()
+
+        with patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock()) as ytdlp:
+            fallback = await self.cog._try_ytdlp_fallback(
+                self.message, "facebook", "url", {}, safety=safety
+            )
+        self.assertFalse(fallback)
+        ytdlp.assert_not_awaited()
+
+    async def test_cleanup_failure_stops_next_candidate_for_auto_proxy_platforms(self):
         self.preview.delete.side_effect = http_error()
         self.cog._verify_proxy_unfurl = AsyncMock(return_value=(False, "timeout"))
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/p", False))) as find:
-            result = await self.cog._try_proxy_chain(self.message, "facebook", "url", {})
+        with patch(
+            "features.embed.cog.find_valid_proxy",
+            new=AsyncMock(return_value=("https://fxtwitter.com/p", False)),
+        ) as find:
+            result = await self.cog._try_proxy_chain(
+                self.message, "twitter", "url", {}
+            )
         self.assertEqual(result.status, "degraded")
         self.assertEqual(find.await_count, 1)
         self.assertIn(4, self.cog._preview_to_origin_map)
@@ -147,7 +160,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
                     entered.set()
                     await release.wait()
                     return self.preview
-                find = AsyncMock(return_value=("https://facebed.com/p", False))
+                find = AsyncMock(return_value=("https://fxtwitter.com/p", False))
                 stack.enter_context(patch("features.embed.cog.find_valid_proxy", new=find))
                 stack.enter_context(patch("features.embed.cog._UNFURL_DELAYS", (0,)))
                 stack.enter_context(patch("core.activity_logger.activity_logger.log"))
@@ -165,10 +178,10 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
                     if stage == "fallback":
                         stack.enter_context(patch("features.embed.cog.extract_media_ytdlp", new=wait))
                     else:
-                        post = PostData(platform="facebook", text="video", media_type="video", media_urls=["https://cdn/v.mp4"])
+                        post = PostData(platform="twitter", text="video", media_type="video", media_urls=["https://cdn/v.mp4"])
                         stack.enter_context(patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock(return_value=post)))
                         self.cog._download_video_file = wait
-                task = asyncio.create_task(self.cog._run_fallback_chain(self.message, "facebook", "url", None, {}))
+                task = asyncio.create_task(self.cog._run_fallback_chain(self.message, "twitter", "url", None, {}))
                 self.cog._in_flight_tasks[1] = task
                 await asyncio.wait_for(entered.wait(), 1)
                 deletion = asyncio.create_task(self.cog.on_raw_message_delete(NS(message_id=1, channel_id=2, guild_id=3)))
@@ -179,17 +192,27 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
                     await task
                 self.assertNotIn(4, self.cog._preview_to_origin_map)
 
-    async def test_two_failed_proxies_then_real_fallback_send(self):
+    async def test_two_failed_proxies_then_real_fallback_send_for_twitter(self):
         from features.embed.result import PreviewResult
         self.cog._try_api_fetcher = AsyncMock(return_value=False)
         first, second, final = [NS(id=i, channel=self.channel, delete=AsyncMock()) for i in (4, 5, 6)]
         self.channel.send.side_effect = [first, second, final]
         self.channel.fetch_message = AsyncMock(return_value=NS(embeds=[]))
-        post = PostData(platform="facebook", text="Bai viet", media_urls=["https://cdn/image.jpg"])
-        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(side_effect=[("https://facebed.com/p", False), ("https://facebed.seria.moe/p", False)])), \
-             patch("features.embed.cog._UNFURL_DELAYS", (0,)), \
-             patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock(return_value=post)):
-            result = await self.cog._run_fallback_chain(self.message, "facebook", "url", None, {})
+        post = PostData(platform="twitter", text="Bai viet", media_urls=["https://cdn/image.jpg"])
+        with patch(
+            "features.embed.cog.find_valid_proxy",
+            new=AsyncMock(side_effect=[
+                ("https://fxtwitter.com/p", False),
+                ("https://fixupx.com/p", False),
+                (None, False),
+            ]),
+        ), patch("features.embed.cog._UNFURL_DELAYS", (0,)), patch(
+            "features.embed.cog.extract_media_ytdlp",
+            new=AsyncMock(return_value=post),
+        ):
+            result = await self.cog._run_fallback_chain(
+                self.message, "twitter", "url", None, {}
+            )
         self.assertTrue(result.success)
         self.assertEqual(result.tier, "ytdlp")
         first.delete.assert_awaited_once()

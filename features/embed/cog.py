@@ -93,8 +93,8 @@ class EmbedCog(commands.Cog):
         # Lock quản lý đồng bộ reaction theo từng tin nhắn để tránh race condition khi nhiều người tương tác cùng lúc
         self._reaction_locks = BoundedDict(max_size=1000)
         self._pending_sends = BoundedDict(max_size=3000)
-        self._manual_fallback_done = BoundedDict(max_size=3000)
         self._manual_fallback_previews = BoundedDict(max_size=3000)
+        self._facebook_proxy_roll_state = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -110,6 +110,7 @@ class EmbedCog(commands.Cog):
         url: str,
         *,
         is_spoiler: bool = False,
+        tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
     ) -> dict | None:
         if platform_key != "facebook":
             return None
@@ -120,6 +121,7 @@ class EmbedCog(commands.Cog):
             "platform": platform_key,
             "url": url,
             "is_spoiler": is_spoiler,
+            "tried_domains": sorted(set(tried_domains or [])),
         }
 
     def _manual_fallback_view(
@@ -129,9 +131,14 @@ class EmbedCog(commands.Cog):
         url: str,
         *,
         is_spoiler: bool = False,
+        tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
     ) -> FacebookFallbackView | None:
         payload = self._manual_fallback_payload(
-            message, platform_key, url, is_spoiler=is_spoiler
+            message,
+            platform_key,
+            url,
+            is_spoiler=is_spoiler,
+            tried_domains=tried_domains,
         )
         return FacebookFallbackView(self, payload) if payload else None
 
@@ -150,6 +157,14 @@ class EmbedCog(commands.Cog):
         target = (channel_id, preview_id)
         if target not in targets:
             targets.append(target)
+
+    def _set_facebook_proxy_state(
+        self,
+        origin_id: int,
+        url: str,
+        tried_domains: set[str] | list[str] | tuple[str, ...],
+    ) -> None:
+        self._facebook_proxy_roll_state[(origin_id, url)] = set(tried_domains)
 
     async def _offer_manual_fallback(
         self,
@@ -389,7 +404,7 @@ class EmbedCog(commands.Cog):
                         response=(
                             f"Tạo bản xem trước {platform_name} thành công"
                             if result.success else
-                            f"Đã giữ bản xem trước và chờ fallback thủ công: {result.reason}"
+                            f"Đã giữ bản xem trước và chờ đổi proxy thủ công: {result.reason}"
                             if result.status == "action_required" else
                             f"Không thể tạo bản xem trước {platform_name}: {result.reason}"
                         ),
@@ -517,6 +532,14 @@ class EmbedCog(commands.Cog):
                 pass
             except Exception as e:
                 print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
+        # Dọn state proxy-roll theo origin để không giữ state/button mapping mồ côi.
+        for state_key in list(self._facebook_proxy_roll_state.keys()):
+            if state_key[0] == payload.message_id:
+                self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._manual_fallback_previews.keys()):
+            if state_key[0] == payload.message_id:
+                self._manual_fallback_previews.pop(state_key, None)
+
         origin = self._preview_to_origin_map.pop(payload.message_id, None)
         if origin:
             channel_id, origin_id = origin
@@ -815,8 +838,8 @@ class EmbedCog(commands.Cog):
         if message.id in self._deleted_message_ids:
             return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
-        # Facebook: không tự động thay một preview có thể đã render bằng yt-dlp.
-        # Nếu proxy thực sự không dùng được, chỉ đưa hyperlink fallback để người dùng chủ động kích hoạt.
+        # Facebook không nhảy sang yt-dlp. Nếu chưa gửi được proxy nào,
+        # để người dùng chủ động thử lại/roll proxy bằng button Discord.
         if platform_key == "facebook":
             return await self._offer_manual_fallback(
                 message,
@@ -957,63 +980,67 @@ class EmbedCog(commands.Cog):
 
                 author_name = _clean_markdown_label(message.author.display_name)
                 author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
+
+                # Facebook cần URL proxy ở dạng raw text để Discord tự unfurl thành native embed.
+                # Button chỉ là điều khiển phụ để người gửi chủ động chuyển sang proxy kế tiếp.
+                if platform_key == "facebook":
+                    raw_link = proxy_url
+                    if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
+                        raw_link = f"||{raw_link}||"
+                    fallback_view = self._manual_fallback_view(
+                        message,
+                        platform_key,
+                        url,
+                        is_spoiler=is_spoiler,
+                        tried_domains=tried,
+                    )
+                    sent_msg = await self._send_embed_preview(
+                        message=message,
+                        content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                        view=fallback_view,
+                    )
+                    if not sent_msg:
+                        last_reason = "proxy_send_failed"
+                        continue
+
+                    self._register_manual_fallback_preview(
+                        message.id, url, message.channel.id, sent_msg.id
+                    )
+                    self._set_facebook_proxy_state(message.id, url, tried)
+                    return PreviewResult(
+                        "success",
+                        "proxy",
+                        "proxy_link_sent",
+                        platform_key,
+                        domain,
+                        message.id,
+                        sent_msg.id,
+                        False,
+                    )
+
                 link = f"[Xem bài viết gốc]({proxy_url})"
                 if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
                     link = f"||{link}||"
-                fallback_view = self._manual_fallback_view(
-                    message, platform_key, url, is_spoiler=is_spoiler
-                )
                 sent_msg = await self._send_embed_preview(
                     message=message,
                     content=f"-# {author_jump} • {link}",
-                    view=fallback_view,
                 )
                 if not sent_msg:
                     last_reason = "proxy_send_failed"
                     continue
                 verified = False
                 removed = True
-                preserve_unverified = False
                 try:
                     verified, last_reason = await self._verify_proxy_unfurl(message.id, sent_msg, platform_key)
                     if verified and message.id not in self._deleted_message_ids:
-                        if fallback_view:
-                            self._register_manual_fallback_preview(
-                                message.id, url, message.channel.id, sent_msg.id
-                            )
                         return PreviewResult("success", "proxy", "usable_embed", platform_key, domain, message.id, sent_msg.id, True)
                     if message.id in self._deleted_message_ids:
                         verified = False
                         last_reason = "origin_deleted"
-                    preserve_unverified = (
-                        platform_key == "facebook"
-                        and last_reason == "unfurl_timeout"
-                        and message.id not in self._deleted_message_ids
-                    )
                 finally:
-                    if not verified and not preserve_unverified:
+                    if not verified:
                         removed = await self._discard_preview(message.id, sent_msg)
 
-                if preserve_unverified:
-                    if fallback_view:
-                        self._register_manual_fallback_preview(
-                            message.id, url, message.channel.id, sent_msg.id
-                        )
-                    print(
-                        f"[EmbedCog] Facebook unfurl chưa xác định; giữ preview {sent_msg.id} và chờ fallback thủ công.",
-                        flush=True,
-                    )
-                    return PreviewResult(
-                        status="action_required",
-                        tier="proxy",
-                        reason="unfurl_timeout",
-                        platform=platform_key,
-                        proxy_domain=domain,
-                        origin_message_id=message.id,
-                        preview_message_id=sent_msg.id,
-                        unfurl_verified=False,
-                        fallback_reason="unfurl_timeout",
-                    )
                 if not removed:
                     return PreviewResult("degraded", "proxy", "cleanup_failed", platform_key, domain, message.id, sent_msg.id)
             return PreviewResult(reason=last_reason, platform=platform_key, origin_message_id=message.id)
@@ -1036,7 +1063,7 @@ class EmbedCog(commands.Cog):
         manual: bool = False,
     ) -> PreviewResult | bool:
         # Chỉ kích hoạt fallback yt-dlp cho các nền tảng video được hỗ trợ
-        if platform_key not in ("twitter", "tiktok", "instagram", "facebook", "reddit", "twitch"):
+        if platform_key not in ("twitter", "tiktok", "instagram", "reddit", "twitch"):
             return False
 
         try:
@@ -1101,29 +1128,47 @@ class EmbedCog(commands.Cog):
             print(f"[EmbedCog] Tier 2 (yt-dlp) lỗi cho {platform_key} ({url}): {e}", flush=True)
             return False
 
-    async def run_manual_fallback(self, payload: dict) -> PreviewResult:
-        """Execute an owner-authorized Facebook fallback triggered by the Discord button."""
+    async def roll_facebook_proxy(
+        self,
+        payload: dict,
+        *,
+        current_preview: discord.Message | None = None,
+    ) -> PreviewResult:
+        """Roll a Facebook preview to the next configured proxy; never jump to yt-dlp."""
         origin_id = int(payload.get("origin_id", 0) or 0)
         channel_id = int(payload.get("channel_id", 0) or 0)
         author_id = int(payload.get("author_id", 0) or 0)
         platform_key = str(payload.get("platform", ""))
         url = str(payload.get("url", ""))
         is_spoiler = bool(payload.get("is_spoiler", False))
+        payload_tried = {
+            str(domain).strip().lower()
+            for domain in payload.get("tried_domains", [])
+            if str(domain).strip()
+        }
 
         if platform_key != "facebook" or not origin_id or not channel_id or not author_id or not url:
-            return PreviewResult(reason="manual_fallback_invalid_payload", platform=platform_key, origin_message_id=origin_id or None)
+            return PreviewResult(
+                reason="proxy_roll_invalid_payload",
+                platform=platform_key,
+                origin_message_id=origin_id or None,
+            )
         if origin_id in self._deleted_message_ids:
-            return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=origin_id)
+            return PreviewResult(
+                status="cancelled",
+                reason="origin_deleted",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
+        if self.session is None:
+            return PreviewResult(
+                reason="session_unavailable",
+                platform=platform_key,
+                origin_message_id=origin_id,
+            )
 
         lock = self._get_reaction_lock(origin_id)
         async with lock:
-            fallback_key = (origin_id, url)
-            if self._manual_fallback_done.get(fallback_key):
-                return PreviewResult(
-                    "success", "ytdlp", "manual_fallback_already_done", platform_key,
-                    origin_message_id=origin_id, used_fallback=True,
-                )
-
             channel = self.bot.get_channel(channel_id)
             if channel is None:
                 try:
@@ -1131,67 +1176,149 @@ class EmbedCog(commands.Cog):
                 except Exception:
                     channel = None
             if channel is None:
-                return PreviewResult(reason="manual_fallback_channel_missing", platform=platform_key, origin_message_id=origin_id)
+                return PreviewResult(
+                    reason="proxy_roll_channel_missing",
+                    platform=platform_key,
+                    origin_message_id=origin_id,
+                )
 
             try:
                 origin_message = await channel.fetch_message(origin_id)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                return PreviewResult(reason="manual_fallback_origin_missing", platform=platform_key, origin_message_id=origin_id)
+                return PreviewResult(
+                    reason="proxy_roll_origin_missing",
+                    platform=platform_key,
+                    origin_message_id=origin_id,
+                )
 
             if origin_message.author.id != author_id:
-                return PreviewResult(reason="manual_fallback_author_mismatch", platform=platform_key, origin_message_id=origin_id)
+                return PreviewResult(
+                    reason="proxy_roll_author_mismatch",
+                    platform=platform_key,
+                    origin_message_id=origin_id,
+                )
             if url not in origin_message.content:
-                return PreviewResult(reason="manual_fallback_url_mismatch", platform=platform_key, origin_message_id=origin_id)
+                return PreviewResult(
+                    reason="proxy_roll_url_mismatch",
+                    platform=platform_key,
+                    origin_message_id=origin_id,
+                )
 
             try:
                 if self.config_manager:
                     config = await self.config_manager.get_effective_config(
                         origin_message.guild.id, origin_message.channel.id
                     )
+                    guild_proxy_domains = await self.config_manager.get_guild_proxy_domains(
+                        origin_message.guild.id, platform_key
+                    )
                 else:
                     config = {"nsfw_mode": "spoiler"}
+                    guild_proxy_domains = None
             except Exception:
                 config = {"nsfw_mode": "spoiler"}
+                guild_proxy_domains = None
 
-            result = await self._try_ytdlp_fallback(
-                origin_message,
-                platform_key,
+            state_key = (origin_id, url)
+            remembered = set(self._facebook_proxy_roll_state.get(state_key, set()))
+            tried = remembered | payload_tried
+            attempted = set(tried)
+
+            proxy_url, is_proxy_nsfw = await find_valid_proxy(
+                self.session,
                 url,
-                config,
-                is_spoiler=is_spoiler,
-                safety=PreviewSafety(),
-                manual=True,
+                platform_key,
+                guild_proxy_domains=guild_proxy_domains,
+                excluded_domains=tried,
+                attempted_domains=attempted,
             )
-            if not isinstance(result, PreviewResult) or not result.success:
-                print(f"[EmbedCog] Manual fallback thất bại cho Facebook origin={origin_id}.", flush=True)
-                return result if isinstance(result, PreviewResult) else PreviewResult(
-                    reason="manual_fallback_failed",
+            tried = attempted
+
+            if not proxy_url:
+                self._set_facebook_proxy_state(origin_id, url, tried)
+                return PreviewResult(
+                    status="action_required",
+                    tier="proxy",
+                    reason="no_more_proxy",
                     platform=platform_key,
                     origin_message_id=origin_id,
                 )
 
-            self._manual_fallback_done[fallback_key] = True
+            domain = (urlparse(proxy_url).hostname or "").lower()
+            if domain:
+                tried.add(domain)
 
-            # Chỉ sau khi fallback mới gửi thành công mới dọn preview/prompt cũ
-            # của đúng URL này. Một origin message có thể chứa nhiều social links.
-            targets = list(self._manual_fallback_previews.get(fallback_key, []))
-            for old_channel_id, preview_id in targets:
-                if preview_id == result.preview_message_id:
-                    continue
+            is_nsfw_channel = getattr(origin_message.channel, "is_nsfw", False)
+            if callable(is_nsfw_channel):
+                is_nsfw_channel = is_nsfw_channel()
+            is_effective_nsfw = is_proxy_nsfw and not is_nsfw_channel
+            if is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "block":
+                return PreviewResult(
+                    "blocked",
+                    "proxy",
+                    "nsfw_blocked",
+                    platform_key,
+                    domain,
+                    origin_id,
+                )
+
+            raw_link = proxy_url
+            if is_spoiler or (
+                is_effective_nsfw
+                and config.get("nsfw_mode", "spoiler") == "spoiler"
+            ):
+                raw_link = f"||{raw_link}||"
+
+            author_name = _clean_markdown_label(origin_message.author.display_name)
+            author_jump = f"[Trả lời]({origin_message.jump_url}) **{author_name}**"
+            next_view = self._manual_fallback_view(
+                origin_message,
+                platform_key,
+                url,
+                is_spoiler=is_spoiler,
+                tried_domains=tried,
+            )
+            sent_msg = await self._send_embed_preview(
+                message=origin_message,
+                content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                view=next_view,
+            )
+            if not sent_msg:
+                return PreviewResult(
+                    reason="proxy_roll_send_failed",
+                    platform=platform_key,
+                    proxy_domain=domain,
+                    origin_message_id=origin_id,
+                )
+
+            self._set_facebook_proxy_state(origin_id, url, tried)
+
+            old_removed = True
+            if current_preview is not None and getattr(current_preview, "id", None) != sent_msg.id:
                 try:
-                    old_channel = self.bot.get_channel(old_channel_id) or channel
-                    old_preview = await old_channel.fetch_message(preview_id)
-                    await self._discard_preview(origin_id, old_preview)
+                    old_removed = await self._discard_preview(origin_id, current_preview)
                 except Exception:
-                    pass
-            self._manual_fallback_previews.pop(fallback_key, None)
+                    old_removed = False
 
-            print(f"[EmbedCog] Manual fallback thành công cho Facebook origin={origin_id}.", flush=True)
+            preview_targets = [(channel_id, sent_msg.id)]
+            if (
+                not old_removed
+                and current_preview is not None
+                and getattr(current_preview, "id", None)
+            ):
+                old_channel_id = getattr(getattr(current_preview, "channel", None), "id", channel_id)
+                preview_targets.append((old_channel_id, current_preview.id))
+            self._manual_fallback_previews[state_key] = preview_targets
+
+            print(
+                f"[EmbedCog] Facebook proxy roll: origin={origin_id} -> {domain}; tried={sorted(tried)}",
+                flush=True,
+            )
             try:
                 from core.activity_logger import activity_logger
                 activity_logger.log(
                     action_type="embed",
-                    action_name="Embed: Facebook manual fallback",
+                    action_name="Embed: Facebook proxy roll",
                     user_id=author_id,
                     user_name=origin_message.author.display_name,
                     user_avatar=origin_message.author.display_avatar.url if origin_message.author.display_avatar else None,
@@ -1200,18 +1327,32 @@ class EmbedCog(commands.Cog):
                     channel_name=getattr(origin_message.channel, "name", "Unknown"),
                     channel_id=channel_id,
                     prompt=url,
-                    response="Người dùng đã kích hoạt fallback thủ công; yt-dlp gửi preview thành công.",
+                    response=f"Người dùng chuyển preview sang proxy {domain}.",
                     status="success",
                     details={
                         "platform": platform_key,
                         "origin_message_id": origin_id,
-                        "preview_message_id": result.preview_message_id,
-                        "manual_fallback": True,
+                        "preview_message_id": sent_msg.id,
+                        "proxy_domain": domain,
+                        "tried_domains": sorted(tried),
+                        "manual_proxy_roll": True,
                     },
                 )
             except Exception:
                 pass
-            return result
+
+            return PreviewResult(
+                "success",
+                "proxy",
+                "proxy_rolled",
+                platform_key,
+                domain,
+                origin_id,
+                sent_msg.id,
+                False,
+                True,
+                "manual_proxy_roll",
+            )
 
     async def _create_spoiler_file(self, image_url: str, max_bytes: int = 10 * 1024 * 1024) -> discord.File | None:
         if self.session is None:

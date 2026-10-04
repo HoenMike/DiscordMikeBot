@@ -12,12 +12,32 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.2"
+CURRENT_VERSION = "2.8.3"
 RELEASE_DATE = "2026-10-04"
-CODENAME = "Asumi - Native Facebook Fallback Button"
+CODENAME = "Asumi - Native Facebook Proxy Roll"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.8.3",
+        "date": "2026-10-04",
+        "type": "bugfix",
+        "title": "Facebook raw proxy embed + manual proxy roll",
+        "summary": "Sửa flow Facebook đúng bản chất Discord unfurl: bot phải gửi URL proxy dạng raw để Discord dựng embed; nút chỉ là điều khiển phụ để người gửi chuyển sang proxy kế tiếp, không còn nhảy sang yt-dlp.",
+        "changes": [
+            {"category": "🪝 Facebook Embed", "items": [
+                "Proxy URL Facebook được gửi nguyên dạng trên một dòng riêng thay vì masked markdown, để Discord có thể tự unfurl thành native embed/video.",
+                "Nút đổi thành 🔄 Proxy khác và chỉ người gửi link gốc được dùng.",
+                "Mỗi lần bấm sẽ roll sang proxy Facebook kế tiếp trong PROXY_DOMAINS/guild override; proxy cũ chỉ bị dọn sau khi proxy mới đã gửi thành công.",
+                "Facebook không còn nằm trong yt-dlp fallback path; hết proxy thì bot báo hết proxy thay vì chuyển thẳng sang yt-dlp.",
+                "Sau khi đã gửi một proxy, bot không tự đánh giá rồi roll tiếp nữa; người dùng quyết định có cần đổi proxy hay không.",
+            ]},
+            {"category": "🧪 Regression", "items": [
+                "Bổ sung test raw URL unfurl, owner-only proxy button, proxy rotation state và guard không gọi yt-dlp cho Facebook.",
+                "Giữ automatic yt-dlp fallback cho các nền tảng khác như Twitter/TikTok/Instagram/Reddit/Twitch.",
+            ]},
+        ],
+    },
     {
         "version": "2.8.2",
         "date": "2026-10-04",

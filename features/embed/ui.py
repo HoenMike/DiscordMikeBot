@@ -31,19 +31,19 @@ def create_platform_view(platform_key: str, original_url: str) -> discord.ui.Vie
 
 
 class FacebookFallbackView(discord.ui.View):
-    """Nút fallback thủ công cho Facebook, chỉ người gửi link gốc được dùng."""
+    """Nút phụ để người gửi link tự chuyển sang proxy Facebook kế tiếp."""
 
     def __init__(self, cog, payload: dict, timeout: float = 900):
         super().__init__(timeout=timeout)
         self.cog = cog
         self.payload = dict(payload)
         self.button = discord.ui.Button(
-            label="Fallback",
-            emoji="↪️",
+            label="Proxy khác",
+            emoji="🔄",
             style=discord.ButtonStyle.secondary,
-            custom_id=f"asumi:fb-fallback:{self.payload.get('origin_id', 0)}",
+            custom_id=f"asumi:fb-proxy-roll:{self.payload.get('origin_id', 0)}",
         )
-        self.button.callback = self._run_fallback
+        self.button.callback = self._roll_proxy
         self.add_item(self.button)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -51,40 +51,50 @@ class FacebookFallbackView(discord.ui.View):
         if interaction.user.id == author_id:
             return True
         await interaction.response.send_message(
-            "Chỉ người gửi link gốc mới có thể dùng fallback này.",
+            "Chỉ người gửi link gốc mới có thể đổi proxy.",
             ephemeral=True,
         )
         return False
 
-    async def _run_fallback(self, interaction: discord.Interaction):
+    async def _roll_proxy(self, interaction: discord.Interaction):
         self.button.disabled = True
         await interaction.response.edit_message(view=self)
 
         try:
-            result = await self.cog.run_manual_fallback(self.payload)
+            result = await self.cog.roll_facebook_proxy(
+                self.payload,
+                current_preview=interaction.message,
+            )
         except Exception as exc:
             result = None
-            print(f"[EmbedCog] Manual fallback button lỗi: {exc}", flush=True)
+            print(f"[EmbedCog] Facebook proxy roll lỗi: {exc}", flush=True)
 
         if result is not None and result.success:
             self.stop()
             await interaction.followup.send(
-                "Đã chạy fallback cho link Facebook này.",
+                f"Đã chuyển sang proxy khác: `{result.proxy_domain or 'proxy mới'}`.",
                 ephemeral=True,
             )
             return
 
-        self.button.disabled = False
+        reason = getattr(result, "reason", "proxy_roll_failed")
+        if reason == "no_more_proxy":
+            self.button.label = "Hết proxy"
+            self.button.disabled = True
+        else:
+            self.button.disabled = False
+
         try:
             await interaction.message.edit(view=self)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
-        reason = getattr(result, "reason", "manual_fallback_failed")
-        await interaction.followup.send(
-            f"Fallback chưa tạo được preview mới (`{reason}`). Preview hiện tại vẫn được giữ.",
-            ephemeral=True,
+        message = (
+            "Đã thử hết proxy Facebook khả dụng."
+            if reason == "no_more_proxy"
+            else f"Chưa đổi được proxy (`{reason}`). Preview hiện tại vẫn được giữ."
         )
+        await interaction.followup.send(message, ephemeral=True)
 
 
 class PlatformToggleSelect(discord.ui.Select):
