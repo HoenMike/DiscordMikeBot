@@ -7,14 +7,7 @@ import config
 from core.ai import bounded_ai_generate
 from core.branding import BOT_BRAND_NAME, LEGACY_BOT_ALIASES
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, get_yes_no_verdict, READER_STYLES
-from features.tarot.reading.schema import (
-    TarotAIResponseSchema,
-    TarotCardInsight,
-    TarotClarifierTarget,
-    TarotConnection,
-    TarotKeyCard,
-    TarotReadingResult,
-)
+from features.tarot.reading.schema import TarotAIResponseSchema, TarotReadingResult
 
 # Semaphore giới hạn tối đa 3 request AI đồng thời để tránh 429 Rate Limit
 AI_SEMAPHORE = asyncio.Semaphore(3)
