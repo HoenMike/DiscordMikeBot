@@ -930,6 +930,8 @@ def render_clarifier_board(state: ClarifierBoardState) -> Image.Image:
     )
 
     target_label = _short_position_title(target.position_title, state.target_position_index)
+    if len(target_label) > 20:
+        target_label = target_label[:17].rstrip() + "..."
     _draw_clarifier_panel_card(
         canvas,
         target,
