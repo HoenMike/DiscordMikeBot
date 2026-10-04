@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.4 Renderer 2.0 implemented; T20.5 Clarifier is next.  
+> **Status:** T20.5 Clarifier implemented; Tarot 2.0 release boundary reached. T20.6 Multi-turn Reading Session is next.  
 > **Last updated:** 2026-10-04.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -47,7 +47,9 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **T20.2 — Question-first Launcher has been implemented.**
 - **T20.3 — Reading Session UX has been implemented.**
 - **T20.4 — Renderer 2.0 has been implemented.**
-- **Next milestone: T20.5 — Clarifier.**
+- **T20.5 — Clarifier has been implemented.**
+- **Tarot 2.0 release boundary (T20.1–T20.5) is complete in Asumi 2.9.0.**
+- **Next milestone: T20.6 — Multi-turn Reading Session.**
 
 ---
 
@@ -231,11 +233,22 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.2 | COMPLETE | Question-first launcher, deterministic smart recommendation, manual override, repeated-question awareness |
 | T20.3 | COMPLETE | Shuffling/face-down/revealing/finalizing lifecycle, compact controls, progress, micro reveal, AI-ready indicator |
 | T20.4 | COMPLETE | Reading Board state contract, responsive layouts, position/progress labels, REV/Major/key/new/target states, dynamic 4/6/7 layouts, final board and fallback |
-| T20.5 | NEXT | Clarifier target picker, one-card draw, Clarifier Board and bounded interpretation |
-| T20.6 | NOT STARTED | Later |
+| T20.5 | COMPLETE | Owner-only target picker, deterministic non-reroll one-card draw, Clarifier Board, bounded interpretation, delivery-safe 1/1 limit and separate persistence |
+| T20.6 | NEXT | Multi-turn follow-ups, session state, Why?, expiry and cleanup |
 | T20.7 | NOT STARTED | Later |
 | T20.8 | NOT STARTED | Later |
 | T20.9 | NOT STARTED | Later |
+
+### T20.5 implementation contract
+
+- Result action exposes **🃏 Làm rõ** only to the reading owner.
+- Picker prioritizes up to two AI-suggested existing positions, while still allowing any real position in the spread.
+- `draw_clarifier(...)` excludes every original card and binds retries to the original spread + target so a failed delivery does not silently reroll.
+- Clarifier Board preserves the complete original spread, marks the selected TARGET and adds one separate CLARIFIER relation panel.
+- AI receives the original question/context/reading, selected target evidence and the one engine-drawn clarifier; it must not regenerate the full reading.
+- Default limit is **1 clarifier per reading**. The count is consumed only after a public Discord delivery succeeds; attachment failure may fall back to text-only.
+- Successfully delivered clarifiers persist in `tarot_clarifiers`; `tarot_history` remains unchanged.
+- T20.6 must build on this state rather than turning Clarifier into an unlimited reroll flow.
 
 When a milestone starts or completes, update this table in the same PR.
 
