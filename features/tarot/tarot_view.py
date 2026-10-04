@@ -1154,7 +1154,7 @@ class TarotResultActionView(discord.ui.View):
         )
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="🔎 Làm rõ 1 lá", style=discord.ButtonStyle.secondary, custom_id="tarot_clarifier", row=0)
+    @discord.ui.button(label="🃏 Làm rõ", style=discord.ButtonStyle.secondary, custom_id="tarot_clarifier", row=0)
     async def clarifier_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
@@ -1292,7 +1292,7 @@ class TarotResultActionView(discord.ui.View):
                 # Attachment failure must not mutate the original reading or consume
                 # the clarifier. Try a text-only delivery once.
                 try:
-                    embed.set_image(url=None)
+                    embed.remove_image()
                     await interaction.followup.send(
                         embed=embed,
                         ephemeral=False,
