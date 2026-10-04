@@ -27,7 +27,8 @@ CHANGELOG: List[Dict[str, Any]] = [
         "changes": [
             {"category": "🪝 Facebook Embed", "items": [
                 "Không còn tự động chạy yt-dlp cho Facebook sau lỗi/timeout proxy; các nền tảng khác giữ nguyên fallback tự động.",
-                "Nếu Facebed đã gửi nhưng Discord chưa xác nhận unfurl kịp thời, Asumi giữ preview thay vì xóa nó và thay bằng card fallback kém chất lượng.",
+                "Generic/login card ở poll sớm không còn fail-fast; Asumi chờ hết grace window để Discord có cơ hội nâng cấp thành preview/video thật.",
+                "Nếu Facebed đã gửi nhưng Discord vẫn chưa xác nhận unfurl kịp thời, Asumi giữ preview thay vì xóa nó và thay bằng card fallback kém chất lượng.",
                 "Thêm hyperlink [fallback] ngắn gọn trên preview Facebook; link dùng token ký, hết hạn sau 15 phút và chỉ POST mới kích hoạt thay đổi trạng thái.",
                 "Fallback thủ công chỉ dọn preview cũ sau khi yt-dlp đã gửi preview mới thành công; nếu thất bại thì preview hiện tại vẫn được giữ.",
             ]},
