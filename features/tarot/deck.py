@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Sequence
 
 # Thư mục chứa assets của Tarot
 TAROT_DIR = pathlib.Path(__file__).parent
@@ -943,6 +943,68 @@ def draw_spread(
         ))
 
     return drawn
+
+
+def draw_custom_spread(
+    positions: Sequence[Tuple[str, str]],
+    user_id: Optional[int] = None,
+    question: Optional[str] = None,
+    schema_title: str = "Smart Custom Spread",
+    seed: Optional[int] = None,
+    fatigue_card_ids: Optional[List[str]] = None,
+) -> List[DrawnCard]:
+    """Draw cards for a validated custom schema; schema never supplies card identities."""
+    if not 3 <= len(positions) <= 7:
+        raise ValueError("Custom spread must contain 3 to 7 positions")
+
+    normalized_positions = []
+    for title, description in positions:
+        clean_title = re.sub(r"\s+", " ", str(title or "")).strip()
+        clean_description = re.sub(r"\s+", " ", str(description or "")).strip()
+        if not clean_title or not clean_description:
+            raise ValueError("Custom spread positions require title and description")
+        normalized_positions.append((clean_title[:80], clean_description[:220]))
+
+    if seed is None and user_id is not None:
+        signature = "|".join(
+            f"{title}:{description}" for title, description in normalized_positions
+        )
+        seed = compute_tarot_seed(
+            user_id=user_id,
+            spread_key="custom",
+            question=f"{question or ''}|{schema_title}|{signature}",
+        )
+
+    rng = random.Random(seed) if seed is not None else random.Random()
+    pool = list(TAROT_DECK.values())
+    chosen_cards = []
+
+    if fatigue_card_ids:
+        fatigue_set = set(fatigue_card_ids)
+        weights = [0.3 if card.id in fatigue_set else 1.0 for card in pool]
+        for _ in normalized_positions:
+            picked = rng.choices(pool, weights=weights, k=1)[0]
+            chosen_cards.append(picked)
+            idx = pool.index(picked)
+            pool.pop(idx)
+            weights.pop(idx)
+    else:
+        chosen_cards = rng.sample(pool, len(normalized_positions))
+
+    return [
+        DrawnCard(
+            card=card,
+            is_reversed=rng.choice([True, False]),
+            position_index=index,
+            position_title=f"LÁ {index}: {title.upper()}",
+            position_description=description,
+        )
+        for index, (card, (title, description)) in enumerate(
+            zip(chosen_cards, normalized_positions),
+            start=1,
+        )
+    ]
+
 
 
 def draw_clarifier(
