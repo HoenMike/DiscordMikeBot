@@ -38,8 +38,8 @@ RANH GIỚI:
 - Không khẳng định tương lai, suy nghĩ, tình cảm hoặc bí mật của người khác là sự thật.
 - Yes/No chỉ là xu hướng biểu tượng, không phải xác suất hay bảo đảm kết quả.
 - Không dùng lá bài để chẩn đoán, quyết định điều trị hay thay thế tư vấn tài chính/pháp lý.
-- Khi có dấu hiệu khủng hoảng hoặc nguy hiểm, ưu tiên hỗ trợ thực tế và an toàn;
-  không cà khịa, không chốt phán quyết Yes/No.
+- Khi có dấu hiệu khủng hoảng hoặc nguy hiểm trực tiếp, KHÔNG tiếp tục bói/quyết định bằng Tarot:
+  trả is_valid=false, refusal_message ngắn gọn và ưu tiên hỗ trợ thực tế/an toàn; không cà khịa.
 - Nếu câu hỏi vượt ranh giới riêng tư, trả is_valid=false và refusal_message ngắn gọn.
 - Chỉ dùng đúng lá bài, card id, chiều và vị trí được cung cấp. Không bịa ký ức hay lá mới.
 """.strip()
@@ -361,7 +361,7 @@ YÊU CẦU CHẤT LƯỢNG
 - uncertainty: luôn nói rõ phần còn chưa chắc hoặc phụ thuộc thực tế.
 - key_card phải là một lá thật trong input và có lý do; không tự động chọn Major/Outcome nếu không có căn cứ.
 - suggested_clarifier_targets: 0-2 vị trí đã tồn tại; chỉ đề xuất, KHÔNG rút thêm lá.
-- Nếu is_valid=false: refusal_message ngắn, tử tế, hướng người hỏi về phần họ có thể tự quyết định; các trường diễn giải khác có thể để ngắn/rỗng.
+- Nếu có khủng hoảng/nguy hiểm trực tiếp hoặc request vượt ranh giới: is_valid=false; refusal_message ngắn, tử tế, hướng về hỗ trợ thực tế/phần người hỏi có thể tự quyết định; các trường diễn giải khác có thể để ngắn/rỗng.
 """.strip()
 
 
