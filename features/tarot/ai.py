@@ -915,7 +915,10 @@ async def generate_followup_answer(
     user_id: Optional[int] = None,
     guild: Optional[Any] = None,
     bot_id: Optional[int] = None,
-    bot_name: str = BOT_BRAND_NAME
+    bot_name: str = BOT_BRAND_NAME,
+    original_context: Optional[str] = None,
+    prior_followups: Optional[List[Tuple[str, str]]] = None,
+    clarifier_context: Optional[str] = None,
 ) -> str:
     """
     Trả lời câu hỏi đào sâu bổ sung của người dùng dựa trên ngữ cảnh quẻ bài vừa giải.
@@ -940,6 +943,18 @@ async def generate_followup_answer(
         else persona_prompt
     )
 
+    history_lines = []
+    for idx, turn in enumerate((prior_followups or [])[-3:], start=1):
+        try:
+            prior_q, prior_a = turn
+        except (TypeError, ValueError):
+            continue
+        history_lines.append(
+            f"{idx}. Người dùng: {str(prior_q)[:260]}\n   Asumi: {str(prior_a)[:700]}"
+        )
+    session_history = "\n".join(history_lines) if history_lines else "Chưa có câu hỏi phụ trước đó."
+    clarifier_block = (clarifier_context or "Chưa dùng clarifier.")[:2200]
+
     prompt = f"""
 Bạn là Asumi đang tiếp tục đúng quẻ bài vừa đọc cho {user_name}.
 Đây là cùng một cuộc trò chuyện, KHÔNG phải một lần rút bài mới.
@@ -951,10 +966,17 @@ GIỌNG
 
 QUẺ GỐC
 - Câu hỏi ban đầu: {original_question or 'Tổng quan'}
+- Bối cảnh thực tế: {original_context or 'Không có thêm bối cảnh'}
 - Các lá bài đã rút:
 {cards_context}
 - Bài đọc trước (chỉ để giữ mạch):
 {original_reading[:1200]}
+
+CLARIFIER TRONG CÙNG SESSION
+{clarifier_block}
+
+CÁC LƯỢT HỎI TRƯỚC TRONG CÙNG SESSION
+{session_history}
 
 CÂU HỎI PHỤ
 - {clean_followup}
@@ -964,6 +986,8 @@ YÊU CẦU
 - Trả lời 1-2 đoạn, tối đa khoảng 800 ký tự.
 - Chỉ dùng các lá đã có; không bịa lá mới, không giả vờ đã rút clarifier.
 - Chọn đúng 1-2 chi tiết từ quẻ giúp trả lời câu hỏi phụ, thay vì kể lại mọi lá.
+- Nếu câu hỏi phụ nối tiếp lượt hỏi trước hoặc clarifier, giữ mạch đó nhưng không tự mâu thuẫn với quẻ gốc.
+- Không coi lịch sử follow-up là bằng chứng Tarot mới; bằng chứng vẫn là các lá/vị trí đã rút và clarifier thật nếu có.
 - Nếu câu hỏi đòi biết chắc suy nghĩ/bí mật của người khác, chuyển về điều quẻ phản chiếu ở phía người hỏi.
 - Nếu câu hỏi y tế/pháp lý/tài chính hoặc khủng hoảng, giữ giới hạn thực tế của Tarot và không chốt thay quyết định.
 - Nếu câu hỏi vượt ranh giới riêng tư của người thứ ba, từ chối ngắn gọn và gợi ý một góc hỏi liên quan trực tiếp đến {user_name}.

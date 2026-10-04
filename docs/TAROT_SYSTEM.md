@@ -219,6 +219,15 @@ Gồm 2 tầng View Discord UI:
 - Clarifier Board giữ nguyên spread bên trái, target được đánh dấu và panel riêng hiển thị TARGET → CLARIFIER.
 - **Delivery là commit point**: lỗi trước/sau render hoặc cả attachment/text delivery đều không tiêu lượt; khi public output đã gửi thành công thì action chuyển sang **✓ Đã làm rõ** và persistence/logging chạy best-effort.
 
+#### Multi-turn result session — T20.6
+
+- `TarotResultActionView` owns a bounded `TarotSessionState` for post-reading interactions.
+- A reading allows up to **3** follow-up questions during the result-view lifetime; each answer receives original context, prior follow-up turns and a delivered clarifier summary.
+- Follow-up capacity is committed only after Discord delivery succeeds.
+- **🔍 Vì sao?** is owner-only and one-use; it calls the evidence-facing Why generator and never exposes hidden chain-of-thought.
+- The default result-view lifetime remains 600 seconds. On timeout, follow-up / clarifier / Why actions are disabled.
+- Clarifier remains one-card, one-use, and is attached to the same session only as context for subsequent questions.
+
 ### 3.5. Module Quản Lý Cơ Sở Dữ Liệu SQLite (`manager.py`)
 
 T20.5 bổ sung bảng `tarot_clarifiers` cho **Clarifier đã delivery thành công**. Record lưu user/guild/channel, spread/question, target position/card + orientation, clarifier card + orientation và interpretation. Dữ liệu này tách khỏi `tarot_history` để quẻ gốc không bị mutation.

@@ -14,11 +14,12 @@ from features.tarot.deck import (
     draw_spread
 )
 from features.tarot.renderer import render_clarifier_board_to_bytes, render_spread_to_bytes
-from features.tarot.ai import generate_clarifier_interpretation, generate_tarot_reading_result, generate_followup_answer, recommend_spread_for_question
+from features.tarot.ai import generate_clarifier_interpretation, generate_tarot_reading_result, generate_followup_answer, generate_why_explanation, recommend_spread_for_question
 from features.tarot.reading.clarifier import resolve_clarifier_suggestions, target_insight
 from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.reading.schema import TarotReadingResult
 from features.tarot.rendering.state import ClarifierBoardState
+from features.tarot.reading.followup import TarotSessionState
 from features.tarot.reading.session import (
     build_ai_ready_status,
     build_micro_reveal,
@@ -931,43 +932,66 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
         if interaction.user.id != self.author_id or not question_text:
             await interaction.response.send_message("Invalid followup submission.", ephemeral=True)
             return
-        if self.result_view.has_asked_followup or self.result_view.is_finished():
-            await interaction.response.send_message("Followup already submitted or expired.", ephemeral=True)
+        if self.result_view._followup_in_progress:
+            await interaction.response.send_message("⌛ Asumi đang trả lời câu hỏi trước đó.", ephemeral=True)
             return
-        self.result_view.has_asked_followup = True
+        if not self.result_view.session_state.can_followup() or self.result_view.is_finished():
+            await interaction.response.send_message("Phiên đọc đã hết lượt hỏi thêm hoặc đã hết hạn.", ephemeral=True)
+            return
+
+        self.result_view._followup_in_progress = True
         try:
             await interaction.response.defer(ephemeral=False)
         except BaseException:
-            self.result_view.has_asked_followup = False
+            self.result_view._followup_in_progress = False
             raise
-        self.result_view.followup_button.disabled = True
-        if self.message:
-            try:
-                await self.message.edit(view=self.result_view)
-            except Exception:
-                pass
 
         bot_user = interaction.client.user if interaction and interaction.client else None
-        answer = await generate_followup_answer(
-            drawn_cards=self.drawn_cards,
-            original_question=self.original_question,
-            original_reading=self.original_reading,
-            user_followup_question=question_text,
-            reader_style=self.reader_style,
-            user_name=self.user_name,
-            user_id=interaction.user.id if interaction and interaction.user else None,
-            guild=interaction.guild if interaction else None,
-            bot_id=bot_user.id if bot_user else None,
-            bot_name=runtime_bot_name(bot_user)
-        )
+        try:
+            answer = await generate_followup_answer(
+                drawn_cards=self.drawn_cards,
+                original_question=self.original_question,
+                original_reading=self.original_reading,
+                user_followup_question=question_text,
+                reader_style=self.reader_style,
+                user_name=self.user_name,
+                user_id=interaction.user.id if interaction and interaction.user else None,
+                guild=interaction.guild if interaction else None,
+                bot_id=bot_user.id if bot_user else None,
+                bot_name=runtime_bot_name(bot_user),
+                original_context=self.result_view.context,
+                prior_followups=self.result_view.session_state.prompt_history(),
+                clarifier_context=self.result_view.session_state.clarifier_summary,
+            )
+        except BaseException:
+            self.result_view._followup_in_progress = False
+            raise
 
         embed = discord.Embed(
             title=f"❓ GIẢI ĐÁP BỔ SUNG CHO {self.user_name.upper()}",
             description=f"**Thắc mắc:** *\"{question_text}\"*\n\n{answer}",
             color=0x8B5CF6
         )
-        embed.set_footer(text="Phản hồi thêm từ Asumi", icon_url=interaction.user.display_avatar.url)
-        await interaction.followup.send(embed=embed)
+        next_turn = len(self.result_view.session_state.followups) + 1
+        embed.set_footer(
+            text=f"Phản hồi thêm từ Asumi • {next_turn}/{self.result_view.session_state.max_followups}",
+            icon_url=interaction.user.display_avatar.url,
+        )
+        try:
+            await interaction.followup.send(embed=embed)
+        except BaseException:
+            self.result_view._followup_in_progress = False
+            raise
+
+        self.result_view.session_state.record_followup(question_text, answer)
+        self.result_view._followup_in_progress = False
+        self.result_view._refresh_session_controls()
+        if self.message:
+            try:
+                await self.message.edit(view=self.result_view)
+            except Exception:
+                pass
+        self.result_view._sync_activity_logger()
 
 
 class TarotClarifierTargetView(discord.ui.View):
@@ -1120,8 +1144,13 @@ class TarotResultActionView(discord.ui.View):
         self.activity_id = activity_id
         self.reading_result = reading_result
         self.clarifier_allowed = clarifier_allowed
-        self.has_asked_followup = False
+        self.session_state = TarotSessionState(max_followups=3, timeout_seconds=float(timeout))
+        self.has_asked_followup = False  # compatibility: true only when all 3 turns are consumed
         self.has_used_clarifier = False
+        self.has_used_why = False
+        self._followup_in_progress = False
+        self._why_in_progress = False
+        self.message: Optional[discord.Message] = None
         self._clarifier_in_progress = False
         self.clarifier_target_index: Optional[int] = None
         self.clarifier_card: Optional[DrawnCard] = None
@@ -1138,8 +1167,11 @@ class TarotResultActionView(discord.ui.View):
             await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể hỏi thêm về quẻ bài này!", ephemeral=True)
             return
 
-        if self.has_asked_followup:
-            await interaction.response.send_message("⚠️ Bạn đã sử dụng lượt hỏi thêm cho quẻ bài này rồi!", ephemeral=True)
+        if not self.session_state.can_followup():
+            await interaction.response.send_message("⚠️ Phiên này đã hết lượt hỏi thêm hoặc đã hết hạn.", ephemeral=True)
+            return
+        if self._followup_in_progress:
+            await interaction.response.send_message("⌛ Asumi đang trả lời câu hỏi trước đó.", ephemeral=True)
             return
 
         modal = TarotFollowupModal(
@@ -1153,6 +1185,48 @@ class TarotResultActionView(discord.ui.View):
             message=interaction.message
         )
         await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="🔍 Vì sao?", style=discord.ButtonStyle.secondary, custom_id="tarot_why", row=0)
+    async def why_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể mở giải thích này.", ephemeral=True)
+            return
+        if self.has_used_why or self.session_state.why_used:
+            await interaction.response.send_message("✓ Asumi đã giải thích bằng chứng chính của quẻ này rồi.", ephemeral=True)
+            return
+        if self._why_in_progress or self.session_state.is_expired():
+            await interaction.response.send_message("⌛ Phiên đọc đã hết hạn hoặc đang được xử lý.", ephemeral=True)
+            return
+
+        self._why_in_progress = True
+        try:
+            await interaction.response.defer(ephemeral=True)
+            answer = await generate_why_explanation(
+                self.drawn_cards,
+                self.question,
+                self.ai_reading,
+                reader_style=self.reader_style,
+                user_name=self.author_name,
+            )
+            embed = discord.Embed(
+                title="🔍 VÌ SAO ASUMI ĐỌC QUẺ THEO HƯỚNG NÀY?",
+                description=answer,
+                color=0x6D5D8F,
+            )
+            embed.set_footer(text="Chỉ dựa trên lá, vị trí và chiều bài đang hiển thị — không phải hidden reasoning.")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            self.session_state.mark_why_used()
+            self.has_used_why = True
+            self._refresh_session_controls()
+            try:
+                if interaction.message:
+                    self.message = interaction.message
+                    await interaction.message.edit(view=self)
+            except Exception:
+                pass
+            self._sync_activity_logger()
+        finally:
+            self._why_in_progress = False
 
     @discord.ui.button(label="🃏 Làm rõ", style=discord.ButtonStyle.secondary, custom_id="tarot_clarifier", row=0)
     async def clarifier_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1309,6 +1383,10 @@ class TarotResultActionView(discord.ui.View):
             self.clarifier_target_index = target_index
             self.clarifier_card = clarifier
             self.clarifier_reading = clarifier_result.full_reading
+            self.session_state.set_clarifier(
+                f"{target.position_title}: {target.card.name_vi} -> {clarifier.card.name_vi}. "
+                f"{clarifier_result.full_reading}"
+            )
             self.clarifier_button.disabled = True
             self.clarifier_button.label = "✓ Đã làm rõ"
 
@@ -1345,6 +1423,27 @@ class TarotResultActionView(discord.ui.View):
             try:
                 if image_buffer is not None:
                     image_buffer.close()
+            except Exception:
+                pass
+
+    def _refresh_session_controls(self):
+        used = len(self.session_state.followups)
+        remaining = self.session_state.remaining_followups
+        self.has_asked_followup = remaining <= 0
+        self.followup_button.label = f"❓ Hỏi thêm ({used}/{self.session_state.max_followups})"
+        self.followup_button.disabled = remaining <= 0 or self.session_state.closed
+        if self.has_used_why or self.session_state.why_used:
+            self.why_button.label = "✓ Đã giải thích"
+            self.why_button.disabled = True
+
+    async def on_timeout(self):
+        self.session_state.close()
+        for item in self.children:
+            if getattr(item, "custom_id", "") in {"tarot_followup", "tarot_clarifier", "tarot_why"}:
+                item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
             except Exception:
                 pass
 
@@ -1410,6 +1509,8 @@ class TarotResultActionView(discord.ui.View):
                     "likes": len(self.liked_user_ids),
                     "dislikes": len(self.disliked_user_ids),
                     "clarifier_used": self.has_used_clarifier,
+                    "followup_count": len(self.session_state.followups),
+                    "why_used": self.has_used_why,
                 }
                 if self.has_used_clarifier and self.clarifier_card is not None:
                     details["clarifier_target_index"] = self.clarifier_target_index
@@ -1908,6 +2009,7 @@ class TarotFlipView(discord.ui.View):
                 clarifier_allowed=is_valid_question,
             )
 
+            action_view.message = self.message or interaction.message
             file.reset()
             attachments = [file] + ([reading_file] if reading_file else [])
             try:

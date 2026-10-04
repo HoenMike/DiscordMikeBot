@@ -1,8 +1,8 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1–T20.5 COMPLETE — Tarot 2.0 release boundary reached. T20.6 NEXT.** The user explicitly approved continuing implementation milestone-by-milestone.  
-> **Last planning update:** 2026-10-04  
+> **Implementation status:** **T20.1–T20.6 COMPLETE — Tarot 2.0 released; post-release expansion continues. T20.7 NEXT.** The user approved continuing through T20.9 without per-milestone approval.  
+> **Last planning update:** 2026-10-05  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
 > **Current-system reference:** `docs/TAROT_SYSTEM.md`  
@@ -1240,7 +1240,18 @@ Implementation notes:
 
 ---
 
-## T20.6 — Multi-turn Reading Session
+## T20.6 — Multi-turn Reading Session — COMPLETE
+
+Implemented 2026-10-05:
+
+- bounded post-reading session state;
+- up to 3 contextual follow-up turns;
+- prior Q/A + clarifier context carried forward;
+- owner-only evidence-oriented **Why?** control;
+- failed generation/delivery does not consume a follow-up slot;
+- 10-minute default inactivity expiry and cleanup.
+
+Original scope:
 
 Implement:
 

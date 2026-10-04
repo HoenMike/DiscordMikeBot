@@ -1,8 +1,8 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.5 Clarifier implemented; Tarot 2.0 release boundary reached. T20.6 Multi-turn Reading Session is next.  
-> **Last updated:** 2026-10-04.
+> **Status:** T20.6 Multi-turn Reading Session implemented; T20.7 Smart Custom Spread is next.  
+> **Last updated:** 2026-10-05.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
 
@@ -49,7 +49,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **T20.4 — Renderer 2.0 has been implemented.**
 - **T20.5 — Clarifier has been implemented.**
 - **Tarot 2.0 release boundary (T20.1–T20.5) is complete in Asumi 2.9.0.**
-- **Next milestone: T20.6 — Multi-turn Reading Session.**
+- **T20.6 — Multi-turn Reading Session has been implemented.**
+- **Next milestone: T20.7 — Smart Custom Spread.**
 
 ---
 
@@ -234,8 +235,9 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.3 | COMPLETE | Shuffling/face-down/revealing/finalizing lifecycle, compact controls, progress, micro reveal, AI-ready indicator |
 | T20.4 | COMPLETE | Reading Board state contract, responsive layouts, position/progress labels, REV/Major/key/new/target states, dynamic 4/6/7 layouts, final board and fallback |
 | T20.5 | COMPLETE | Owner-only target picker, deterministic non-reroll one-card draw, Clarifier Board, bounded interpretation, delivery-safe 1/1 limit and separate persistence |
-| T20.6 | NEXT | Multi-turn follow-ups, session state, Why?, expiry and cleanup |
-| T20.7 | NOT STARTED | Later |
+| T20.6 | COMPLETE | Up to 3 contextual follow-ups, shared session state, owner-only Why?, 10-minute inactivity expiry and delivery-safe consumption |
+| T20.7 | NEXT | Smart Custom Spread |
+
 | T20.8 | NOT STARTED | Later |
 | T20.9 | NOT STARTED | Later |
 
@@ -249,6 +251,16 @@ Avoid implementing all V2 milestones in one giant branch.
 - Default limit is **1 clarifier per reading**. The count is consumed only after a public Discord delivery succeeds; attachment failure may fall back to text-only.
 - Successfully delivered clarifiers persist in `tarot_clarifiers`; `tarot_history` remains unchanged.
 - T20.6 must build on this state rather than turning Clarifier into an unlimited reroll flow.
+
+### T20.6 implementation contract
+
+- Final result actions now share an in-memory `TarotSessionState` instead of treating each follow-up as an isolated one-shot.
+- Each reading supports up to **3** follow-up questions. Previous follow-up Q/A, real-world context and a successfully delivered clarifier are passed forward as bounded session context.
+- A follow-up slot is consumed only after its public Discord response is delivered; generation/send failure leaves the slot available.
+- **🔍 Vì sao?** is owner-only, one-use, ephemeral, and calls the existing evidence-oriented `generate_why_explanation(...)`; it explains visible card/position evidence rather than hidden reasoning.
+- Clarifier remains **1/1** and becomes context for later follow-ups; it is not converted into reroll behavior.
+- The result session inherits the Discord View timeout (10 minutes by default). Timeout closes the session actions and disables follow-up / clarifier / Why controls.
+- Activity details now track follow-up count and Why usage.
 
 When a milestone starts or completes, update this table in the same PR.
 
