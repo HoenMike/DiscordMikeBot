@@ -41,14 +41,12 @@ class EmbedActionView(discord.ui.View):
         platform = str(self.payload.get("platform", "social"))[:20]
 
         self.reload_button = discord.ui.Button(
-            label="Reload",
             emoji="🔄",
             style=discord.ButtonStyle.secondary,
             custom_id=f"asumi:embed-reload:{platform}:{origin_id}",
         )
         self.remove_button = discord.ui.Button(
-            label="Bỏ embed",
-            emoji="🗑️",
+            emoji="❌",
             style=discord.ButtonStyle.danger,
             custom_id=f"asumi:embed-remove:{platform}:{origin_id}",
         )
@@ -92,7 +90,6 @@ class EmbedActionView(discord.ui.View):
         reason = getattr(result, "reason", "reload_failed")
         self._set_busy(False)
         if reason == "no_more_proxy":
-            self.reload_button.label = "Hết proxy"
             self.reload_button.disabled = True
         elif result is not None and result.status == "action_required" and result.preview_message_id is not None:
             self.stop()
