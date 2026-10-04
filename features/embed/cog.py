@@ -996,7 +996,7 @@ class EmbedCog(commands.Cog):
                     )
                     sent_msg = await self._send_embed_preview(
                         message=message,
-                        content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                        content=f"-# {author_jump} • [{domain}]({raw_link})",
                         view=fallback_view,
                     )
                     if not sent_msg:
@@ -1280,7 +1280,7 @@ class EmbedCog(commands.Cog):
             )
             sent_msg = await self._send_embed_preview(
                 message=origin_message,
-                content=f"-# {author_jump} • `{domain}`\n{raw_link}",
+                content=f"-# {author_jump} • [{domain}]({raw_link})",
                 view=next_view,
             )
             if not sent_msg:
