@@ -14,7 +14,7 @@ from typing import List, Optional, Set, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, TarotCard, ensure_card_asset
-from features.tarot.rendering.state import ReadingBoardState
+from features.tarot.rendering.state import ClarifierBoardState, ReadingBoardState
 
 
 # Restrained Tarot 2.0 palette: dark celestial, muted violet, warm gold, blue-grey.
@@ -326,12 +326,14 @@ def _load_and_prepare_card_image(drawn: DrawnCard, target_w: int, target_h: int)
 
 
 def _state_accent(state: ReadingBoardState, index: int):
+    # Clarifier target wins during target-selection/rendering so the relation remains
+    # visible even when the same card is also the final key card.
+    if state.is_target(index):
+        return COLOR_BLUEGREY_LIGHT, "TARGET"
     if state.is_key_card(index):
         return COLOR_GOLD_LIGHT, "KEY"
     if state.is_just_revealed(index):
         return COLOR_VIOLET_LIGHT, "NEW"
-    if state.is_target(index):
-        return COLOR_BLUEGREY_LIGHT, "TARGET"
     return (77, 70, 92), ""
 
 
@@ -792,6 +794,221 @@ def render_reading_board_to_bytes(state: ReadingBoardState) -> io.BytesIO:
     except Exception as exc:
         print(f"[TarotRenderer] Reading Board fallback: {type(exc).__name__}: {exc}", flush=True)
         image = _render_emergency_board(state, exc)
+
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
+    buffer.seek(0)
+    return buffer
+
+
+
+def _draw_clarifier_panel_card(
+    canvas: Image.Image,
+    drawn_card: DrawnCard,
+    center_x: int,
+    center_y: int,
+    card_w: int,
+    card_h: int,
+    *,
+    label: str,
+    accent,
+) -> None:
+    draw = ImageDraw.Draw(canvas)
+    img = _load_and_prepare_card_image(drawn_card, card_w, card_h)
+    left = center_x - card_w // 2
+    top = center_y - card_h // 2
+
+    draw.rounded_rectangle(
+        (left + 9, top + 9, left + card_w + 9, top + card_h + 9),
+        radius=max(9, card_w // 20),
+        fill=COLOR_SHADOW,
+    )
+    canvas.paste(img, (left, top), img)
+    draw.rounded_rectangle(
+        (left - 4, top - 4, left + card_w + 4, top + card_h + 4),
+        radius=max(10, card_w // 18),
+        outline=accent,
+        width=max(4, card_w // 45),
+    )
+
+    label_font = _get_font(max(18, card_w // 9), bold=True)
+    meta_font = _get_font(max(14, card_w // 12), bold=True)
+    _draw_pill(
+        draw,
+        label,
+        center_x,
+        top - 52,
+        label_font,
+        fill=COLOR_PANEL,
+        outline=accent,
+        text_color=COLOR_TEXT,
+        pad_x=14,
+        pad_y=5,
+    )
+
+    badge_y = top + 10
+    if drawn_card.is_reversed:
+        _draw_badge(
+            draw,
+            "REV",
+            left + 10,
+            badge_y,
+            meta_font,
+            fill=(67, 43, 50),
+            outline=COLOR_REVERSED,
+            text_color=(246, 210, 210),
+        )
+
+    name_font = _get_font(max(17, card_w // 10), bold=True)
+    name = drawn_card.card.name_vi
+    if len(name) > 24:
+        name = name[:21].rstrip() + "..."
+    _draw_centered_text(draw, name, center_x, top + card_h + 12, name_font, COLOR_TEXT)
+    orientation = "NGƯỢC" if drawn_card.is_reversed else "XUÔI"
+    _draw_centered_text(
+        draw,
+        orientation,
+        center_x,
+        top + card_h + 40,
+        meta_font,
+        COLOR_REVERSED if drawn_card.is_reversed else COLOR_UPRIGHT,
+    )
+
+
+def render_clarifier_board(state: ClarifierBoardState) -> Image.Image:
+    """Render original spread + one target-linked clarifier without replacing cards."""
+    target = state.target_card
+    original = render_reading_board(state.original_board_state())
+
+    canvas_w, canvas_h = 1800, 1200
+    canvas = _gradient_background(canvas_w, canvas_h)
+    draw = ImageDraw.Draw(canvas)
+
+    title_font = _get_font(42, bold=True)
+    sub_font = _get_font(20, bold=True)
+    small_font = _get_font(17)
+    title = f"CLARIFIER · {_safe_title(state.spread_key, state.spread_title)}"
+    _draw_centered_text(draw, title.upper(), canvas_w // 2, 42, title_font, COLOR_GOLD_LIGHT)
+    _draw_centered_text(
+        draw,
+        "Một lá bổ sung cho đúng một vị trí · quẻ gốc vẫn giữ nguyên",
+        canvas_w // 2,
+        100,
+        small_font,
+        COLOR_MUTED,
+    )
+
+    # Preserve the complete original spread on the left, scaled only for composition.
+    max_w, max_h = 1120, 930
+    scale = min(max_w / original.width, max_h / original.height, 1.0)
+    base_w = max(1, int(original.width * scale))
+    base_h = max(1, int(original.height * scale))
+    base = original.resize((base_w, base_h), Image.Resampling.LANCZOS)
+    base_x = 60 + (1120 - base_w) // 2
+    base_y = 185 + (930 - base_h) // 2
+    canvas.paste(base, (base_x, base_y), base)
+    _draw_pill(
+        draw,
+        "ORIGINAL SPREAD · TARGET ĐƯỢC ĐÁNH DẤU",
+        620,
+        150,
+        sub_font,
+        fill=COLOR_PANEL,
+        outline=COLOR_BLUEGREY,
+        text_color=COLOR_BLUEGREY_LIGHT,
+        pad_x=20,
+    )
+
+    # Clarifier relation panel.
+    panel = (1210, 155, 1745, 1130)
+    draw.rounded_rectangle(
+        panel,
+        radius=28,
+        fill=(31, 28, 44, 245),
+        outline=COLOR_GOLD_DARK,
+        width=2,
+    )
+
+    target_label = _short_position_title(target.position_title, state.target_position_index)
+    _draw_clarifier_panel_card(
+        canvas,
+        target,
+        1477,
+        405,
+        190,
+        327,
+        label=f"TARGET · {target_label}",
+        accent=COLOR_BLUEGREY_LIGHT,
+    )
+
+    arrow_y1, arrow_y2 = 610, 680
+    draw.line((1477, arrow_y1, 1477, arrow_y2), fill=COLOR_GOLD, width=5)
+    draw.polygon(
+        [(1464, arrow_y2 - 10), (1490, arrow_y2 - 10), (1477, arrow_y2 + 10)],
+        fill=COLOR_GOLD_LIGHT,
+    )
+    _draw_centered_text(draw, "LÀM RÕ", 1477, 635, small_font, COLOR_MUTED)
+
+    _draw_clarifier_panel_card(
+        canvas,
+        state.clarifier_card,
+        1477,
+        860,
+        210,
+        361,
+        label="CLARIFIER",
+        accent=COLOR_VIOLET_LIGHT,
+    )
+
+    return canvas
+
+
+def _render_emergency_clarifier_board(
+    state: ClarifierBoardState,
+    error: Exception,
+) -> Image.Image:
+    canvas = _gradient_background(1200, 900)
+    draw = ImageDraw.Draw(canvas)
+    title_font = _get_font(36, bold=True)
+    row_font = _get_font(24, bold=True)
+    small_font = _get_font(18)
+
+    target = state.target_card
+    clarifier = state.clarifier_card
+    _draw_centered_text(draw, "TAROT CLARIFIER", 600, 65, title_font, COLOR_GOLD_LIGHT)
+    draw.text(
+        (90, 220),
+        f"TARGET: {target.position_title} — {target.card.name_vi} ({'NGƯỢC' if target.is_reversed else 'XUÔI'})",
+        font=row_font,
+        fill=COLOR_TEXT,
+    )
+    draw.text(
+        (90, 330),
+        f"CLARIFIER: {clarifier.card.name_vi} ({'NGƯỢC' if clarifier.is_reversed else 'XUÔI'})",
+        font=row_font,
+        fill=COLOR_TEXT,
+    )
+    draw.text(
+        (90, 470),
+        "Quẻ gốc không bị thay đổi. Clarifier chỉ bổ sung ngữ cảnh cho vị trí đã chọn.",
+        font=small_font,
+        fill=COLOR_MUTED,
+    )
+    draw.text(
+        (90, 820),
+        f"Renderer fallback: {type(error).__name__}",
+        font=small_font,
+        fill=COLOR_MUTED,
+    )
+    return canvas
+
+
+def render_clarifier_board_to_bytes(state: ClarifierBoardState) -> io.BytesIO:
+    try:
+        image = render_clarifier_board(state)
+    except Exception as exc:
+        print(f"[TarotRenderer] Clarifier Board fallback: {type(exc).__name__}: {exc}", flush=True)
+        image = _render_emergency_clarifier_board(state, exc)
 
     buffer = io.BytesIO()
     image.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
