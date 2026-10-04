@@ -28,7 +28,7 @@ Before any Tarot 2.0 work, read:
 
 ### Important Tarot status
 
-Tarot 2.0 implementation is active and user-approved.
+Tarot 2.0 / 2.1 roadmap T20.1–T20.9 is implemented and now in maintenance mode.
 
 - T20.0 — baseline/docs: complete.
 - T20.1 — Prompt & Reading Engine 2.0: complete.
@@ -40,8 +40,8 @@ Tarot 2.0 implementation is active and user-approved.
 - **T20.6 — Multi-turn Reading Session: complete.**
 - **T20.7 — Smart Custom Spread: complete.**
 - **T20.8 — Tarot Journey: complete.**
-- **Next milestone: T20.9 — Recap & Polish.**
-- Continue milestone-by-milestone; do not skip ahead or bundle unrelated later milestones into one PR.
+- **T20.9 — Recap & Polish: complete.**
+- **Asumi 2.10.0 — Tarot 2.1 completes the T20.1–T20.9 roadmap.** No next Tarot milestone is defined until the user requests a new roadmap.
 
 ### Tarot milestone IDs
 
@@ -55,10 +55,10 @@ T20.5  Clarifier — COMPLETE
 T20.6  Multi-turn Reading Session — COMPLETE
 T20.7  Smart Custom Spread — COMPLETE
 T20.8  Tarot Journey — COMPLETE
-T20.9  Recap & Polish — NEXT
+T20.9  Recap & Polish — COMPLETE
 ```
 
-Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0. T20.6–T20.8 are complete; continue with T20.9 without waiting for approval unless a real blocker appears.
+Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0; T20.6–T20.9 are complete in v2.10.0 / Tarot 2.1. Treat these milestones as shipped behavior unless the user explicitly asks to change them.
 
 ### Tarot continuity rule
 
