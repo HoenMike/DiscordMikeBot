@@ -375,6 +375,32 @@ class TarotLauncherView(discord.ui.View):
         )
         return embed
 
+    def build_shuffling_embed(self) -> discord.Embed:
+        """Short transition state between launcher setup and the face-down reading board."""
+        spread_name = SPREAD_DEFINITIONS.get(self.selected_spread, {}).get(
+            "name", self.selected_spread
+        )
+        lines = [
+            f"**{spread_name}**",
+            "🔀 *Asumi đang xáo bài và khóa thứ tự lá cho phiên này...*",
+        ]
+        if self.question:
+            lines.extend(["", f"**❓ {self.question}**"])
+        lines.extend([
+            "",
+            "✨ *Luận giải bắt đầu chạy nền ngay khi bộ bài được rút, nên bạn có thể lật bài mà không phải chờ AI trước.*",
+        ])
+        embed = discord.Embed(
+            title="🔮 ĐANG CHUẨN BỊ TRẢI BÀI",
+            description="\n".join(lines),
+            color=READER_STYLES.get(self.selected_reader, READER_STYLES["auto"]).get("color", 0x7851A9),
+        )
+        embed.set_footer(
+            text=f"{self.author_name} • Shuffling",
+            icon_url=self.author_avatar_url,
+        )
+        return embed
+
     def _build_components(self):
         self.clear_items()
 
