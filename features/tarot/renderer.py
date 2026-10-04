@@ -934,26 +934,24 @@ def render_clarifier_board(state: ClarifierBoardState) -> Image.Image:
         canvas,
         target,
         1477,
-        405,
+        385,
         190,
         327,
         label=f"TARGET · {target_label}",
         accent=COLOR_BLUEGREY_LIGHT,
     )
 
-    arrow_y1, arrow_y2 = 610, 680
+    arrow_y1, arrow_y2 = 600, 640
     draw.line((1477, arrow_y1, 1477, arrow_y2), fill=COLOR_GOLD, width=5)
     draw.polygon(
         [(1464, arrow_y2 - 10), (1490, arrow_y2 - 10), (1477, arrow_y2 + 10)],
         fill=COLOR_GOLD_LIGHT,
     )
-    _draw_centered_text(draw, "LÀM RÕ", 1477, 635, small_font, COLOR_MUTED)
-
     _draw_clarifier_panel_card(
         canvas,
         state.clarifier_card,
         1477,
-        860,
+        895,
         210,
         361,
         label="CLARIFIER",
