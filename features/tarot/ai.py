@@ -1087,9 +1087,3 @@ def recommend_spread_for_question(question: str) -> Tuple[str, str, str]:
     """Backward-compatible tuple wrapper around the Tarot 2.0 launcher recommender."""
     rec = recommend_spread(question)
     return rec.spread_key, rec.spread_name, rec.reason
-
-
-    if any(kw in q for kw in ["tổng quan", "năm nay", "cuộc đời", "sự nghiệp dài hạn", "vận mệnh", "bức tranh toàn cảnh"]):
-        return ("celtic", "Celtic Cross - Thập Tự Celtic (10 lá)", "Vấn đề phức tạp và mang tính bước ngoặt. Celtic Cross là trải bài kinh điển 10 lá phân tích toàn diện mọi khía cạnh ẩn sâu.")
-
-    return ("ppf", "Quá Khứ - Hiện Tại - Tương Lai (3 lá)", "Trải bài 3 lá cổ điển, linh hoạt và phù hợp nhất để xem xét tiến trình của hầu hết mọi vấn đề trong cuộc sống.")
