@@ -98,7 +98,7 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("0 / 3 lá đã lật", embed.description)
         self.assertIn("Asumi đang đọc mối liên hệ", embed.description)
         self.assertIn("▫️ *Chưa lật*", embed.description)
-        self.assertIn("FACE DOWN", embed.footer.text)
+        self.assertIn("CHỜ LẬT", embed.footer.text)
 
         labels = [item.label for item in self.view.children if isinstance(item, discord.ui.Button)]
         self.assertEqual(labels, ["1", "2", "3", "✨ Lật hết"])
@@ -112,7 +112,7 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("1 / 3 lá đã lật", embed.description)
         self.assertIn("✨ Vừa lật", embed.description)
         self.assertIn(self.cards[1].card.name_vi, embed.description)
-        self.assertIn("REVEALING", embed.footer.text)
+        self.assertIn("ĐANG LẬT", embed.footer.text)
 
         labels = [item.label for item in self.view.children if isinstance(item, discord.ui.Button)]
         self.assertEqual(labels, ["1", "✓ 2", "3", "✨ Lật hết"])
