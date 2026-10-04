@@ -232,12 +232,16 @@ class TarotLauncherView(discord.ui.View):
         """Detect a similar recent reading without blocking or forcing the user."""
         self.similar_question_hint = None
         if not self.question:
+            self.reading_context_mode = "current"
             return
         try:
             history = await self.tarot_manager.get_user_history(self.author_id, limit=5)
         except Exception:
+            self.reading_context_mode = "current"
             return
         self.similar_question_hint = find_similar_recent_question(history, self.question)
+        if not self.similar_question_hint:
+            self.reading_context_mode = "current"
 
     async def prepare(self) -> "TarotLauncherView":
         """Async preparation hook used before the launcher is first shown."""
@@ -527,8 +531,9 @@ class TarotLauncherView(discord.ui.View):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
             return
 
+        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
         if not self._can_start():
-            if not self.question and self.selection_source == "default":
+            if spread_info.get("requires_question", True) and not self.question:
                 await interaction.response.send_modal(TarotQuestionModal(self))
             else:
                 await interaction.response.send_message(
@@ -536,8 +541,6 @@ class TarotLauncherView(discord.ui.View):
                     ephemeral=True,
                 )
             return
-
-        spread_info = SPREAD_DEFINITIONS.get(self.selected_spread, SPREAD_DEFINITIONS["daily"])
 
         # Kiểm tra câu hỏi nếu trải bài yêu cầu
         if spread_info.get("requires_question", True) and not self.question:
