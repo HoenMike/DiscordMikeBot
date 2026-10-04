@@ -1017,27 +1017,53 @@ YÊU CẦU
 
 
 def _format_clarifier_result(payload: TarotClarifierAIResponseSchema) -> TarotClarifierResult:
+    # Clarifier is intentionally compact. Discord embeds cap descriptions at 4096
+    # characters, and the result view adds target/card metadata around this text.
+    limits = {
+        "relationship": 520,
+        "clarity": 440,
+        "effect": 220,
+        "practical_implication": 440,
+        "uncertainty": 400,
+    }
+
+    def _bounded(value: str, key: str) -> str:
+        text = (value or "").strip()
+        limit = limits[key]
+        if len(text) <= limit:
+            return text
+        return text[: max(0, limit - 1)].rstrip() + "…"
+
+    relationship = _bounded(payload.relationship, "relationship")
+    clarity = _bounded(payload.clarity, "clarity")
+    effect = _bounded(payload.effect, "effect")
+    practical_implication = _bounded(payload.practical_implication, "practical_implication")
+    uncertainty = _bounded(payload.uncertainty, "uncertainty")
+
     parts = []
-    if payload.relationship:
-        parts.append(f"**🔗 Mối liên hệ:** {payload.relationship.strip()}")
-    if payload.clarity:
-        parts.append(f"**🔎 Điều rõ hơn:** {payload.clarity.strip()}")
-    if payload.effect:
-        parts.append(f"**↪️ Tác động lên cách đọc cũ:** {payload.effect.strip()}")
-    if payload.practical_implication:
-        parts.append(f"**📌 Điều đáng kiểm tra/làm:** {payload.practical_implication.strip()}")
-    if payload.uncertainty:
-        parts.append(f"**🌫️ Vẫn còn chưa chắc:** {payload.uncertainty.strip()}")
+    if relationship:
+        parts.append(f"**🔗 Mối liên hệ:** {relationship}")
+    if clarity:
+        parts.append(f"**🔎 Điều rõ hơn:** {clarity}")
+    if effect:
+        parts.append(f"**↪️ Tác động lên cách đọc cũ:** {effect}")
+    if practical_implication:
+        parts.append(f"**📌 Điều đáng kiểm tra/làm:** {practical_implication}")
+    if uncertainty:
+        parts.append(f"**🌫️ Vẫn còn chưa chắc:** {uncertainty}")
+
+    full_reading = "\n\n".join(parts).strip()
+    if len(full_reading) > 2600:
+        full_reading = full_reading[:2599].rstrip() + "…"
 
     return TarotClarifierResult(
-        relationship=payload.relationship.strip(),
-        clarity=payload.clarity.strip(),
-        effect=payload.effect.strip(),
-        practical_implication=payload.practical_implication.strip(),
-        uncertainty=payload.uncertainty.strip(),
-        full_reading="\n\n".join(parts).strip(),
+        relationship=relationship,
+        clarity=clarity,
+        effect=effect,
+        practical_implication=practical_implication,
+        uncertainty=uncertainty,
+        full_reading=full_reading,
     )
-
 
 async def generate_clarifier_interpretation(
     *,
@@ -1101,7 +1127,7 @@ YÊU CẦU
 - Nói điều vẫn chưa thể biết chắc.
 - Không bịa thêm lá, không dự đoán chắc chắn, không biến clarifier thành quyết định thay người dùng.
 - Nếu chủ đề là y tế/pháp lý/tài chính/high-stakes, giữ giới hạn thực tế của Tarot.
-- Output JSON đúng 5 field: relationship, clarity, effect, practical_implication, uncertainty.
+- Output JSON đúng 5 field: relationship, clarity, effect, practical_implication, uncertainty.\n- Mỗi field chỉ 1-2 câu; toàn bộ phần diễn giải nên dưới khoảng 2200 ký tự.
 """.strip()
 
     models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
