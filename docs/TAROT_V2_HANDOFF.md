@@ -269,7 +269,7 @@ Implemented:
 - Daily remains available manually with no question;
 - reader style remains a secondary option;
 - direct slash/prefix spread syntax still bypasses the launcher for backward compatibility;
-- launcher detects sufficiently similar recent Tarot questions using local token-overlap logic, without an extra AI call;
+- launcher detects sufficiently similar recent Tarot questions using local token-overlap logic, without an extra AI call; this awareness is disabled when the user has Tarot memory turned off;
 - when a similar question is found, the user can choose:
   - **Xem tình hình hiện tại** — prior Tarot context may be used lightly;
   - **Xem như câu hỏi mới** — prior Tarot context is not injected into this reading;
