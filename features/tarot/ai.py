@@ -84,7 +84,8 @@ def _format_cards_context(drawn_cards: List[DrawnCard]) -> str:
         kw = drawn.card.keywords_reversed if drawn.is_reversed else drawn.card.keywords_upright
         keywords_str = ", ".join(kw)
         lines.append(
-            f"• [{drawn.position_title}]: {drawn.card.name_vi} ({drawn.card.name_en}) - [{orient}]\n"
+            f"• [position_id={drawn.position_index} | {drawn.position_title}] "
+            f"[card_id={drawn.card.id}] {drawn.card.name_vi} ({drawn.card.name_en}) - [{orient}]\n"
             f"  - Biểu tượng cốt lõi: {drawn.card.description}\n"
             f"  - Từ khóa trạng thái ({orient}): {keywords_str}"
         )
@@ -837,7 +838,8 @@ async def generate_tarot_reading(
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Sử dụng bộ luận giải chiêm tinh cổ điển từ điển Tarot...", flush=True)
     fallback_parts = [
-        "📖 **BÀI LUẬN GIẢI CHIÊM TINH (TỪ ĐIỂN TAROT CỔ ĐIỂN):**\n"
+        "📖 **BẢN ĐỌC DỰ PHÒNG:**\n"
+        "AI đang tạm thời không phản hồi, nên phần dưới đây chỉ dùng ý nghĩa cơ bản của các lá đã rút.\n"
     ]
     for c in drawn_cards:
         orient_str = "Ngược" if c.is_reversed else "Xuôi"
@@ -848,7 +850,7 @@ async def generate_tarot_reading(
             f"• *Ý nghĩa:* {c.card.description}\n"
         )
     fallback_parts.append(
-        "💡 **Lời khuyên tổng kết:** Hãy nhìn nhận thông điệp từ góc độ khách quan, lắng nghe trực giác và đưa ra quyết định phù hợp nhất với hành trình của bạn!"
+        "📌 **Điều đáng làm lúc này:** Đối chiếu các từ khóa trên với tình huống thực tế của bạn và ưu tiên những dữ kiện có thể kiểm chứng trước khi quyết định."
     )
     return "\n".join(fallback_parts), "general", "Chiêm nghiệm cổ điển", "Thông điệp chiêm tinh cổ điển từ điển Tarot", True
 
