@@ -5,6 +5,7 @@ import discord
 
 from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, TAROT_DECK
 from features.tarot.reading.schema import TarotKeyCard, TarotReadingResult
+from features.tarot.reading.followup import TarotSessionState
 from features.tarot.reading.session import (
     build_ai_ready_status,
     build_micro_reveal,
@@ -161,6 +162,36 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Luận giải đã sẵn sàng", message.edits[0]["embed"].description)
         self.assertIs(message.edits[0]["view"], view)
         view.stop()
+
+
+class TarotMultiTurnStateTests(unittest.TestCase):
+    def test_three_followups_are_bounded_and_keep_order(self):
+        state = TarotSessionState(max_followups=3, timeout_seconds=900, last_activity_at=100.0)
+        self.assertTrue(state.record_followup("Q1", "A1", now=110.0))
+        self.assertTrue(state.record_followup("Q2", "A2", now=120.0))
+        self.assertTrue(state.record_followup("Q3", "A3", now=130.0))
+        self.assertFalse(state.record_followup("Q4", "A4", now=140.0))
+        self.assertEqual(state.remaining_followups, 0)
+        self.assertEqual(state.prompt_history(), [("Q1", "A1"), ("Q2", "A2"), ("Q3", "A3")])
+
+    def test_failed_turn_does_not_consume_capacity(self):
+        state = TarotSessionState(max_followups=3, timeout_seconds=900, last_activity_at=100.0)
+        self.assertFalse(state.record_followup("", "A", now=110.0))
+        self.assertFalse(state.record_followup("Q", "", now=110.0))
+        self.assertEqual(state.remaining_followups, 3)
+
+    def test_timeout_blocks_followup_and_why(self):
+        state = TarotSessionState(timeout_seconds=900, last_activity_at=100.0)
+        self.assertFalse(state.can_followup(now=1000.0))
+        self.assertFalse(state.mark_why_used(now=1000.0))
+
+    def test_clarifier_and_why_share_same_session_lifecycle(self):
+        state = TarotSessionState(timeout_seconds=900, last_activity_at=100.0)
+        state.set_clarifier("Target -> Clarifier", now=200.0)
+        self.assertEqual(state.clarifier_summary, "Target -> Clarifier")
+        self.assertTrue(state.mark_why_used(now=250.0))
+        self.assertTrue(state.why_used)
+        self.assertEqual(state.last_activity_at, 250.0)
 
 
 if __name__ == "__main__":
