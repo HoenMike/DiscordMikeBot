@@ -108,6 +108,7 @@ features/tarot/
 │   ├── recommendation.py # Smart launcher recommendation + repeated-question helper
 │   ├── clarifier.py # Resolve AI-suggested targets + existing target insight
 │   ├── custom_spread.py # T20.7 schema-only Smart Custom Spread validation
+│   ├── journey.py # T20.8 stored-history analytics for Tarot Journey
 │   └── session.py   # Progress, micro reveal, compact controls & AI-ready presentation helpers
 ├── rendering/
 │   └── state.py     # ReadingBoardState: reveal/final/key/target state independent from Discord UI
@@ -238,6 +239,13 @@ Gồm 2 tầng View Discord UI:
 - `draw_custom_spread(...)` trong deck engine mới rút lá thật; schema lỗi sẽ fallback về spread chuẩn được recommendation chọn.
 - Renderer dynamic 3–7 lá hiện có được tái sử dụng và giữ custom title tới final/Clarifier Board.
 
+#### Tarot Journey — T20.8
+
+- `/tarot_journey` và `.m tarot journey` đọc tối đa 30 ngày từ `tarot_history`; không gọi AI mới để tạo pattern.
+- `reading/journey.py` tổng hợp reading/card counts, suit mix, Major ratio, repeated cards/reversed cards, topic progression và most-used spread.
+- `manager.py` có query bounded 30 ngày riêng cho Journey; dữ liệu vẫn thuộc lịch sử hiện hữu và biến mất khi user dùng forget.
+- `renderer.py` tạo `tarot_journey.png` 1400×900, nhấn mạnh đây là thống kê tự phản chiếu chứ không phải dự đoán/chẩn đoán.
+
 ### 3.5. Module Quản Lý Cơ Sở Dữ Liệu SQLite (`manager.py`)
 
 T20.5 bổ sung bảng `tarot_clarifiers` cho **Clarifier đã delivery thành công**. Record lưu user/guild/channel, spread/question, target position/card + orientation, clarifier card + orientation và interpretation. Dữ liệu này tách khỏi `tarot_history` để quẻ gốc không bị mutation.
@@ -254,6 +262,7 @@ T20.5 bổ sung bảng `tarot_clarifiers` cho **Clarifier đã delivery thành c
 ### 3.6. Module Điều Phối Discord Cog (`cog.py`)
 - **Slash Commands**:
   - `/tarot`: Mở giao diện tương tác đầy đủ kèm tùy chọn câu hỏi, bối cảnh, trải bài, phong cách.
+  - `/tarot_journey`: Xem summary 30 ngày từ lịch sử Tarot đã lưu.
   - `/tarot history`: Xem lại lịch sử các lần bốc bài gần nhất.
 - **Prefix Commands**:
   - `$m tarot`, `$m xemque`, `$m bocadoi`...
