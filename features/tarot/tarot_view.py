@@ -970,6 +970,120 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
         await interaction.followup.send(embed=embed)
 
 
+class TarotClarifierTargetView(discord.ui.View):
+    """Ephemeral owner-only picker for the one allowed clarifier target."""
+
+    def __init__(
+        self,
+        result_view: "TarotResultActionView",
+        origin_message: Optional[discord.Message],
+        timeout: float = 120.0,
+    ):
+        super().__init__(timeout=timeout)
+        self.result_view = result_view
+        self.origin_message = origin_message
+
+        suggestions = resolve_clarifier_suggestions(
+            result_view.reading_result,
+            result_view.drawn_cards,
+        )
+        suggested_order = list(suggestions.keys())
+        remaining = [
+            idx for idx in range(len(result_view.drawn_cards))
+            if idx not in suggestions
+        ]
+        ordered_indices = suggested_order + remaining
+
+        options = []
+        for idx in ordered_indices:
+            drawn = result_view.drawn_cards[idx]
+            position = drawn.position_title
+            if position.upper().startswith("LÁ ") and ":" in position:
+                position = position.split(":", 1)[1].strip()
+            prefix = "✨ " if idx in suggestions else ""
+            label = f"{prefix}{idx + 1}. {position}"[:100]
+            if idx in suggestions and suggestions[idx]:
+                description = f"Asumi gợi ý: {suggestions[idx]}"[:100]
+            else:
+                orient = "Ngược" if drawn.is_reversed else "Xuôi"
+                description = f"{drawn.card.name_vi} · {orient}"[:100]
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=str(idx),
+                    description=description,
+                )
+            )
+
+        self.target_select = discord.ui.Select(
+            placeholder="Chọn vị trí muốn làm rõ...",
+            options=options,
+            min_values=1,
+            max_values=1,
+            custom_id="tarot_clarifier_target",
+        )
+        self.target_select.callback = self._handle_target
+        self.add_item(self.target_select)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.result_view.author_id:
+            return True
+        await interaction.response.send_message(
+            "🔒 Chỉ người bốc quẻ mới có thể rút clarifier.",
+            ephemeral=True,
+        )
+        return False
+
+    async def _handle_target(self, interaction: discord.Interaction):
+        if self.result_view.has_used_clarifier:
+            await interaction.response.send_message(
+                "✓ Quẻ này đã dùng clarifier rồi.",
+                ephemeral=True,
+            )
+            return
+        if self.result_view._clarifier_in_progress:
+            await interaction.response.send_message(
+                "⌛ Clarifier đang được xử lý, chờ một chút nhé.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            target_index = int(interaction.data["values"][0])
+        except (KeyError, IndexError, TypeError, ValueError):
+            await interaction.response.send_message(
+                "⚠️ Vị trí làm rõ không hợp lệ.",
+                ephemeral=True,
+            )
+            return
+
+        self.target_select.disabled = True
+        await interaction.response.edit_message(
+            content="🔀 Asumi đang rút đúng **1 lá clarifier** cho vị trí bạn chọn...",
+            view=self,
+        )
+
+        success = await self.result_view.run_clarifier(
+            interaction=interaction,
+            target_index=target_index,
+            origin_message=self.origin_message,
+        )
+        try:
+            if success:
+                await interaction.edit_original_response(
+                    content="✅ Clarifier đã được gửi vào kênh. Quẻ gốc vẫn được giữ nguyên.",
+                    view=None,
+                )
+            else:
+                self.target_select.disabled = False
+                await interaction.edit_original_response(
+                    content="❌ Chưa gửi được clarifier. Lượt clarifier **chưa bị dùng**; bạn có thể thử lại.",
+                    view=self,
+                )
+        except Exception:
+            pass
+
+
 class TarotResultActionView(discord.ui.View):
     """View tương tác sau khi hoàn tất quẻ bài: Nút Hỏi Thêm AI & Nút Đánh Giá Luận Giải 👍/👎 cộng dồn nhiều người."""
 
