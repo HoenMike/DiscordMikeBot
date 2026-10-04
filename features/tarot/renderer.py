@@ -1,627 +1,818 @@
+"""Tarot 2.0 Reading Board renderer.
+
+The public `render_spread_to_bytes` signature remains backward-compatible, while the
+new `ReadingBoardState` contract carries reveal/final/emphasis state independently
+from Discord UI code.
+"""
+
+from __future__ import annotations
+
 import io
-import math
 import pathlib
-from typing import List, Tuple, Optional, Set
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from typing import Iterable, List, Optional, Sequence, Set, Tuple
 
-from features.tarot.deck import (
-    DrawnCard,
-    TarotCard,
-    SPREAD_DEFINITIONS,
-    ensure_card_asset,
-    CARDS_DIR
-)
+from PIL import Image, ImageDraw, ImageFont
 
-# Màu sắc chủ đạo phong cách Tarot huyền bí
-COLOR_BG_DARK = (16, 12, 26)        # #100C1A - Tím đêm thẳm
-COLOR_BG_BANNER = (28, 20, 48, 230) # Nền banner tiêu đề
-COLOR_GOLD_PRIMARY = (218, 165, 32) # #DAA520 - Vàng kim hoàng gia
-COLOR_GOLD_LIGHT = (245, 215, 110)  # #F5D76E - Vàng kim sáng
-COLOR_GOLD_DARK = (140, 100, 20)    # Vàng kim trầm
-COLOR_WHITE = (245, 245, 250)
-COLOR_MUTED = (175, 165, 200)
-COLOR_UPRIGHT = (46, 204, 113)      # #2ECC71 - Xanh ngọc
-COLOR_REVERSED = (231, 76, 60)      # #E74C3C - Đỏ hồng
-COLOR_BRANCH_A = (52, 152, 219)     # #3498DB - Xanh biển cho Nhánh A
-COLOR_BRANCH_B = (155, 89, 182)     # #9B59B6 - Tím pastel cho Nhánh B
+from features.tarot.deck import DrawnCard, SPREAD_DEFINITIONS, TarotCard, ensure_card_asset
+from features.tarot.rendering.state import ReadingBoardState
 
+
+# Restrained Tarot 2.0 palette: dark celestial, muted violet, warm gold, blue-grey.
+COLOR_BG_TOP = (18, 18, 28)
+COLOR_BG_BOTTOM = (27, 24, 39)
+COLOR_PANEL = (35, 32, 49)
+COLOR_PANEL_SOFT = (43, 39, 58)
+COLOR_GOLD = (203, 166, 92)
+COLOR_GOLD_LIGHT = (236, 211, 151)
+COLOR_GOLD_DARK = (115, 91, 50)
+COLOR_VIOLET = (132, 111, 171)
+COLOR_VIOLET_LIGHT = (183, 166, 215)
+COLOR_BLUEGREY = (117, 143, 164)
+COLOR_BLUEGREY_LIGHT = (171, 191, 207)
+COLOR_TEXT = (244, 241, 247)
+COLOR_MUTED = (177, 174, 188)
+COLOR_REVERSED = (210, 126, 126)
+COLOR_UPRIGHT = (143, 184, 158)
+COLOR_SHADOW = (0, 0, 0, 120)
 
 FONTS_DIR = pathlib.Path(__file__).parent / "assets" / "fonts"
 
-
-def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
-    """Tải font hỗ trợ Tiếng Việt an toàn tuyệt đối trên mọi hệ điều hành."""
-    font_candidates = []
-
-    # 1. Ưu tiên font bundle sẵn trong thư mục assets/fonts
-    if bold:
-        font_candidates.extend([
-            FONTS_DIR / "segoeuib.ttf",
-            FONTS_DIR / "arialbd.ttf",
-        ])
-    else:
-        font_candidates.extend([
-            FONTS_DIR / "segoeui.ttf",
-            FONTS_DIR / "arial.ttf",
-        ])
-
-    # 2. Font hệ thống Windows / Linux
-    if bold:
-        font_candidates.extend([
-            "C:/Windows/Fonts/segoeuib.ttf",
-            "C:/Windows/Fonts/arialbd.ttf",
-            "C:/Windows/Fonts/calibrib.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "segouib.ttf",
-            "arialbd.ttf",
-        ])
-    else:
-        font_candidates.extend([
-            "C:/Windows/Fonts/segoeui.ttf",
-            "C:/Windows/Fonts/arial.ttf",
-            "C:/Windows/Fonts/calibri.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "segoeui.ttf",
-            "arial.ttf",
-        ])
-
-    for font_path in font_candidates:
-        try:
-            return ImageFont.truetype(str(font_path), size)
-        except Exception:
-            continue
-
-    return ImageFont.load_default()
-
-
-def _draw_sparkle_star(draw: ImageDraw.ImageDraw, cx: int, cy: int, size: int = 10, color=COLOR_GOLD_LIGHT):
-    """Vẽ ngôi sao 4 cánh lấp lánh (thay cho ký tự unicode lỗi font)."""
-    points = [
-        (cx, cy - size),
-        (cx + size // 4, cy - size // 4),
-        (cx + size, cy),
-        (cx + size // 4, cy + size // 4),
-        (cx, cy + size),
-        (cx - size // 4, cy + size // 4),
-        (cx - size, cy),
-        (cx - size // 4, cy - size // 4),
-    ]
-    draw.polygon(points, fill=color, outline=COLOR_GOLD_PRIMARY)
-    draw.ellipse([(cx - 2, cy - 2), (cx + 2, cy + 2)], fill=COLOR_WHITE)
-
-
-def _draw_ornate_corner(draw: ImageDraw.ImageDraw, x: int, y: int, radius: int = 24, quadrant: int = 1):
-    """Vẽ hoa văn góc vàng kim ma thuật."""
-    if quadrant == 1:
-        draw.line([(x, y + radius), (x, y), (x + radius, y)], fill=COLOR_GOLD_PRIMARY, width=2)
-        draw.line([(x + 6, y + radius - 6), (x + 6, y + 6), (x + radius - 6, y + 6)], fill=COLOR_GOLD_DARK, width=1)
-        draw.ellipse([(x + 3, y + 3), (x + 9, y + 9)], fill=COLOR_GOLD_LIGHT)
-    elif quadrant == 2:
-        draw.line([(x, y + radius), (x, y), (x - radius, y)], fill=COLOR_GOLD_PRIMARY, width=2)
-        draw.line([(x - 6, y + radius - 6), (x - 6, y + 6), (x - radius + 6, y + 6)], fill=COLOR_GOLD_DARK, width=1)
-        draw.ellipse([(x - 9, y + 3), (x - 3, y + 9)], fill=COLOR_GOLD_LIGHT)
-    elif quadrant == 3:
-        draw.line([(x, y - radius), (x, y), (x + radius, y)], fill=COLOR_GOLD_PRIMARY, width=2)
-        draw.line([(x + 6, y - radius + 6), (x + 6, y - 6), (x + radius - 6, y - 6)], fill=COLOR_GOLD_DARK, width=1)
-        draw.ellipse([(x + 3, y - 9), (x + 9, y - 3)], fill=COLOR_GOLD_LIGHT)
-    elif quadrant == 4:
-        draw.line([(x, y - radius), (x, y), (x - radius, y)], fill=COLOR_GOLD_PRIMARY, width=2)
-        draw.line([(x - 6, y - radius + 6), (x - 6, y - 6), (x - radius + 6, y - 6)], fill=COLOR_GOLD_DARK, width=1)
-        draw.ellipse([(x - 9, y - 9), (x - 3, y - 3)], fill=COLOR_GOLD_LIGHT)
-
-
-def _draw_mystic_background(width: int, height: int, title: str) -> Image.Image:
-    """Tạo canvas nền tối sang trọng với hoa văn và banner tiêu đề Tarot."""
-    img = Image.new("RGBA", (width, height), COLOR_BG_DARK)
-    draw = ImageDraw.Draw(img)
-
-    margin = 12
-    draw.rectangle([(margin, margin), (width - margin, height - margin)], outline=COLOR_GOLD_PRIMARY, width=2)
-    draw.rectangle([(margin + 5, margin + 5), (width - margin - 5, height - margin - 5)], outline=COLOR_GOLD_DARK, width=1)
-
-    _draw_ornate_corner(draw, margin, margin, radius=28, quadrant=1)
-    _draw_ornate_corner(draw, width - margin, margin, radius=28, quadrant=2)
-    _draw_ornate_corner(draw, margin, height - margin, radius=28, quadrant=3)
-    _draw_ornate_corner(draw, width - margin, height - margin, radius=28, quadrant=4)
-
-    # Tiêu đề trải bài ở đỉnh
-    font_title = _get_font(19, bold=True)
-    title_text = title.upper()
-    bbox = draw.textbbox((0, 0), title_text, font=font_title)
-    t_w = bbox[2] - bbox[0]
-    title_x = (width - t_w) // 2
-    title_y = 22
-
-    banner_pad_x = 42
-    banner_pad_y = 5
-    draw.rectangle(
-        [(title_x - banner_pad_x, title_y - banner_pad_y), (title_x + t_w + banner_pad_x, title_y + 25)],
-        fill=COLOR_BG_BANNER,
-        outline=COLOR_GOLD_PRIMARY,
-        width=1
-    )
-
-    _draw_sparkle_star(draw, title_x - 20, title_y + 10, size=8)
-    _draw_sparkle_star(draw, title_x + t_w + 20, title_y + 10, size=8)
-
-    draw.text((title_x, title_y), title_text, fill=COLOR_GOLD_LIGHT, font=font_title)
-
-    return img
-
-
-def _generate_procedural_card(card: TarotCard, target_w: int, target_h: int) -> Image.Image:
-    """Vẽ lá bài nghệ thuật dự phòng nếu chưa có file ảnh gốc."""
-    img = Image.new("RGBA", (target_w, target_h), (24, 18, 38))
-    draw = ImageDraw.Draw(img)
-
-    draw.rectangle([(4, 4), (target_w - 4, target_h - 4)], outline=COLOR_GOLD_PRIMARY, width=2)
-    draw.rectangle([(7, 7), (target_w - 7, target_h - 7)], outline=COLOR_GOLD_DARK, width=1)
-
-    _draw_ornate_corner(draw, 7, 7, radius=10, quadrant=1)
-    _draw_ornate_corner(draw, target_w - 7, 7, radius=10, quadrant=2)
-    _draw_ornate_corner(draw, 7, target_h - 7, radius=10, quadrant=3)
-    _draw_ornate_corner(draw, target_w - 7, target_h - 7, radius=10, quadrant=4)
-
-    _draw_sparkle_star(draw, target_w // 2, int(target_h * 0.40), size=int(target_w * 0.20))
-
-    font_roman = _get_font(max(9, int(target_h * 0.062)), bold=True)
-    font_vi = _get_font(max(10, int(target_w * 0.078)), bold=True)
-    font_en = _get_font(max(8, int(target_w * 0.062)))
-
-    num_str = f"NO. {card.number}" if card.arcana != "Major" else f"ARCANA {card.number}"
-    bbox_num = draw.textbbox((0, 0), num_str, font=font_roman)
-    draw.text(((target_w - (bbox_num[2] - bbox_num[0])) // 2, int(target_h * 0.08)), num_str, fill=COLOR_GOLD_LIGHT, font=font_roman)
-
-    bbox_vi = draw.textbbox((0, 0), card.name_vi, font=font_vi)
-    draw.text(((target_w - (bbox_vi[2] - bbox_vi[0])) // 2, int(target_h * 0.70)), card.name_vi, fill=COLOR_GOLD_LIGHT, font=font_vi)
-
-    bbox_en = draw.textbbox((0, 0), card.name_en, font=font_en)
-    draw.text(((target_w - (bbox_en[2] - bbox_en[0])) // 2, int(target_h * 0.82)), card.name_en, fill=COLOR_MUTED, font=font_en)
-
-    return img
-
-
-# Cache in-memory cho mặt bài và lưng bài đã resize/xoay
 _CARD_IMAGE_CACHE: dict[Tuple[str, int, int, bool], Image.Image] = {}
 _CARD_BACK_CACHE: dict[Tuple[int, int], Image.Image] = {}
 
 
-def _generate_card_back(target_w: int, target_h: int) -> Image.Image:
-    """Vẽ mặt lưng bài Tarot huyền bí với hoa văn hoàng gia vàng kim và tinh tú (kèm in-memory cache)."""
-    cache_key = (target_w, target_h)
-    if cache_key in _CARD_BACK_CACHE:
-        return _CARD_BACK_CACHE[cache_key].copy()
+def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    candidates = []
+    if bold:
+        candidates.extend([
+            FONTS_DIR / "segoeuib.ttf",
+            FONTS_DIR / "arialbd.ttf",
+            "C:/Windows/Fonts/segoeuib.ttf",
+            "C:/Windows/Fonts/arialbd.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ])
+    else:
+        candidates.extend([
+            FONTS_DIR / "segoeui.ttf",
+            FONTS_DIR / "arial.ttf",
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ])
+    for candidate in candidates:
+        try:
+            return ImageFont.truetype(str(candidate), size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
 
-    img = Image.new("RGBA", (target_w, target_h), (18, 14, 30))
+
+def _gradient_background(width: int, height: int) -> Image.Image:
+    img = Image.new("RGB", (width, height), COLOR_BG_TOP)
     draw = ImageDraw.Draw(img)
+    for y in range(height):
+        ratio = y / max(1, height - 1)
+        rgb = tuple(
+            int(COLOR_BG_TOP[i] * (1.0 - ratio) + COLOR_BG_BOTTOM[i] * ratio)
+            for i in range(3)
+        )
+        draw.line((0, y, width, y), fill=rgb)
 
-    # Khung viền kép vàng kim
-    draw.rectangle([(4, 4), (target_w - 5, target_h - 5)], outline=COLOR_GOLD_PRIMARY, width=2)
-    draw.rectangle([(8, 8), (target_w - 9, target_h - 9)], outline=COLOR_GOLD_DARK, width=1)
-    draw.rectangle([(12, 12), (target_w - 13, target_h - 13)], outline=COLOR_GOLD_PRIMARY, width=1)
+    # Subtle board frame; no heavy gothic ornament.
+    margin = max(18, width // 70)
+    draw.rounded_rectangle(
+        (margin, margin, width - margin, height - margin),
+        radius=max(18, width // 60),
+        outline=COLOR_GOLD_DARK,
+        width=max(2, width // 500),
+    )
+    draw.rounded_rectangle(
+        (margin + 8, margin + 8, width - margin - 8, height - margin - 8),
+        radius=max(15, width // 65),
+        outline=(59, 52, 73),
+        width=1,
+    )
 
-    # 4 góc ornate
-    _draw_ornate_corner(draw, 8, 8, radius=12, quadrant=1)
-    _draw_ornate_corner(draw, target_w - 8, 8, radius=12, quadrant=2)
-    _draw_ornate_corner(draw, 8, target_h - 8, radius=12, quadrant=3)
-    _draw_ornate_corner(draw, target_w - 8, target_h - 8, radius=12, quadrant=4)
+    # Sparse celestial dots for texture, deterministic from canvas size.
+    dots = [
+        (0.10, 0.12), (0.18, 0.76), (0.29, 0.18), (0.41, 0.88),
+        (0.57, 0.13), (0.68, 0.78), (0.81, 0.21), (0.90, 0.70),
+        (0.12, 0.46), (0.88, 0.45),
+    ]
+    dot_r = max(2, width // 650)
+    for px, py in dots:
+        x, y = int(width * px), int(height * py)
+        draw.ellipse((x - dot_r, y - dot_r, x + dot_r, y + dot_r), fill=(103, 94, 124))
+    return img.convert("RGBA")
 
-    # Họa tiết Sacred Geometry ở trung tâm
+
+def _safe_title(spread_key: str, custom_title: Optional[str] = None) -> str:
+    if custom_title:
+        return custom_title
+    return SPREAD_DEFINITIONS.get(spread_key, {}).get("name", "Tarot Spread")
+
+
+def _short_position_title(raw: str, fallback_index: int) -> str:
+    title = (raw or "").strip()
+    upper = title.upper()
+    if upper.startswith("LÁ ") and ":" in title:
+        title = title.split(":", 1)[1].strip()
+    if upper.startswith("PHÁN QUYẾT"):
+        title = "PHÁN QUYẾT"
+    title = " ".join(title.split())
+    if not title:
+        title = f"VỊ TRÍ {fallback_index + 1}"
+    if len(title) > 34:
+        title = title[:31].rstrip() + "..."
+    return title
+
+
+def _draw_centered_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    center_x: int,
+    y: int,
+    font: ImageFont.ImageFont,
+    fill,
+) -> None:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    draw.text((center_x - (bbox[2] - bbox[0]) // 2, y), text, font=font, fill=fill)
+
+
+def _draw_pill(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    center_x: int,
+    y: int,
+    font: ImageFont.ImageFont,
+    *,
+    fill=COLOR_PANEL,
+    outline=COLOR_GOLD_DARK,
+    text_color=COLOR_GOLD_LIGHT,
+    pad_x: int = 12,
+    pad_y: int = 5,
+) -> Tuple[int, int, int, int]:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    box = (
+        center_x - tw // 2 - pad_x,
+        y,
+        center_x + tw // 2 + pad_x,
+        y + th + pad_y * 2,
+    )
+    draw.rounded_rectangle(box, radius=max(6, pad_y + 2), fill=fill, outline=outline, width=2)
+    draw.text((center_x - tw // 2, y + pad_y - bbox[1]), text, font=font, fill=text_color)
+    return box
+
+
+def _draw_header(canvas: Image.Image, state: ReadingBoardState) -> int:
+    draw = ImageDraw.Draw(canvas)
+    width, _ = canvas.size
+    title = _safe_title(state.spread_key, state.spread_title)
+    title_font = _get_font(max(28, width // 34), bold=True)
+    meta_font = _get_font(max(18, width // 60), bold=True)
+    brand_font = _get_font(max(14, width // 82))
+
+    _draw_centered_text(draw, title.upper(), width // 2, max(34, width // 42), title_font, COLOR_GOLD_LIGHT)
+    _draw_centered_text(draw, "ASUMI · TAROT", width // 2, max(78, width // 20), brand_font, COLOR_MUTED)
+
+    if state.final:
+        _draw_pill(
+            draw,
+            "FINAL SPREAD",
+            width // 2,
+            max(112, width // 13),
+            meta_font,
+            fill=(43, 39, 58),
+            outline=COLOR_GOLD_DARK,
+            text_color=COLOR_GOLD_LIGHT,
+            pad_x=18,
+        )
+    else:
+        progress = f"{state.revealed_count} / {state.total_cards} REVEALED"
+        _draw_pill(
+            draw,
+            progress,
+            width // 2,
+            max(112, width // 13),
+            meta_font,
+            fill=(39, 36, 53),
+            outline=COLOR_VIOLET,
+            text_color=COLOR_TEXT,
+            pad_x=18,
+        )
+
+        if state.total_cards <= 10:
+            dots = "  ".join(
+                "●" if idx in state.revealed_indices else "○"
+                for idx in range(state.total_cards)
+            )
+            dots_font = _get_font(max(16, width // 68), bold=True)
+            _draw_centered_text(
+                draw,
+                dots,
+                width // 2,
+                max(154, width // 9),
+                dots_font,
+                COLOR_VIOLET_LIGHT,
+            )
+    return max(190, width // 7)
+
+
+def _generate_procedural_card(card: TarotCard, target_w: int, target_h: int) -> Image.Image:
+    img = Image.new("RGBA", (target_w, target_h), (29, 26, 39, 255))
+    draw = ImageDraw.Draw(img)
+    border = max(2, target_w // 75)
+    draw.rounded_rectangle(
+        (border, border, target_w - border - 1, target_h - border - 1),
+        radius=max(8, target_w // 14),
+        outline=COLOR_GOLD,
+        width=border,
+        fill=(31, 28, 43, 255),
+    )
+    draw.ellipse(
+        (
+            target_w * 0.25,
+            target_h * 0.24,
+            target_w * 0.75,
+            target_h * 0.57,
+        ),
+        outline=COLOR_VIOLET_LIGHT,
+        width=max(2, target_w // 90),
+    )
+    font_top = _get_font(max(14, target_w // 12), bold=True)
+    font_name = _get_font(max(16, target_w // 10), bold=True)
+    _draw_centered_text(draw, f"ARCANA {card.number}" if card.arcana == "Major" else card.arcana.upper(), target_w // 2, int(target_h * 0.09), font_top, COLOR_GOLD_LIGHT)
+    _draw_centered_text(draw, card.name_vi, target_w // 2, int(target_h * 0.72), font_name, COLOR_TEXT)
+    return img
+
+
+def _generate_card_back(target_w: int, target_h: int) -> Image.Image:
+    key = (target_w, target_h)
+    if key in _CARD_BACK_CACHE:
+        return _CARD_BACK_CACHE[key].copy()
+
+    img = Image.new("RGBA", (target_w, target_h), (29, 26, 43, 255))
+    draw = ImageDraw.Draw(img)
+    border = max(2, target_w // 65)
+    inset = max(8, target_w // 16)
+    draw.rounded_rectangle(
+        (1, 1, target_w - 2, target_h - 2),
+        radius=max(9, target_w // 13),
+        outline=COLOR_GOLD,
+        width=border,
+        fill=(31, 28, 47, 255),
+    )
+    draw.rounded_rectangle(
+        (inset, inset, target_w - inset, target_h - inset),
+        radius=max(7, target_w // 16),
+        outline=COLOR_VIOLET,
+        width=max(1, border - 1),
+    )
     cx, cy = target_w // 2, target_h // 2
-    r = min(target_w, target_h) // 4
-    draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], outline=COLOR_GOLD_LIGHT, width=1)
-    draw.ellipse([(cx - r + 4, cy - r + 4), (cx + r - 4, cy + r - 4)], outline=COLOR_GOLD_DARK, width=1)
-    _draw_sparkle_star(draw, cx, cy, size=int(r * 0.75))
-
-    # Viền ngoài cùng
-    draw.rectangle([(0, 0), (target_w - 1, target_h - 1)], outline=COLOR_GOLD_PRIMARY, width=2)
-
-    _CARD_BACK_CACHE[cache_key] = img.copy()
+    r = min(target_w, target_h) // 5
+    draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=COLOR_GOLD_DARK, width=max(2, border - 1))
+    draw.line((cx - r, cy, cx + r, cy), fill=COLOR_VIOLET_LIGHT, width=max(1, border - 1))
+    draw.line((cx, cy - r, cx, cy + r), fill=COLOR_VIOLET_LIGHT, width=max(1, border - 1))
+    _CARD_BACK_CACHE[key] = img.copy()
     return img
 
 
 def _load_and_prepare_card_image(drawn: DrawnCard, target_w: int, target_h: int) -> Image.Image:
-    """Tải ảnh lá bài từ assets hoặc tạo procedural, xoay 180° nếu reversed (kèm in-memory cache)."""
-    cache_key = (drawn.card.id, target_w, target_h, drawn.is_reversed)
-    if cache_key in _CARD_IMAGE_CACHE:
-        return _CARD_IMAGE_CACHE[cache_key].copy()
+    key = (drawn.card.id, target_w, target_h, drawn.is_reversed)
+    if key in _CARD_IMAGE_CACHE:
+        return _CARD_IMAGE_CACHE[key].copy()
 
-    card = drawn.card
-    asset_path = ensure_card_asset(card)
-
-    card_img = None
+    card_img: Optional[Image.Image] = None
+    asset_path = ensure_card_asset(drawn.card)
     if asset_path and asset_path.exists():
         try:
-            with Image.open(asset_path) as raw_img:
-                raw_rgb = raw_img.convert("RGBA")
-                card_img = raw_rgb.resize((target_w, target_h), Image.Resampling.LANCZOS)
-        except Exception as e:
-            print(f"[TarotRenderer] Lỗi mở ảnh {asset_path}: {e}", flush=True)
+            with Image.open(asset_path) as raw:
+                card_img = raw.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
+        except Exception as exc:
+            print(f"[TarotRenderer] Failed to read {asset_path}: {exc}", flush=True)
 
     if card_img is None:
-        card_img = _generate_procedural_card(card, target_w, target_h)
+        card_img = _generate_procedural_card(drawn.card, target_w, target_h)
 
     if drawn.is_reversed:
         card_img = card_img.rotate(180)
 
-    draw_c = ImageDraw.Draw(card_img)
-    draw_c.rectangle([(0, 0), (target_w - 1, target_h - 1)], outline=COLOR_GOLD_PRIMARY, width=2)
-
-    _CARD_IMAGE_CACHE[cache_key] = card_img.copy()
+    frame = ImageDraw.Draw(card_img)
+    frame.rounded_rectangle(
+        (1, 1, target_w - 2, target_h - 2),
+        radius=max(6, target_w // 24),
+        outline=COLOR_GOLD_DARK,
+        width=max(2, target_w // 100),
+    )
+    _CARD_IMAGE_CACHE[key] = card_img.copy()
     return card_img
 
 
-def _draw_card_with_meta(
+def _state_accent(state: ReadingBoardState, index: int):
+    if state.is_key_card(index):
+        return COLOR_GOLD_LIGHT, "KEY"
+    if state.is_just_revealed(index):
+        return COLOR_VIOLET_LIGHT, "NEW"
+    if state.is_target(index):
+        return COLOR_BLUEGREY_LIGHT, "TARGET"
+    return (77, 70, 92), ""
+
+
+def _draw_badge(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    x: int,
+    y: int,
+    font: ImageFont.ImageFont,
+    *,
+    fill=COLOR_PANEL_SOFT,
+    outline=COLOR_GOLD_DARK,
+    text_color=COLOR_TEXT,
+) -> Tuple[int, int]:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    box = (x, y, x + tw + 18, y + th + 10)
+    draw.rounded_rectangle(box, radius=7, fill=fill, outline=outline, width=2)
+    draw.text((x + 9, y + 5 - bbox[1]), text, font=font, fill=text_color)
+    return box[2], box[3]
+
+
+def _draw_card_slot(
     canvas: Image.Image,
-    drawn: DrawnCard,
+    state: ReadingBoardState,
+    index: int,
     center_x: int,
     center_y: int,
     card_w: int,
     card_h: int,
-    custom_pos_title: Optional[str] = None,
-    font_size_scale: float = 1.0,
-    wrap_name: bool = False,
-    is_revealed: bool = True,
-):
-    """Vẽ 1 lá bài (hoặc lưng bài nếu chưa lật) kèm nhãn vị trí trên canvas."""
-    draw = ImageDraw.Draw(canvas)
-
-    if is_revealed:
-        card_img = _load_and_prepare_card_image(drawn, card_w, card_h)
-    else:
-        card_img = _generate_card_back(card_w, card_h)
-
-    top_left_x = center_x - card_w // 2
-    top_left_y = center_y - card_h // 2
-
-    # Drop shadow
-    shadow = Image.new("RGBA", (card_w + 10, card_h + 10), (0, 0, 0, 150))
-    canvas.paste(shadow, (top_left_x - 5, top_left_y - 2), shadow)
-
-    canvas.paste(card_img, (top_left_x, top_left_y), card_img)
-
-    # Position Header (Luôn hiển thị để người xem biết ý nghĩa vị trí)
-    pos_title = custom_pos_title or drawn.position_title
-    pos_font_size = max(10, int(12 * font_size_scale))
-    font_pos = _get_font(pos_font_size, bold=True)
-    bbox_pos = draw.textbbox((0, 0), pos_title, font=font_pos)
-    pos_w = bbox_pos[2] - bbox_pos[0]
-    pos_y = top_left_y - (pos_font_size + 9)
-
-    draw.rectangle(
-        [(center_x - pos_w // 2 - 5, pos_y - 2), (center_x + pos_w // 2 + 5, pos_y + pos_font_size + 3)],
-        fill=(32, 24, 52, 230),
-        outline=COLOR_GOLD_PRIMARY,
-        width=1
-    )
-    draw.text((center_x - pos_w // 2, pos_y), pos_title, fill=COLOR_GOLD_LIGHT, font=font_pos)
-
-    # Footer
-    name_font_size = max(10, int(12 * font_size_scale))
-    orient_font_size = max(9, int(10 * font_size_scale))
-    font_name = _get_font(name_font_size, bold=True)
-    font_orient = _get_font(orient_font_size, bold=True)
-    footer_y = top_left_y + card_h + 4
-
-    if not is_revealed:
-        # Nếu lá bài đang úp: hiển thị nhãn chờ lật
-        secret_text = "• ĐANG CHỜ LẬT •"
-        bbox_secret = draw.textbbox((0, 0), secret_text, font=font_orient)
-        sec_w = bbox_secret[2] - bbox_secret[0]
-        draw.text((center_x - sec_w // 2, footer_y + 2), secret_text, fill=COLOR_GOLD_LIGHT, font=font_orient)
+    *,
+    position_title: Optional[str] = None,
+    rotate_degrees: int = 0,
+    show_footer: bool = True,
+) -> None:
+    if not 0 <= index < len(state.drawn_cards):
         return
 
-    # Nếu đã lật: hiển thị tên lá bài và chiều Xuôi/Ngược
-    orient_str = "[NGƯỢC]" if drawn.is_reversed else "[XUÔI]"
-    orient_color = COLOR_REVERSED if drawn.is_reversed else COLOR_UPRIGHT
-    bbox_orient = draw.textbbox((0, 0), orient_str, font=font_orient)
-    orient_w = bbox_orient[2] - bbox_orient[0]
-
-    if wrap_name:
-        vi_name = drawn.card.name_vi
-        en_name = f"({drawn.card.name_en})"
-        bbox_vi = draw.textbbox((0, 0), vi_name, font=font_name)
-        bbox_en = draw.textbbox((0, 0), en_name, font=_get_font(max(8, int(10 * font_size_scale))))
-
-        draw.text((center_x - (bbox_vi[2] - bbox_vi[0]) // 2, footer_y), vi_name, fill=COLOR_WHITE, font=font_name)
-        draw.text((center_x - (bbox_en[2] - bbox_en[0]) // 2, footer_y + name_font_size + 1), en_name, fill=COLOR_MUTED, font=_get_font(max(8, int(10 * font_size_scale))))
-        draw.text((center_x - orient_w // 2, footer_y + 2 * name_font_size + 2), orient_str, fill=orient_color, font=font_orient)
-    else:
-        card_name_str = f"{drawn.card.name_vi} ({drawn.card.name_en})"
-        bbox_name = draw.textbbox((0, 0), card_name_str, font=font_name)
-        name_w = bbox_name[2] - bbox_name[0]
-
-        draw.text((center_x - name_w // 2, footer_y), card_name_str, fill=COLOR_WHITE, font=font_name)
-        draw.text((center_x - orient_w // 2, footer_y + name_font_size + 2), orient_str, fill=orient_color, font=font_orient)
-
-
-def render_1_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
-    """Render layout cho trải bài 1 lá (daily, yes_no, single)."""
-    if revealed_indices is None:
-        revealed_indices = {0}
-
-    spread_name = SPREAD_DEFINITIONS[spread_key]["name"]
-    width = 520
-    height = 760
-    canvas = _draw_mystic_background(width, height, spread_name)
-
-    card_w = 320
-    card_h = 550
-    center_x = width // 2
-    center_y = 395
-
-    _draw_card_with_meta(
-        canvas, drawn_cards[0], center_x, center_y, card_w, card_h,
-        font_size_scale=1.1, is_revealed=(0 in revealed_indices)
-    )
-    return canvas
-
-
-def render_3_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
-    """Render layout cho trải bài 3 lá hàng ngang (choices, ppf, mbs)."""
-    if revealed_indices is None:
-        revealed_indices = {0, 1, 2}
-
-    spread_name = SPREAD_DEFINITIONS[spread_key]["name"]
-    width = 980
-    height = 600
-    canvas = _draw_mystic_background(width, height, spread_name)
-
-    card_w = 200
-    card_h = 344
-    center_y = 330
-    xs = [190, 490, 790]
-
-    for idx, (card, cx) in enumerate(zip(drawn_cards, xs)):
-        _draw_card_with_meta(
-            canvas, card, cx, center_y, card_w, card_h,
-            wrap_name=True, is_revealed=(idx in revealed_indices)
-        )
-
-    return canvas
-
-
-def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
-    """Render layout cho trải bài 5 lá: Two Paths (Cây phân nhánh) hoặc Horseshoe (Cánh cung móng ngựa)."""
-    if revealed_indices is None:
-        revealed_indices = set(range(len(drawn_cards)))
-
-    spread_name = SPREAD_DEFINITIONS.get(spread_key, {}).get("name", "TRẢI BÀI 5 LÁ")
-
-    if spread_key == "two_paths":
-        width = 1140
-        height = 800
-        canvas = _draw_mystic_background(width, height, "TWO PATHS (SO SÁNH 2 LỰA CHỌN)")
-        draw = ImageDraw.Draw(canvas)
-
-        card_w = 150
-        card_h = 258
-
-        # 1. Lá 1: Bối cảnh chung (Ở đỉnh chính giữa)
-        _draw_card_with_meta(
-            canvas, drawn_cards[0], width // 2, 235, card_w, card_h,
-            "LÁ 1: BỐI CẢNH CHUNG", font_size_scale=0.9, wrap_name=True,
-            is_revealed=(0 in revealed_indices)
-        )
-
-        # Hàm vẽ Banner nhánh cân đối tuyệt đối theo tọa độ tâm
-        def _draw_branch_header(center_x: int, top_y: int, text: str, border_color, text_color):
-            font_branch = _get_font(13, bold=True)
-            bbox = draw.textbbox((0, 0), text, font=font_branch)
-            text_w = bbox[2] - bbox[0]
-            text_h = bbox[3] - bbox[1]
-
-            pad_x = 26
-            pad_y = 5
-            box_left = center_x - text_w // 2 - pad_x
-            box_right = center_x + text_w // 2 + pad_x
-            box_top = top_y
-            box_bottom = top_y + text_h + 2 * pad_y
-
-            draw.rectangle([(box_left, box_top), (box_right, box_bottom)], fill=(22, 26, 48, 230), outline=border_color, width=2)
-            star_y = (box_top + box_bottom) // 2
-            _draw_sparkle_star(draw, box_left + 12, star_y, size=5, color=text_color)
-            _draw_sparkle_star(draw, box_right - 12, star_y, size=5, color=text_color)
-
-            text_x = center_x - text_w // 2
-            text_y = box_top + pad_y - 1
-            draw.text((text_x, text_y), text, fill=text_color, font=font_branch)
-
-        # Nhánh A (Trái): Tâm giữa 2 lá là cx = 295
-        center_a = 295
-        _draw_branch_header(center_a, 405, "HƯỚNG ĐI A", COLOR_BRANCH_A, (130, 200, 255))
-        _draw_card_with_meta(canvas, drawn_cards[1], 200, 580, card_w, card_h, "LÁ 2: THUẬN LỢI A", font_size_scale=0.85, wrap_name=True, is_revealed=(1 in revealed_indices))
-        _draw_card_with_meta(canvas, drawn_cards[2], 390, 580, card_w, card_h, "LÁ 3: RỦI RO A", font_size_scale=0.85, wrap_name=True, is_revealed=(2 in revealed_indices))
-
-        # Nhánh B (Phải): Tâm giữa 2 lá là cx = 845
-        center_b = 845
-        _draw_branch_header(center_b, 405, "HƯỚNG ĐI B", COLOR_BRANCH_B, (225, 160, 255))
-        _draw_card_with_meta(canvas, drawn_cards[3], 750, 580, card_w, card_h, "LÁ 4: THUẬN LỢI B", font_size_scale=0.85, wrap_name=True, is_revealed=(3 in revealed_indices))
-        _draw_card_with_meta(canvas, drawn_cards[4], 940, 580, card_w, card_h, "LÁ 5: RỦI RO B", font_size_scale=0.85, wrap_name=True, is_revealed=(4 in revealed_indices))
-
-        return canvas
-
-    else:
-        # Layout Móng Ngựa (Horseshoe) hoặc 5 lá hình cánh cung
-        width = 1200
-        height = 700
-        canvas = _draw_mystic_background(width, height, spread_name)
-
-        card_w = 160
-        card_h = 275
-
-        positions = [
-            (0, drawn_cards[0], 160, 290, "LÁ 1: QUÁ KHỨ ẢNH HƯỞNG"),
-            (1, drawn_cards[1], 380, 385, "LÁ 2: HIỆN TRẠNG VẤN ĐỀ"),
-            (2, drawn_cards[2], 600, 445, "LÁ 3: TRỞ NGẠI / YẾU TỐ ẨN"),
-            (3, drawn_cards[3], 820, 385, "LÁ 4: LỜI KHUYÊN HÀNH ĐỘNG"),
-            (4, drawn_cards[4], 1040, 290, "LÁ 5: KẾT QUẢ TIỀM NĂNG"),
-        ]
-
-        for idx, card, cx, cy, pos_title in positions:
-            _draw_card_with_meta(
-                canvas, card, cx, cy, card_w, card_h, pos_title,
-                font_size_scale=0.85, wrap_name=True, is_revealed=(idx in revealed_indices)
-            )
-
-        return canvas
-
-
-def render_celtic_cross_spread(drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
-    """
-    Render layout Celtic Cross 10 lá chuẩn truyền thống với không gian chặt chẽ,
-    cân đối hài hòa giữa Cụm Chữ Thập và Cột Quyền Trượng, không có khoảng trống thừa.
-    """
-    if revealed_indices is None:
-        revealed_indices = set(range(len(drawn_cards)))
-
-    width = 1140
-    height = 1000
-    canvas = _draw_mystic_background(width, height, "CELTIC CROSS (TRẢI BÀI 10 LÁ)")
-
-    # Kích thước từng lá bài: Tỷ lệ chuẩn Tarot
-    card_w = 96
-    card_h = 164
-
-    # Cross Area (Bên trái): Tâm cx = 410, cy = 500
-    cx_cross = 410
-    cy_cross = 500
-
-    # 1. Lá 1: Hiện tại (Dọc ở trung tâm)
-    if 0 in revealed_indices:
-        card1_img = _load_and_prepare_card_image(drawn_cards[0], card_w, card_h)
-    else:
-        card1_img = _generate_card_back(card_w, card_h)
-    shadow1 = Image.new("RGBA", (card_w + 10, card_h + 10), (0, 0, 0, 180))
-    canvas.paste(shadow1, (cx_cross - card_w // 2 - 5, cy_cross - card_h // 2 - 2), shadow1)
-    canvas.paste(card1_img, (cx_cross - card_w // 2, cy_cross - card_h // 2), card1_img)
-
-    # 2. Lá 2: Thử thách (Đè ngang qua lá 1)
-    if 1 in revealed_indices:
-        card2_img = _load_and_prepare_card_image(drawn_cards[1], card_w, card_h)
-    else:
-        card2_img = _generate_card_back(card_w, card_h)
-    card2_img = card2_img.rotate(90, expand=True)
-    w_rot, h_rot = card2_img.size
-    shadow2 = Image.new("RGBA", (w_rot + 10, h_rot + 10), (0, 0, 0, 200))
-    canvas.paste(shadow2, (cx_cross - w_rot // 2 - 5, cy_cross - h_rot // 2 - 2), shadow2)
-    canvas.paste(card2_img, (cx_cross - w_rot // 2, cy_cross - h_rot // 2), card2_img)
-
-    # 3. Header cho Cụm Trung Tâm (1. HIỆN TẠI • 2. THỬ THÁCH)
+    drawn = state.drawn_cards[index]
+    revealed = state.is_revealed(index)
     draw = ImageDraw.Draw(canvas)
-    header_title = "1. HIỆN TẠI • 2. THỬ THÁCH"
-    font_pos = _get_font(10, bold=True)
-    bbox_pos = draw.textbbox((0, 0), header_title, font=font_pos)
-    pos_w = bbox_pos[2] - bbox_pos[0]
-    pos_y = cy_cross - card_h // 2 - 20
-    draw.rectangle(
-        [(cx_cross - pos_w // 2 - 6, pos_y - 2), (cx_cross + pos_w // 2 + 6, pos_y + 14)],
-        fill=(32, 24, 52, 240),
-        outline=COLOR_GOLD_PRIMARY,
-        width=1
+    label = _short_position_title(position_title or drawn.position_title, index)
+
+    label_font = _get_font(max(15, card_w // 10), bold=True)
+    name_font = _get_font(max(14, card_w // 11), bold=True)
+    meta_font = _get_font(max(12, card_w // 13), bold=True)
+    tiny_font = _get_font(max(10, card_w // 16), bold=True)
+
+    img = _load_and_prepare_card_image(drawn, card_w, card_h) if revealed else _generate_card_back(card_w, card_h)
+    if rotate_degrees:
+        img = img.rotate(rotate_degrees, expand=True)
+    img_w, img_h = img.size
+
+    left = center_x - img_w // 2
+    top = center_y - img_h // 2
+
+    shadow_pad = max(6, card_w // 30)
+    draw.rounded_rectangle(
+        (left + shadow_pad, top + shadow_pad, left + img_w + shadow_pad, top + img_h + shadow_pad),
+        radius=max(7, card_w // 22),
+        fill=COLOR_SHADOW,
     )
-    draw.text((cx_cross - pos_w // 2, pos_y), header_title, fill=COLOR_GOLD_LIGHT, font=font_pos)
+    canvas.paste(img, (left, top), img)
 
-    # 4. Footer chi tiết cho cả Lá 1 và Lá 2
-    footer_y1 = cy_cross + card_h // 2 + 5
-    footer_y2 = footer_y1 + 16
-    font_name = _get_font(10, bold=True)
-    font_orient = _get_font(9, bold=True)
+    accent, state_tag = _state_accent(state, index)
+    border_w = max(3, card_w // 55) if state_tag else max(2, card_w // 95)
+    draw.rounded_rectangle(
+        (left - 3, top - 3, left + img_w + 3, top + img_h + 3),
+        radius=max(8, card_w // 20),
+        outline=accent,
+        width=border_w,
+    )
 
-    # Dòng Lá 1
-    if 0 in revealed_indices:
-        c1 = drawn_cards[0]
-        c1_orient = "[NGƯỢC]" if c1.is_reversed else "[XUÔI]"
-        c1_color = COLOR_REVERSED if c1.is_reversed else COLOR_UPRIGHT
-        c1_prefix = f"Lá 1: {c1.card.name_vi}"
-        bbox_p1 = draw.textbbox((0, 0), c1_prefix, font=font_name)
-        wp1 = bbox_p1[2] - bbox_p1[0]
-        bbox_o1 = draw.textbbox((0, 0), f" {c1_orient}", font=font_orient)
-        wo1 = bbox_o1[2] - bbox_o1[0]
-        total_w1 = wp1 + wo1
-        draw.text((cx_cross - total_w1 // 2, footer_y1), c1_prefix, fill=(255, 255, 255), font=font_name)
-        draw.text((cx_cross - total_w1 // 2 + wp1, footer_y1), f" {c1_orient}", fill=c1_color, font=font_orient)
-    else:
-        s1_text = "Lá 1: • ĐANG CHỜ LẬT •"
-        bbox_s1 = draw.textbbox((0, 0), s1_text, font=font_orient)
-        draw.text((cx_cross - (bbox_s1[2] - bbox_s1[0]) // 2, footer_y1), s1_text, fill=COLOR_GOLD_LIGHT, font=font_orient)
+    # Position title remains visible for face-up and face-down cards.
+    label_y = top - max(42, card_w // 4)
+    _draw_pill(
+        draw,
+        f"{index + 1}. {label}",
+        center_x,
+        label_y,
+        label_font,
+        fill=COLOR_PANEL,
+        outline=accent if state_tag else COLOR_GOLD_DARK,
+        text_color=COLOR_TEXT,
+        pad_x=max(9, card_w // 18),
+        pad_y=max(4, card_w // 55),
+    )
 
-    # Dòng Lá 2
-    if 1 in revealed_indices:
-        c2 = drawn_cards[1]
-        c2_orient = "[NGƯỢC]" if c2.is_reversed else "[XUÔI]"
-        c2_color = COLOR_REVERSED if c2.is_reversed else COLOR_UPRIGHT
-        c2_prefix = f"Lá 2: {c2.card.name_vi}"
-        bbox_p2 = draw.textbbox((0, 0), c2_prefix, font=font_name)
-        wp2 = bbox_p2[2] - bbox_p2[0]
-        bbox_o2 = draw.textbbox((0, 0), f" {c2_orient}", font=font_orient)
-        wo2 = bbox_o2[2] - bbox_o2[0]
-        total_w2 = wp2 + wo2
-        draw.text((cx_cross - total_w2 // 2, footer_y2), c2_prefix, fill=(255, 255, 255), font=font_name)
-        draw.text((cx_cross - total_w2 // 2 + wp2, footer_y2), f" {c2_orient}", fill=c2_color, font=font_orient)
-    else:
-        s2_text = "Lá 2: • ĐANG CHỜ LẬT •"
-        bbox_s2 = draw.textbbox((0, 0), s2_text, font=font_orient)
-        draw.text((cx_cross - (bbox_s2[2] - bbox_s2[0]) // 2, footer_y2), s2_text, fill=COLOR_GOLD_LIGHT, font=font_orient)
+    if not revealed:
+        number_font = _get_font(max(22, card_w // 6), bold=True)
+        _draw_pill(
+            draw,
+            str(index + 1),
+            center_x,
+            center_y - max(18, card_w // 9),
+            number_font,
+            fill=(34, 30, 49),
+            outline=COLOR_VIOLET,
+            text_color=COLOR_GOLD_LIGHT,
+            pad_x=max(14, card_w // 10),
+            pad_y=max(6, card_w // 25),
+        )
+        return
 
-    # 3. Lá 3: Tiềm thức / Gốc rễ (Bên DƯỚI)
-    _draw_card_with_meta(canvas, drawn_cards[2], cx_cross, cy_cross + 265, card_w, card_h, "3. GỐC RỄ", font_size_scale=0.72, wrap_name=True, is_revealed=(2 in revealed_indices))
-
-    # 4. Lá 4: Quá khứ gần (Bên TRÁI)
-    _draw_card_with_meta(canvas, drawn_cards[3], cx_cross - 240, cy_cross, card_w, card_h, "4. QUÁ KHỨ", font_size_scale=0.72, wrap_name=True, is_revealed=(3 in revealed_indices))
-
-    # 5. Lá 5: Nhận thức / Mục tiêu (Bên TRÊN)
-    _draw_card_with_meta(canvas, drawn_cards[4], cx_cross, cy_cross - 265, card_w, card_h, "5. NHẬN THỨC", font_size_scale=0.72, wrap_name=True, is_revealed=(4 in revealed_indices))
-
-    # 6. Lá 6: Tương lai gần (Bên PHẢI)
-    _draw_card_with_meta(canvas, drawn_cards[5], cx_cross + 240, cy_cross, card_w, card_h, "6. TƯƠNG LAI GẦN", font_size_scale=0.72, wrap_name=True, is_revealed=(5 in revealed_indices))
-
-    # Cột Quyền Trượng (Staff Column - Bên phải): cx = 950
-    # Phân bố đều với khoảng cách 230px đảm bảo không bao giờ dính chữ giữa header và footer
-    cx_staff = 950
-    staff_ys = [850, 620, 390, 160]
-    staff_cards = [
-        (6, drawn_cards[6], "7. BẢN THÂN"),
-        (7, drawn_cards[7], "8. MÔI TRƯỜNG"),
-        (8, drawn_cards[8], "9. HY VỌNG & NỖI SỢ"),
-        (9, drawn_cards[9], "10. KẾT QUẢ TỔNG THỂ"),
-    ]
-
-    for (orig_idx, card, pos_title), cy in zip(staff_cards, staff_ys):
-        _draw_card_with_meta(
-            canvas, card, cx_staff, cy, card_w, card_h, pos_title,
-            font_size_scale=0.72, wrap_name=True, is_revealed=(orig_idx in revealed_indices)
+    # Accessible orientation/state badges: important meaning never relies on color alone.
+    badge_y = top + max(8, card_w // 25)
+    badge_x = left + max(8, card_w // 25)
+    if drawn.is_reversed:
+        _, badge_bottom = _draw_badge(
+            draw,
+            "REV",
+            badge_x,
+            badge_y,
+            meta_font,
+            fill=(67, 43, 50),
+            outline=COLOR_REVERSED,
+            text_color=(246, 210, 210),
+        )
+        badge_y = badge_bottom + 6
+    if drawn.card.arcana == "Major":
+        _, badge_bottom = _draw_badge(
+            draw,
+            "MAJOR",
+            badge_x,
+            badge_y,
+            tiny_font,
+            fill=(53, 45, 33),
+            outline=COLOR_GOLD_DARK,
+            text_color=COLOR_GOLD_LIGHT,
+        )
+        badge_y = badge_bottom + 6
+    if state_tag:
+        _draw_badge(
+            draw,
+            state_tag,
+            badge_x,
+            badge_y,
+            tiny_font,
+            fill=(49, 42, 65),
+            outline=accent,
+            text_color=accent,
         )
 
+    if not show_footer:
+        return
+
+    footer_y = top + img_h + max(10, card_w // 22)
+    name = drawn.card.name_vi
+    if len(name) > 24:
+        name = name[:21].rstrip() + "..."
+    _draw_centered_text(draw, name, center_x, footer_y, name_font, COLOR_TEXT)
+    orientation = "NGƯỢC" if drawn.is_reversed else "XUÔI"
+    orient_color = COLOR_REVERSED if drawn.is_reversed else COLOR_UPRIGHT
+    _draw_centered_text(
+        draw,
+        orientation,
+        center_x,
+        footer_y + max(24, card_w // 8),
+        meta_font,
+        orient_color,
+    )
+
+
+def _layout_1(state: ReadingBoardState) -> Image.Image:
+    width, height = 1080, 1350
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    _draw_card_slot(canvas, state, 0, 540, 735, 440, 756)
     return canvas
+
+
+def _layout_3(state: ReadingBoardState) -> Image.Image:
+    width, height = 1400, 900
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    xs = (260, 700, 1140)
+    for idx, x in enumerate(xs):
+        _draw_card_slot(canvas, state, idx, x, 515, 250, 430)
+    return canvas
+
+
+def _layout_4(state: ReadingBoardState) -> Image.Image:
+    width, height = 1300, 1100
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    positions = (
+        (650, 335),
+        (365, 620),
+        (935, 620),
+        (650, 840),
+    )
+    for idx, (x, y) in enumerate(positions):
+        _draw_card_slot(canvas, state, idx, x, y, 190, 327)
+    return canvas
+
+
+def _layout_two_paths(state: ReadingBoardState) -> Image.Image:
+    width, height = 1400, 1100
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    draw = ImageDraw.Draw(canvas)
+    branch_font = _get_font(25, bold=True)
+
+    _draw_card_slot(canvas, state, 0, 700, 375, 230, 395, position_title="BỐI CẢNH CHUNG")
+
+    _draw_pill(draw, "HƯỚNG A", 390, 560, branch_font, fill=(35, 42, 54), outline=COLOR_BLUEGREY, text_color=COLOR_BLUEGREY_LIGHT, pad_x=26)
+    _draw_pill(draw, "HƯỚNG B", 1010, 560, branch_font, fill=(43, 36, 54), outline=COLOR_VIOLET, text_color=COLOR_VIOLET_LIGHT, pad_x=26)
+
+    slots = (
+        (1, 245, 800, "THUẬN LỢI A"),
+        (2, 535, 800, "RỦI RO A"),
+        (3, 865, 800, "THUẬN LỢI B"),
+        (4, 1155, 800, "RỦI RO B"),
+    )
+    for idx, x, y, title in slots:
+        _draw_card_slot(canvas, state, idx, x, y, 210, 361, position_title=title)
+    return canvas
+
+
+def _layout_horseshoe(state: ReadingBoardState) -> Image.Image:
+    width, height = 1500, 1100
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    positions = (
+        (210, 410),
+        (480, 600),
+        (750, 735),
+        (1020, 600),
+        (1290, 410),
+    )
+    for idx, (x, y) in enumerate(positions):
+        _draw_card_slot(canvas, state, idx, x, y, 200, 344)
+    return canvas
+
+
+def _layout_generic_5(state: ReadingBoardState) -> Image.Image:
+    width, height = 1300, 1100
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    positions = (
+        (650, 330),
+        (370, 570),
+        (650, 570),
+        (930, 570),
+        (650, 835),
+    )
+    for idx, (x, y) in enumerate(positions):
+        _draw_card_slot(canvas, state, idx, x, y, 180, 310)
+    return canvas
+
+
+def _layout_6(state: ReadingBoardState) -> Image.Image:
+    width, height = 1500, 1150
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    xs = (300, 750, 1200)
+    ys = (395, 850)
+    idx = 0
+    for y in ys:
+        for x in xs:
+            _draw_card_slot(canvas, state, idx, x, y, 210, 361)
+            idx += 1
+    return canvas
+
+
+def _layout_7(state: ReadingBoardState) -> Image.Image:
+    width, height = 1500, 1150
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    positions = (
+        (170, 390),
+        (365, 565),
+        (560, 700),
+        (750, 765),
+        (940, 700),
+        (1135, 565),
+        (1330, 390),
+    )
+    for idx, (x, y) in enumerate(positions):
+        _draw_card_slot(canvas, state, idx, x, y, 170, 292)
+    return canvas
+
+
+def _layout_grid(state: ReadingBoardState) -> Image.Image:
+    count = state.total_cards
+    columns = 3 if count <= 9 else 4
+    rows = (count + columns - 1) // columns
+    width = 1500
+    height = max(1000, 250 + rows * 400)
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+    card_w, card_h = 190, 327
+    x_gap = width // (columns + 1)
+    y_start = 360
+    y_gap = 400
+    for idx in range(count):
+        row, col = divmod(idx, columns)
+        _draw_card_slot(
+            canvas,
+            state,
+            idx,
+            x_gap * (col + 1),
+            y_start + row * y_gap,
+            card_w,
+            card_h,
+        )
+    return canvas
+
+
+def _draw_celtic_center(canvas: Image.Image, state: ReadingBoardState) -> None:
+    draw = ImageDraw.Draw(canvas)
+    center_x, center_y = 610, 710
+    card_w, card_h = 170, 292
+
+    # Draw card 1 without its normal footer/position header; card 2 crosses over it.
+    for idx, rotation in ((0, 0), (1, 90)):
+        drawn = state.drawn_cards[idx]
+        revealed = state.is_revealed(idx)
+        img = _load_and_prepare_card_image(drawn, card_w, card_h) if revealed else _generate_card_back(card_w, card_h)
+        if rotation:
+            img = img.rotate(rotation, expand=True)
+        iw, ih = img.size
+        left, top = center_x - iw // 2, center_y - ih // 2
+        draw.rounded_rectangle(
+            (left + 8, top + 8, left + iw + 8, top + ih + 8),
+            radius=10,
+            fill=COLOR_SHADOW,
+        )
+        canvas.paste(img, (left, top), img)
+        accent, tag = _state_accent(state, idx)
+        draw.rounded_rectangle(
+            (left - 3, top - 3, left + iw + 3, top + ih + 3),
+            radius=10,
+            outline=accent,
+            width=5 if tag else 2,
+        )
+
+    central_font = _get_font(20, bold=True)
+    _draw_pill(
+        draw,
+        "1. HIỆN TẠI  ·  2. TRỞ NGẠI",
+        center_x,
+        500,
+        central_font,
+        fill=COLOR_PANEL,
+        outline=COLOR_GOLD_DARK,
+        text_color=COLOR_TEXT,
+        pad_x=18,
+    )
+
+    detail_font = _get_font(16, bold=True)
+    detail_y = 875
+    for idx in (0, 1):
+        drawn = state.drawn_cards[idx]
+        if state.is_revealed(idx):
+            orientation = " · REV" if drawn.is_reversed else ""
+            text = f"{idx + 1}. {drawn.card.name_vi}{orientation}"
+            color = COLOR_REVERSED if drawn.is_reversed else COLOR_TEXT
+        else:
+            text = f"{idx + 1}. CHƯA LẬT"
+            color = COLOR_MUTED
+        _draw_centered_text(draw, text, center_x, detail_y + (idx * 28), detail_font, color)
+
+
+def _layout_celtic(state: ReadingBoardState) -> Image.Image:
+    width, height = 1600, 1350
+    canvas = _gradient_background(width, height)
+    _draw_header(canvas, state)
+
+    _draw_celtic_center(canvas, state)
+
+    # Traditional cross around the center pair.
+    outer = (
+        (2, 610, 1090, "GỐC RỄ"),
+        (3, 315, 710, "QUÁ KHỨ"),
+        (4, 610, 325, "NHẬN THỨC"),
+        (5, 905, 710, "TƯƠNG LAI GẦN"),
+    )
+    for idx, x, y, title in outer:
+        _draw_card_slot(canvas, state, idx, x, y, 155, 267, position_title=title)
+
+    # Staff column.
+    staff = (
+        (6, 1320, 1090, "BẢN THÂN"),
+        (7, 1320, 825, "MÔI TRƯỜNG"),
+        (8, 1320, 560, "HY VỌNG & NỖI SỢ"),
+        (9, 1320, 295, "KẾT QUẢ"),
+    )
+    for idx, x, y, title in staff:
+        _draw_card_slot(canvas, state, idx, x, y, 145, 249, position_title=title)
+    return canvas
+
+
+def render_reading_board(state: ReadingBoardState) -> Image.Image:
+    count = state.total_cards
+    if count <= 0:
+        raise ValueError("ReadingBoardState requires at least one card")
+    if count == 1:
+        return _layout_1(state)
+    if count == 3:
+        return _layout_3(state)
+    if count == 4:
+        return _layout_4(state)
+    if count == 5:
+        if state.spread_key == "two_paths":
+            return _layout_two_paths(state)
+        if state.spread_key == "horseshoe":
+            return _layout_horseshoe(state)
+        return _layout_generic_5(state)
+    if count == 6:
+        return _layout_6(state)
+    if count == 7:
+        return _layout_7(state)
+    if count == 10 or state.spread_key == "celtic":
+        return _layout_celtic(state)
+    return _layout_grid(state)
+
+
+def _render_emergency_board(state: ReadingBoardState, error: Exception) -> Image.Image:
+    """Text-first renderer fallback: preserve reading outcome if visual composition fails."""
+    width, height = 1200, max(760, 260 + 82 * state.total_cards)
+    canvas = _gradient_background(width, height)
+    draw = ImageDraw.Draw(canvas)
+    title_font = _get_font(34, bold=True)
+    row_font = _get_font(24, bold=True)
+    small_font = _get_font(18)
+
+    _draw_centered_text(draw, _safe_title(state.spread_key, state.spread_title).upper(), width // 2, 60, title_font, COLOR_GOLD_LIGHT)
+    _draw_centered_text(draw, "Visual fallback · cards remain unchanged", width // 2, 110, small_font, COLOR_MUTED)
+
+    y = 190
+    for idx, card in enumerate(state.drawn_cards):
+        label = _short_position_title(card.position_title, idx)
+        if idx in state.revealed_indices:
+            orientation = "NGƯỢC" if card.is_reversed else "XUÔI"
+            text = f"{idx + 1}. {label} — {card.card.name_vi} · {orientation}"
+        else:
+            text = f"{idx + 1}. {label} — CHƯA LẬT"
+        draw.text((90, y), text, font=row_font, fill=COLOR_TEXT)
+        y += 64
+
+    # Keep implementation detail tiny and local; do not expose stack traces.
+    err_name = type(error).__name__
+    draw.text((90, height - 70), f"Renderer fallback: {err_name}", font=small_font, fill=COLOR_MUTED)
+    return canvas
+
+
+def render_reading_board_to_bytes(state: ReadingBoardState) -> io.BytesIO:
+    try:
+        image = render_reading_board(state)
+    except Exception as exc:
+        print(f"[TarotRenderer] Reading Board fallback: {type(exc).__name__}: {exc}", flush=True)
+        image = _render_emergency_board(state, exc)
+
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=6)
+    buffer.seek(0)
+    return buffer
 
 
 def render_spread_to_bytes(
     spread_key: str,
     drawn_cards: List[DrawnCard],
-    revealed_indices: Optional[Set[int]] = None
+    revealed_indices: Optional[Set[int]] = None,
+    *,
+    just_revealed_indices: Optional[Set[int]] = None,
+    key_card_id: Optional[str] = None,
+    target_position_index: Optional[int] = None,
+    final: bool = False,
+    spread_title: Optional[str] = None,
 ) -> io.BytesIO:
-    """Tạo ảnh trải bài và đóng gói vào io.BytesIO gửi thẳng lên Discord."""
-    count = len(drawn_cards)
-    if count == 1:
-        img = render_1_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
-    elif count == 3:
-        img = render_3_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
-    elif count == 5:
-        img = render_5_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
-    elif count == 10 or spread_key == "celtic":
-        img = render_celtic_cross_spread(drawn_cards, revealed_indices=revealed_indices)
-    else:
-        if count <= 2:
-            img = render_1_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
-        elif count <= 4:
-            img = render_3_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
-        elif count <= 6:
-            img = render_5_card_spread(spread_key, drawn_cards, revealed_indices=revealed_indices)
-        else:
-            img = render_celtic_cross_spread(drawn_cards, revealed_indices=revealed_indices)
+    """Backward-compatible renderer entry point used by current Discord views."""
+    state = ReadingBoardState.from_legacy(
+        spread_key,
+        drawn_cards,
+        revealed_indices,
+        just_revealed_indices=just_revealed_indices,
+        key_card_id=key_card_id,
+        target_position_index=target_position_index,
+        final=final,
+        spread_title=spread_title,
+    )
+    return render_reading_board_to_bytes(state)
 
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG", optimize=True)
-    buffer.seek(0)
-    return buffer
+
+# Compatibility image-returning helpers used by older local tooling.
+def render_1_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
+    return render_reading_board(ReadingBoardState.from_legacy(spread_key, drawn_cards, revealed_indices))
+
+
+def render_3_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
+    return render_reading_board(ReadingBoardState.from_legacy(spread_key, drawn_cards, revealed_indices))
+
+
+def render_5_card_spread(spread_key: str, drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
+    return render_reading_board(ReadingBoardState.from_legacy(spread_key, drawn_cards, revealed_indices))
+
+
+def render_celtic_cross_spread(drawn_cards: List[DrawnCard], revealed_indices: Optional[Set[int]] = None) -> Image.Image:
+    return render_reading_board(ReadingBoardState.from_legacy("celtic", drawn_cards, revealed_indices))
