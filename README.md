@@ -170,6 +170,8 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
   - `two_paths`: **Two Paths** (5 lá) - Phân tích chi tiết rủi ro/lợi ích 2 hướng (Bối cảnh chung, Thuận lợi A, Rủi ro A, Thuận lợi B, Rủi ro B).
   - `celtic`: **Celtic Cross** (10 lá) - Trải bài chuyên sâu toàn diện 10 góc nhìn.
 - **Engine Canvas Pillow**: Tự động ghép các lá bài thành ảnh trải bài (`tarot_spread.png`), tự động xoay $180^\circ$ cho lá bài Ngược (Reversed) và vẽ ngôi sao vàng kim vector sắc nét.
+- **Reading Session UX**: một message chính hiển thị tiến độ lật bài, micro reveal từng lá, trạng thái AI đang đọc / đã sẵn sàng và tự chuyển sang luận giải cuối mà không spam kênh.
+- **Mobile controls**: các nút lá dùng số compact, phù hợp cả Celtic Cross 10 lá.
 
 ### `/tarot_history`
 

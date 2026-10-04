@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1–T20.2 COMPLETE. T20.3 NEXT.** The user explicitly approved starting Tarot 2.0 implementation.  
+> **Implementation status:** **T20.1–T20.3 COMPLETE. T20.4 NEXT.** The user explicitly approved starting Tarot 2.0 implementation.  
 > **Last planning update:** 2026-10-04  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -1171,9 +1171,9 @@ Implementation keeps manual spread selection and direct-command compatibility, w
 
 ---
 
-## T20.3 — Reading Session UX — NEXT
+## T20.3 — Reading Session UX — COMPLETE
 
-Implement:
+Implemented:
 
 - one-message lifecycle where practical;
 - shuffling/revealing/ready state;
@@ -1188,7 +1188,7 @@ Reading flow feels coherent and channel noise is reduced.
 
 ---
 
-## T20.4 — Renderer 2.0
+## T20.4 — Renderer 2.0 — NEXT
 
 Implement:
 

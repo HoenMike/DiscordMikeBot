@@ -19,7 +19,6 @@ from features.tarot.manager import TarotManager
 from features.tarot.tarot_view import (
     TarotFlipView,
     TarotLauncherView,
-    WIDE_DIVIDER
 )
 from core.ai import split_text
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
@@ -224,7 +223,7 @@ class TarotCog(commands.Cog):
         if interaction:
             await interaction.response.defer(thinking=True)
         elif ctx:
-            initial_msg = await ctx.reply("🔮 Đang kết nối năng lượng và trải bài Tarot...", mention_author=False)
+            initial_msg = await ctx.reply("🔀 Asumi đang xáo bài và chuẩn bị trải bài...", mention_author=False)
 
         ai_task = None
         view = None
@@ -291,40 +290,15 @@ class TarotCog(commands.Cog):
             )
             file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
-            # 5. Xây dựng Embed
-            desc_lines = []
-            if clean_question:
-                desc_lines.append(f"**❓ Câu hỏi / Chủ đề:**\n*{clean_question}*\n")
-            if clean_context:
-                desc_lines.append(f"**📝 Bối cảnh:**\n*{clean_context}*\n")
-            desc_lines.append(f"**🎭 Người trải bài:** {view.style_info['name']}\n")
-
-            desc_lines.append(WIDE_DIVIDER)
-
-            cards_summary_lines = []
-            for drawn in drawn_cards:
-                cards_summary_lines.append(f"• **{drawn.position_title}**: ⏳ *(Chờ lật)*")
-
-            desc_lines.append("**🃏 Các Lá Bài:**\n" + "\n".join(cards_summary_lines) + "\n")
-            desc_lines.append("⏳ *Hãy bấm vào các nút bên dưới để lật mở từng lá bài...*")
-
-            embed = discord.Embed(
-                title=f"🔮 TRẢI BÀI TAROT: {spread_info['name'].upper()}",
-                description="\n".join(desc_lines),
-                color=view.embed_color
-            )
-            embed.set_image(url="attachment://tarot_spread.png")
-            embed.set_footer(
-                text=f"Quẻ bài của {user.display_name} (Đang bốc bài...)",
-                icon_url=user_avatar
-            )
+            # 5. Xây dựng session embed FACE_DOWN
+            embed = view.build_session_embed()
 
             if interaction:
                 sent_msg = await interaction.followup.send(embed=embed, file=file, view=view)
-                view.message = sent_msg
+                await view.attach_message(sent_msg)
             elif ctx and initial_msg:
                 await initial_msg.edit(content=None, embed=embed, attachments=[file], view=view)
-                view.message = initial_msg
+                await view.attach_message(initial_msg)
 
             delivered = view.message is not None
             if delivered:

@@ -346,6 +346,8 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
             "• **Nút Hỏi Thêm Ý Nghĩa (❓)**: Mở modal cho phép đặt thêm câu hỏi đào sâu hoặc xin thêm lời khuyên chi tiết cho quẻ bài vừa bốc.\n"
             "• **Nút Đánh Giá (👍 Hữu ích / 👎 Chưa chuẩn)**: Góp ý phản hồi chất lượng luận giải của AI.\n"
             "• **Smart Launcher**: Nhập câu hỏi trước; Asumi đề xuất spread, nhưng bạn vẫn có thể tự chọn kiểu khác.\n"
+            "• **Reading Session**: Một message xuyên suốt việc lật bài, có progress, micro reveal và báo khi AI đã luận giải xong.\n"
+            "• **Mobile Reveal Controls**: Nút lá đánh số compact, kể cả Celtic Cross 10 lá vẫn gọn.\n"
             "• **Nhận diện câu hỏi gần giống**: Nếu bạn vừa hỏi chuyện tương tự, launcher cho chọn dùng ngữ cảnh cũ nhẹ hoặc xem như câu hỏi mới.\n"
             "• **Trí Nhớ Bạn Cũ (Memory)**: AI có khả năng liên kết nhẹ nhàng ngữ cảnh từ các quẻ bài trước.\n"
             "• **Cooldown An Toàn**: **30 giây** giữa 2 lần bốc bài liên tiếp để giữ không gian tĩnh tâm."

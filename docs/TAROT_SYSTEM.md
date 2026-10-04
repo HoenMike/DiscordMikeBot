@@ -100,7 +100,11 @@ features/tarot/
 ├── flavor.py        # [NEW] Phát hiện combo hiếm, Easter eggs & sinh Flavor Text huyền bí
 ├── renderer.py      # Bộ sinh đồ họa ảnh bài (Pillow), xếp layout đa dạng & In-memory Cache
 ├── ai.py            # Gemini AI: Structured JSON output, Trí nhớ bạn cũ, Follow-up & Semaphore
-├── tarot_view.py    # UI Discord: Lật bài, Micro-interpretation, Follow-up Modal & Rating Buttons
+├── tarot_view.py    # UI Discord: Launcher + live reading session + Follow-up/Rating
+├── reading/
+│   ├── schema.py    # Structured Reading Result V2
+│   ├── recommendation.py # Smart launcher recommendation + repeated-question helper
+│   └── session.py   # Progress, micro reveal, compact controls & AI-ready presentation helpers
 ├── manager.py       # Quản lý Turso Cloud LibSQL / SQLite DB, Lịch sử, Cooldown, Ratings & Preferences
 ├── cog.py           # Điều phối Slash commands, Prefix commands, Memory/Forget & Weekly Card Loop
 └── assets/          # Thư mục chứa tài nguyên ảnh bài & font chữ Unicode
@@ -174,10 +178,14 @@ Gồm 2 tầng View Discord UI:
    - Menu spread vẫn giữ làm manual override; Reader Style là tuỳ chọn thứ cấp.
    - Daily Card vẫn có thể tự chọn và bắt đầu mà không cần câu hỏi.
    - Nếu phát hiện câu hỏi gần giống lịch sử gần đây, launcher hiện cảnh báo nhẹ và cho chọn dùng ngữ cảnh cũ hoặc xem như câu hỏi mới.
-2. **`TarotFlipView` (Interactive Flipping)**:
-   - Sinh động với các nút bấm đại diện cho từng vị trí lá bài: `[🃏 Lá 1]`, `[🃏 Lá 2]`, `[🃏 Lá 3]`...
-   - **Realtime Flip Update**: Mỗi khi người dùng bấm nút:
-     - Nút đó sẽ bị vô hiệu hóa (`disabled=True`) và đổi nhãn thành `[✅ Đã lật: Tên Lá]`.
+2. **`TarotFlipView` — Live Reading Session từ T20.3**:
+   - Một reading dùng **một message chính** xuyên suốt các trạng thái: xáo bài → mặt úp → đang lật → AI sẵn sàng/finalizing → kết quả.
+   - Nút lật dùng nhãn số compact (`1`, `2`, …, `✓ 2`) để 10-card spread vẫn gọn trên mobile; `✨ Lật hết` vẫn được giữ.
+   - **Reveal progress** luôn có cả dots và số lượng, ví dụ `● ○ ○   1 / 3 lá đã lật`.
+   - Mỗi lá vừa lật nhận **micro reveal** deterministic: vị trí + tên lá + xuôi/ngược + tối đa 3 từ khóa. Không gọi AI thêm cho micro reveal.
+   - AI chạy nền song song với việc lật bài. Nếu AI xong trước, message hiện `✓ Luận giải đã sẵn sàng` mà không tạo message mới.
+   - Nếu user lật hết trước AI, chính message đó chuyển sang trạng thái **ĐANG LUẬN GIẢI** rồi được edit thành kết quả cuối.
+   - `features/tarot/reading/session.py` chứa các presentation helper thuần để test độc lập.
      - Renderer vẽ lại ảnh mới (thay thế mặt lưng bài bằng mặt trước của lá vừa lật).
      - Cập nhật embed Discord ngay lập tức.
    - **Nút "⚡ Lật Tất Cả"**: Hỗ trợ mở toàn bộ bài cùng lúc nếu người dùng không muốn bấm từng lá.

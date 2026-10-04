@@ -10,6 +10,12 @@ from .recommendation import (
     question_similarity,
     recommend_spread,
 )
+from .session import (
+    build_ai_ready_status,
+    build_micro_reveal,
+    build_reveal_progress,
+    compact_flip_label,
+)
 from .schema import (
     TarotAIResponseSchema,
     TarotCardInsight,
@@ -24,6 +30,10 @@ __all__ = [
     "find_similar_recent_question",
     "question_similarity",
     "recommend_spread",
+    "build_ai_ready_status",
+    "build_micro_reveal",
+    "build_reveal_progress",
+    "compact_flip_label",
     "TarotAIResponseSchema",
     "TarotCardInsight",
     "TarotClarifierTarget",
