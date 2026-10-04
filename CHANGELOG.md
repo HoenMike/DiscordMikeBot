@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.8.2] - 2026-10-04 — *Native Facebook Fallback Button*
+
+### Fixed
+- **Fallback hoạt động trực tiếp trong Discord**: bỏ masked hyperlink của v2.8.1 và chuyển sang nút Discord native **↪️ Fallback**, không còn phụ thuộc public URL, browser hay JavaScript.
+- **Owner-only interaction**: chỉ đúng Discord user đã gửi link gốc được kích hoạt fallback; người khác bấm sẽ nhận thông báo ephemeral.
+- **State an toàn**: nút disable ngay khi chạy; nếu yt-dlp thất bại thì nút được bật lại và preview hiện tại vẫn giữ. Chỉ cleanup preview cũ sau khi replacement gửi thành công.
+- **Per-URL cleanup**: manual fallback track preview theo `(origin_message_id, URL)`, tránh xóa nhầm khi một message có nhiều link Facebook/social.
+
+### Changed
+- Giữ nguyên cơ chế chống false fallback của v2.8.1: Facebook không auto yt-dlp, generic/login card ở poll sớm tiếp tục được chờ hết grace window.
+- Xóa `features/embed/manual_fallback.py`, web fallback routes và cấu hình `ASUMI_PUBLIC_URL` / `PUBLIC_BASE_URL`.
+- Cập nhật README, tài liệu pipeline và regression tests cho button flow.
+
 ## [2.8.1] - 2026-10-04 — *Facebook Manual Fallback Link*
 
 ### Fixed
