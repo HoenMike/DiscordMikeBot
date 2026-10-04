@@ -15,7 +15,7 @@ from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
 from features.embed.ui import PlatformToggleView, FacebookFallbackView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
-from features.embed.validator import find_valid_proxy, build_proxy_url
+from features.embed.validator import find_valid_proxy
 from features.embed.validator import is_generic_or_login_preview
 from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
@@ -830,8 +830,8 @@ class EmbedCog(commands.Cog):
         if message.id in self._deleted_message_ids:
             return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
-        # Facebook: không tự động thay một preview có thể đã render bằng yt-dlp.
-        # Nếu proxy thực sự không dùng được, chỉ đưa hyperlink fallback để người dùng chủ động kích hoạt.
+        # Facebook không nhảy sang yt-dlp. Nếu chưa gửi được proxy nào,
+        # để người dùng chủ động thử lại/roll proxy bằng button Discord.
         if platform_key == "facebook":
             return await self._offer_manual_fallback(
                 message,
