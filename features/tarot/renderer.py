@@ -527,7 +527,7 @@ def _layout_4(state: ReadingBoardState) -> Image.Image:
         (650, 875),
     )
     for idx, (x, y) in enumerate(positions):
-        _draw_card_slot(canvas, state, idx, x, y, 190, 327)
+        _draw_card_slot(canvas, state, idx, x, y, 190, 327, show_footer=False)
     return canvas
 
 
@@ -571,18 +571,18 @@ def _layout_horseshoe(state: ReadingBoardState) -> Image.Image:
 
 
 def _layout_generic_5(state: ReadingBoardState) -> Image.Image:
-    width, height = 1300, 1100
+    width, height = 1300, 1150
     canvas = _gradient_background(width, height)
     _draw_header(canvas, state)
     positions = (
-        (650, 395),
-        (370, 625),
-        (650, 625),
-        (930, 625),
-        (650, 875),
+        (650, 350),
+        (380, 650),
+        (650, 650),
+        (920, 650),
+        (650, 950),
     )
     for idx, (x, y) in enumerate(positions):
-        _draw_card_slot(canvas, state, idx, x, y, 180, 310)
+        _draw_card_slot(canvas, state, idx, x, y, 150, 258, show_footer=False)
     return canvas
 
 
@@ -595,7 +595,7 @@ def _layout_6(state: ReadingBoardState) -> Image.Image:
     idx = 0
     for y in ys:
         for x in xs:
-            _draw_card_slot(canvas, state, idx, x, y, 190, 327)
+            _draw_card_slot(canvas, state, idx, x, y, 190, 327, show_footer=False)
             idx += 1
     return canvas
 
@@ -614,7 +614,7 @@ def _layout_7(state: ReadingBoardState) -> Image.Image:
         (1330, 390),
     )
     for idx, (x, y) in enumerate(positions):
-        _draw_card_slot(canvas, state, idx, x, y, 170, 292)
+        _draw_card_slot(canvas, state, idx, x, y, 170, 292, show_footer=False)
     return canvas
 
 
@@ -722,9 +722,9 @@ def _layout_celtic(state: ReadingBoardState) -> Image.Image:
 
     # Staff column.
     staff = (
-        (6, 1320, 1180, "BẢN THÂN"),
-        (7, 1320, 910, "MÔI TRƯỜNG"),
-        (8, 1320, 640, "HY VỌNG & NỖI SỢ"),
+        (6, 1320, 1150, "BẢN THÂN"),
+        (7, 1320, 890, "MÔI TRƯỜNG"),
+        (8, 1320, 630, "HY VỌNG & NỖI SỢ"),
         (9, 1320, 370, "KẾT QUẢ"),
     )
     for idx, x, y, title in staff:
