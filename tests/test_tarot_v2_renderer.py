@@ -105,8 +105,9 @@ class TarotReadingBoardRendererTests(unittest.TestCase):
             final=True,
         )
 
-    def test_dynamic_four_six_seven_layouts(self):
+    def test_dynamic_four_five_six_seven_layouts(self):
         self.assert_board("custom_four", cards(4), (1300, 1100), spread_title="Custom 4")
+        self.assert_board("custom_five", cards(5), (1300, 1150), spread_title="Custom 5")
         self.assert_board("custom_six", cards(6), (1500, 1150), spread_title="Custom 6")
         self.assert_board("custom_seven", cards(7), (1500, 1150), spread_title="Custom 7")
 
