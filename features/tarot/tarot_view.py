@@ -145,9 +145,17 @@ class TarotQuestionModal(discord.ui.Modal, title="🔮 Nhập Câu Hỏi & Bối
     async def on_submit(self, interaction: discord.Interaction):
         clean_q = self.question_input.value.strip() if self.question_input.value else None
         clean_ctx = self.context_input.value.strip() if self.context_input.value else None
+        previous_question = self.launcher_view.question
 
         self.launcher_view.question = clean_q if clean_q else None
         self.launcher_view.context = clean_ctx if clean_ctx else None
+
+        if previous_question != self.launcher_view.question and self.launcher_view.selection_source == "recommendation":
+            self.launcher_view.selection_source = "default"
+
+        self.launcher_view.refresh_recommendation()
+        await self.launcher_view.refresh_similar_question_hint()
+        self.launcher_view._build_components()
 
         embed = self.launcher_view.build_launcher_embed()
         await interaction.response.edit_message(embed=embed, view=self.launcher_view)
