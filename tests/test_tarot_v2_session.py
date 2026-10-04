@@ -12,7 +12,7 @@ from features.tarot.reading.session import (
     build_reveal_progress,
     compact_flip_label,
 )
-from features.tarot.tarot_view import TarotFlipView, _unpack_tarot_result
+from features.tarot.tarot_view import TarotFlipView, TarotResultActionView, _unpack_tarot_result
 
 
 def drawn(card_id: str, position_index: int, position_title: str, reversed_: bool = False) -> DrawnCard:
@@ -192,6 +192,27 @@ class TarotMultiTurnStateTests(unittest.TestCase):
         self.assertTrue(state.mark_why_used(now=250.0))
         self.assertTrue(state.why_used)
         self.assertEqual(state.last_activity_at, 250.0)
+
+
+class TarotResultSessionControlTests(unittest.TestCase):
+    def test_result_view_exposes_three_turn_followup_and_why(self):
+        view = TarotResultActionView(
+            author_id=1,
+            author_name="Mai",
+            drawn_cards=[drawn("major_02", 0, "Lời khuyên")],
+            question="Tôi nên chú ý gì?",
+            context="Đang cân nhắc.",
+            ai_reading="Reading",
+            reader_style="auto",
+            spread_key="single",
+            tarot_manager=FakeManager(),
+        )
+        custom_ids = {getattr(item, "custom_id", "") for item in view.children}
+        self.assertIn("tarot_followup", custom_ids)
+        self.assertIn("tarot_why", custom_ids)
+        self.assertIn("tarot_clarifier", custom_ids)
+        self.assertEqual(view.session_state.max_followups, 3)
+        view.stop()
 
 
 if __name__ == "__main__":
