@@ -947,21 +947,25 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
             raise
 
         bot_user = interaction.client.user if interaction and interaction.client else None
-        answer = await generate_followup_answer(
-            drawn_cards=self.drawn_cards,
-            original_question=self.original_question,
-            original_reading=self.original_reading,
-            user_followup_question=question_text,
-            reader_style=self.reader_style,
-            user_name=self.user_name,
-            user_id=interaction.user.id if interaction and interaction.user else None,
-            guild=interaction.guild if interaction else None,
-            bot_id=bot_user.id if bot_user else None,
-            bot_name=runtime_bot_name(bot_user),
-            original_context=self.result_view.context,
-            prior_followups=self.result_view.session_state.prompt_history(),
-            clarifier_context=self.result_view.session_state.clarifier_summary,
-        )
+        try:
+            answer = await generate_followup_answer(
+                drawn_cards=self.drawn_cards,
+                original_question=self.original_question,
+                original_reading=self.original_reading,
+                user_followup_question=question_text,
+                reader_style=self.reader_style,
+                user_name=self.user_name,
+                user_id=interaction.user.id if interaction and interaction.user else None,
+                guild=interaction.guild if interaction else None,
+                bot_id=bot_user.id if bot_user else None,
+                bot_name=runtime_bot_name(bot_user),
+                original_context=self.result_view.context,
+                prior_followups=self.result_view.session_state.prompt_history(),
+                clarifier_context=self.result_view.session_state.clarifier_summary,
+            )
+        except BaseException:
+            self.result_view._followup_in_progress = False
+            raise
 
         embed = discord.Embed(
             title=f"❓ GIẢI ĐÁP BỔ SUNG CHO {self.user_name.upper()}",
