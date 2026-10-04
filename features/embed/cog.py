@@ -404,7 +404,7 @@ class EmbedCog(commands.Cog):
                         response=(
                             f"Tạo bản xem trước {platform_name} thành công"
                             if result.success else
-                            f"Đã giữ bản xem trước và chờ fallback thủ công: {result.reason}"
+                            f"Đã giữ bản xem trước và chờ đổi proxy thủ công: {result.reason}"
                             if result.status == "action_required" else
                             f"Không thể tạo bản xem trước {platform_name}: {result.reason}"
                         ),
@@ -532,6 +532,14 @@ class EmbedCog(commands.Cog):
                 pass
             except Exception as e:
                 print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
+        # Dọn state proxy-roll theo origin để không giữ state/button mapping mồ côi.
+        for state_key in list(self._facebook_proxy_roll_state.keys()):
+            if state_key[0] == payload.message_id:
+                self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._manual_fallback_previews.keys()):
+            if state_key[0] == payload.message_id:
+                self._manual_fallback_previews.pop(state_key, None)
+
         origin = self._preview_to_origin_map.pop(payload.message_id, None)
         if origin:
             channel_id, origin_id = origin
