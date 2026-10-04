@@ -12,12 +12,31 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.8.3"
+CURRENT_VERSION = "2.8.4"
 RELEASE_DATE = "2026-10-04"
-CODENAME = "Asumi - Native Facebook Proxy Roll"
+CODENAME = "Asumi - Compact Facebook Proxy Link"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.8.4",
+        "date": "2026-10-04",
+        "type": "bugfix",
+        "title": "Compact Facebook proxy hyperlink",
+        "summary": "Rút gọn dòng preview Facebook: URL proxy dài được giấu trong chính tên domain clickable, vẫn giữ nút Proxy khác và proxy-roll flow của v2.8.3.",
+        "changes": [
+            {"category": "🪝 Facebook Embed", "items": [
+                "Hiển thị proxy dưới dạng masked link [facebed.domain](proxy-url) thay vì in toàn bộ URL dài trên dòng riêng.",
+                "Không dùng dạng <url> trong target để tránh suppress Discord link preview.",
+                "Spoiler bọc toàn bộ masked link thay vì chèn spoiler marker vào URL đích.",
+                "Áp dụng cùng format cho preview đầu tiên và mọi lần bấm Proxy khác.",
+            ]},
+            {"category": "🧪 Regression", "items": [
+                "Cập nhật test cho compact proxy link và spoilered masked link.",
+                "Giữ nguyên owner-only proxy roll, không auto-roll và không yt-dlp cho Facebook.",
+            ]},
+        ],
+    },
     {
         "version": "2.8.3",
         "date": "2026-10-04",
