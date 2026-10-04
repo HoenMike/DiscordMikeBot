@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.7 Smart Custom Spread implemented; T20.8 Tarot Journey is next.  
+> **Status:** T20.8 Tarot Journey implemented; T20.9 Recap & Polish is next.  
 > **Last updated:** 2026-10-05.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -51,7 +51,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **Tarot 2.0 release boundary (T20.1–T20.5) is complete in Asumi 2.9.0.**
 - **T20.6 — Multi-turn Reading Session has been implemented.**
 - **T20.7 — Smart Custom Spread has been implemented.**
-- **Next milestone: T20.8 — Tarot Journey.**
+- **T20.8 — Tarot Journey has been implemented.**
+- **Next milestone: T20.9 — Recap & Polish.**
 
 ---
 
@@ -238,8 +239,8 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.5 | COMPLETE | Owner-only target picker, deterministic non-reroll one-card draw, Clarifier Board, bounded interpretation, delivery-safe 1/1 limit and separate persistence |
 | T20.6 | COMPLETE | Up to 3 contextual follow-ups, shared session state, owner-only Why?, 10-minute inactivity expiry and delivery-safe consumption |
 | T20.7 | COMPLETE | Schema-only AI design, validated 3–7 positions, deck-owned draw, fixed-spread fallback |
-| T20.8 | NEXT | Tarot Journey |
-| T20.9 | NOT STARTED | Later |
+| T20.8 | COMPLETE | 30-day stored-history analytics + Journey Card + slash/prefix access |
+| T20.9 | NEXT | Recap & Polish |
 
 ### T20.5 implementation contract
 
@@ -269,6 +270,14 @@ Avoid implementing all V2 milestones in one giant branch.
 - `draw_custom_spread(...)` remains the sole card-draw authority for custom schemas and keeps no-repeat/fatigue behavior.
 - Existing dynamic Reading Board layouts are reused and custom titles flow through live/final/Clarifier boards.
 - Invalid or unavailable custom schema generation falls back to the known-spread recommendation instead of failing.
+
+### T20.8 implementation contract
+
+- `/tarot_journey` and `.m tarot journey` summarize only readings actually stored in the last 30 days; no extra divination call is made.
+- Metrics include reading/card counts, Minor Arcana suit mix, Major Arcana ratio, repeated cards, repeated reversed cards, topic progression and most-used spread.
+- Suit percentages use deterministic apportionment so displayed shares sum to 100% when Minor Arcana data exists.
+- `render_journey_card_to_bytes(...)` produces a compact visual summary; both card and embed explicitly frame patterns as reflection statistics, not fate or diagnosis.
+- Journey disappears naturally when the user clears Tarot history because it has no parallel hidden profile store.
 
 When a milestone starts or completes, update this table in the same PR.
 
