@@ -30,6 +30,7 @@ Discord unfurl và Facebook share redirect không hoàn toàn đồng bộ với
 ### Hành vi mới
 
 - Preview Facebook do API/proxy tạo ra có hyperlink **`[fallback]`** nhỏ gọn.
+- Generic/login card ở poll sớm **không fail-fast** nữa; Asumi chờ hết grace window vì Discord có thể nâng cấp card đó thành preview/video thật ở poll sau.
 - Nếu Discord xác minh được preview: giữ nguyên như bình thường.
 - Nếu Facebed đã gửi nhưng kết quả chỉ là `unfurl_timeout`:
   - giữ preview hiện tại;
@@ -86,7 +87,7 @@ Các case cần giữ khi chỉnh embed pipeline:
 
 - Facebook `unfurl_timeout` không được xóa preview và không được gọi yt-dlp tự động.
 - Facebook generic/login card vẫn được phép thử proxy tiếp theo.
-- Manual fallback thành công mới dọn preview cũ.
+- Manual fallback thành công mới dọn preview cũ, và chỉ dọn preview của đúng URL đó nếu một message chứa nhiều link.
 - NSFW block không được rơi xuống manual/automatic fallback.
 - Twitter/X và các nền tảng ngoài Facebook vẫn giữ automatic yt-dlp fallback.
 - Original embed chỉ suppress khi pipeline đã xử lý được, bị block, hoặc đang ở trạng thái `action_required`.
