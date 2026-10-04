@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1–T20.3 COMPLETE. T20.4 NEXT.** The user explicitly approved starting Tarot 2.0 implementation.  
+> **Implementation status:** **T20.1–T20.5 COMPLETE — Tarot 2.0 release boundary reached. T20.6 NEXT.** The user explicitly approved continuing implementation milestone-by-milestone.  
 > **Last planning update:** 2026-10-04  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -1188,9 +1188,9 @@ Reading flow feels coherent and channel noise is reduced.
 
 ---
 
-## T20.4 — Renderer 2.0 — NEXT
+## T20.4 — Renderer 2.0 — COMPLETE
 
-Implement:
+Implemented:
 
 - Reading Board;
 - mobile-friendly responsive layouts;
@@ -1210,9 +1210,9 @@ Acceptance:
 
 ---
 
-## T20.5 — Clarifier — NEXT
+## T20.5 — Clarifier — COMPLETE
 
-Implement:
+Implemented:
 
 - clarifier target picker;
 - one-card draw;
@@ -1225,9 +1225,18 @@ Acceptance:
 
 Clarifier adds context without rerolling original cards.
 
+Implementation notes:
+- owner-only ephemeral target picker, with structured-AI suggestions promoted but not forced;
+- exactly one clarifier card, excluding every card in the original spread;
+- deterministic retry binding to the original spread/target;
+- original spread + TARGET → CLARIFIER visual board;
+- bounded structured AI interpretation tied only to the selected target and new card;
+- 1/1 limit committed only after successful Discord delivery;
+- delivered Clarifiers persist separately so the original history record remains immutable.
+
 ### Tarot 2.0 release boundary
 
-**T20.1 through T20.5** are sufficient to release the feature as **Tarot 2.0**.
+**T20.1 through T20.5 are complete and form the Tarot 2.0 release in Asumi 2.9.0.**
 
 ---
 
