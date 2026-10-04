@@ -328,10 +328,10 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
     embed.add_field(
         name="💡 DANH SÁCH LỆNH TAROT ĐẦY ĐỦ",
         value=(
-            "• `/tarot` hoặc `.m tarot` : Mở bảng chọn kiểu bài & phong cách Asumi\n"
+            "• `/tarot` hoặc `.m tarot` : Mở launcher **question-first** — nhập câu hỏi để Asumi gợi ý kiểu trải bài\n"
             "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `.m tarot yes_no Có nên đổi việc?`\n"
             "• `/tarot_history` hoặc `.m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
-            "• `/tarot_recommend [question]` hoặc `.m tarot recommend [câu hỏi]` : AI gợi ý kiểu trải bài phù hợp nhất\n"
+            "• `/tarot_recommend [question]` hoặc `.m tarot recommend [câu hỏi]` : Gợi ý spread nhanh (launcher chính đã tích hợp sẵn)\n"
             "• `/tarot_memory [on/off]` hoặc `.m tarot memory [on/off]` : Bật / tắt trí nhớ ngữ cảnh bạn cũ\n"
             "• `/tarot_forget` hoặc `.m tarot forget` : Xóa sạch toàn bộ lịch sử bốc bài khỏi hệ thống\n"
             "• `/tarot_weekly_setup [channel]` : Cài đặt kênh nhận bài tuần vào sáng Thứ Hai (Admin)"
@@ -345,6 +345,8 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
             "vũ trụ sẽ giữ nguyên các lá bài rút ra để đảm bảo tính nhất quán (tránh vừa Có vừa Không).\n"
             "• **Nút Hỏi Thêm Ý Nghĩa (❓)**: Mở modal cho phép đặt thêm câu hỏi đào sâu hoặc xin thêm lời khuyên chi tiết cho quẻ bài vừa bốc.\n"
             "• **Nút Đánh Giá (👍 Hữu ích / 👎 Chưa chuẩn)**: Góp ý phản hồi chất lượng luận giải của AI.\n"
+            "• **Smart Launcher**: Nhập câu hỏi trước; Asumi đề xuất spread, nhưng bạn vẫn có thể tự chọn kiểu khác.\n"
+            "• **Nhận diện câu hỏi gần giống**: Nếu bạn vừa hỏi chuyện tương tự, launcher cho chọn dùng ngữ cảnh cũ nhẹ hoặc xem như câu hỏi mới.\n"
             "• **Trí Nhớ Bạn Cũ (Memory)**: AI có khả năng liên kết nhẹ nhàng ngữ cảnh từ các quẻ bài trước.\n"
             "• **Cooldown An Toàn**: **30 giây** giữa 2 lần bốc bài liên tiếp để giữ không gian tĩnh tâm."
         ),
