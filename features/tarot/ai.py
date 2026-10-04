@@ -950,9 +950,9 @@ async def generate_followup_answer(
         except (TypeError, ValueError):
             continue
         history_lines.append(
-            f"{idx}. Người dùng: {str(prior_q)[:260]}\\n   Asumi: {str(prior_a)[:700]}"
+            f"{idx}. Người dùng: {str(prior_q)[:260]}\n   Asumi: {str(prior_a)[:700]}"
         )
-    session_history = "\\n".join(history_lines) if history_lines else "Chưa có câu hỏi phụ trước đó."
+    session_history = "\n".join(history_lines) if history_lines else "Chưa có câu hỏi phụ trước đó."
     clarifier_block = (clarifier_context or "Chưa dùng clarifier.")[:2200]
 
     prompt = f"""
