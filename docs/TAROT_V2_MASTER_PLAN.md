@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
-> **Status:** DRAFT / planning context has been requested and committed to the repository.  
-> **Implementation status:** **NOT STARTED.** Do not begin feature implementation only because this document exists. Wait for the user to explicitly approve the Tarot 2.0 implementation scope or a specific milestone.  
+> **Status:** ACTIVE implementation plan.  
+> **Implementation status:** **T20.1 COMPLETE. T20.2 NEXT.** The user explicitly approved starting Tarot 2.0 implementation.  
 > **Last planning update:** 2026-10-04  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -1128,9 +1128,9 @@ Tasks:
 
 ---
 
-## T20.1 — Prompt & Reading Engine 2.0
+## T20.1 — Prompt & Reading Engine 2.0 — COMPLETE
 
-Implement:
+Implemented:
 
 - new persona prompt;
 - Observe → Connect → Interpret → Ground → Uncertainty;
@@ -1147,9 +1147,11 @@ Acceptance:
 - explicit uncertainty;
 - existing styles remain compatible.
 
+Implementation notes are recorded in `docs/TAROT_V2_HANDOFF.md` and `docs/TAROT_V2_PROMPT_SPEC.md`. The rich result API is available now, while Discord UI consumption remains backward-compatible until later milestones.
+
 ---
 
-## T20.2 — Question-first Launcher
+## T20.2 — Question-first Launcher — NEXT
 
 Implement:
 
