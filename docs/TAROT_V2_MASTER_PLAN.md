@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** ACTIVE implementation plan.  
-> **Implementation status:** **T20.1–T20.7 COMPLETE — Tarot 2.0 released; post-release expansion continues. T20.8 NEXT.** The user approved continuing through T20.9 without per-milestone approval.  
+> **Implementation status:** **T20.1–T20.8 COMPLETE — Tarot 2.0 released; post-release expansion continues. T20.9 NEXT.** The user approved continuing through T20.9 without per-milestone approval.  
 > **Last planning update:** 2026-10-05  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -673,6 +673,16 @@ Journey analytics should be based on stored reading metadata and card statistics
 Avoid pretending statistical repetition proves fate or psychological diagnosis.
 
 ---
+
+## T20.8 implementation status — COMPLETE
+
+Implemented 2026-10-05:
+
+- 30-day query over stored Tarot history only;
+- suit distribution with coherent percentages, Major Arcana ratio, repeated/reversed-repeat cards;
+- topic progression and most-used spread;
+- `/tarot_journey` plus `.m tarot journey`;
+- dedicated Journey Card renderer with explicit non-fate/non-diagnostic framing.
 
 # 14. Renderer 2.0
 
