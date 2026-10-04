@@ -1374,7 +1374,9 @@ class TarotFlipView(discord.ui.View):
             render_spread_to_bytes,
             self.spread_key,
             self.drawn_cards,
-            self.revealed_indices
+            self.revealed_indices,
+            just_revealed_indices=(newly_revealed if len(newly_revealed) <= 3 else set()),
+            final=is_completed,
         )
         file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
@@ -1450,19 +1452,29 @@ class TarotFlipView(discord.ui.View):
 
             # Await bài luận giải thông điệp
             ai_res = await self.ai_task
-            is_valid_question = True
-            if isinstance(ai_res, tuple):
-                if len(ai_res) >= 5:
-                    ai_reading, topic_tag, mood_tag, summary_headline, is_valid_question = ai_res[0], ai_res[1], ai_res[2], ai_res[3], ai_res[4]
-                elif len(ai_res) >= 4:
-                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], ai_res[1], ai_res[2], ai_res[3]
-                elif len(ai_res) == 2:
-                    ai_reading, topic_tag = ai_res[0], ai_res[1]
-                    mood_tag, summary_headline = "", ""
-                else:
-                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], "general", "", ""
-            else:
-                ai_reading, topic_tag, mood_tag, summary_headline = str(ai_res), "general", "", ""
+            (
+                ai_reading,
+                topic_tag,
+                mood_tag,
+                summary_headline,
+                is_valid_question,
+                key_card_id,
+            ) = _unpack_tarot_result(ai_res)
+
+            # Re-render the locked final board with the AI-selected key-card emphasis.
+            try:
+                file.close()
+            except Exception:
+                pass
+            final_image_buffer = await asyncio.to_thread(
+                render_spread_to_bytes,
+                self.spread_key,
+                self.drawn_cards,
+                self.revealed_indices,
+                key_card_id=key_card_id,
+                final=True,
+            )
+            file = discord.File(fp=final_image_buffer, filename="tarot_spread.png")
 
             # Nếu câu hỏi không hợp lệ (hỏi cho người thứ ba B và C), cập nhật Embed 1 nếu là Yes/No
             if not is_valid_question and self.spread_key == "yes_no":
@@ -1625,22 +1637,22 @@ class TarotFlipView(discord.ui.View):
                     except Exception:
                         pass
                 return
-            if isinstance(ai_res, tuple):
-                if len(ai_res) >= 4:
-                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], ai_res[1], ai_res[2], ai_res[3]
-                elif len(ai_res) == 2:
-                    ai_reading, topic_tag = ai_res[0], ai_res[1]
-                    mood_tag, summary_headline = "", ""
-                else:
-                    ai_reading, topic_tag, mood_tag, summary_headline = ai_res[0], "general", "", ""
-            else:
-                ai_reading, topic_tag, mood_tag, summary_headline = str(ai_res), "general", "", ""
+            (
+                ai_reading,
+                topic_tag,
+                mood_tag,
+                summary_headline,
+                _is_valid_question,
+                key_card_id,
+            ) = _unpack_tarot_result(ai_res)
 
             image_buffer = await asyncio.to_thread(
                 render_spread_to_bytes,
                 self.spread_key,
                 self.drawn_cards,
-                self.revealed_indices
+                self.revealed_indices,
+                key_card_id=key_card_id,
+                final=True,
             )
             file = discord.File(fp=image_buffer, filename="tarot_spread.png")
 
