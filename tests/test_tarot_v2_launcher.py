@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import AsyncMock
 
 import discord
 
@@ -19,6 +20,44 @@ class FakeTarotManager:
 
     async def is_user_memory_enabled(self, user_id: int):
         return True
+
+
+class LauncherCooldownManager(FakeTarotManager):
+    def __init__(self, *, daily_available=True, command_available=True):
+        super().__init__()
+        self.daily_available = daily_available
+        self.command_available = command_available
+
+    async def check_daily_cooldown(self, user_id: int):
+        if self.daily_available:
+            return True, None
+        return False, {
+            "name_vi": "Mặt Trời",
+            "name_en": "The Sun",
+            "is_reversed": False,
+            "drawn_at": "08:00",
+        }
+
+    def check_user_cooldown(self, user_id: int, cooldown_seconds: int):
+        return (True, 0) if self.command_available else (False, 12)
+
+
+class FakeResponse:
+    def __init__(self):
+        self.messages = []
+        self.modals = []
+
+    async def send_message(self, *args, **kwargs):
+        self.messages.append((args, kwargs))
+
+    async def send_modal(self, modal):
+        self.modals.append(modal)
+
+
+class FakeInteraction:
+    def __init__(self, user_id: int = 1):
+        self.user = type("User", (), {"id": user_id})()
+        self.response = FakeResponse()
 
 
 def component(view: TarotLauncherView, custom_id: str):
@@ -166,6 +205,58 @@ class TarotV2LauncherTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(start.disabled)
         self.assertEqual(start.row, 1)
         self.assertEqual(spread_select.row, 2)
+
+    async def test_daily_quick_path_starts_in_one_click(self):
+        view = TarotLauncherView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            tarot_manager=LauncherCooldownManager(),
+        )
+        await view.prepare()
+        view.start_reading = AsyncMock()
+        interaction = FakeInteraction()
+
+        await view._handle_daily_button(interaction)
+
+        self.assertEqual(view.selected_spread, "daily")
+        self.assertEqual(view.selection_source, "manual")
+        view.start_reading.assert_awaited_once_with(interaction)
+
+    async def test_daily_quick_path_rolls_back_when_already_drawn(self):
+        view = TarotLauncherView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            tarot_manager=LauncherCooldownManager(daily_available=False),
+        )
+        await view.prepare()
+        interaction = FakeInteraction()
+
+        await view._handle_daily_button(interaction)
+
+        self.assertEqual(view.selection_source, "default")
+        self.assertEqual(view.selected_spread, "daily")
+        self.assertTrue(interaction.response.messages)
+        self.assertIsInstance(component(view, "launcher_btn_daily"), discord.ui.Button)
+
+    async def test_recommendation_rolls_back_when_command_cooldown_blocks_start(self):
+        view = TarotLauncherView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            tarot_manager=LauncherCooldownManager(command_available=False),
+            question="Tôi đang phân vân đổi việc hay ở lại công ty",
+        )
+        await view.prepare()
+        interaction = FakeInteraction()
+
+        await view._handle_recommendation_button(interaction)
+
+        self.assertEqual(view.selection_source, "default")
+        self.assertEqual(view.selected_spread, "daily")
+        self.assertTrue(interaction.response.messages)
+        self.assertEqual(component(view, "launcher_btn_recommend").label, "✨ Trải theo đề xuất")
 
     async def test_repeated_question_awareness_respects_memory_preference(self):
         class MemoryOffManager(FakeTarotManager):
