@@ -52,6 +52,13 @@ Avoid:
 
 Card art remains the primary focal point.
 
+### Spread title fitting
+
+- Never hard-truncate the spread title with `...`.
+- Prefer a modest font-size reduction when a full title almost fits on one line.
+- If needed, wrap the complete title to at most two readable lines.
+- This applies to fixed bilingual names and Smart Custom Spread titles.
+
 ---
 
 ## 3. Reading Board anatomy
