@@ -1,5 +1,5 @@
-import io
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 from datetime import datetime, timezone, timedelta
@@ -27,11 +27,16 @@ class FakeManager:
 
 class TarotRecapTests(unittest.TestCase):
     def setUp(self):
+        self.asset_patch = patch("features.tarot.renderer.ensure_card_asset", return_value=None)
+        self.asset_patch.start()
         self.cards = [
             drawn("major_01", 1),
             drawn("major_09", 2),
             drawn("cups_02", 3),
         ]
+
+    def tearDown(self):
+        self.asset_patch.stop()
 
     def test_prefers_structured_key_card_and_takeaway(self):
         result = TarotReadingResult(
