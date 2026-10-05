@@ -159,6 +159,12 @@ Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài t
 | `context` | Bối cảnh thực tế giúp recommendation/reading bám sát tình huống hơn | Không | Không |
 | `reader` | Phong cách Asumi: Tự động / Tĩnh / Dịu / Tinh quái | Tự động | Không |
 
+**Quick start Asumi 3.0:**
+- Có câu hỏi: `/tarot` hoặc `.m tarot` → **✏️ Nhập câu hỏi** → **✨ Trải theo đề xuất**. Asumi chọn spread phù hợp, người dùng không cần biết tên spread.
+- Daily: `/tarot` hoặc `.m tarot` → **☀️ Daily hôm nay** để vào quẻ ngay, không cần câu hỏi.
+- Daily direct: `/tarot spread:Daily Card` hoặc `.m tarot daily`.
+- Người dùng nâng cao vẫn có thể tự chọn spread/style; các tuỳ chọn này được đưa xuống secondary để launcher bớt rối.
+
 - **Reading Board 2.0**: layout responsive theo số lá, nhãn vị trí ngay trên board, progress reveal, REV/Major/key-card states và fallback giữ nguyên kết quả.
 - **Multi-turn Session**: sau quẻ có tối đa **3 follow-up** giữ context liên tục, thêm **🔍 Vì sao?** để giải thích evidence visible của quẻ.
 - **Clarifier 1/1**: sau khi quẻ hoàn tất, chủ quẻ có thể chọn một vị trí để rút đúng một lá bổ sung. Clarifier không thay/reroll lá gốc; board giữ original spread và hiển thị TARGET → CLARIFIER.
@@ -202,7 +208,7 @@ Repository có tài liệu để các session/agent khác tiếp tục công vi�
 - `docs/TAROT_V2_PROMPT_SPEC.md` — persona, system-prompt direction, reading schema và tiêu chí chống văn phong máy móc.
 - `docs/TAROT_V2_RENDERER_SPEC.md` — Reading Board, visual direction, responsive layout và contract renderer.
 
-> **Tarot 2.1 đã hoàn tất T20.6–T20.9 trong Asumi 2.10.0.** Toàn bộ roadmap T20.1–T20.9 hiện đã được triển khai; xem handoff để bảo trì hoặc mở roadmap mới.
+> **Asumi 3.0.0** là major release đưa Tarot 2.x thành trải nghiệm mặc định dễ dùng hơn: question-first, one-tap Daily và one-click recommendation. Roadmap T20.1–T20.9 vẫn là baseline đã hoàn tất.
 
 ---
 
