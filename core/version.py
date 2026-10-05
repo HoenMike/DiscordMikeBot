@@ -12,12 +12,27 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.0.0"
+CURRENT_VERSION = "3.0.1"
 RELEASE_DATE = "2026-10-05"
 CODENAME = "Asumi 3.0 - Tarot-first UX"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.0.1",
+        "date": "2026-10-05",
+        "type": "bugfix",
+        "title": "Tarot renderer title hotfix",
+        "summary": "Sửa Reading Board bị cắt tên spread dài bằng dấu ...; title giờ giữ nguyên nội dung và tự fit font hoặc wrap tối đa hai dòng.",
+        "changes": [
+            {"category": "🖼️ Tarot Reading Board", "items": [
+                "Bỏ hard truncate 44 ký tự ở spread title, nên các tên dài như Mind - Body - Spirit không còn bị cắt bằng dấu ba chấm.",
+                "Header tự giảm cỡ chữ vừa phải trước; nếu vẫn dài sẽ wrap tối đa hai dòng thay vì mất nội dung.",
+                "Áp dụng cùng logic cho Reading Board, visual fallback và Clarifier Board.",
+                "Thêm regression cho bilingual fixed-spread title và Smart Custom Spread title dài.",
+            ]},
+        ],
+    },
     {
         "version": "3.0.0",
         "date": "2026-10-05",
