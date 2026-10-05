@@ -1029,7 +1029,7 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
     async def on_submit(self, interaction: discord.Interaction):
         question_text = self.followup_input.value.strip()
         if interaction.user.id != self.author_id or not question_text:
-            await interaction.response.send_message("Invalid followup submission.", ephemeral=True)
+            await interaction.response.send_message("⚠️ Câu hỏi bổ sung không hợp lệ hoặc phiên này không thuộc về bạn.", ephemeral=True)
             return
         if self.result_view._followup_in_progress:
             await interaction.response.send_message("⌛ Asumi đang trả lời câu hỏi trước đó.", ephemeral=True)
@@ -1264,7 +1264,7 @@ class TarotResultActionView(discord.ui.View):
         if not clarifier_allowed or not drawn_cards:
             self.clarifier_button.disabled = True
 
-    @discord.ui.button(label="❓ Hỏi Thêm Ý Nghĩa", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
+    @discord.ui.button(label="❓ Hỏi thêm (0/3)", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể hỏi thêm về quẻ bài này!", ephemeral=True)
@@ -1316,7 +1316,7 @@ class TarotResultActionView(discord.ui.View):
                 description=answer,
                 color=0x6D5D8F,
             )
-            embed.set_footer(text="Chỉ dựa trên lá, vị trí và chiều bài đang hiển thị — không phải hidden reasoning.")
+            embed.set_footer(text="Chỉ dựa trên lá, vị trí và chiều bài đang hiển thị — không hiển thị suy luận nội bộ.")
             await interaction.followup.send(embed=embed, ephemeral=True)
             self.session_state.mark_why_used()
             self.has_used_why = True
@@ -1543,7 +1543,7 @@ class TarotResultActionView(discord.ui.View):
     async def on_timeout(self):
         self.session_state.close()
         for item in self.children:
-            if getattr(item, "custom_id", "") in {"tarot_followup", "tarot_clarifier", "tarot_why", "tarot_recap"}:
+            if isinstance(item, discord.ui.Button):
                 item.disabled = True
         if self.message:
             try:
@@ -1585,11 +1585,16 @@ class TarotResultActionView(discord.ui.View):
             )
             image_buffer = await asyncio.to_thread(render_recap_card_to_bytes, state)
             file = discord.File(fp=image_buffer, filename="tarot_recap.png")
+            orientation = "NGƯỢC" if state.hero_card.is_reversed else "XUÔI"
             embed = discord.Embed(
                 title="📌 TAROT RECAP",
                 description=(
                     "Bản tóm tắt gọn từ **chính quẻ vừa đọc** — không rút thêm lá "
-                    "và không gọi AI thêm."
+                    "và không gọi AI thêm.\n\n"
+                    f"**🃏 Hero:** {state.hero_card.card.name_vi} · {orientation}\n"
+                    f"**✨ Headline:** {state.headline}\n"
+                    f"**📌 Mang theo:** {state.takeaway}\n"
+                    f"**🗂️ Spread:** {state.spread_title} · {state.date_label}"
                 ),
                 color=0x6D5D8F,
             )
@@ -1623,7 +1628,7 @@ class TarotResultActionView(discord.ui.View):
             except Exception:
                 pass
 
-    @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
+    @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=1)
     async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = interaction.user.id
         if uid in self.liked_user_ids:
@@ -1644,7 +1649,7 @@ class TarotResultActionView(discord.ui.View):
         except Exception:
             pass
 
-    @discord.ui.button(label="👎 Chưa chuẩn", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_neg", row=0)
+    @discord.ui.button(label="👎 Chưa chuẩn", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_neg", row=1)
     async def rate_neg_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = interaction.user.id
         if uid in self.disliked_user_ids:
