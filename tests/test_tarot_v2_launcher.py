@@ -61,7 +61,7 @@ class TarotV2RecommendationTests(unittest.TestCase):
 
 
 class TarotV2LauncherTests(unittest.IsolatedAsyncioTestCase):
-    async def test_launcher_starts_question_first_without_fake_daily_selection(self):
+    async def test_launcher_prioritizes_question_and_one_tap_daily(self):
         view = TarotLauncherView(
             author_id=1,
             author_name="Mai",
@@ -71,18 +71,29 @@ class TarotV2LauncherTests(unittest.IsolatedAsyncioTestCase):
         await view.prepare()
 
         embed = view.build_launcher_embed()
-        self.assertIn("Bạn đang muốn hỏi điều gì?", embed.description)
+        self.assertIn("Bạn muốn xem gì hôm nay?", embed.description)
+        self.assertIn("Daily hôm nay", embed.description)
         self.assertEqual(view.selection_source, "default")
         self.assertIsNone(view.recommended_spread)
 
-        start = component(view, "launcher_btn_start")
-        self.assertIsInstance(start, discord.ui.Button)
-        self.assertTrue(start.disabled)
-
+        question = component(view, "launcher_btn_question")
+        daily = component(view, "launcher_btn_daily")
         spread_select = component(view, "launcher_spread_select")
-        self.assertTrue(all(not option.default for option in spread_select.options))
+        reader_select = component(view, "launcher_reader_select")
 
-    async def test_question_generates_recommendation_but_requires_accept_or_override(self):
+        self.assertEqual(question.row, 0)
+        self.assertEqual(daily.row, 0)
+        self.assertEqual(daily.label, "☀️ Daily hôm nay")
+        self.assertEqual(spread_select.row, 1)
+        self.assertEqual(reader_select.row, 2)
+        self.assertIn("Tuỳ chọn nâng cao", spread_select.placeholder)
+        self.assertTrue(all(not option.default for option in spread_select.options))
+        self.assertFalse(any(
+            getattr(item, "custom_id", None) == "launcher_btn_start"
+            for item in view.children
+        ))
+
+    async def test_question_generates_one_click_recommendation_cta(self):
         view = TarotLauncherView(
             author_id=1,
             author_name="Mai",
@@ -94,17 +105,30 @@ class TarotV2LauncherTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(view.recommended_spread, "two_paths")
         self.assertEqual(view.selection_source, "default")
-        self.assertTrue(component(view, "launcher_btn_start").disabled)
-        self.assertFalse(component(view, "launcher_btn_recommend").disabled)
+
+        recommend = component(view, "launcher_btn_recommend")
+        custom = component(view, "launcher_btn_custom")
+        spread_select = component(view, "launcher_spread_select")
+        reader_select = component(view, "launcher_reader_select")
+
+        self.assertEqual(recommend.label, "✨ Trải theo đề xuất")
+        self.assertEqual(recommend.row, 1)
+        self.assertEqual(custom.row, 1)
+        self.assertEqual(spread_select.row, 2)
+        self.assertEqual(reader_select.row, 3)
+        self.assertNotIn("launcher_btn_daily", {
+            getattr(item, "custom_id", None) for item in view.children
+        })
+        self.assertFalse(any(
+            getattr(item, "custom_id", None) == "launcher_btn_start"
+            for item in view.children
+        ))
+        self.assertIn("Trải theo đề xuất", view.build_launcher_embed().description)
 
         self.assertTrue(view._use_recommendation())
-        view._build_components()
-
         self.assertEqual(view.selected_spread, "two_paths")
         self.assertEqual(view.selection_source, "recommendation")
-        self.assertFalse(component(view, "launcher_btn_start").disabled)
-        self.assertTrue(component(view, "launcher_btn_recommend").disabled)
-        self.assertIn("đề xuất của Asumi", view.build_launcher_embed().description)
+        self.assertTrue(view._can_start())
 
     async def test_manual_daily_remains_available_without_question(self):
         view = TarotLauncherView(
@@ -113,12 +137,35 @@ class TarotV2LauncherTests(unittest.IsolatedAsyncioTestCase):
             author_avatar_url=None,
             tarot_manager=FakeTarotManager(),
         )
+        self.assertIsInstance(component(view, "launcher_btn_daily"), discord.ui.Button)
+
         view.selected_spread = "daily"
         view.selection_source = "manual"
         view._build_components()
 
         self.assertTrue(view._can_start())
-        self.assertFalse(component(view, "launcher_btn_start").disabled)
+        start = component(view, "launcher_btn_start")
+        self.assertFalse(start.disabled)
+        self.assertEqual(start.row, 0)
+
+    async def test_manual_override_stays_secondary_but_can_start(self):
+        view = TarotLauncherView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            tarot_manager=FakeTarotManager(),
+            question="Tôi nên ưu tiên việc gì tuần này?",
+        )
+        await view.prepare()
+        view.selected_spread = "single"
+        view.selection_source = "manual"
+        view._build_components()
+
+        start = component(view, "launcher_btn_start")
+        spread_select = component(view, "launcher_spread_select")
+        self.assertFalse(start.disabled)
+        self.assertEqual(start.row, 1)
+        self.assertEqual(spread_select.row, 2)
 
     async def test_repeated_question_awareness_respects_memory_preference(self):
         class MemoryOffManager(FakeTarotManager):
