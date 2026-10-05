@@ -1,4 +1,7 @@
+import io
 import unittest
+
+from PIL import Image
 from datetime import datetime, timezone, timedelta
 
 from features.tarot.deck import DrawnCard, TAROT_DECK
@@ -80,7 +83,12 @@ class TarotRecapTests(unittest.TestCase):
             ai_reading="Reading",
         )
         buffer = render_recap_card_to_bytes(state)
+        self.assertLess(len(buffer.getvalue()), 8 * 1024 * 1024)
         self.assertEqual(buffer.read(8), b"\x89PNG\r\n\x1a\n")
+        buffer.seek(0)
+        with Image.open(buffer) as image:
+            self.assertEqual(image.size, (1200, 1500))
+            self.assertEqual(image.mode, "RGB")
 
     def test_result_view_exposes_recap_on_second_row(self):
         view = TarotResultActionView(
@@ -103,6 +111,46 @@ class TarotRecapTests(unittest.TestCase):
             if getattr(item, "custom_id", "") == "tarot_recap"
         )
         self.assertEqual(recap.row, 1)
+        followup = next(item for item in view.children if getattr(item, "custom_id", "") == "tarot_followup")
+        positive = next(item for item in view.children if getattr(item, "custom_id", "") == "tarot_rate_pos")
+        negative = next(item for item in view.children if getattr(item, "custom_id", "") == "tarot_rate_neg")
+        self.assertEqual(followup.row, 0)
+        self.assertEqual(followup.label, "❓ Hỏi thêm (0/3)")
+        self.assertEqual(positive.row, 1)
+        self.assertEqual(negative.row, 1)
+        view.stop()
+
+    def test_fallback_text_strips_markdown_for_image(self):
+        state = build_recap_state(
+            spread_title="**Single Card**",
+            user_name="Mai",
+            drawn_cards=[self.cards[0]],
+            reading_result=None,
+            ai_reading="**Điều đáng làm:** kiểm tra lại dữ kiện trước khi quyết định.",
+        )
+        self.assertNotIn("**", state.spread_title)
+        self.assertNotIn("**", state.takeaway)
+
+
+class TarotRecapTimeoutTests(unittest.IsolatedAsyncioTestCase):
+    async def test_timeout_visually_disables_every_result_button(self):
+        view = TarotResultActionView(
+            author_id=1,
+            author_name="Mai",
+            drawn_cards=[drawn("major_01", 1)],
+            question="Test",
+            ai_reading="Reading",
+            reader_style="auto",
+            spread_key="single",
+            tarot_manager=FakeManager(),
+            reading_result=TarotReadingResult(
+                headline="Headline",
+                practical_takeaway=["Takeaway"],
+            ),
+            spread_title="Single Card",
+        )
+        await view.on_timeout()
+        self.assertTrue(all(item.disabled for item in view.children))
         view.stop()
 
 
