@@ -305,11 +305,14 @@ After question input, Asumi analyzes the intent and offers:
 > **Asumi đề xuất: Two Paths · 5 lá**  
 > Because the question compares two paths and benefits from explicit trade-offs.
 
-Controls:
+Shipped controls after the Asumi 3.0 UX refresh:
 
-- `✨ Dùng đề xuất`
-- `🃏 Chọn kiểu khác`
-- style remains secondary / optional.
+- `✏️ Nhập câu hỏi` as the primary question path;
+- `☀️ Daily hôm nay` as a one-tap no-question path;
+- `✨ Trải theo đề xuất` starts the recommended spread immediately;
+- manual spread and reader style remain available below as advanced/secondary controls.
+
+This supersedes the earlier accept-then-start recommendation UX while preserving the same recommendation engine and backward compatibility.
 
 ### Backward compatibility
 
