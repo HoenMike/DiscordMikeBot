@@ -27,7 +27,7 @@ CHANGELOG: List[Dict[str, Any]] = [
         "changes": [
             {"category": "💬 Reading Session", "items": [
                 "Mỗi quẻ hỗ trợ tối đa 3 follow-up có context liên tục; clarifier đã delivery trở thành context cho câu hỏi sau nhưng vẫn giữ giới hạn 1/1.",
-                "Nút Vì sao? giải thích dựa trên lá/vị trí nhìn thấy, owner-only và không expose hidden reasoning.",
+                "Nút Vì sao? giải thích dựa trên lá/vị trí nhìn thấy, owner-only và không hiển thị suy luận nội bộ.",
                 "Session timeout khóa các action tương tác; lỗi generate/delivery không âm thầm tiêu lượt follow-up.",
             ]},
             {"category": "🧩 Smart Custom Spread", "items": [
