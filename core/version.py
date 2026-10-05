@@ -12,12 +12,36 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.10.0"
+CURRENT_VERSION = "3.0.0"
 RELEASE_DATE = "2026-10-05"
-CODENAME = "Asumi - Tarot 2.1"
+CODENAME = "Asumi 3.0 - Tarot-first UX"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.0.0",
+        "date": "2026-10-05",
+        "type": "major",
+        "title": "Asumi 3.0 — Tarot-first UX",
+        "summary": "Nâng Asumi lên major version 3.0 sau Tarot 2.x: launcher ưu tiên câu hỏi và Daily quick start, recommendation vào quẻ một chạm nhưng vẫn giữ toàn bộ direct/manual flow cũ.",
+        "changes": [
+            {"category": "🔮 Tarot launcher mới", "items": [
+                "Launcher mở bằng hai primary path rõ ràng: Nhập câu hỏi hoặc Daily hôm nay.",
+                "Sau khi nhập câu hỏi, Asumi hiển thị spread đề xuất và nút Trải theo đề xuất bắt đầu quẻ ngay trong một click.",
+                "Daily hôm nay bắt đầu ngay từ launcher, không cần nhập câu hỏi; /tarot spread:Daily Card và .m tarot daily vẫn hoạt động.",
+            ]},
+            {"category": "⚙️ UX & compatibility", "items": [
+                "Manual spread và Reader Style được chuyển xuống Tuỳ chọn nâng cao thay vì chiếm vị trí đầu launcher.",
+                "Custom Spread, History, Journey, follow-up, Why, Clarifier và Recap giữ nguyên.",
+                "Slash /tarot và prefix .m tarot dùng cùng launcher; .m tarot <câu hỏi> tiếp tục mở launcher với recommendation tự động.",
+                "Nếu Daily/recommendation bị chặn bởi cooldown, launcher khôi phục state để người dùng có thể thao tác lại bình thường.",
+            ]},
+            {"category": "📚 Help & release", "items": [
+                "Help và README có quick-start riêng cho câu hỏi, Daily và direct spread flow.",
+                "Tarot 2.x vẫn là engine/feature generation; Asumi 3.0.0 là repository-wide major release.",
+            ]},
+        ],
+    },
     {
         "version": "2.10.0",
         "date": "2026-10-05",
