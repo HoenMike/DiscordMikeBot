@@ -150,7 +150,7 @@ Khôi phục danh sách proxy domain của nền tảng về mặc định toàn
 
 ### `/tarot`
 
-Bốc và giải bài Tarot tích hợp AI với hình ảnh ghép trải bài trực quan. Launcher mặc định theo **question-first**: nhập điều đang băn khoăn → Asumi đề xuất spread → bạn chấp nhận hoặc tự chọn kiểu khác.
+Bốc và giải bài Tarot tích hợp AI với Reading Board trực quan. Launcher Asumi 3.0 có hai primary path: **nhập câu hỏi → Asumi đề xuất → trải ngay**, hoặc **Daily hôm nay → vào quẻ một chạm**. Manual spread/style vẫn còn cho người dùng nâng cao.
 
 | Tham số    | Mô tả                                                                                              | Mặc định | Bắt buộc |
 |------------|----------------------------------------------------------------------------------------------------|----------|----------|
