@@ -41,7 +41,7 @@ Tarot 2.0 / 2.1 roadmap T20.1–T20.9 is implemented and now in maintenance mode
 - **T20.7 — Smart Custom Spread: complete.**
 - **T20.8 — Tarot Journey: complete.**
 - **T20.9 — Recap & Polish: complete.**
-- **Asumi 2.10.0 — Tarot 2.1 completes the T20.1–T20.9 roadmap.** No next Tarot milestone is defined until the user requests a new roadmap.
+- **Asumi 3.0.0 is the current bot release.** It keeps the completed Tarot 2.1 runtime and adds question-first / one-tap Daily / one-click recommendation launcher UX. No next Tarot milestone is defined until the user requests a new roadmap.
 
 ### Tarot milestone IDs
 
@@ -58,7 +58,7 @@ T20.8  Tarot Journey — COMPLETE
 T20.9  Recap & Polish — COMPLETE
 ```
 
-Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0; T20.6–T20.9 are complete in v2.10.0 / Tarot 2.1. Treat these milestones as shipped behavior unless the user explicitly asks to change them.
+Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0; T20.6–T20.9 completed in v2.10.0 / Tarot 2.1. Asumi 3.0.0 is a repository-wide major release layered on that shipped behavior; treat all milestone contracts as stable unless the user explicitly asks to change them.
 
 ### Tarot continuity rule
 
