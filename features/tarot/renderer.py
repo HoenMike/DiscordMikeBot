@@ -159,6 +159,16 @@ def _wrap_text_to_width(
     return lines
 
 
+def _text_fits_width(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+) -> bool:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    return (bbox[2] - bbox[0]) <= max_width
+
+
 def _fit_header_title(
     draw: ImageDraw.ImageDraw,
     text: str,
@@ -192,16 +202,14 @@ def _fit_header_title(
         font = _get_font(size, bold=True)
         lines = _wrap_text_to_width(draw, normalized, font, max_width)
         if len(lines) <= max_lines and all(
-            (
-                lambda box: box[2] - box[0] <= max_width
-            )(draw.textbbox((0, 0), line, font=font))
+            _text_fits_width(draw, line, font, max_width)
             for line in lines
         ):
             return font, lines
 
     # Defensive fallback for unusually wide tokens: continue shrinking until the
     # complete title fits rather than ever truncating it.
-    for size in range(min_size - 1, 15, -1):
+    for size in range(min_size - 1, 9, -1):
         font = _get_font(size, bold=True)
         lines = _wrap_text_to_width(draw, normalized, font, max_width)
         if len(lines) <= max_lines and all(
@@ -212,7 +220,9 @@ def _fit_header_title(
         ):
             return font, lines
 
-    font = _get_font(16, bold=True)
+    # This should be unreachable for the bounded spread-title inputs, but keep a
+    # complete text fallback rather than introducing truncation again.
+    font = _get_font(10, bold=True)
     return font, _wrap_text_to_width(draw, normalized, font, max_width)
 
 
