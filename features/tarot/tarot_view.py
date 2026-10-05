@@ -620,6 +620,12 @@ class TarotLauncherView(discord.ui.View):
         if not self._check_author(interaction):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
             return
+        previous_state = (
+            self.selected_spread,
+            self.selection_source,
+            self.custom_spread_schema,
+            self.custom_spread_notice,
+        )
         if not self._use_recommendation():
             await interaction.response.send_message(
                 "⚠️ Chưa có đề xuất nào. Hãy nhập câu hỏi trước nhé.",
@@ -628,10 +634,16 @@ class TarotLauncherView(discord.ui.View):
             return
 
         # One-click happy path: the recommendation is already visible in the
-        # launcher, so accepting it starts the reading immediately. Do not
-        # rebuild the View first: if cooldown blocks the start, the visible
-        # controls must remain backed by the same live components.
-        await self._handle_start_button(interaction)
+        # launcher. If cooldown/validation blocks the start, restore launcher
+        # state so the still-visible controls remain semantically accurate.
+        started = await self._handle_start_button(interaction)
+        if not started:
+            (
+                self.selected_spread,
+                self.selection_source,
+                self.custom_spread_schema,
+                self.custom_spread_notice,
+            ) = previous_state
 
     async def _handle_daily_button(self, interaction: discord.Interaction):
         if not self._check_author(interaction):
@@ -640,11 +652,24 @@ class TarotLauncherView(discord.ui.View):
 
         # Daily is the other primary launcher path. It intentionally bypasses
         # question entry and starts immediately after normal cooldown checks.
+        previous_state = (
+            self.selected_spread,
+            self.selection_source,
+            self.custom_spread_schema,
+            self.custom_spread_notice,
+        )
         self.selected_spread = "daily"
         self.selection_source = "manual"
         self.custom_spread_schema = None
         self.custom_spread_notice = None
-        await self._handle_start_button(interaction)
+        started = await self._handle_start_button(interaction)
+        if not started:
+            (
+                self.selected_spread,
+                self.selection_source,
+                self.custom_spread_schema,
+                self.custom_spread_notice,
+            ) = previous_state
 
     async def _handle_custom_spread_button(self, interaction: discord.Interaction):
         if not self._check_author(interaction):
@@ -709,10 +734,10 @@ class TarotLauncherView(discord.ui.View):
 
         await interaction.response.send_modal(TarotQuestionModal(self))
 
-    async def _handle_start_button(self, interaction: discord.Interaction):
+    async def _handle_start_button(self, interaction: discord.Interaction) -> bool:
         if not self._check_author(interaction):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
-            return
+            return False
 
         spread_info = (
             self.custom_spread_schema.as_spread_info()
@@ -727,12 +752,12 @@ class TarotLauncherView(discord.ui.View):
                     "✨ Hãy bấm **Trải theo đề xuất**, tạo spread riêng hoặc tự chọn một spread trước khi bắt đầu.",
                     ephemeral=True,
                 )
-            return
+            return False
 
         # Kiểm tra câu hỏi nếu trải bài yêu cầu
         if spread_info.get("requires_question", True) and not self.question:
             await interaction.response.send_modal(TarotQuestionModal(self))
-            return
+            return False
 
         # Kiểm tra Daily Cooldown
         if self.selected_spread == "daily":
@@ -745,10 +770,10 @@ class TarotLauncherView(discord.ui.View):
                     f"☀️ **Bạn đã rút Daily Card của ngày hôm nay rồi!**\n\n"
                     f"🃏 Lá bài hôm nay của bạn: {last_card_str} - `{orient_str}` *(Rút lúc {drawn_time})*\n"
                     f"⏰ *Lượt bốc bài sẽ được làm mới vào lúc 00:00 (Giờ VN)!*\n\n"
-                    f"💡 *Nếu bạn có câu hỏi khác, hãy chọn `Single Card` hoặc `Yes / No` trong menu nhé!*",
+                    "💡 *Nếu bạn có câu hỏi khác, hãy bấm **Nhập câu hỏi** để Asumi tự gợi ý spread phù hợp.*",
                     ephemeral=True
                 )
-                return
+                return False
 
         # Kiểm tra Cooldown 1 phút chống spam giữa 2 lần bốc bài
         can_proceed, wait_sec = self.tarot_manager.check_user_cooldown(interaction.user.id, cooldown_seconds=config.COMMAND_COOLDOWN_SECONDS)
@@ -757,10 +782,11 @@ class TarotLauncherView(discord.ui.View):
                 f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(wait_sec) + 1}s` nữa trước khi bốc quẻ tiếp theo.",
                 ephemeral=True
             )
-            return
+            return False
 
         # Khởi chạy phiên bốc bài
         await self.start_reading(interaction)
+        return True
 
     async def start_reading(self, interaction: discord.Interaction):
         if self._starting or self.is_finished():
