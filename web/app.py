@@ -21,9 +21,14 @@ app.secret_key = config.FLASK_SECRET_KEY
 
 @app.context_processor
 def release_template_context():
-    from core.version import RELEASE_DATE, CODENAME
-    return {"release_version": CURRENT_VERSION, "release_date": RELEASE_DATE,
-            "release_codename": CODENAME}
+    from core.version import RELEASE_DATE, CODENAME, CHANGELOG
+    latest_type = CHANGELOG[0].get("type", "minor") if CHANGELOG else "minor"
+    return {
+        "release_version": CURRENT_VERSION,
+        "release_date": RELEASE_DATE,
+        "release_codename": CODENAME,
+        "release_type": latest_type,
+    }
 
 
 def check_password_hash(provided_password: str) -> bool:
