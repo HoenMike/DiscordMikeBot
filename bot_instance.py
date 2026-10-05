@@ -373,7 +373,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         inline=False
     )
     embed.set_footer(
-        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} Tarot Engine v2.1",
+        text=f"Yêu cầu bởi {user.display_name} • {BOT_BRAND_NAME} v{CURRENT_VERSION} • Tarot Engine v2.1",
         icon_url=user.display_avatar.url if user.display_avatar else None
     )
     return embed
