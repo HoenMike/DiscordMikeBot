@@ -343,7 +343,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         name="✨ TAROT 2.1 — SAU KHI QUẺ HOÀN TẤT",
         value=(
             "• **Follow-up 3 lượt (❓)**: Hỏi tiếp trong cùng session, giữ context quẻ/câu trước/Clarifier.\n"
-            "• **🔍 Vì sao?**: Giải thích dựa trên lá và vị trí đang hiển thị, không expose hidden reasoning.\n"
+            "• **🔍 Vì sao?**: Giải thích dựa trên lá và vị trí đang hiển thị, không hiển thị suy luận nội bộ.\n"
             "• **🃏 Clarifier 1/1**: Rút đúng một lá làm rõ cho một vị trí, không reroll quẻ gốc.\n"
             "• **📌 Recap**: Card gọn để lưu/chia sẻ từ quẻ đã đọc; không rút bài hay gọi AI thêm.\n"
             "• **👍/👎 Đánh giá**: Gửi phản hồi chất lượng luận giải."
