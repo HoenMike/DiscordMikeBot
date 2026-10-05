@@ -2,10 +2,12 @@ import io
 import unittest
 from unittest.mock import patch
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from features.tarot.deck import DrawnCard, TAROT_DECK
 from features.tarot.renderer import (
+    _fit_header_title,
+    _safe_title,
     render_reading_board_to_bytes,
     render_spread_to_bytes,
 )
@@ -81,6 +83,38 @@ class TarotReadingBoardRendererTests(unittest.TestCase):
 
     def test_one_card_portrait_board(self):
         self.assert_board("single", cards(1), (1080, 1350), revealed={0})
+
+    def test_long_bilingual_spread_title_is_not_truncated(self):
+        full_title = "Mind - Body - Spirit (Tâm Trí - Thể Chất - Trực Giác)"
+        safe = _safe_title("mbs", full_title)
+        self.assertEqual(safe, full_title)
+        self.assertNotIn("...", safe)
+
+        canvas = Image.new("RGB", (1400, 900))
+        draw = ImageDraw.Draw(canvas)
+        font, lines = _fit_header_title(draw, safe.upper(), 1400)
+
+        self.assertLessEqual(len(lines), 2)
+        self.assertEqual(" ".join(lines), safe.upper())
+        max_width = 1400 - max(120, 1400 // 10)
+        for line in lines:
+            box = draw.textbbox((0, 0), line, font=font)
+            self.assertLessEqual(box[2] - box[0], max_width)
+
+    def test_custom_title_up_to_schema_limit_keeps_full_text(self):
+        full_title = (
+            "Bản Đồ Quyết Định Giữa Hai Hướng Đi Và Những Điều Cần Cân Nhắc Kỹ"
+        )
+        safe = _safe_title("custom", full_title)
+        self.assertEqual(safe, full_title)
+        self.assertNotIn("...", safe)
+
+        canvas = Image.new("RGB", (1500, 1150))
+        draw = ImageDraw.Draw(canvas)
+        font, lines = _fit_header_title(draw, safe.upper(), 1500)
+
+        self.assertLessEqual(len(lines), 2)
+        self.assertEqual(" ".join(lines), safe.upper())
 
     def test_three_card_partial_board(self):
         self.assert_board(
