@@ -300,6 +300,16 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
         color=0x9B59B6
     )
     embed.add_field(
+        name="⚡ CÁCH DÙNG NHANH — ASUMI 3.0",
+        value=(
+            "• **Có câu hỏi:** `/tarot` hoặc `.m tarot` → **✏️ Nhập câu hỏi** → Asumi tự đề xuất → **✨ Trải theo đề xuất**. Không cần biết tên spread.\n"
+            "• **Daily hằng ngày:** `/tarot` hoặc `.m tarot` → **☀️ Daily hôm nay**. Không cần nhập câu hỏi.\n"
+            "• **Daily nhanh bằng lệnh:** `/tarot spread:Daily Card` hoặc `.m tarot daily`.\n"
+            "• **Biết sẵn spread:** chọn trong slash option hoặc dùng `.m tarot <spread> <câu hỏi>`; flow direct cũ vẫn được giữ."
+        ),
+        inline=False
+    )
+    embed.add_field(
         name="🃏 9 SPREAD CỐ ĐỊNH + SMART CUSTOM SPREAD",
         value=(
             "• `daily` : **🌟 Daily Card (1 lá)** — Năng lượng & thông điệp ngày (Reset 00:00 VN)\n"
@@ -328,7 +338,7 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
     embed.add_field(
         name="💡 DANH SÁCH LỆNH TAROT ĐẦY ĐỦ",
         value=(
-            "• `/tarot` hoặc `.m tarot` : Mở launcher **question-first** — nhập câu hỏi để Asumi gợi ý kiểu trải bài\n"
+            "• `/tarot` hoặc `.m tarot` : Mở launcher **question-first + Daily quick start**\n"
             "• `/tarot spread:Yes / No question:Có nên đổi việc?` hoặc `.m tarot yes_no Có nên đổi việc?`\n"
             "• `/tarot_history` hoặc `.m tarot history` : Xem lại các lượt bốc bài gần nhất của bạn\n"
             "• `/tarot_journey` hoặc `.m tarot journey` : Xem Tarot Journey 30 ngày từ lịch sử đã lưu\n"
@@ -353,7 +363,8 @@ def build_tarot_help_embed(user: Union[discord.User, discord.Member]) -> discord
     embed.add_field(
         name="🧭 SMART UX & HÀNH TRÌNH",
         value=(
-            "• **Smart Launcher + Custom Spread**: đề xuất spread cố định hoặc schema riêng 3–7 vị trí; deck engine vẫn tự rút lá.\n"
+            "• **Smart Launcher**: câu hỏi là primary path, suggestion chạy trước; manual spread/style được đưa xuống tuỳ chọn nâng cao.\n"
+            "• **Custom Spread**: Asumi có thể tạo schema riêng 3–7 vị trí; deck engine vẫn tự rút lá.\n"
             "• **Reading Board/Session 2.0**: một message, progress, micro reveal, key-card và controls gọn cho mobile.\n"
             "• **Tarot Journey**: summary 30 ngày về suit, Major, lá lặp và chủ đề; dùng để tự nhìn lại, không phải dự đoán định mệnh.\n"
             "• **Memory + câu hỏi gần giống**: liên kết nhẹ lịch sử khi bật memory; `/tarot_forget` xóa nguồn dữ liệu.\n"
