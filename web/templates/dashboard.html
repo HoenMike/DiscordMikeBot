@@ -754,7 +754,7 @@
                                 🔁 Xoay tua 45s
                             </span>
                         </div>
-                        <p id="presence-text-preview" class="text-xs text-slate-300 font-medium">Live v2.4.6 | .m help</p>
+                        <p id="presence-text-preview" class="text-xs text-slate-300 font-medium">Live v{{ release_version }} | .m help</p>
                     </div>
                 </div>
 
@@ -2782,7 +2782,7 @@
             if (preset === 'live') {
                 selectPresenceStatus('online');
                 document.getElementById('presence-activity-type').value = 'custom';
-                document.getElementById('presence-activity-text').value = 'Live v2.4.6 | .m help';
+                document.getElementById('presence-activity-text').value = 'Live v{{ release_version }} | .m help';
                 document.getElementById('presence-is-rotating-toggle').checked = true;
             } else if (preset === 'redeploy') {
                 selectPresenceStatus('idle');
