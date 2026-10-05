@@ -288,10 +288,10 @@ Avoid implementing all V2 milestones in one giant branch.
 
 ### T20.9 implementation contract
 
-- Final result view exposes owner-only **📌 Recap** on a separate component row so the existing action row remains within Discord limits.
+- Final result view exposes owner-only **📌 Recap** on the secondary component row; follow-up / Why / Clarifier stay on the primary row while Recap + ratings stay compact on row 2.
 - Recap does **not** draw cards or call AI again. It reuses the completed structured reading, preferring the actual key card as hero and falling back deterministically to the first drawn card.
 - The Recap Card contains only hero card/orientation, short headline, one practical takeaway, spread title, date and lightweight Asumi branding; it does not embed the full reading or Journey analytics.
-- Recap is generated ephemerally, becomes one-use only after successful delivery, and is disabled with the other session actions on timeout.
+- Recap is generated ephemerally, includes a text equivalent of hero/headline/takeaway for accessibility, becomes one-use only after successful delivery, and every visible result button is disabled when the View times out.
 - User-facing help, README, renderer/system docs and version/changelog are synchronized for **Asumi 2.10.0 — Tarot 2.1**.
 - T20.1–T20.9 are now maintenance baseline. Future work should start a new roadmap/milestone series unless the user explicitly reopens one of these milestones.
 
