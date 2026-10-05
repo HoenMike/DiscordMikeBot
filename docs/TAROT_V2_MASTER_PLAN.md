@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** IMPLEMENTED roadmap / maintenance reference.  
-> **Implementation status:** **T20.1–T20.9 COMPLETE — Asumi 2.10.0 / Tarot 2.1 release complete.** Treat this document as the shipped baseline until a new roadmap is requested.  
+> **Implementation status:** **T20.1–T20.9 COMPLETE.** The roadmap completed in Tarot 2.1; current repository release **Asumi 3.0.0** adds a post-roadmap launcher UX refresh while preserving these contracts.  
 > **Last planning update:** 2026-10-05  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
