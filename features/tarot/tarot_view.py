@@ -375,7 +375,11 @@ class TarotLauncherView(discord.ui.View):
         lines.append(WIDE_DIVIDER)
 
         if self.selection_source == "default":
-            selection_text = "*(Chưa chọn — dùng đề xuất, tạo spread riêng hoặc tự chọn bên dưới)*"
+            selection_text = (
+                "*(Chưa chọn — bấm **Trải theo đề xuất**, tạo spread riêng hoặc tự chọn bên dưới)*"
+                if self.question
+                else "*(Chưa chọn — nhập câu hỏi, dùng **Daily hôm nay** hoặc mở tuỳ chọn nâng cao)*"
+            )
         elif self.selection_source == "custom" and self.custom_spread_schema:
             selection_text = f"**{self.custom_spread_schema.title}** · Smart Custom Spread"
         else:
@@ -430,7 +434,7 @@ class TarotLauncherView(discord.ui.View):
         ])
 
         embed = discord.Embed(
-            title="🔮 ASUMI TAROT — BẮT ĐẦU TỪ CÂU HỎI",
+            title="🔮 ASUMI TAROT — BẮT ĐẦU",
             description="\n".join(lines),
             color=embed_color,
         )
