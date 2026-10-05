@@ -79,6 +79,16 @@ Baseline at planning time:
 
 Always re-check current main before work starts.
 
+### Current Asumi 3.0 launcher contract
+
+- `/tarot` and `.m tarot` open the same launcher.
+- No question: primary controls are **✏️ Nhập câu hỏi** and **☀️ Daily hôm nay**; Daily starts immediately after cooldown checks.
+- With a question: recommendation is shown in the embed and **✨ Trải theo đề xuất** both accepts it and starts the reading.
+- **🧩 Tạo spread riêng** remains available for a generated 3–7 position schema.
+- Manual fixed-spread selection and Reader Style are lower **Tuỳ chọn nâng cao** controls.
+- Direct syntax remains supported: slash `spread:` choice, `.m tarot daily`, `.m tarot <spread> <question>`, and `.m tarot <free-form question>`.
+- One-click Daily/recommendation rolls back temporary selection state when cooldown/validation blocks the start.
+
 ---
 
 ## 4. Current Tarot capabilities that already exist
