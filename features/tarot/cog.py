@@ -424,7 +424,7 @@ class TarotCog(commands.Cog):
     # =========================================================================
     @app_commands.command(
         name="tarot",
-        description="Kể điều bạn đang băn khoăn để Asumi gợi ý và trải bài Tarot phù hợp"
+        description="Nhập câu hỏi để Asumi gợi ý spread, hoặc mở launcher để rút Daily nhanh"
     )
     @app_commands.describe(
         spread="Tuỳ chọn: chọn sẵn kiểu trải bài; bỏ trống để Asumi gợi ý từ câu hỏi",
@@ -584,7 +584,7 @@ class TarotCog(commands.Cog):
     @commands.command(
         name="tarot",
         aliases=["tr", "bocbai", "tarotcard"],
-        help="Bốc bài Tarot với menu tương tác trực quan hoặc bốc nhanh qua cú pháp"
+        help="Mở Tarot launcher: nhập câu hỏi để Asumi gợi ý, hoặc rút Daily nhanh"
     )
     @commands.cooldown(1, 30.0, commands.BucketType.user)
     async def tarot_prefix(

@@ -1,7 +1,7 @@
 # Asumi Tarot 2.0 — Master Plan
 
 > **Status:** IMPLEMENTED roadmap / maintenance reference.  
-> **Implementation status:** **T20.1–T20.9 COMPLETE — Asumi 2.10.0 / Tarot 2.1 release complete.** Treat this document as the shipped baseline until a new roadmap is requested.  
+> **Implementation status:** **T20.1–T20.9 COMPLETE.** The roadmap completed in Tarot 2.1; current repository release **Asumi 3.0.0** adds a post-roadmap launcher UX refresh while preserving these contracts.  
 > **Last planning update:** 2026-10-05  
 > **Repository baseline at planning time:** DiscordMikeBot `v2.8.4`, main commit `560637145b8a96980bcca66b051491e34eb7bc8d`.  
 > **Primary runtime code:** `features/tarot/`  
@@ -305,11 +305,14 @@ After question input, Asumi analyzes the intent and offers:
 > **Asumi đề xuất: Two Paths · 5 lá**  
 > Because the question compares two paths and benefits from explicit trade-offs.
 
-Controls:
+Shipped controls after the Asumi 3.0 UX refresh:
 
-- `✨ Dùng đề xuất`
-- `🃏 Chọn kiểu khác`
-- style remains secondary / optional.
+- `✏️ Nhập câu hỏi` as the primary question path;
+- `☀️ Daily hôm nay` as a one-tap no-question path;
+- `✨ Trải theo đề xuất` starts the recommended spread immediately;
+- manual spread and reader style remain available below as advanced/secondary controls.
+
+This supersedes the earlier accept-then-start recommendation UX while preserving the same recommendation engine and backward compatibility.
 
 ### Backward compatibility
 

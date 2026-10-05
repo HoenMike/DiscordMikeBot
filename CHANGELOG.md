@@ -7,6 +7,24 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.0.0] - 2026-10-05 — *Asumi 3.0 — Tarot-first UX*
+
+### Changed
+- **Hai primary path rõ ràng trong `/tarot` / `.m tarot`**: **✏️ Nhập câu hỏi** cho smart recommendation hoặc **☀️ Daily hôm nay** để vào Daily ngay.
+- **One-click recommendation**: sau khi nhập câu hỏi, **✨ Trải theo đề xuất** chấp nhận spread Asumi gợi ý và bắt đầu quẻ trong cùng một thao tác.
+- **Manual controls thành advanced options**: dropdown tự chọn spread và Reader Style được đưa xuống dưới, không còn khiến người mới nghĩ rằng bắt buộc phải biết spread trước.
+- **Daily không cần câu hỏi**: quick button trong launcher, `/tarot spread:Daily Card` và `.m tarot daily` đều được giữ.
+- **Slash/prefix parity**: `.m tarot <câu hỏi>` vẫn hiểu toàn bộ text là câu hỏi, mở launcher và đưa recommendation giống flow slash.
+
+### Reliability
+- Nếu one-click Daily/recommendation bị Daily cooldown hoặc anti-spam cooldown chặn, selection state được rollback để button đang hiển thị vẫn dùng lại được.
+- Giữ nguyên Tarot 2.1 runtime: Smart Custom Spread, Reading Board, 3 follow-up, Why, Clarifier 1/1, Journey và Recap.
+- Help/README/docs được cập nhật theo flow thực tế.
+
+### Versioning
+- **Tarot 2.x** tiếp tục là tên generation của subsystem Tarot.
+- **Asumi 3.0.0** là major version của toàn bot, phản ánh việc Tarot 2.x trở thành một trải nghiệm lớn và launcher được tái thiết kế quanh flow đó.
+
 ## [2.10.0] - 2026-10-05 — *Tarot 2.1*
 
 ### Added

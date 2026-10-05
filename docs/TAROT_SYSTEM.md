@@ -2,7 +2,7 @@
 
 Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).
 
-> **Tarot roadmap T20.1–T20.9 đã hoàn tất trong Asumi 2.10.0 / Tarot 2.1.** Đây là runtime baseline hiện tại; đọc `docs/TAROT_V2_MASTER_PLAN.md` và `docs/TAROT_V2_HANDOFF.md` trước khi bảo trì hoặc mở roadmap mới.
+> **Tarot roadmap T20.1–T20.9 đã hoàn tất; runtime hiện được phát hành trong Asumi 3.0.0 với Tarot 2.x làm subsystem chính.** Asumi 3.0 thêm launcher UX question-first + one-tap Daily + one-click recommendation trên baseline Tarot 2.1.
 
 > v2.8.0: Asumi là nhân vật Tarot duy nhất. `auto` là mặc định; `neutral`, `healer`, `chaos` là các style ID tương thích dữ liệu cũ, nay hiển thị lần lượt là Tĩnh, Dịu, Tinh quái. Prompt mới điều chỉnh cách nói theo câu hỏi, vẫn dùng schema JSON và các ranh giới an toàn hiện có.
 
@@ -191,13 +191,14 @@ Schema V2 nằm tại `features/tarot/reading/schema.py`.
 ### 3.4. Module Giao Diện Tương Tác Gamification (`tarot_view.py`)
 
 Gồm 2 tầng View Discord UI:
-1. **`TarotLauncherView` — Question-first từ T20.2**:
-   - Mở bằng câu hỏi/bối cảnh thay vì giả định người dùng đã biết spread.
-   - `features/tarot/reading/recommendation.py` đề xuất spread cố định tức thì, không gọi AI.
-   - T20.7 thêm **🧩 Trải bài riêng**: AI chỉ thiết kế schema 3–7 vị trí; `reading/custom_spread.py` validate schema rồi `deck.py` mới rút bài.
-   - User phải bấm **Dùng đề xuất** hoặc tự chọn spread trước khi **Bắt đầu** được bật.
-   - Menu spread vẫn giữ làm manual override; Reader Style là tuỳ chọn thứ cấp.
-   - Daily Card vẫn có thể tự chọn và bắt đầu mà không cần câu hỏi.
+1. **`TarotLauncherView` — Asumi 3 question-first + Daily quick path**:
+   - Primary row ưu tiên **✏️ Nhập câu hỏi** và, khi chưa có câu hỏi, **☀️ Daily hôm nay**.
+   - Có câu hỏi → `features/tarot/reading/recommendation.py` đề xuất spread cố định tức thì, không gọi AI; **✨ Trải theo đề xuất** chấp nhận recommendation và bắt đầu quẻ trong cùng một click.
+   - Daily quick button bắt đầu `daily` ngay sau các cooldown check; không cần câu hỏi. Direct `/tarot spread:daily` và `.m tarot daily` vẫn giữ.
+   - T20.7 **🧩 Tạo spread riêng** vẫn tồn tại cho câu hỏi cần cấu trúc 3–7 vị trí.
+   - Manual spread và Reader Style được đưa xuống các select **Tuỳ chọn nâng cao**; khi user tự chọn manual/custom, nút **🎴 Bắt đầu** xuất hiện.
+   - Nếu one-click Daily/recommendation bị cooldown/validation chặn, launcher rollback selection state để control đang hiển thị vẫn dùng lại được.
+   - Slash `/tarot` và prefix `.m tarot` dùng cùng `TarotLauncherView`; `.m tarot <câu hỏi>` mở launcher với question prefilled và recommendation sẵn.
    - Nếu phát hiện câu hỏi gần giống lịch sử gần đây, launcher hiện cảnh báo nhẹ và cho chọn dùng ngữ cảnh cũ hoặc xem như câu hỏi mới.
 2. **`TarotFlipView` — Live Reading Session từ T20.3**:
    - Một reading dùng **một message chính** xuyên suốt các trạng thái: xáo bài → mặt úp → đang lật → AI sẵn sàng/finalizing → kết quả.

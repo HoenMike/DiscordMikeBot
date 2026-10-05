@@ -335,7 +335,7 @@ class TarotLauncherView(discord.ui.View):
         return interaction.user.id == self.author_id
 
     def build_launcher_embed(self) -> discord.Embed:
-        """Question-first Tarot 2.0 launcher."""
+        """Asumi 3 launcher: question-first by default with a one-tap Daily path."""
         if self.selected_reader == "random" or self.selected_reader not in READER_STYLES:
             reader_display = "✨ **Tự động**"
             embed_color = 0x7851A9
@@ -347,10 +347,11 @@ class TarotLauncherView(discord.ui.View):
         lines = []
         if not self.question:
             lines.extend([
-                "**Bạn đang muốn hỏi điều gì?**",
-                "Nhập câu hỏi trước; Asumi sẽ đề xuất kiểu trải phù hợp để bạn không cần biết tên các spread.",
+                "**Bạn muốn xem gì hôm nay?**",
+                "• Có câu hỏi → bấm **✏️ Nhập câu hỏi**, Asumi sẽ tự đề xuất kiểu trải phù hợp.",
+                "• Chỉ muốn năng lượng hôm nay → bấm **☀️ Daily hôm nay** để vào quẻ ngay.",
                 "",
-                "Nếu chỉ muốn xem năng lượng hôm nay, bạn có thể tự chọn **Daily Card** ở menu bên dưới.",
+                "Bạn vẫn có thể tự chọn spread ở phần **Tuỳ chọn nâng cao** bên dưới.",
             ])
         else:
             lines.extend([
@@ -374,7 +375,11 @@ class TarotLauncherView(discord.ui.View):
         lines.append(WIDE_DIVIDER)
 
         if self.selection_source == "default":
-            selection_text = "*(Chưa chọn — dùng đề xuất, tạo spread riêng hoặc tự chọn bên dưới)*"
+            selection_text = (
+                "*(Chưa chọn — bấm **Trải theo đề xuất**, tạo spread riêng hoặc tự chọn bên dưới)*"
+                if self.question
+                else "*(Chưa chọn — nhập câu hỏi, dùng **Daily hôm nay** hoặc mở tuỳ chọn nâng cao)*"
+            )
         elif self.selection_source == "custom" and self.custom_spread_schema:
             selection_text = f"**{self.custom_spread_schema.title}** · Smart Custom Spread"
         else:
@@ -418,12 +423,18 @@ class TarotLauncherView(discord.ui.View):
 
         lines.extend([
             "",
-            "💡 **Flow:** Nhập câu hỏi → dùng đề xuất / tạo spread riêng / tự chọn → bắt đầu.",
+            (
+                "💡 **Flow chính:** Nhập câu hỏi → **✨ Trải theo đề xuất**. "
+                "Không cần biết tên spread trước."
+                if self.question
+                else "💡 **Flow chính:** **✏️ Nhập câu hỏi** hoặc **☀️ Daily hôm nay**."
+            ),
+            "⚙️ Manual spread và phong cách vẫn có ở phần tuỳ chọn nâng cao.",
             "Tarot dùng để tự chiêm nghiệm; Asumi không soi bí mật của người ngoài cuộc hay chốt thay quyết định thực tế.",
         ])
 
         embed = discord.Embed(
-            title="🔮 ASUMI TAROT — BẮT ĐẦU TỪ CÂU HỎI",
+            title="🔮 ASUMI TAROT — BẮT ĐẦU",
             description="\n".join(lines),
             color=embed_color,
         )
@@ -464,9 +475,81 @@ class TarotLauncherView(discord.ui.View):
     def _build_components(self):
         self.clear_items()
 
-        # Manual spread override remains available, but is visually secondary to question-first.
+        # Primary actions come first visually. Manual spread/style are deliberately
+        # lower in the launcher so new users do not need to know spread names.
+        btn_question = discord.ui.Button(
+            label="✏️ Sửa câu hỏi" if self.question else "✏️ Nhập câu hỏi",
+            style=discord.ButtonStyle.primary,
+            custom_id="launcher_btn_question",
+            row=0,
+        )
+        btn_question.callback = self._handle_question_button
+        self.add_item(btn_question)
+
+        if not self.question:
+            btn_daily = discord.ui.Button(
+                label="☀️ Daily hôm nay",
+                style=discord.ButtonStyle.success,
+                custom_id="launcher_btn_daily",
+                row=0,
+            )
+            btn_daily.callback = self._handle_daily_button
+            self.add_item(btn_daily)
+
+        # A generic Start button is only needed after a manual/custom selection.
+        # Recommended readings have their own one-click CTA.
+        if self.selection_source in {"manual", "custom"}:
+            btn_start = discord.ui.Button(
+                label="🎴 Bắt đầu",
+                style=discord.ButtonStyle.success,
+                custom_id="launcher_btn_start",
+                row=0 if not self.question else 1,
+                disabled=not self._can_start(),
+            )
+            btn_start.callback = self._handle_start_button
+            self.add_item(btn_start)
+
+        btn_history = discord.ui.Button(
+            label="📜 Lịch sử",
+            style=discord.ButtonStyle.secondary,
+            custom_id="launcher_btn_history",
+            row=0,
+        )
+        btn_history.callback = self._handle_history_button
+        self.add_item(btn_history)
+
+        btn_cancel = discord.ui.Button(
+            label="❌ Đóng",
+            style=discord.ButtonStyle.secondary,
+            custom_id="launcher_btn_cancel",
+            row=0,
+        )
+        btn_cancel.callback = self._handle_cancel_button
+        self.add_item(btn_cancel)
+
+        if self.question and self.recommended_spread:
+            btn_recommend = discord.ui.Button(
+                label="✨ Trải theo đề xuất",
+                style=discord.ButtonStyle.success,
+                custom_id="launcher_btn_recommend",
+                row=1,
+            )
+            btn_recommend.callback = self._handle_recommendation_button
+            self.add_item(btn_recommend)
+
+        if self.question:
+            btn_custom = discord.ui.Button(
+                label="✓ Spread riêng" if self.selection_source == "custom" else "🧩 Tạo spread riêng",
+                style=discord.ButtonStyle.secondary if self.selection_source == "custom" else discord.ButtonStyle.primary,
+                custom_id="launcher_btn_custom",
+                row=1,
+                disabled=(self.selection_source == "custom"),
+            )
+            btn_custom.callback = self._handle_custom_spread_button
+            self.add_item(btn_custom)
+
         spread_select = discord.ui.Select(
-            placeholder="🃏 Tự chọn kiểu trải bài...",
+            placeholder="⚙️ Tuỳ chọn nâng cao · tự chọn spread...",
             options=[
                 discord.SelectOption(
                     label=opt.label,
@@ -479,14 +562,14 @@ class TarotLauncherView(discord.ui.View):
                 )
                 for opt in SPREAD_SELECT_OPTIONS
             ],
-            row=0,
+            row=2 if self.question else 1,
             custom_id="launcher_spread_select",
         )
         spread_select.callback = self._handle_spread_select
         self.add_item(spread_select)
 
         reader_select = discord.ui.Select(
-            placeholder="🎭 Phong cách Asumi (tuỳ chọn)...",
+            placeholder="🎭 Tuỳ chọn · đổi phong cách Asumi...",
             options=[
                 discord.SelectOption(
                     label=opt.label,
@@ -496,77 +579,11 @@ class TarotLauncherView(discord.ui.View):
                 )
                 for opt in READER_SELECT_OPTIONS
             ],
-            row=1,
+            row=3 if self.question else 2,
             custom_id="launcher_reader_select",
         )
         reader_select.callback = self._handle_reader_select
         self.add_item(reader_select)
-
-        btn_question = discord.ui.Button(
-            label="✏️ Sửa câu hỏi" if self.question else "✏️ Nhập câu hỏi",
-            style=discord.ButtonStyle.primary,
-            custom_id="launcher_btn_question",
-            row=2,
-        )
-        btn_question.callback = self._handle_question_button
-        self.add_item(btn_question)
-
-        if self.recommended_spread:
-            recommendation_active = (
-                self.selection_source == "recommendation"
-                and self.selected_spread == self.recommended_spread
-            )
-            btn_recommend = discord.ui.Button(
-                label="✓ Đang dùng đề xuất" if recommendation_active else "✨ Dùng đề xuất",
-                style=discord.ButtonStyle.secondary if recommendation_active else discord.ButtonStyle.primary,
-                custom_id="launcher_btn_recommend",
-                row=2,
-                disabled=recommendation_active,
-            )
-            btn_recommend.callback = self._handle_recommendation_button
-            self.add_item(btn_recommend)
-
-        btn_start = discord.ui.Button(
-            label="🎴 Bắt đầu",
-            style=discord.ButtonStyle.success,
-            custom_id="launcher_btn_start",
-            row=2,
-            disabled=not self._can_start(),
-        )
-        btn_start.callback = self._handle_start_button
-        self.add_item(btn_start)
-
-        btn_history = discord.ui.Button(
-            label="📜 Lịch sử",
-            style=discord.ButtonStyle.secondary,
-            custom_id="launcher_btn_history",
-            row=2,
-        )
-        btn_history.callback = self._handle_history_button
-        self.add_item(btn_history)
-
-        if self.question:
-            btn_custom = discord.ui.Button(
-                label="✓ Spread riêng" if self.selection_source == "custom" else "🧩 Trải bài riêng",
-                style=discord.ButtonStyle.secondary if self.selection_source == "custom" else discord.ButtonStyle.primary,
-                custom_id="launcher_btn_custom",
-                row=3,
-                disabled=(self.selection_source == "custom"),
-            )
-            btn_custom.callback = self._handle_custom_spread_button
-            self.add_item(btn_custom)
-
-        # Discord allows max 5 components per row. When recommendation is present,
-        # close moves to its own compact row with same-question controls.
-        close_row = 3 if self.recommended_spread else 2
-        btn_cancel = discord.ui.Button(
-            label="❌ Đóng",
-            style=discord.ButtonStyle.danger,
-            custom_id="launcher_btn_cancel",
-            row=close_row,
-        )
-        btn_cancel.callback = self._handle_cancel_button
-        self.add_item(btn_cancel)
 
         if self.similar_question_hint:
             context_select = discord.ui.Select(
@@ -607,6 +624,12 @@ class TarotLauncherView(discord.ui.View):
         if not self._check_author(interaction):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
             return
+        previous_state = (
+            self.selected_spread,
+            self.selection_source,
+            self.custom_spread_schema,
+            self.custom_spread_notice,
+        )
         if not self._use_recommendation():
             await interaction.response.send_message(
                 "⚠️ Chưa có đề xuất nào. Hãy nhập câu hỏi trước nhé.",
@@ -614,8 +637,43 @@ class TarotLauncherView(discord.ui.View):
             )
             return
 
-        self._build_components()
-        await interaction.response.edit_message(embed=self.build_launcher_embed(), view=self)
+        # One-click happy path: the recommendation is already visible in the
+        # launcher. If cooldown/validation blocks the start, restore launcher
+        # state so the still-visible controls remain semantically accurate.
+        started = await self._handle_start_button(interaction)
+        if not started:
+            (
+                self.selected_spread,
+                self.selection_source,
+                self.custom_spread_schema,
+                self.custom_spread_notice,
+            ) = previous_state
+
+    async def _handle_daily_button(self, interaction: discord.Interaction):
+        if not self._check_author(interaction):
+            await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
+            return
+
+        # Daily is the other primary launcher path. It intentionally bypasses
+        # question entry and starts immediately after normal cooldown checks.
+        previous_state = (
+            self.selected_spread,
+            self.selection_source,
+            self.custom_spread_schema,
+            self.custom_spread_notice,
+        )
+        self.selected_spread = "daily"
+        self.selection_source = "manual"
+        self.custom_spread_schema = None
+        self.custom_spread_notice = None
+        started = await self._handle_start_button(interaction)
+        if not started:
+            (
+                self.selected_spread,
+                self.selection_source,
+                self.custom_spread_schema,
+                self.custom_spread_notice,
+            ) = previous_state
 
     async def _handle_custom_spread_button(self, interaction: discord.Interaction):
         if not self._check_author(interaction):
@@ -680,10 +738,10 @@ class TarotLauncherView(discord.ui.View):
 
         await interaction.response.send_modal(TarotQuestionModal(self))
 
-    async def _handle_start_button(self, interaction: discord.Interaction):
+    async def _handle_start_button(self, interaction: discord.Interaction) -> bool:
         if not self._check_author(interaction):
             await interaction.response.send_message("🔒 Chỉ người mở menu mới có thể tương tác!", ephemeral=True)
-            return
+            return False
 
         spread_info = (
             self.custom_spread_schema.as_spread_info()
@@ -695,15 +753,15 @@ class TarotLauncherView(discord.ui.View):
                 await interaction.response.send_modal(TarotQuestionModal(self))
             else:
                 await interaction.response.send_message(
-                    "✨ Hãy dùng đề xuất của Asumi hoặc tự chọn một kiểu trải bài trước khi bắt đầu.",
+                    "✨ Hãy bấm **Trải theo đề xuất**, tạo spread riêng hoặc tự chọn một spread trước khi bắt đầu.",
                     ephemeral=True,
                 )
-            return
+            return False
 
         # Kiểm tra câu hỏi nếu trải bài yêu cầu
         if spread_info.get("requires_question", True) and not self.question:
             await interaction.response.send_modal(TarotQuestionModal(self))
-            return
+            return False
 
         # Kiểm tra Daily Cooldown
         if self.selected_spread == "daily":
@@ -716,10 +774,10 @@ class TarotLauncherView(discord.ui.View):
                     f"☀️ **Bạn đã rút Daily Card của ngày hôm nay rồi!**\n\n"
                     f"🃏 Lá bài hôm nay của bạn: {last_card_str} - `{orient_str}` *(Rút lúc {drawn_time})*\n"
                     f"⏰ *Lượt bốc bài sẽ được làm mới vào lúc 00:00 (Giờ VN)!*\n\n"
-                    f"💡 *Nếu bạn có câu hỏi khác, hãy chọn `Single Card` hoặc `Yes / No` trong menu nhé!*",
+                    "💡 *Nếu bạn có câu hỏi khác, hãy bấm **Nhập câu hỏi** để Asumi tự gợi ý spread phù hợp.*",
                     ephemeral=True
                 )
-                return
+                return False
 
         # Kiểm tra Cooldown 1 phút chống spam giữa 2 lần bốc bài
         can_proceed, wait_sec = self.tarot_manager.check_user_cooldown(interaction.user.id, cooldown_seconds=config.COMMAND_COOLDOWN_SECONDS)
@@ -728,10 +786,11 @@ class TarotLauncherView(discord.ui.View):
                 f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(wait_sec) + 1}s` nữa trước khi bốc quẻ tiếp theo.",
                 ephemeral=True
             )
-            return
+            return False
 
         # Khởi chạy phiên bốc bài
         await self.start_reading(interaction)
+        return True
 
     async def start_reading(self, interaction: discord.Interaction):
         if self._starting or self.is_finished():

@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.1–T20.9 implemented; Asumi 2.10.0 / Tarot 2.1 release is complete on this release branch.  
+> **Status:** T20.1–T20.9 remain complete; current bot release is **Asumi 3.0.0** with a post-roadmap Tarot launcher UX refresh.  
 > **Last updated:** 2026-10-05.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -53,7 +53,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **T20.7 — Smart Custom Spread has been implemented.**
 - **T20.8 — Tarot Journey has been implemented.**
 - **T20.9 — Recap & Polish has been implemented.**
-- **T20.1–T20.9 are complete. No next Tarot implementation milestone is defined until a new roadmap is requested.**
+- **T20.1–T20.9 are complete. No next numbered Tarot milestone is defined until a new roadmap is requested.**
+- **Asumi 3.0 UX refresh:** launcher now prioritizes question + Daily quick start; recommendation starts in one click; manual spread/style are secondary.
 
 ---
 
@@ -73,10 +74,20 @@ Baseline at planning time:
 - T20.6 merged main commit: `7f7f5c26a6741449b04b650bf514fbba4114fa92`
 - T20.7 merged main commit: `7aedf5edd8888cb5aaf7a2b60d6be8a9212cd695`
 - T20.8 merged main commit: `b4a36c581aa34fd91e825e76d77a146d48440037`
-- release branch version: `2.10.0`
-- release codename: `Asumi - Tarot 2.1`
+- T20.9 completion release: `2.10.0 / Asumi - Tarot 2.1`
+- current bot release: `3.0.0 / Asumi 3.0 - Tarot-first UX`
 
 Always re-check current main before work starts.
+
+### Current Asumi 3.0 launcher contract
+
+- `/tarot` and `.m tarot` open the same launcher.
+- No question: primary controls are **✏️ Nhập câu hỏi** and **☀️ Daily hôm nay**; Daily starts immediately after cooldown checks.
+- With a question: recommendation is shown in the embed and **✨ Trải theo đề xuất** both accepts it and starts the reading.
+- **🧩 Tạo spread riêng** remains available for a generated 3–7 position schema.
+- Manual fixed-spread selection and Reader Style are lower **Tuỳ chọn nâng cao** controls.
+- Direct syntax remains supported: slash `spread:` choice, `.m tarot daily`, `.m tarot <spread> <question>`, and `.m tarot <free-form question>`.
+- One-click Daily/recommendation rolls back temporary selection state when cooldown/validation blocks the start.
 
 ---
 
@@ -292,8 +303,9 @@ Avoid implementing all V2 milestones in one giant branch.
 - Recap does **not** draw cards or call AI again. It reuses the completed structured reading, preferring the actual key card as hero and falling back deterministically to the first drawn card.
 - The Recap Card contains only hero card/orientation, short headline, one practical takeaway, spread title, date and lightweight Asumi branding; it does not embed the full reading or Journey analytics.
 - Recap is generated ephemerally, includes a text equivalent of hero/headline/takeaway for accessibility, becomes one-use only after successful delivery, and every visible result button is disabled when the View times out.
-- User-facing help, README, renderer/system docs and version/changelog are synchronized for **Asumi 2.10.0 — Tarot 2.1**.
-- T20.1–T20.9 are now maintenance baseline. Future work should start a new roadmap/milestone series unless the user explicitly reopens one of these milestones.
+- T20.1–T20.9 are the maintenance baseline. Asumi 3.0.0 adds a post-roadmap launcher UX refresh without changing those milestone contracts.
+- Current launcher contract: **question → one-click recommendation**, **Daily → one-tap start**, advanced manual spread/style below; slash and `.m` share the same launcher.
+- Future feature work should start a new roadmap/milestone series unless the user explicitly reopens one of these milestones.
 
 When a milestone starts or completes, update this table in the same PR.
 

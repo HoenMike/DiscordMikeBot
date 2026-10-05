@@ -903,7 +903,13 @@
                         <div class="flex items-center gap-2 mb-1">
                             <span class="text-lg font-black text-white tracking-tight">Asumi</span>
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-brand-500 text-white shadow-md shadow-brand-500/40">v{{ release_version }}</span>
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Minor Release</span>
+                            {% if release_type == 'major' %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Major Release</span>
+                            {% elif release_type == 'bugfix' %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">BugFix Release</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30">Minor Release</span>
+                            {% endif %}
                         </div>
                         <p class="text-xs text-slate-300">Codename: <span class="font-semibold text-brand-300">{{ release_codename }}</span> • Phát hành: <span class="text-slate-400">{{ release_date }}</span></p>
                     </div>
