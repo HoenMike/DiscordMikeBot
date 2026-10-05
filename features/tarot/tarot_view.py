@@ -628,8 +628,9 @@ class TarotLauncherView(discord.ui.View):
             return
 
         # One-click happy path: the recommendation is already visible in the
-        # launcher, so accepting it starts the reading immediately.
-        self._build_components()
+        # launcher, so accepting it starts the reading immediately. Do not
+        # rebuild the View first: if cooldown blocks the start, the visible
+        # controls must remain backed by the same live components.
         await self._handle_start_button(interaction)
 
     async def _handle_daily_button(self, interaction: discord.Interaction):
@@ -643,7 +644,6 @@ class TarotLauncherView(discord.ui.View):
         self.selection_source = "manual"
         self.custom_spread_schema = None
         self.custom_spread_notice = None
-        self._build_components()
         await self._handle_start_button(interaction)
 
     async def _handle_custom_spread_button(self, interaction: discord.Interaction):
