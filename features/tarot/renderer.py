@@ -108,9 +108,14 @@ def _gradient_background(width: int, height: int) -> Image.Image:
 
 
 def _safe_title(spread_key: str, custom_title: Optional[str] = None) -> str:
+    """Return the full normalized spread title.
+
+    Title length is handled visually by the renderer. Do not truncate the source
+    string here, otherwise fixed/custom spread names can leak an ugly trailing
+    ellipsis into the final image even when the canvas has enough room.
+    """
     if custom_title:
-        title = " ".join(custom_title.split())
-        return title if len(title) <= 44 else title[:41].rstrip() + "..."
+        return " ".join(custom_title.split())
 
     compact = {
         "daily": "Daily Card",
@@ -127,6 +132,84 @@ def _safe_title(spread_key: str, custom_title: Optional[str] = None) -> str:
         spread_key,
         SPREAD_DEFINITIONS.get(spread_key, {}).get("name", "Tarot Spread"),
     )
+
+
+def _wrap_text_to_width(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+) -> list[str]:
+    words = " ".join((text or "").split()).split()
+    if not words:
+        return [""]
+
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if current and bbox[2] - bbox[0] > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _fit_header_title(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    canvas_width: int,
+    *,
+    max_lines: int = 2,
+) -> tuple[ImageFont.ImageFont, list[str]]:
+    """Fit a spread title without truncation.
+
+    Prefer one readable line with a modest font reduction. If that still does
+    not fit, keep the full title and wrap it across at most two lines.
+    """
+    normalized = " ".join((text or "").split()) or "Tarot Spread"
+    max_width = canvas_width - max(120, canvas_width // 10)
+    base_size = max(28, canvas_width // 34)
+    min_size = max(22, canvas_width // 58)
+    single_line_floor = max(min_size, int(base_size * 0.78))
+
+    # First preserve the existing single-line visual whenever a small reduction
+    # is enough. This fixes most long bilingual fixed-spread names cleanly.
+    for size in range(base_size, single_line_floor - 1, -1):
+        font = _get_font(size, bold=True)
+        bbox = draw.textbbox((0, 0), normalized, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            return font, [normalized]
+
+    # Otherwise use the available vertical space instead of replacing content
+    # with "...". Custom spread titles are bounded, so two lines are sufficient
+    # at mobile-readable sizes in normal operation.
+    for size in range(base_size, min_size - 1, -1):
+        font = _get_font(size, bold=True)
+        lines = _wrap_text_to_width(draw, normalized, font, max_width)
+        if len(lines) <= max_lines and all(
+            draw.textbbox((0, 0), line, font=font)[2] <= max_width
+            for line in lines
+        ):
+            return font, lines
+
+    # Defensive fallback for unusually wide tokens: continue shrinking until the
+    # complete title fits rather than ever truncating it.
+    for size in range(min_size - 1, 15, -1):
+        font = _get_font(size, bold=True)
+        lines = _wrap_text_to_width(draw, normalized, font, max_width)
+        if len(lines) <= max_lines and all(
+            draw.textbbox((0, 0), line, font=font)[2] <= max_width
+            for line in lines
+        ):
+            return font, lines
+
+    font = _get_font(16, bold=True)
+    return font, _wrap_text_to_width(draw, normalized, font, max_width)
 
 
 def _short_position_title(raw: str, fallback_index: int) -> str:
@@ -185,55 +268,74 @@ def _draw_pill(
 def _draw_header(canvas: Image.Image, state: ReadingBoardState) -> int:
     draw = ImageDraw.Draw(canvas)
     width, _ = canvas.size
-    title = _safe_title(state.spread_key, state.spread_title)
-    title_font = _get_font(max(28, width // 34), bold=True)
+    title = _safe_title(state.spread_key, state.spread_title).upper()
+    title_font, title_lines = _fit_header_title(draw, title, width)
     meta_font = _get_font(max(18, width // 60), bold=True)
     brand_font = _get_font(max(14, width // 82))
 
-    _draw_centered_text(draw, title.upper(), width // 2, max(34, width // 42), title_font, COLOR_GOLD_LIGHT)
-    _draw_centered_text(draw, "ASUMI · TAROT", width // 2, max(78, width // 20), brand_font, COLOR_MUTED)
+    title_y = max(30, width // 46)
+    line_gap = max(4, width // 280)
+    current_y = title_y
+    for line in title_lines:
+        _draw_centered_text(draw, line, width // 2, current_y, title_font, COLOR_GOLD_LIGHT)
+        bbox = draw.textbbox((0, 0), line or "Ag", font=title_font)
+        current_y += max(1, bbox[3] - bbox[1]) + line_gap
+
+    brand_y = max(current_y + 2, max(78, width // 20))
+    _draw_centered_text(draw, "ASUMI · TAROT", width // 2, brand_y, brand_font, COLOR_MUTED)
+    brand_bbox = draw.textbbox((0, 0), "ASUMI · TAROT", font=brand_font)
+    pill_y = max(
+        brand_y + (brand_bbox[3] - brand_bbox[1]) + 14,
+        max(112, width // 13),
+    )
 
     if state.final:
-        _draw_pill(
+        pill_box = _draw_pill(
             draw,
             "FINAL SPREAD",
             width // 2,
-            max(112, width // 13),
+            pill_y,
             meta_font,
             fill=(43, 39, 58),
             outline=COLOR_GOLD_DARK,
             text_color=COLOR_GOLD_LIGHT,
             pad_x=18,
         )
-    else:
-        progress = f"{state.revealed_count} / {state.total_cards} REVEALED"
-        _draw_pill(
-            draw,
-            progress,
-            width // 2,
-            max(112, width // 13),
-            meta_font,
-            fill=(39, 36, 53),
-            outline=COLOR_VIOLET,
-            text_color=COLOR_TEXT,
-            pad_x=18,
-        )
+        return max(pill_box[3] + 18, max(190, width // 7))
 
-        if state.total_cards <= 10:
-            dots = "  ".join(
-                "●" if idx in state.revealed_indices else "○"
-                for idx in range(state.total_cards)
-            )
-            dots_font = _get_font(max(16, width // 68), bold=True)
-            _draw_centered_text(
-                draw,
-                dots,
-                width // 2,
-                max(154, width // 9),
-                dots_font,
-                COLOR_VIOLET_LIGHT,
-            )
-    return max(190, width // 7)
+    progress = f"{state.revealed_count} / {state.total_cards} REVEALED"
+    pill_box = _draw_pill(
+        draw,
+        progress,
+        width // 2,
+        pill_y,
+        meta_font,
+        fill=(39, 36, 53),
+        outline=COLOR_VIOLET,
+        text_color=COLOR_TEXT,
+        pad_x=18,
+    )
+
+    header_bottom = pill_box[3] + 18
+    if state.total_cards <= 10:
+        dots = "  ".join(
+            "●" if idx in state.revealed_indices else "○"
+            for idx in range(state.total_cards)
+        )
+        dots_font = _get_font(max(16, width // 68), bold=True)
+        dots_y = max(pill_box[3] + 12, max(154, width // 9))
+        _draw_centered_text(
+            draw,
+            dots,
+            width // 2,
+            dots_y,
+            dots_font,
+            COLOR_VIOLET_LIGHT,
+        )
+        dots_bbox = draw.textbbox((0, 0), dots, font=dots_font)
+        header_bottom = max(header_bottom, dots_y + (dots_bbox[3] - dots_bbox[1]) + 12)
+
+    return max(header_bottom, max(190, width // 7))
 
 
 def _generate_procedural_card(card: TarotCard, target_w: int, target_h: int) -> Image.Image:
@@ -769,8 +871,14 @@ def _render_emergency_board(state: ReadingBoardState, error: Exception) -> Image
     row_font = _get_font(24, bold=True)
     small_font = _get_font(18)
 
-    _draw_centered_text(draw, _safe_title(state.spread_key, state.spread_title).upper(), width // 2, 60, title_font, COLOR_GOLD_LIGHT)
-    _draw_centered_text(draw, "Visual fallback · cards remain unchanged", width // 2, 110, small_font, COLOR_MUTED)
+    fallback_title = _safe_title(state.spread_key, state.spread_title).upper()
+    fitted_font, fitted_lines = _fit_header_title(draw, fallback_title, width)
+    title_y = 50
+    for line in fitted_lines:
+        _draw_centered_text(draw, line, width // 2, title_y, fitted_font, COLOR_GOLD_LIGHT)
+        bbox = draw.textbbox((0, 0), line or "Ag", font=fitted_font)
+        title_y += max(1, bbox[3] - bbox[1]) + 5
+    _draw_centered_text(draw, "Visual fallback · cards remain unchanged", width // 2, max(110, title_y + 4), small_font, COLOR_MUTED)
 
     y = 190
     for idx, card in enumerate(state.drawn_cards):
@@ -885,16 +993,20 @@ def render_clarifier_board(state: ClarifierBoardState) -> Image.Image:
     canvas = _gradient_background(canvas_w, canvas_h)
     draw = ImageDraw.Draw(canvas)
 
-    title_font = _get_font(42, bold=True)
     sub_font = _get_font(20, bold=True)
     small_font = _get_font(17)
-    title = f"CLARIFIER · {_safe_title(state.spread_key, state.spread_title)}"
-    _draw_centered_text(draw, title.upper(), canvas_w // 2, 42, title_font, COLOR_GOLD_LIGHT)
+    title = f"CLARIFIER · {_safe_title(state.spread_key, state.spread_title)}".upper()
+    title_font, title_lines = _fit_header_title(draw, title, canvas_w)
+    title_y = 36
+    for line in title_lines:
+        _draw_centered_text(draw, line, canvas_w // 2, title_y, title_font, COLOR_GOLD_LIGHT)
+        bbox = draw.textbbox((0, 0), line or "Ag", font=title_font)
+        title_y += max(1, bbox[3] - bbox[1]) + 5
     _draw_centered_text(
         draw,
         "Một lá bổ sung cho đúng một vị trí · quẻ gốc vẫn giữ nguyên",
         canvas_w // 2,
-        100,
+        max(100, title_y + 2),
         small_font,
         COLOR_MUTED,
     )
