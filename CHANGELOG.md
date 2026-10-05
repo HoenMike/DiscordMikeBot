@@ -7,6 +7,14 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.0.1] - 2026-10-05 — *Tarot renderer title hotfix*
+
+### Fixed
+- Reading Board không còn hard-cut spread title ở 44 ký tự rồi thêm `...`.
+- Title dài giữ nguyên đầy đủ và tự giảm font vừa phải; nếu vẫn chưa đủ chỗ sẽ wrap tối đa hai dòng.
+- Fix áp dụng cho Reading Board chính, visual fallback và Clarifier Board.
+- Thêm regression cho **Mind - Body - Spirit (Tâm Trí - Thể Chất - Trực Giác)** và Smart Custom Spread title dài.
+
 ## [3.0.0] - 2026-10-05 — *Asumi 3.0 — Tarot-first UX*
 
 ### Changed
