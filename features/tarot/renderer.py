@@ -213,9 +213,7 @@ def _fit_header_title(
         font = _get_font(size, bold=True)
         lines = _wrap_text_to_width(draw, normalized, font, max_width)
         if len(lines) <= max_lines and all(
-            (
-                lambda box: box[2] - box[0] <= max_width
-            )(draw.textbbox((0, 0), line, font=font))
+            _text_fits_width(draw, line, font, max_width)
             for line in lines
         ):
             return font, lines
@@ -881,7 +879,6 @@ def _render_emergency_board(state: ReadingBoardState, error: Exception) -> Image
     width, height = 1200, max(760, 260 + 82 * state.total_cards)
     canvas = _gradient_background(width, height)
     draw = ImageDraw.Draw(canvas)
-    title_font = _get_font(34, bold=True)
     row_font = _get_font(24, bold=True)
     small_font = _get_font(18)
 
