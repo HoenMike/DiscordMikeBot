@@ -192,7 +192,9 @@ def _fit_header_title(
         font = _get_font(size, bold=True)
         lines = _wrap_text_to_width(draw, normalized, font, max_width)
         if len(lines) <= max_lines and all(
-            draw.textbbox((0, 0), line, font=font)[2] <= max_width
+            (
+                lambda box: box[2] - box[0] <= max_width
+            )(draw.textbbox((0, 0), line, font=font))
             for line in lines
         ):
             return font, lines
@@ -203,7 +205,9 @@ def _fit_header_title(
         font = _get_font(size, bold=True)
         lines = _wrap_text_to_width(draw, normalized, font, max_width)
         if len(lines) <= max_lines and all(
-            draw.textbbox((0, 0), line, font=font)[2] <= max_width
+            (
+                lambda box: box[2] - box[0] <= max_width
+            )(draw.textbbox((0, 0), line, font=font))
             for line in lines
         ):
             return font, lines
