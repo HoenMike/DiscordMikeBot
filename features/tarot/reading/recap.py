@@ -16,7 +16,7 @@ VN_TZ = timezone(timedelta(hours=7))
 
 def _compact(text: Optional[str], limit: int) -> str:
     clean = str(text or "")
-    clean = re.sub(r"[\`*_>#]+", " ", clean)
+    clean = re.sub(r"[`*_>#]+", " ", clean)
     clean = re.sub(r"\s+", " ", clean).strip(" -•")
     if len(clean) <= limit:
         return clean
