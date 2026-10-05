@@ -11,7 +11,7 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Added
 - **Multi-turn Reading Session**: tối đa 3 follow-up có context liên tục; clarifier đã giao thành công được giữ làm context nhưng vẫn 1/1.
-- **🔍 Vì sao?**: giải thích evidence từ lá/vị trí đang hiển thị, owner-only và không expose hidden reasoning.
+- **🔍 Vì sao?**: giải thích evidence từ lá/vị trí đang hiển thị, owner-only và không hiển thị suy luận nội bộ.
 - **Smart Custom Spread**: AI chỉ tạo schema 3–7 vị trí; deck engine tự rút lá, schema lỗi fallback spread chuẩn.
 - **Tarot Journey**: `/tarot_journey` và `.m tarot journey` tổng hợp 30 ngày gồm suit mix, Major ratio, lá lặp/lá ngược lặp, topic progression và spread dùng nhiều.
 - **Journey Card**: visual summary 1400×900, framing rõ đây là thống kê tự phản chiếu.
