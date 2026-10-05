@@ -249,10 +249,10 @@ Gồm 2 tầng View Discord UI:
 
 #### Reading Recap — T20.9
 
-- Kết quả cuối có **📌 Recap** owner-only trên row riêng; action không làm thay đổi quẻ và không gọi AI/rút lá thêm.
+- Kết quả cuối có **📌 Recap** owner-only trên secondary row cùng ratings; follow-up / Why / Clarifier giữ primary row gọn cho mobile. Action không làm thay đổi quẻ và không gọi AI/rút lá thêm.
 - `reading/recap.py` chọn hero card từ structured key card nếu có, fallback deterministic về lá đầu tiên; headline/takeaway cũng lấy từ structured result hoặc reading đã có.
 - `render_recap_card_to_bytes(...)` tạo ảnh portrait 1200×1500 chỉ gồm hero/orientation, headline, một takeaway, spread, ngày và branding gọn.
-- Recap gửi ephemeral cho chủ quẻ, chỉ khóa sau delivery thành công và bị disable cùng các session action khi View timeout.
+- Recap gửi ephemeral cho chủ quẻ kèm text-equivalent hero/headline/takeaway để nội dung chính không phụ thuộc ảnh; chỉ khóa sau delivery thành công. Khi View timeout, toàn bộ result buttons được disable trực quan.
 
 ### 3.5. Module Quản Lý Cơ Sở Dữ Liệu SQLite (`manager.py`)
 
