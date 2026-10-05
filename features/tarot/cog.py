@@ -572,7 +572,7 @@ class TarotCog(commands.Cog):
 
     @app_commands.command(
         name="tarot_help",
-        description="Xem hướng dẫn 9 kiểu trải bài và 4 phong cách của Asumi"
+        description="Xem hướng dẫn Tarot, Smart Spread, Journey và các action sau quẻ"
     )
     async def tarot_help_slash(self, interaction: discord.Interaction):
         from bot_instance import send_bot_help

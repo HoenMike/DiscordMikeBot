@@ -1,7 +1,7 @@
 # Tarot 2.0 — Session Handoff / Resume Guide
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
-> **Status:** T20.8 Tarot Journey implemented; T20.9 Recap & Polish is next.  
+> **Status:** T20.1–T20.9 implemented; Asumi 2.10.0 / Tarot 2.1 release is complete on this release branch.  
 > **Last updated:** 2026-10-05.
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
@@ -52,7 +52,8 @@ The user wants a **Tarot 2.0** upgrade focused on:
 - **T20.6 — Multi-turn Reading Session has been implemented.**
 - **T20.7 — Smart Custom Spread has been implemented.**
 - **T20.8 — Tarot Journey has been implemented.**
-- **Next milestone: T20.9 — Recap & Polish.**
+- **T20.9 — Recap & Polish has been implemented.**
+- **T20.1–T20.9 are complete. No next Tarot implementation milestone is defined until a new roadmap is requested.**
 
 ---
 
@@ -69,7 +70,11 @@ Baseline at planning time:
 - T20.1 merged main commit: `c755fa89e194fa15d92fd64d5212ae2f6e29883b`
 - T20.2 merged main commit: `46857dbdcaff502579e504a3de09ae34b6e6eb8b`
 - T20.3 merged main commit: `8b150ac6823d956445c55d3b2fc5cd311b5b9586`
-- codename: `Asumi - Compact Facebook Proxy Link`
+- T20.6 merged main commit: `7f7f5c26a6741449b04b650bf514fbba4114fa92`
+- T20.7 merged main commit: `7aedf5edd8888cb5aaf7a2b60d6be8a9212cd695`
+- T20.8 merged main commit: `b4a36c581aa34fd91e825e76d77a146d48440037`
+- release branch version: `2.10.0`
+- release codename: `Asumi - Tarot 2.1`
 
 Always re-check current main before work starts.
 
@@ -98,8 +103,10 @@ Do not accidentally re-build these as if they were new:
 - user memory toggle;
 - forget/history deletion;
 - card fatigue / recent-card avoidance;
-- spread recommendation helper;
-- one follow-up interaction;
+- spread recommendation + Smart Custom Spread;
+- up to three contextual follow-ups;
+- owner-only Why / Clarifier / Recap actions;
+- Tarot Journey 30-day analytics;
 - rating buttons;
 - rare-combo / flavor text;
 - weekly guild card;
@@ -240,7 +247,7 @@ Avoid implementing all V2 milestones in one giant branch.
 | T20.6 | COMPLETE | Up to 3 contextual follow-ups, shared session state, owner-only Why?, 10-minute inactivity expiry and delivery-safe consumption |
 | T20.7 | COMPLETE | Schema-only AI design, validated 3–7 positions, deck-owned draw, fixed-spread fallback |
 | T20.8 | COMPLETE | 30-day stored-history analytics + Journey Card + slash/prefix access |
-| T20.9 | NEXT | Recap & Polish |
+| T20.9 | COMPLETE | Owner-only Recap Card, help/docs polish and Asumi 2.10.0 / Tarot 2.1 release |
 
 ### T20.5 implementation contract
 
@@ -278,6 +285,15 @@ Avoid implementing all V2 milestones in one giant branch.
 - Suit percentages use deterministic apportionment so displayed shares sum to 100% when Minor Arcana data exists.
 - `render_journey_card_to_bytes(...)` produces a compact visual summary; both card and embed explicitly frame patterns as reflection statistics, not fate or diagnosis.
 - Journey disappears naturally when the user clears Tarot history because it has no parallel hidden profile store.
+
+### T20.9 implementation contract
+
+- Final result view exposes owner-only **📌 Recap** on the secondary component row; follow-up / Why / Clarifier stay on the primary row while Recap + ratings stay compact on row 2.
+- Recap does **not** draw cards or call AI again. It reuses the completed structured reading, preferring the actual key card as hero and falling back deterministically to the first drawn card.
+- The Recap Card contains only hero card/orientation, short headline, one practical takeaway, spread title, date and lightweight Asumi branding; it does not embed the full reading or Journey analytics.
+- Recap is generated ephemerally, includes a text equivalent of hero/headline/takeaway for accessibility, becomes one-use only after successful delivery, and every visible result button is disabled when the View times out.
+- User-facing help, README, renderer/system docs and version/changelog are synchronized for **Asumi 2.10.0 — Tarot 2.1**.
+- T20.1–T20.9 are now maintenance baseline. Future work should start a new roadmap/milestone series unless the user explicitly reopens one of these milestones.
 
 When a milestone starts or completes, update this table in the same PR.
 

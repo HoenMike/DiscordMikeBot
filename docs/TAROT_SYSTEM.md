@@ -2,7 +2,7 @@
 
 Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).
 
-> **Tarot 2.0 runtime (T20.1–T20.5) đã hoàn tất trong Asumi 2.9.0.** Khi làm T20.6+, đọc `docs/TAROT_V2_MASTER_PLAN.md` và `docs/TAROT_V2_HANDOFF.md` trước. Tài liệu này mô tả runtime hiện tại và phải được cập nhật cùng code khi behavior/architecture thay đổi.
+> **Tarot roadmap T20.1–T20.9 đã hoàn tất trong Asumi 2.10.0 / Tarot 2.1.** Đây là runtime baseline hiện tại; đọc `docs/TAROT_V2_MASTER_PLAN.md` và `docs/TAROT_V2_HANDOFF.md` trước khi bảo trì hoặc mở roadmap mới.
 
 > v2.8.0: Asumi là nhân vật Tarot duy nhất. `auto` là mặc định; `neutral`, `healer`, `chaos` là các style ID tương thích dữ liệu cũ, nay hiển thị lần lượt là Tĩnh, Dịu, Tinh quái. Prompt mới điều chỉnh cách nói theo câu hỏi, vẫn dùng schema JSON và các ranh giới an toàn hiện có.
 
@@ -109,6 +109,7 @@ features/tarot/
 │   ├── clarifier.py # Resolve AI-suggested targets + existing target insight
 │   ├── custom_spread.py # T20.7 schema-only Smart Custom Spread validation
 │   ├── journey.py # T20.8 stored-history analytics for Tarot Journey
+│   ├── recap.py # T20.9 deterministic Recap Card content selection
 │   └── session.py   # Progress, micro reveal, compact controls & AI-ready presentation helpers
 ├── rendering/
 │   └── state.py     # ReadingBoardState: reveal/final/key/target state independent from Discord UI
@@ -246,6 +247,13 @@ Gồm 2 tầng View Discord UI:
 - `manager.py` có query bounded 30 ngày riêng cho Journey; dữ liệu vẫn thuộc lịch sử hiện hữu và biến mất khi user dùng forget.
 - `renderer.py` tạo `tarot_journey.png` 1400×900, nhấn mạnh đây là thống kê tự phản chiếu chứ không phải dự đoán/chẩn đoán.
 
+#### Reading Recap — T20.9
+
+- Kết quả cuối có **📌 Recap** owner-only trên secondary row cùng ratings; follow-up / Why / Clarifier giữ primary row gọn cho mobile. Action không làm thay đổi quẻ và không gọi AI/rút lá thêm.
+- `reading/recap.py` chọn hero card từ structured key card nếu có, fallback deterministic về lá đầu tiên; headline/takeaway cũng lấy từ structured result hoặc reading đã có.
+- `render_recap_card_to_bytes(...)` tạo ảnh portrait 1200×1500 chỉ gồm hero/orientation, headline, một takeaway, spread, ngày và branding gọn.
+- Recap gửi ephemeral cho chủ quẻ kèm text-equivalent hero/headline/takeaway để nội dung chính không phụ thuộc ảnh; chỉ khóa sau delivery thành công. Khi View timeout, toàn bộ result buttons được disable trực quan.
+
 ### 3.5. Module Quản Lý Cơ Sở Dữ Liệu SQLite (`manager.py`)
 
 T20.5 bổ sung bảng `tarot_clarifiers` cho **Clarifier đã delivery thành công**. Record lưu user/guild/channel, spread/question, target position/card + orientation, clarifier card + orientation và interpretation. Dữ liệu này tách khỏi `tarot_history` để quẻ gốc không bị mutation.
@@ -263,7 +271,8 @@ T20.5 bổ sung bảng `tarot_clarifiers` cho **Clarifier đã delivery thành c
 - **Slash Commands**:
   - `/tarot`: Mở giao diện tương tác đầy đủ kèm tùy chọn câu hỏi, bối cảnh, trải bài, phong cách.
   - `/tarot_journey`: Xem summary 30 ngày từ lịch sử Tarot đã lưu.
-  - `/tarot history`: Xem lại lịch sử các lần bốc bài gần nhất.
+  - `/tarot_history`: Xem lại lịch sử các lần bốc bài gần nhất.
+  - `/tarot_help`: Xem help Tarot 2.1 gồm Smart Custom Spread, post-reading actions và Journey.
 - **Prefix Commands**:
   - `$m tarot`, `$m xemque`, `$m bocadoi`...
   - Hỗ trợ các bí danh (aliases) linh hoạt: `daily`, `3la`, `yn`, `celtic`, `choices`...

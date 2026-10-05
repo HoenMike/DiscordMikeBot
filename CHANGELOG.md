@@ -7,6 +7,24 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [2.10.0] - 2026-10-05 — *Tarot 2.1*
+
+### Added
+- **Multi-turn Reading Session**: tối đa 3 follow-up có context liên tục; clarifier đã giao thành công được giữ làm context nhưng vẫn 1/1.
+- **🔍 Vì sao?**: giải thích evidence từ lá/vị trí đang hiển thị, owner-only và không hiển thị suy luận nội bộ.
+- **Smart Custom Spread**: AI chỉ tạo schema 3–7 vị trí; deck engine tự rút lá, schema lỗi fallback spread chuẩn.
+- **Tarot Journey**: `/tarot_journey` và `.m tarot journey` tổng hợp 30 ngày gồm suit mix, Major ratio, lá lặp/lá ngược lặp, topic progression và spread dùng nhiều.
+- **Journey Card**: visual summary 1400×900, framing rõ đây là thống kê tự phản chiếu.
+- **📌 Recap Card**: owner-only, portrait save/share-friendly với hero/key card, headline, một takeaway, spread và ngày; không gọi AI thêm.
+
+### Reliability & UX
+- Follow-up chỉ tiêu lượt sau delivery thành công; generation/send failure giữ nguyên capacity.
+- Session hết hạn sẽ khóa follow-up, clarifier, Why và Recap.
+- Custom schema validator chặn count ngoài 3–7, duplicate, card/orientation do model cung cấp và private third-party framing.
+- Suit percentages của Journey luôn được phân bổ nhất quán về tổng 100% khi có Minor Arcana.
+- Journey chỉ đọc `tarot_history`; `/tarot_forget` tiếp tục xóa nguồn dữ liệu của Journey.
+- T20.1–T20.9 được đồng bộ trong handoff/master/system docs để agent sau tiếp tục bảo trì trực tiếp từ repo.
+
 ## [2.9.0] - 2026-10-04 — *Tarot 2.0*
 
 ### Added

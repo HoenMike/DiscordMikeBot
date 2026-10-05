@@ -109,3 +109,24 @@ class ClarifierBoardState:
             final=True,
             spread_title=self.spread_title,
         )
+
+
+
+@dataclass(frozen=True)
+class RecapCardState:
+    """Save/share-friendly summary of one completed reading."""
+
+    spread_title: str
+    user_name: str
+    hero_card: DrawnCard
+    headline: str
+    takeaway: str
+    date_label: str
+
+    def __post_init__(self):
+        if not self.spread_title.strip():
+            raise ValueError("Recap requires a spread title")
+        if not self.headline.strip():
+            raise ValueError("Recap requires a headline")
+        if not self.takeaway.strip():
+            raise ValueError("Recap requires a takeaway")

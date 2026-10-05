@@ -12,12 +12,41 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "2.9.0"
-RELEASE_DATE = "2026-10-04"
-CODENAME = "Asumi - Tarot 2.0"
+CURRENT_VERSION = "2.10.0"
+RELEASE_DATE = "2026-10-05"
+CODENAME = "Asumi - Tarot 2.1"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "2.10.0",
+        "date": "2026-10-05",
+        "type": "minor",
+        "title": "Tarot 2.1",
+        "summary": "Hoàn tất T20.6–T20.9: phiên đọc nhiều lượt, Smart Custom Spread, Tarot Journey 30 ngày và Recap Card gọn để lưu/chia sẻ.",
+        "changes": [
+            {"category": "💬 Reading Session", "items": [
+                "Mỗi quẻ hỗ trợ tối đa 3 follow-up có context liên tục; clarifier đã delivery trở thành context cho câu hỏi sau nhưng vẫn giữ giới hạn 1/1.",
+                "Nút Vì sao? giải thích dựa trên lá/vị trí nhìn thấy, owner-only và không hiển thị suy luận nội bộ.",
+                "Session timeout khóa các action tương tác; lỗi generate/delivery không âm thầm tiêu lượt follow-up.",
+            ]},
+            {"category": "🧩 Smart Custom Spread", "items": [
+                "Launcher có Trải bài riêng: AI chỉ thiết kế schema 3–7 vị trí, deck engine mới là nơi rút lá thật.",
+                "Validator chặn duplicate, text vượt giới hạn, card/orientation do model cung cấp và framing xâm phạm đời tư; schema lỗi fallback về spread chuẩn.",
+                "Custom title đi xuyên live/final Reading Board và Clarifier Board; renderer dynamic hiện có được tái sử dụng.",
+            ]},
+            {"category": "🧭 Tarot Journey", "items": [
+                "Thêm /tarot_journey và .m tarot journey với summary 30 ngày từ lịch sử đã lưu.",
+                "Hiển thị suit mix, Major ratio, lá lặp/lá ngược lặp, topic progression và spread dùng nhiều nhất.",
+                "Journey Card nhấn mạnh đây là thống kê tự phản chiếu, không phải dự đoán số phận hay chẩn đoán.",
+            ]},
+            {"category": "📌 Recap & polish", "items": [
+                "Kết quả quẻ có Recap Card owner-only: hero/key card, headline, một takeaway, spread và ngày; không gọi AI thêm.",
+                "Recap dùng layout portrait save/share-friendly và không nhét toàn bộ luận giải vào ảnh.",
+                "Tài liệu/handoff/help được đồng bộ để T20.1–T20.9 có thể tiếp tục bảo trì từ repository mà không cần chat cũ.",
+            ]},
+        ],
+    },
     {
         "version": "2.9.0",
         "date": "2026-10-04",

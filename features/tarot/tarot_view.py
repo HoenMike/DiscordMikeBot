@@ -14,11 +14,12 @@ from features.tarot.deck import (
     draw_custom_spread,
     draw_spread
 )
-from features.tarot.renderer import render_clarifier_board_to_bytes, render_spread_to_bytes
+from features.tarot.renderer import render_clarifier_board_to_bytes, render_recap_card_to_bytes, render_spread_to_bytes
 from features.tarot.ai import generate_clarifier_interpretation, generate_custom_spread_schema, generate_tarot_reading_result, generate_followup_answer, generate_why_explanation, recommend_spread_for_question
 from features.tarot.reading.clarifier import resolve_clarifier_suggestions, target_insight
 from features.tarot.reading.custom_spread import CustomSpreadSchema
 from features.tarot.reading.recommendation import find_similar_recent_question
+from features.tarot.reading.recap import build_recap_state
 from features.tarot.reading.schema import TarotReadingResult
 from features.tarot.rendering.state import ClarifierBoardState
 from features.tarot.reading.followup import TarotSessionState
@@ -1028,7 +1029,7 @@ class TarotFollowupModal(discord.ui.Modal, title="❓ Hỏi Thêm Ý Nghĩa Qu�
     async def on_submit(self, interaction: discord.Interaction):
         question_text = self.followup_input.value.strip()
         if interaction.user.id != self.author_id or not question_text:
-            await interaction.response.send_message("Invalid followup submission.", ephemeral=True)
+            await interaction.response.send_message("⚠️ Câu hỏi bổ sung không hợp lệ hoặc phiên này không thuộc về bạn.", ephemeral=True)
             return
         if self.result_view._followup_in_progress:
             await interaction.response.send_message("⌛ Asumi đang trả lời câu hỏi trước đó.", ephemeral=True)
@@ -1248,8 +1249,10 @@ class TarotResultActionView(discord.ui.View):
         self.has_asked_followup = False  # compatibility: true only when all 3 turns are consumed
         self.has_used_clarifier = False
         self.has_used_why = False
+        self.has_generated_recap = False
         self._followup_in_progress = False
         self._why_in_progress = False
+        self._recap_in_progress = False
         self.message: Optional[discord.Message] = None
         self._clarifier_in_progress = False
         self.clarifier_target_index: Optional[int] = None
@@ -1261,7 +1264,7 @@ class TarotResultActionView(discord.ui.View):
         if not clarifier_allowed or not drawn_cards:
             self.clarifier_button.disabled = True
 
-    @discord.ui.button(label="❓ Hỏi Thêm Ý Nghĩa", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
+    @discord.ui.button(label="❓ Hỏi thêm (0/3)", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.author_id:
             await interaction.response.send_message("🔒 Chỉ người bốc quẻ mới có thể hỏi thêm về quẻ bài này!", ephemeral=True)
@@ -1313,7 +1316,7 @@ class TarotResultActionView(discord.ui.View):
                 description=answer,
                 color=0x6D5D8F,
             )
-            embed.set_footer(text="Chỉ dựa trên lá, vị trí và chiều bài đang hiển thị — không phải hidden reasoning.")
+            embed.set_footer(text="Chỉ dựa trên lá, vị trí và chiều bài đang hiển thị — không hiển thị suy luận nội bộ.")
             await interaction.followup.send(embed=embed, ephemeral=True)
             self.session_state.mark_why_used()
             self.has_used_why = True
@@ -1540,7 +1543,7 @@ class TarotResultActionView(discord.ui.View):
     async def on_timeout(self):
         self.session_state.close()
         for item in self.children:
-            if getattr(item, "custom_id", "") in {"tarot_followup", "tarot_clarifier", "tarot_why"}:
+            if isinstance(item, discord.ui.Button):
                 item.disabled = True
         if self.message:
             try:
@@ -1548,7 +1551,84 @@ class TarotResultActionView(discord.ui.View):
             except Exception:
                 pass
 
-    @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=0)
+    @discord.ui.button(label="📌 Recap", style=discord.ButtonStyle.secondary, custom_id="tarot_recap", row=1)
+    async def recap_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "🔒 Chỉ chủ quẻ mới có thể tạo Recap Card.",
+                ephemeral=True,
+            )
+            return
+        if self.has_generated_recap:
+            await interaction.response.send_message(
+                "✓ Recap Card của quẻ này đã được tạo rồi.",
+                ephemeral=True,
+            )
+            return
+        if self._recap_in_progress:
+            await interaction.response.send_message("⌛ Recap đang được dựng.", ephemeral=True)
+            return
+
+        self._recap_in_progress = True
+        image_buffer = None
+        try:
+            await interaction.response.defer(ephemeral=True)
+            spread_title = self.spread_title or SPREAD_DEFINITIONS.get(
+                self.spread_key, {}
+            ).get("name", self.spread_key)
+            state = build_recap_state(
+                spread_title=spread_title,
+                user_name=self.author_name,
+                drawn_cards=self.drawn_cards,
+                reading_result=self.reading_result,
+                ai_reading=self.ai_reading,
+            )
+            image_buffer = await asyncio.to_thread(render_recap_card_to_bytes, state)
+            file = discord.File(fp=image_buffer, filename="tarot_recap.png")
+            orientation = "NGƯỢC" if state.hero_card.is_reversed else "XUÔI"
+            embed = discord.Embed(
+                title="📌 TAROT RECAP",
+                description=(
+                    "Bản tóm tắt gọn từ **chính quẻ vừa đọc** — không rút thêm lá "
+                    "và không gọi AI thêm.\n\n"
+                    f"**🃏 Hero:** {state.hero_card.card.name_vi} · {orientation}\n"
+                    f"**✨ Headline:** {state.headline}\n"
+                    f"**📌 Mang theo:** {state.takeaway}\n"
+                    f"**🗂️ Spread:** {state.spread_title} · {state.date_label}"
+                ),
+                color=0x6D5D8F,
+            )
+            embed.set_image(url="attachment://tarot_recap.png")
+            await interaction.followup.send(embed=embed, file=file, ephemeral=True)
+
+            self.has_generated_recap = True
+            self.recap_button.label = "✓ Recap"
+            self.recap_button.disabled = True
+            if interaction.message:
+                self.message = interaction.message
+                try:
+                    await interaction.message.edit(view=self)
+                except Exception:
+                    pass
+            self._sync_activity_logger()
+        except Exception as exc:
+            print(f"❌ [TarotRecap] Không tạo/gửi được recap: {type(exc).__name__}: {exc}", flush=True)
+            try:
+                await interaction.followup.send(
+                    "❌ Chưa tạo được Recap Card. Lượt recap **chưa bị khóa**; bạn có thể thử lại.",
+                    ephemeral=True,
+                )
+            except Exception:
+                pass
+        finally:
+            self._recap_in_progress = False
+            try:
+                if image_buffer is not None:
+                    image_buffer.close()
+            except Exception:
+                pass
+
+    @discord.ui.button(label="👍 Hữu ích", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_pos", row=1)
     async def rate_pos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = interaction.user.id
         if uid in self.liked_user_ids:
@@ -1569,7 +1649,7 @@ class TarotResultActionView(discord.ui.View):
         except Exception:
             pass
 
-    @discord.ui.button(label="👎 Chưa chuẩn", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_neg", row=0)
+    @discord.ui.button(label="👎 Chưa chuẩn", style=discord.ButtonStyle.secondary, custom_id="tarot_rate_neg", row=1)
     async def rate_neg_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         uid = interaction.user.id
         if uid in self.disliked_user_ids:
@@ -1612,6 +1692,7 @@ class TarotResultActionView(discord.ui.View):
                     "clarifier_used": self.has_used_clarifier,
                     "followup_count": len(self.session_state.followups),
                     "why_used": self.has_used_why,
+                    "recap_generated": self.has_generated_recap,
                 }
                 if self.has_used_clarifier and self.clarifier_card is not None:
                     details["clarifier_target_index"] = self.clarifier_target_index
