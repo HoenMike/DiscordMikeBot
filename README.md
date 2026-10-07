@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligence + Archive (3.3.1)
+### Asumi Intelligence (3.4)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -25,6 +25,8 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - Vectorize chỉ là derived index; canonical Archive vẫn ở Turso/SQLite và mỗi semantic result được owner-check lại trước khi hiển thị.
 - Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
 - Clef-flash trên Cloudflare là router tùy chọn; Admin Dashboard có filter **Asumi AI** để theo dõi latency/tool path.
+- 3.4 Dashboard phân biệt Archive lexical / semantic-hybrid / fallback, Vectorize latency và Clef fallback mà không lưu nguyên nội dung hội thoại.
+- Semantic requests có concurrency guard riêng (mặc định 3) để tránh burst request khi nhiều Save/Search cùng lúc.
 
 ### Tóm tắt cuộc trò chuyện bằng AI
 
