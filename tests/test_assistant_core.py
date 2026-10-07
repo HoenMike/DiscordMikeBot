@@ -190,7 +190,7 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         )
         replied = SimpleNamespace(
             id=77,
-            content="https://example.com/game",
+            content="",
             author=SimpleNamespace(display_name="Theo"),
             attachments=[],
             embeds=[embed],
@@ -203,6 +203,19 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         ctx = await ContextBuilder().build(msg, "cái này có coop không?")
         self.assertIn("[Embed] Game page", ctx.reply.content)
         self.assertIn("Co-op farming game", ctx.reply.content)
+        self.assertIn("https://example.com/game", ctx.urls)
+
+    async def test_missing_content_type_infers_image_from_extension(self):
+        attachment = SimpleNamespace(
+            content_type=None,
+            filename="screen.PNG",
+            size=3,
+            read=AsyncMock(return_value=b"png"),
+        )
+        msg = fake_message("<@123> xem cái này", attachments=[attachment])
+        ctx = await ContextBuilder().build(msg, "xem cái này")
+        self.assertEqual(len(ctx.images), 1)
+        self.assertEqual(ctx.images[0].mime_type, "image/png")
 
     async def test_direct_image_attachment_is_loaded(self):
         attachment = SimpleNamespace(
