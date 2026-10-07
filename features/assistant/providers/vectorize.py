@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -46,6 +47,7 @@ class ArchiveSemanticIndex:
         dimensions: int = 1024,
         timeout_seconds: float = 6.0,
         min_score: float = 0.45,
+        max_concurrency: int = 3,
     ):
         self.account_id = account_id.strip()
         self.ai_token = ai_token.strip()
@@ -58,6 +60,8 @@ class ArchiveSemanticIndex:
         self.dimensions = int(dimensions)
         self.timeout_seconds = max(1.0, float(timeout_seconds))
         self.min_score = max(0.0, min(float(min_score), 1.0))
+        self.max_concurrency = max(1, min(int(max_concurrency), 10))
+        self._semaphore = asyncio.Semaphore(self.max_concurrency)
         self._index_ready = False
         self._blocked_reason = ""
 
@@ -83,6 +87,9 @@ class ArchiveSemanticIndex:
             dimensions=int(os.getenv("CF_ARCHIVE_VECTOR_DIMENSIONS", "1024")),
             timeout_seconds=float(os.getenv("CF_ARCHIVE_SEMANTIC_TIMEOUT_SECONDS", "6")),
             min_score=float(os.getenv("CF_ARCHIVE_SEMANTIC_MIN_SCORE", "0.45")),
+            max_concurrency=int(
+                os.getenv("CF_ARCHIVE_SEMANTIC_MAX_CONCURRENCY", "3")
+            ),
         )
 
     @property
@@ -225,30 +232,31 @@ class ArchiveSemanticIndex:
         if not self.enabled:
             return False
         try:
-            await self.ensure_index()
-            text = self.document_text(item)
-            if not text:
-                return False
-            vector = await self._embed(text)
-            payload = {
-                "id": str(int(item["id"])),
-                "values": vector,
-                "namespace": self.namespace(int(item["owner_user_id"])),
-                "metadata": {
-                    "archive_id": int(item["id"]),
-                    "kind": str(item.get("source_kind") or "message")[:32],
-                },
-            }
-            ndjson = json.dumps(payload, ensure_ascii=False) + "\n"
-            await self._json_request(
-                "POST",
-                self._api(
-                    f"vectorize/v2/indexes/{self.index_name}/upsert"
-                ),
-                token=self.vectorize_token,
-                file_body=ndjson.encode("utf-8"),
-            )
-            return True
+            async with self._semaphore:
+                await self.ensure_index()
+                text = self.document_text(item)
+                if not text:
+                    return False
+                vector = await self._embed(text)
+                payload = {
+                    "id": str(int(item["id"])),
+                    "values": vector,
+                    "namespace": self.namespace(int(item["owner_user_id"])),
+                    "metadata": {
+                        "archive_id": int(item["id"]),
+                        "kind": str(item.get("source_kind") or "message")[:32],
+                    },
+                }
+                ndjson = json.dumps(payload, ensure_ascii=False) + "\n"
+                await self._json_request(
+                    "POST",
+                    self._api(
+                        f"vectorize/v2/indexes/{self.index_name}/upsert"
+                    ),
+                    token=self.vectorize_token,
+                    file_body=ndjson.encode("utf-8"),
+                )
+                return True
         except SemanticUnavailable as exc:
             print(f"⚠️ [Asumi Archive Semantic] upsert skipped: {exc}", flush=True)
             return False
@@ -281,9 +289,10 @@ class ArchiveSemanticIndex:
                 elapsed_ms=0.0,
             )
         try:
-            await self.ensure_index()
-            vector = await self._embed(query)
-            _, body = await self._json_request(
+            async with self._semaphore:
+                await self.ensure_index()
+                vector = await self._embed(query)
+                _, body = await self._json_request(
                 "POST",
                 self._api(
                     f"vectorize/v2/indexes/{self.index_name}/query"
@@ -295,8 +304,8 @@ class ArchiveSemanticIndex:
                     "namespace": self.namespace(owner_user_id),
                     "returnMetadata": "all",
                     "returnValues": False,
-                },
-            )
+                    },
+                )
             result = body.get("result", body) if isinstance(body, dict) else {}
             matches = result.get("matches", []) if isinstance(result, dict) else []
             output: list[SemanticMatch] = []
@@ -359,16 +368,17 @@ class ArchiveSemanticIndex:
         if not self.enabled:
             return False
         try:
-            await self.ensure_index()
-            await self._json_request(
-                "POST",
-                self._api(
-                    f"vectorize/v2/indexes/{self.index_name}/delete_by_ids"
-                ),
-                token=self.vectorize_token,
-                json_body={"ids": [str(int(archive_id))]},
-            )
-            return True
+            async with self._semaphore:
+                await self.ensure_index()
+                await self._json_request(
+                    "POST",
+                    self._api(
+                        f"vectorize/v2/indexes/{self.index_name}/delete_by_ids"
+                    ),
+                    token=self.vectorize_token,
+                    json_body={"ids": [str(int(archive_id))]},
+                )
+                return True
         except Exception as exc:
             print(
                 f"⚠️ [Asumi Archive Semantic] delete skipped: "
