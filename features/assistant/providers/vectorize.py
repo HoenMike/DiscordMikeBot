@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +18,14 @@ class SemanticUnavailable(RuntimeError):
 class SemanticMatch:
     archive_id: int
     score: float
+
+
+@dataclass(frozen=True)
+class SemanticQueryReport:
+    matches: tuple[SemanticMatch, ...]
+    status: str
+    elapsed_ms: float = 0.0
+    error_type: str = ""
 
 
 class ArchiveSemanticIndex:
@@ -37,6 +47,7 @@ class ArchiveSemanticIndex:
         dimensions: int = 1024,
         timeout_seconds: float = 6.0,
         min_score: float = 0.45,
+        max_concurrency: int = 3,
     ):
         self.account_id = account_id.strip()
         self.ai_token = ai_token.strip()
@@ -49,6 +60,9 @@ class ArchiveSemanticIndex:
         self.dimensions = int(dimensions)
         self.timeout_seconds = max(1.0, float(timeout_seconds))
         self.min_score = max(0.0, min(float(min_score), 1.0))
+        self.max_concurrency = max(1, min(int(max_concurrency), 10))
+        self._semaphore = asyncio.Semaphore(self.max_concurrency)
+        self._index_lock = asyncio.Lock()
         self._index_ready = False
         self._blocked_reason = ""
 
@@ -74,6 +88,9 @@ class ArchiveSemanticIndex:
             dimensions=int(os.getenv("CF_ARCHIVE_VECTOR_DIMENSIONS", "1024")),
             timeout_seconds=float(os.getenv("CF_ARCHIVE_SEMANTIC_TIMEOUT_SECONDS", "6")),
             min_score=float(os.getenv("CF_ARCHIVE_SEMANTIC_MIN_SCORE", "0.45")),
+            max_concurrency=int(
+                os.getenv("CF_ARCHIVE_SEMANTIC_MAX_CONCURRENCY", "3")
+            ),
         )
 
     @property
@@ -171,28 +188,32 @@ class ArchiveSemanticIndex:
         if self._index_ready:
             return True
 
-        status, _ = await self._json_request(
-            "GET",
-            self._api(f"vectorize/v2/indexes/{self.index_name}"),
-            token=self.vectorize_token,
-            allow_404=True,
-        )
-        if status == 404:
-            await self._json_request(
-                "POST",
-                self._api("vectorize/v2/indexes"),
+        async with self._index_lock:
+            if self._index_ready:
+                return True
+
+            status, _ = await self._json_request(
+                "GET",
+                self._api(f"vectorize/v2/indexes/{self.index_name}"),
                 token=self.vectorize_token,
-                json_body={
-                    "name": self.index_name,
-                    "description": "Derived semantic index for Asumi Archive",
-                    "config": {
-                        "dimensions": self.dimensions,
-                        "metric": "cosine",
-                    },
-                },
+                allow_404=True,
             )
-        self._index_ready = True
-        return True
+            if status == 404:
+                await self._json_request(
+                    "POST",
+                    self._api("vectorize/v2/indexes"),
+                    token=self.vectorize_token,
+                    json_body={
+                        "name": self.index_name,
+                        "description": "Derived semantic index for Asumi Archive",
+                        "config": {
+                            "dimensions": self.dimensions,
+                            "metric": "cosine",
+                        },
+                    },
+                )
+            self._index_ready = True
+            return True
 
     @staticmethod
     def document_text(item: dict[str, Any]) -> str:
@@ -216,30 +237,31 @@ class ArchiveSemanticIndex:
         if not self.enabled:
             return False
         try:
-            await self.ensure_index()
-            text = self.document_text(item)
-            if not text:
-                return False
-            vector = await self._embed(text)
-            payload = {
-                "id": str(int(item["id"])),
-                "values": vector,
-                "namespace": self.namespace(int(item["owner_user_id"])),
-                "metadata": {
-                    "archive_id": int(item["id"]),
-                    "kind": str(item.get("source_kind") or "message")[:32],
-                },
-            }
-            ndjson = json.dumps(payload, ensure_ascii=False) + "\n"
-            await self._json_request(
-                "POST",
-                self._api(
-                    f"vectorize/v2/indexes/{self.index_name}/upsert"
-                ),
-                token=self.vectorize_token,
-                file_body=ndjson.encode("utf-8"),
-            )
-            return True
+            async with self._semaphore:
+                await self.ensure_index()
+                text = self.document_text(item)
+                if not text:
+                    return False
+                vector = await self._embed(text)
+                payload = {
+                    "id": str(int(item["id"])),
+                    "values": vector,
+                    "namespace": self.namespace(int(item["owner_user_id"])),
+                    "metadata": {
+                        "archive_id": int(item["id"]),
+                        "kind": str(item.get("source_kind") or "message")[:32],
+                    },
+                }
+                ndjson = json.dumps(payload, ensure_ascii=False) + "\n"
+                await self._json_request(
+                    "POST",
+                    self._api(
+                        f"vectorize/v2/indexes/{self.index_name}/upsert"
+                    ),
+                    token=self.vectorize_token,
+                    file_body=ndjson.encode("utf-8"),
+                )
+                return True
         except SemanticUnavailable as exc:
             print(f"⚠️ [Asumi Archive Semantic] upsert skipped: {exc}", flush=True)
             return False
@@ -251,32 +273,44 @@ class ArchiveSemanticIndex:
             )
             return False
 
-    async def query(
+    async def query_report(
         self,
         owner_user_id: int,
         query: str,
         *,
         top_k: int = 8,
-    ) -> list[SemanticMatch]:
-        if not self.enabled or not (query or "").strip():
-            return []
-        try:
-            await self.ensure_index()
-            vector = await self._embed(query)
-            _, body = await self._json_request(
-                "POST",
-                self._api(
-                    f"vectorize/v2/indexes/{self.index_name}/query"
-                ),
-                token=self.vectorize_token,
-                json_body={
-                    "vector": vector,
-                    "topK": max(1, min(int(top_k), 20)),
-                    "namespace": self.namespace(owner_user_id),
-                    "returnMetadata": "all",
-                    "returnValues": False,
-                },
+    ) -> SemanticQueryReport:
+        started = time.perf_counter()
+        if not self.enabled:
+            return SemanticQueryReport(
+                matches=(),
+                status="disabled",
+                elapsed_ms=0.0,
             )
+        if not (query or "").strip():
+            return SemanticQueryReport(
+                matches=(),
+                status="empty_query",
+                elapsed_ms=0.0,
+            )
+        try:
+            async with self._semaphore:
+                await self.ensure_index()
+                vector = await self._embed(query)
+                _, body = await self._json_request(
+                    "POST",
+                    self._api(
+                        f"vectorize/v2/indexes/{self.index_name}/query"
+                    ),
+                    token=self.vectorize_token,
+                    json_body={
+                        "vector": vector,
+                        "topK": max(1, min(int(top_k), 20)),
+                        "namespace": self.namespace(owner_user_id),
+                        "returnMetadata": "all",
+                        "returnValues": False,
+                    },
+                )
             result = body.get("result", body) if isinstance(body, dict) else {}
             matches = result.get("matches", []) if isinstance(result, dict) else []
             output: list[SemanticMatch] = []
@@ -288,32 +322,68 @@ class ArchiveSemanticIndex:
                     continue
                 if score >= self.min_score:
                     output.append(SemanticMatch(archive_id=archive_id, score=score))
-            return output
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            return SemanticQueryReport(
+                matches=tuple(output),
+                status="ok" if output else "no_match",
+                elapsed_ms=elapsed_ms,
+            )
         except SemanticUnavailable as exc:
+            elapsed_ms = (time.perf_counter() - started) * 1000
             print(f"⚠️ [Asumi Archive Semantic] query fallback: {exc}", flush=True)
-            return []
+            return SemanticQueryReport(
+                matches=(),
+                status=(
+                    "permission_error"
+                    if self._blocked_reason.startswith("permission_")
+                    else "unavailable"
+                ),
+                elapsed_ms=elapsed_ms,
+                error_type=type(exc).__name__,
+            )
         except Exception as exc:
+            elapsed_ms = (time.perf_counter() - started) * 1000
             print(
                 f"⚠️ [Asumi Archive Semantic] query error: "
                 f"{type(exc).__name__}: {str(exc)[:160]}",
                 flush=True,
             )
-            return []
+            return SemanticQueryReport(
+                matches=(),
+                status="error",
+                elapsed_ms=elapsed_ms,
+                error_type=type(exc).__name__,
+            )
+
+    async def query(
+        self,
+        owner_user_id: int,
+        query: str,
+        *,
+        top_k: int = 8,
+    ) -> list[SemanticMatch]:
+        report = await self.query_report(
+            owner_user_id,
+            query,
+            top_k=top_k,
+        )
+        return list(report.matches)
 
     async def delete_item(self, archive_id: int) -> bool:
         if not self.enabled:
             return False
         try:
-            await self.ensure_index()
-            await self._json_request(
-                "POST",
-                self._api(
-                    f"vectorize/v2/indexes/{self.index_name}/delete_by_ids"
-                ),
-                token=self.vectorize_token,
-                json_body={"ids": [str(int(archive_id))]},
-            )
-            return True
+            async with self._semaphore:
+                await self.ensure_index()
+                await self._json_request(
+                    "POST",
+                    self._api(
+                        f"vectorize/v2/indexes/{self.index_name}/delete_by_ids"
+                    ),
+                    token=self.vectorize_token,
+                    json_body={"ids": [str(int(archive_id))]},
+                )
+                return True
         except Exception as exc:
             print(
                 f"⚠️ [Asumi Archive Semantic] delete skipped: "

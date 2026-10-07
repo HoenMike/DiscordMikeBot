@@ -1469,12 +1469,41 @@
             if (!activity || activity.action_type !== 'assistant') return '';
             const d = activity.details || {};
             const parts = [];
-            if (d.model) parts.push(String(d.model).replace('gemini-', ''));
-            if (Number(d.ai_ms) > 0) parts.push('AI ' + formatTimingMs(d.ai_ms));
-            if (Number(d.clef_ms) > 0) parts.push('Clef ' + formatTimingMs(d.clef_ms));
-            if (d.path === 'tool' && Number(d.tool_ms) > 0) parts.push('Tool ' + formatTimingMs(d.tool_ms));
+
+            if (d.archive_action) {
+                parts.push('Archive ' + String(d.archive_action));
+                if (d.archive_search_mode) {
+                    const mode = String(d.archive_search_mode)
+                        .replace('semantic_hybrid', 'hybrid')
+                        .replace('semantic_fallback', 'fallback');
+                    parts.push(mode);
+                }
+                if (Number(d.semantic_ms) > 0) {
+                    parts.push('Vector ' + formatTimingMs(d.semantic_ms));
+                }
+                if (Number(d.semantic_matches) > 0) {
+                    parts.push(String(d.semantic_matches) + ' semantic');
+                }
+            } else {
+                if (d.model) parts.push(String(d.model).replace('gemini-', ''));
+                if (Number(d.ai_ms) > 0) parts.push('AI ' + formatTimingMs(d.ai_ms));
+                if (Number(d.clef_ms) > 0) parts.push('Clef ' + formatTimingMs(d.clef_ms));
+                if (d.source === 'local_clef_error') parts.push('Clef fallback');
+                if (d.source === 'local_low_confidence') parts.push('Clef low-confidence');
+            }
+
+            if (d.path === 'tool' && Number(d.tool_ms) > 0) {
+                parts.push('Tool ' + formatTimingMs(d.tool_ms));
+            }
             if (!parts.length) return '';
-            return `<div class="text-[9px] text-cyan-300/80 code-font mt-0.5 truncate max-w-[210px]" title="${escapeHtml(parts.join(' • '))}">${escapeHtml(parts.join(' • '))}</div>`;
+
+            const isFallback = d.archive_search_mode === 'semantic_fallback';
+            const tone = isFallback ? 'text-amber-300/90' : 'text-cyan-300/80';
+            const titleParts = [...parts];
+            if (d.semantic_status) {
+                titleParts.push('semantic=' + String(d.semantic_status));
+            }
+            return `<div class="text-[9px] ${tone} code-font mt-0.5 truncate max-w-[260px]" title="${escapeHtml(titleParts.join(' • '))}">${escapeHtml(parts.join(' • '))}</div>`;
         }
 
         function renderFeedbackPills(details) {

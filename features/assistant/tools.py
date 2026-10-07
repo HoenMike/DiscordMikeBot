@@ -4,7 +4,7 @@ import asyncio
 import copy
 
 import discord
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from features.assistant.archive import archive_store
 from features.assistant.providers.vectorize import archive_semantic
@@ -17,6 +17,7 @@ class ToolExecutionResult:
     command_text: str | None = None
     response_message_ids: tuple[int, ...] = ()
     response_context: str = ""
+    details: dict = field(default_factory=dict)
 
 
 def _render_bot_message(message, max_chars: int = 2200) -> str:
@@ -86,6 +87,12 @@ class CommandToolRegistry:
                     handled=True,
                     response_message_ids=(int(sent.id),),
                     response_context=error,
+                    details={
+                        "archive_action": "save",
+                        "archive_created": False,
+                        "archive_status": "rejected",
+                        "semantic_enabled": archive_semantic.enabled,
+                    },
                 )
 
             state = "Đã lưu" if created else "Mục này đã có trong Archive"
@@ -104,6 +111,14 @@ class CommandToolRegistry:
                 handled=True,
                 response_message_ids=(int(sent.id),),
                 response_context=f"Archive #{item['id']}: {snippet}",
+                details={
+                    "archive_action": "save",
+                    "archive_id": int(item["id"]),
+                    "archive_created": bool(created),
+                    "archive_status": "saved" if created else "deduped",
+                    "semantic_enabled": archive_semantic.enabled,
+                    "semantic_index_queued": bool(archive_semantic.enabled),
+                },
             )
 
         if decision.tool == "archive.search":
@@ -116,12 +131,20 @@ class CommandToolRegistry:
             )
             items = list(lexical_items)
 
+            semantic_status = "disabled"
+            semantic_ms = 0.0
+            semantic_match_count = 0
+
             if query and archive_semantic.enabled:
-                matches = await archive_semantic.query(
+                semantic_report = await archive_semantic.query_report(
                     owner_user_id,
                     semantic_query,
                     top_k=8,
                 )
+                matches = list(semantic_report.matches)
+                semantic_status = semantic_report.status
+                semantic_ms = semantic_report.elapsed_ms
+                semantic_match_count = len(matches)
                 if matches:
                     semantic_items = await archive_store.get_by_ids(
                         owner_user_id,
@@ -153,6 +176,23 @@ class CommandToolRegistry:
                     handled=True,
                     response_message_ids=(int(sent.id),),
                     response_context="Archive search returned no matches.",
+                    details={
+                        "archive_action": "search",
+                        "archive_search_mode": (
+                            "semantic_fallback"
+                            if semantic_status in {"permission_error", "unavailable", "error"}
+                            else (
+                                "semantic_hybrid"
+                                if semantic_status in {"ok", "no_match"}
+                                else "lexical"
+                            )
+                        ),
+                        "semantic_status": semantic_status,
+                        "semantic_ms": round(semantic_ms, 1),
+                        "semantic_matches": semantic_match_count,
+                        "lexical_matches": len(lexical_items),
+                        "result_count": 0,
+                    },
                 )
 
             lines = ["🧠 **ASUMI ARCHIVE**"]
@@ -178,6 +218,23 @@ class CommandToolRegistry:
                     f"Archive #{item['id']}: {self._archive_snippet(item)}"
                     for item in items
                 )[:6000],
+                details={
+                    "archive_action": "search",
+                    "archive_search_mode": (
+                        "semantic_fallback"
+                        if semantic_status in {"permission_error", "unavailable", "error"}
+                        else (
+                            "semantic_hybrid"
+                            if semantic_status in {"ok", "no_match"}
+                            else "lexical"
+                        )
+                    ),
+                    "semantic_status": semantic_status,
+                    "semantic_ms": round(semantic_ms, 1),
+                    "semantic_matches": semantic_match_count,
+                    "lexical_matches": len(lexical_items),
+                    "result_count": len(items),
+                },
             )
 
         if decision.tool == "archive.forget":
@@ -198,6 +255,15 @@ class CommandToolRegistry:
                 handled=True,
                 response_message_ids=(int(sent.id),),
                 response_context=text,
+                details={
+                    "archive_action": "forget",
+                    "archive_id": archive_id,
+                    "archive_deleted": bool(deleted),
+                    "semantic_enabled": archive_semantic.enabled,
+                    "semantic_delete_queued": bool(
+                        deleted and archive_semantic.enabled
+                    ),
+                },
             )
 
         return ToolExecutionResult(handled=False)
@@ -281,6 +347,10 @@ class CommandToolRegistry:
                     handled=True,
                     response_message_ids=(int(sent.id),),
                     response_context="Archive unavailable; no mutation confirmed.",
+                    details={
+                        "archive_status": "error",
+                        "tool_error_type": type(exc).__name__,
+                    },
                 )
 
         command_text = self._command_for(decision)

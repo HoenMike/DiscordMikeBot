@@ -12,12 +12,33 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.3.1"
-RELEASE_DATE = "2026-10-07"
-CODENAME = "Asumi 3.3 - Archive Semantic"
+CURRENT_VERSION = "3.4.0"
+RELEASE_DATE = "2026-10-08"
+CODENAME = "Asumi 3.4 - Intelligence Polish"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.4.0",
+        "date": "2026-10-08",
+        "type": "minor",
+        "title": "Intelligence Polish",
+        "summary": "Hoàn thiện observability, semantic fallback visibility và concurrency guard cho Asumi Intelligence.",
+        "changes": [
+            {"category": "📊 Observability", "items": [
+                "Asumi AI telemetry ghi Archive save/search/forget, lexical vs semantic-hybrid/fallback, semantic latency và match counts.",
+                "Dashboard hiển thị Archive mode/Vector latency ngay trên activity row; semantic fallback được tô cảnh báo.",
+                "Clef error/low-confidence fallback được hiển thị rõ thay vì chỉ có timing.",
+                "Telemetry tiếp tục không lưu nguyên prompt/response hay Archive content.",
+            ]},
+            {"category": "🛡️ Reliability", "items": [
+                "Vectorize query trả typed status report để phân biệt ok/no-match/permission-error/unavailable.",
+                "Semantic request có concurrency cap mặc định 3 để chống burst Save/Search.",
+                "Index initialization được serialize để tránh race auto-create ở first request.",
+                "Load smoke test khóa concurrency guard và regression tests cover lexical fallback metrics.",
+            ]},
+        ],
+    },
     {
         "version": "3.3.1",
         "date": "2026-10-08",

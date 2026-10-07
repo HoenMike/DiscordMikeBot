@@ -82,7 +82,7 @@ Before any T21 work, read:
 - T21.1, T21.2 and T21.4 are complete; T21.3 Clef adapter is implemented but requires Cloudflare credentials for live verification.
 - **Asumi 3.2 Context + Lens is implemented; remaining reply/link/image edge-case checks roll into the final regression matrix.** Image input is required and audio/voice transcription remains out of scope.
 - **Asumi 3.3 Archive Core is shipped; 3.3.1 optional semantic retrieval is implemented behind `CF_ARCHIVE_SEMANTIC_ENABLED` and requires Vectorize credential/live validation.** Canonical Archive records use the existing core.db Turso/SQLite adapter; Vectorize is derived state only and R2 remains optional.
-- Asumi 3.4 Intelligence Polish remains planned after Archive acceptance.
+- **Asumi 3.4 Intelligence Polish is implemented; final production regression/live semantic validation remains.** Dashboard telemetry exposes Clef/Archive/Vectorize fallback state without storing assistant prompt/response bodies.
 - Cloudflare/AI work is **free-only** and must fail closed rather than silently create paid usage.
 - Do not make Asumi respond to ordinary unmentioned server chat.
 - Clef-flash is a decision/router layer, not the primary prose model.

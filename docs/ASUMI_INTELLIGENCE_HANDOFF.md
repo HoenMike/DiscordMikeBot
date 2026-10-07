@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.3.1 ARCHIVE SEMANTIC — implemented behind feature flag; Vectorize credential + live validation pending  
+**Status:** ASUMI 3.4.0 INTELLIGENCE POLISH — implemented; Vectorize credential + final production regression pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -13,7 +13,7 @@
 Asumi 3.1  Conversational Core        COMPLETE
 Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
 Asumi 3.3  Asumi Archive              CORE + SEMANTIC IMPLEMENTED; LIVE VERIFY
-Asumi 3.4  Intelligence Polish        PLANNED
+Asumi 3.4  Intelligence Polish        IMPLEMENTED; LIVE REGRESSION
 ```
 
 Audio / voice transcription is explicitly excluded unless the owner reopens it.
@@ -46,7 +46,7 @@ No mention/reply => no conversational response.
 - Tarot cards remain deck-engine controlled.
 - No passive full-server message archive.
 - Conversation context is bounded.
-- Long-term memory is explicit opt-in and later.
+- Long-term Archive memory is explicit opt-in only; no passive server archive.
 - Cloudflare usage is **free-only** and fails closed rather than creating paid usage.
 - Clef-flash is planned as a decision/router model, not the main prose model.
 - Cloudflare model names/quotas must be re-verified at implementation time.
@@ -76,7 +76,7 @@ T21.4  Existing feature tool adapters              COMPLETE (Help/Tarot/Summary)
 T21.5  Context Builder v2 / Lens text+link         IMPLEMENTED; LIVE VERIFY
 T21.6  Image Lens                                  IMPLEMENTED; LIVE VERIFY
 T21.7  Asumi Archive / explicit memory             CORE + SEMANTIC IMPLEMENTED; LIVE VERIFY
-T21.8  Polish + observability + release            NOT STARTED
+T21.8  Polish + observability + release            IMPLEMENTED; LIVE REGRESSION
 ```
 
 ---
@@ -163,34 +163,84 @@ CF_ARCHIVE_VECTOR_DIMENSIONS=1024
 
 Use a **separate Vectorize token** rather than replacing the existing Workers AI token. The code auto-creates the index on first enabled semantic request.
 
+## 3.4 Intelligence Polish implementation
+
+Implementation PR: **#31 — feat: Asumi 3.4 Intelligence Polish**.
+
+3.4.0 closes the implementation side of T21.8:
+- Archive tool telemetry now exposes action, lexical/semantic-hybrid/fallback mode, semantic status, semantic latency, semantic/lexical match counts and result count.
+- Tool/provider metrics are merged into the existing privacy-safe Asumi AI ActivityLogger record; prompt/response bodies remain blank.
+- Admin Dashboard renders Archive mode + Vector latency inline and highlights semantic fallback.
+- Clef error / low-confidence fallback is surfaced inline in dashboard timing summaries.
+- Vectorize query now returns typed provider status reports instead of forcing operators to infer failures from empty match lists.
+- Semantic concurrency is bounded (default 3, configurable) and first index initialization is serialized to avoid race creation.
+- Added concurrent-query smoke coverage plus provider-failure -> lexical-fallback metric regression coverage.
+- No new user command or passive data collection is introduced.
+
+3.4.0 is implementation-complete but **not production-accepted** until the final live matrix below is run.
+
 ## 3.2.1 Tarot UX follow-up
 
 During 3.2 live testing, the Daily result exposed a presentation issue: the AI-pending state was visually hidden below a tall Reading Board. 3.2.1 moves the pending status above the board and compacts one-card final results. Re-run the Tarot live case in the acceptance matrix after deploy.
 
 ## Exact next action
 
-**Manual blocker: enable Vectorize on Render for live semantic validation.**
+Two live tasks remain before T21 can be marked fully accepted:
 
-1. Create a Cloudflare API token with **Vectorize Read + Vectorize Write** for the same account.
-2. Add it to Render as `CLOUDFLARE_VECTORIZE_TOKEN`.
-3. Set `CF_ARCHIVE_SEMANTIC_ENABLED=true`.
-4. Redeploy. Do not replace `CLOUDFLARE_API_TOKEN`; that existing token continues to handle Workers AI embeddings/Clef.
-5. No manual Vectorize index creation is required; Asumi creates `asumi-archive-v1` (1024 dimensions / cosine) on first use.
+### A. Enable + verify Archive semantic retrieval
+1. Create a **separate** Cloudflare API token with Vectorize Read + Vectorize Write.
+2. Render env:
+   - `CLOUDFLARE_VECTORIZE_TOKEN=<new token>`
+   - `CF_ARCHIVE_SEMANTIC_ENABLED=true`
+3. Redeploy. Keep the existing `CLOUDFLARE_API_TOKEN` unchanged.
+4. The bot auto-creates `asumi-archive-v1` (1024 dimensions / cosine).
 
-Live semantic acceptance:
+Semantic acceptance:
 ```text
-reply source "con mèo nằm ngủ trên bàn" -> @Asumi nhớ cái này
-@Asumi tìm lại cái meme con vật nằm ngủ
--> should recover the saved item even when wording differs
+save:   "con mèo nằm ngủ trên bàn"
+search: "tìm lại cái meme con vật nằm ngủ"
+expect: saved item returned through semantic-hybrid
 
-another user runs the same semantic query
--> must not receive the first user's Archive item
+other user searches same meaning
+expect: no cross-user result
 
-disable/remove Vectorize token
--> same Archive search must continue through lexical fallback without breaking Save/Search/Forget
+remove/disable Vectorize credential
+expect: Archive still works through lexical fallback
+dashboard: Archive search • fallback + semantic_status visible
 ```
 
-Also keep the remaining 3.2 reply/image/Tarot regression matrix for **T21.8 final polish**.
+### B. Final T21 production regression
+```text
+@Asumi hello
+reply latest Asumi response -> continuation
+
+other user replies to that response
+-> no session inheritance
+
+reply normal user text/link + @Asumi cái này nói gì?
+-> bounded reply context
+
+upload image + @Asumi lỗi gì đây?
+reply image answer -> image follow-up still works
+
+@Asumi tarot daily
+reply completed Reading Board -> no redraw, same result context
+
+@Asumi tóm tắt 2h
+-> real Summary engine
+
+Archive Save -> duplicate Save -> Search -> Forget
+-> owner-scoped, deduped, deletable
+
+ordinary unmentioned chat
+-> no Asumi response
+
+dashboard
+-> chat/Clef/tool/Archive/semantic timing/fallback visible
+-> assistant prompt/response body remains empty
+```
+
+After these checks pass, mark T21/Asumi 3.x Intelligence **production accepted**. R2 media retention remains optional and is not required for Definition of Done.
 
 
 ---
