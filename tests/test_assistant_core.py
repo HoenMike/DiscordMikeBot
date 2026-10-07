@@ -181,6 +181,28 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([x.author for x in ctx.recent], ["Theo", "Mai"])
         self.assertIn("https://example.com/a", ctx.urls)
 
+    async def test_reply_embed_metadata_is_included(self):
+        embed = SimpleNamespace(
+            title="Game page",
+            description="Co-op farming game",
+            url="https://example.com/game",
+        )
+        replied = SimpleNamespace(
+            id=77,
+            content="https://example.com/game",
+            author=SimpleNamespace(display_name="Theo"),
+            attachments=[],
+            embeds=[embed],
+        )
+        msg = fake_message(
+            "<@123> cái này có coop không?",
+            reply_id=77,
+            resolved=replied,
+        )
+        ctx = await ContextBuilder().build(msg, "cái này có coop không?")
+        self.assertIn("[Embed] Game page", ctx.reply.content)
+        self.assertIn("Co-op farming game", ctx.reply.content)
+
     async def test_direct_image_attachment_is_loaded(self):
         attachment = SimpleNamespace(
             content_type="image/png",
@@ -269,6 +291,17 @@ class AssistantMultimodalPromptTests(unittest.IsolatedAsyncioTestCase):
         contents = generate.await_args.kwargs["contents"]
         self.assertEqual(len(contents[0].parts), 2)
         self.assertEqual(contents[0].parts[1].inline_data.mime_type, "image/png")
+
+    async def test_url_context_tool_is_enabled_when_context_has_url(self):
+        context = AssistantContext(urls=["https://example.com/article"])
+        fake_response = SimpleNamespace(text="đã đọc")
+        with patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(return_value=fake_response),
+        ) as generate:
+            await generate_chat_reply("link này nói gì?", context=context)
+        config = generate.await_args.kwargs["config"]
+        self.assertIsNotNone(config.tools)
 
     def test_prompt_contains_reply_context(self):
         ctx = AssistantContext()
