@@ -41,6 +41,7 @@ class ContextLine:
 @dataclass
 class AssistantContext:
     reply: ContextLine | None = None
+    prompt_char_limit: int = 7000
     recent: list[ContextLine] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
     images: list[ImagePayload] = field(default_factory=list)
@@ -48,7 +49,7 @@ class AssistantContext:
     used_recent_history: bool = False
     used_session_images: bool = False
 
-    def to_prompt_text(self, max_chars: int = 7000) -> str:
+    def to_prompt_text(self, max_chars: int | None = None) -> str:
         parts: list[str] = []
 
         if self.reply:
@@ -78,7 +79,8 @@ class AssistantContext:
             parts.append("Giới hạn context:\n" + "\n".join(self.warnings[:4]))
 
         text = "\n\n".join(parts)
-        return text[:max_chars]
+        limit = self.prompt_char_limit if max_chars is None else max_chars
+        return text[:max(1000, int(limit))]
 
 
 def _fold(text: str) -> str:
@@ -113,6 +115,24 @@ def needs_recent_context(query: str) -> bool:
         "bon no",
     )
     return any(signal in folded for signal in signals)
+
+
+def needs_broad_recent_context(query: str) -> bool:
+    folded = _fold(query)
+    broad_signals = (
+        "nay gio",
+        "vua roi",
+        "hoi nay",
+        "luc nay",
+        "doan chat",
+        "dang noi gi",
+        "dang ban gi",
+        "chuyen vua xay ra",
+        "moi nguoi",
+        "tui no",
+        "bon no",
+    )
+    return any(signal in folded for signal in broad_signals)
 
 
 def _extract_urls(text: str) -> list[str]:
@@ -286,7 +306,7 @@ class ContextBuilder:
         session=None,
         is_live_continuation: bool = False,
     ) -> AssistantContext:
-        ctx = AssistantContext()
+        ctx = AssistantContext(prompt_char_limit=self.max_context_chars)
         reply_message = await _resolve_reply_message(message)
 
         # Plain chat replies are already represented by bounded session turns.
@@ -340,7 +360,11 @@ class ContextBuilder:
             ctx.images.extend(list(session.images)[: self.max_images])
             ctx.used_session_images = True
 
-        if needs_recent_context(query):
+        should_fetch_recent = needs_recent_context(query) and (
+            needs_broad_recent_context(query)
+            or (ctx.reply is None and not ctx.images)
+        )
+        if should_fetch_recent:
             channel = getattr(message, "channel", None)
             history = getattr(channel, "history", None)
             if history:
