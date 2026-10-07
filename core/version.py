@@ -12,12 +12,40 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.1.2"
+CURRENT_VERSION = "3.2.0"
 RELEASE_DATE = "2026-10-07"
-CODENAME = "Asumi 3.1 - Conversational Core"
+CODENAME = "Asumi 3.2 - Context + Lens"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.2.0",
+        "date": "2026-10-07",
+        "type": "minor",
+        "title": "Context + Lens",
+        "summary": "Asumi hiểu reply/recent context có chọn lọc, link/embed metadata và ảnh; follow-up đúng live session không reroute thành action mới.",
+        "changes": [
+            {"category": "🧠 Context", "items": [
+                "Reply vào một message rồi tag Asumi sẽ đưa đúng message đó vào context.",
+                "Recent channel history chỉ được fetch khi câu hỏi có cue như cái này/cái trước/phía trên/vừa rồi, với số message và character budget bị giới hạn.",
+                "Reply đúng response conversational mới nhất tiếp tục session mà không gọi Clef/tool router lại; reply cũ, khác user hoặc session hết hạn không được tiếp tục.",
+            ]},
+            {"category": "🖼️ Image Lens", "items": [
+                "Nhận PNG/JPEG/WEBP từ attachment trực tiếp hoặc message được reply.",
+                "Ảnh được gửi multimodal vào Gemini 3.5 Flash-Lite; image-only mention cũng vào vision chat thay vì mở Help.",
+                "Ảnh gần nhất có thể được giữ tạm trong RAM của live session để follow-up như 'vậy sửa chỗ nào?' vẫn hiểu ảnh cũ; không persist DB/R2.",
+            ]},
+            {"category": "🔗 Link Lens", "items": [
+                "Thu thập URL từ current/reply/recent context và bật Gemini URL Context khi có link.",
+                "Đọc metadata Discord embed/attachment làm fallback context cho các social link khó fetch trực tiếp.",
+            ]},
+            {"category": "🔒 Bounds & privacy", "items": [
+                "Mặc định recent context tối đa 8 messages / 7000 chars; image context tối đa 2 ảnh / 5 MiB mỗi ảnh.",
+                "Context chỉ dùng just-in-time; telemetry dashboard tiếp tục không lưu nguyên prompt/response.",
+                "Audio/voice vẫn ngoài scope Asumi 3.x.",
+            ]},
+        ],
+    },
     {
         "version": "3.1.2",
         "date": "2026-10-07",
