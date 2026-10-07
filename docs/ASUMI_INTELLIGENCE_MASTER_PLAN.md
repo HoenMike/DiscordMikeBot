@@ -385,6 +385,9 @@ Tests:
 - TTL default 20 minutes.
 - Compact intent/tool/entity/result refs.
 - No continuation without a live session.
+- Natural-language tool outputs (Tarot/Summary/etc.) may register their bot response message IDs as continuation targets.
+- A multi-message assistant response must allow replies to any chunk belonging to the current response.
+- Tool-output follow-up must reuse the existing result; it must not re-run the tool or redraw Tarot.
 - Bound turns/context.
 
 Examples:
