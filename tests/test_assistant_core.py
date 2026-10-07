@@ -188,6 +188,58 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("https://example.com/game", ctx.urls)
         self.assertFalse(channel.history_called)
 
+    async def test_direct_reply_referent_does_not_scan_recent_history(self):
+        replied = SimpleNamespace(
+            id=77,
+            content="nội dung cần hỏi",
+            author=SimpleNamespace(display_name="Theo"),
+            attachments=[],
+            embeds=[],
+        )
+        channel = _FakeHistoryChannel([])
+        msg = fake_message(
+            "<@123> cái này nghĩa là gì?",
+            reply_id=77,
+            resolved=replied,
+            channel=channel,
+        )
+
+        ctx = await ContextBuilder().build(msg, "cái này nghĩa là gì?")
+
+        self.assertIsNotNone(ctx.reply)
+        self.assertFalse(channel.history_called)
+
+    async def test_broad_catchup_still_scans_recent_even_with_reply(self):
+        replied = SimpleNamespace(
+            id=77,
+            content="mốc tham chiếu",
+            author=SimpleNamespace(display_name="Theo"),
+            attachments=[],
+            embeds=[],
+        )
+        history_item = SimpleNamespace(
+            id=1,
+            content="có chuyện mới",
+            author=SimpleNamespace(display_name="Mai"),
+            attachments=[],
+            embeds=[],
+        )
+        channel = _FakeHistoryChannel([history_item])
+        msg = fake_message(
+            "<@123> nãy giờ mọi người đang bàn gì?",
+            reply_id=77,
+            resolved=replied,
+            channel=channel,
+        )
+
+        ctx = await ContextBuilder().build(
+            msg,
+            "nãy giờ mọi người đang bàn gì?",
+        )
+
+        self.assertTrue(channel.history_called)
+        self.assertTrue(ctx.used_recent_history)
+
     async def test_recent_history_is_only_fetched_for_contextual_cues(self):
         # discord.py history(oldest_first=False) yields newest -> oldest.
         recent = [
@@ -392,6 +444,15 @@ class AssistantMultimodalPromptTests(unittest.IsolatedAsyncioTestCase):
             await generate_chat_reply("link này nói gì?", context=context)
         config = generate.await_args.kwargs["config"]
         self.assertIsNotNone(config.tools)
+
+    def test_context_prompt_respects_configured_char_cap(self):
+        ctx = AssistantContext(
+            prompt_char_limit=1000,
+            recent=[
+                SimpleNamespace(author="A", content="x" * 2000),
+            ],
+        )
+        self.assertLessEqual(len(ctx.to_prompt_text()), 1000)
 
     def test_prompt_contains_reply_context(self):
         ctx = AssistantContext()
