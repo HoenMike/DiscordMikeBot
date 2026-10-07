@@ -80,6 +80,9 @@ async def generate_chat_reply(
         temperature=0.55,
         max_output_tokens=900,
         system_instruction=ASSISTANT_SYSTEM_PROMPT,
+        tools=[{"url_context": {}}]
+        if context is not None and context.urls
+        else None,
     )
     prompt = _build_prompt(query, session, context)
     content_parts = [types.Part.from_text(text=prompt)]
