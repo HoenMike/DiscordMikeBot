@@ -30,7 +30,10 @@ class CloudflareDecisionRouter:
         self.account_id = account_id.strip()
         self.api_token = api_token.strip()
         self.enabled = bool(enabled and self.account_id and self.api_token)
-        self.model = model.strip() or "@cf/cloudflare/clef-flash"
+        raw_model = model.strip() or "@cf/cloudflare/clef-flash"
+        if raw_model in {"clef", "clef-flash"}:
+            raw_model = f"@cf/cloudflare/{raw_model}"
+        self.model = raw_model
         self.timeout_seconds = max(1.0, float(timeout_seconds))
 
     @classmethod
