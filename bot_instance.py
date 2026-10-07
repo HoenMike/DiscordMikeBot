@@ -245,17 +245,18 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         title=f"🤖 HƯỚNG DẪN SỬ DỤNG {BOT_BRAND_NAME.upper()} (TỔNG QUAN & TÍNH NĂNG MỚI)",
         description=(
             f"Chào mừng bạn đến với **{BOT_BRAND_NAME}**! Bot Discord đa tính năng tích hợp AI.\n\n"
-            f"💬 **Asumi 3.1:** tag **@{BOT_BRAND_NAME}** rồi nói tự nhiên; reply response conversational để nói tiếp.\n"
+            f"💬 **Asumi 3.2:** tag **@{BOT_BRAND_NAME}** rồi nói tự nhiên; reply message/link/ảnh để hỏi theo context, hoặc reply response của Asumi để nói tiếp.\n"
             "⌨️ Slash Command (`/`) và Prefix Command (`.m`, `.M`) vẫn được giữ cho thao tác deterministic.\n\n"
             "💡 *Hãy sử dụng menu thả xuống bên dưới để tra cứu chi tiết từng tính năng & cơ chế QoL!*"
         ),
         color=0x7851A9
     )
     embed.add_field(
-        name="💬 ASUMI CONVERSATIONAL (3.1)",
+        name="💬 ASUMI CONTEXT + LENS (3.2)",
         value=(
             "• Tag bot rồi nói tự nhiên: `@Asumi tóm tắt 2 tiếng vừa rồi`, `@Asumi tarot daily đi`, hoặc hỏi chuyện bình thường.\n"
-            "• Reply response conversational gần nhất để tiếp tục session ngắn mà không cần tag lại.\n"
+            "• Reply một message/link/ảnh rồi tag Asumi để hỏi trực tiếp về nội dung đó; hỗ trợ PNG/JPG/WEBP.\n"
+            "• Reply response gần nhất của Asumi để follow-up cùng session mà không cần tag lại.\n"
             "• Command cũ vẫn chạy trước AI; chat không tag/reply thì Asumi không tự chen vào."
         ),
         inline=False

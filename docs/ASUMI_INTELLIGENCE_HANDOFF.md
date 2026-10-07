@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.1.2 DASHBOARD TELEMETRY — live validation pending  
+**Status:** ASUMI 3.2.0 CONTEXT + LENS — implementation complete; live edge-case validation pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -11,7 +11,7 @@
 
 ```text
 Asumi 3.1  Conversational Core        COMPLETE
-Asumi 3.2  Context + Lens             PLANNED (image input required)
+Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
 Asumi 3.3  Asumi Archive              PLANNED
 Asumi 3.4  Intelligence Polish        PLANNED
 ```
@@ -71,10 +71,10 @@ No mention/reply => no conversational response.
 T21.0  Baseline + contracts                         COMPLETE (docs)
 T21.1  Mention conversational vertical slice       COMPLETE
 T21.2  Reply continuation + short session          COMPLETE
-T21.3  Clef decision router                        IMPLEMENTED; LIVE VERIFY PENDING CREDENTIALS
+T21.3  Clef decision router                        IMPLEMENTED; credentials configured
 T21.4  Existing feature tool adapters              COMPLETE (Help/Tarot/Summary)
-T21.5  Context Builder v2 / Lens text+link         NOT STARTED
-T21.6  Image Lens                                  NOT STARTED
+T21.5  Context Builder v2 / Lens text+link         IMPLEMENTED; LIVE VERIFY
+T21.6  Image Lens                                  IMPLEMENTED; LIVE VERIFY
 T21.7  Asumi Archive / explicit memory             NOT STARTED
 T21.8  Polish + observability + release            NOT STARTED
 ```
@@ -83,7 +83,45 @@ T21.8  Polish + observability + release            NOT STARTED
 
 ## Exact next action
 
-**Asumi 3.1.2 adds dashboard-native telemetry.** After deploy, verify an Asumi AI activity row for a greeting and a non-zero `clef_ms` for an ambiguous request. Then continue Asumi 3.2 Context + Image Lens.
+**Deploy Asumi 3.2.0 and run the live edge-case matrix below.** Do not start Archive until reply/context/image behavior is accepted.
+
+```text
+1. @Asumi hello
+   -> normal conversational response
+
+2. reply latest Asumi response: "ý thứ 2 là sao?"
+   -> source=session_followup, no Clef/tool reroute
+
+2b. @Asumi tarot daily -> complete/flip the reading -> reply Reading Board: "lá này nghĩa sao?"
+   -> same session, no new draw, current edited Reading Board is used as context
+
+2c. force a long Asumi answer that splits into 2+ messages -> reply chunk 1
+   -> still continues the same session
+
+3. another user replies to that Asumi response
+   -> must NOT inherit the original user's session
+
+4. reply an older Asumi response from the same user
+   -> must NOT continue the live session
+
+5. reply a normal user message/link + @Asumi "cái này nói gì?"
+   -> replied message + URL/embed metadata are context
+
+6. upload PNG/JPG/WEBP + @Asumi "lỗi gì đây?"
+   -> image is understood
+
+7. reply the image answer: "vậy sửa chỗ nào?"
+   -> previous image remains available from in-memory session
+
+8. @Asumi "game Theo gửi phía trên là gì?"
+   -> bounded recent history is fetched; no full-channel dump
+```
+
+Dashboard validation:
+- Asumi AI detail should show `context_ms`, `reply_context`, `recent_messages`, `images`, `session_images`.
+- Prompt/response bodies remain empty in telemetry.
+
+After live acceptance, next milestone is **Asumi 3.3 Archive / explicit memory**.
 
 First prove one end-to-end vertical slice:
 
@@ -108,6 +146,22 @@ guild suspension behavior
 The first implementation PR should add `features/assistant/` and tests before broad Cloudflare infrastructure.
 
 ---
+
+## 3.2 implementation result
+
+- Added `features/assistant/context.py` as the single bounded Context Builder.
+- Reply target is resolved from Discord reference and passed to the AI only for the current request.
+- Recent channel history is fetched only for contextual/referential cues and is bounded by message count + character budget.
+- Live reply continuation bypasses Clef/tool routing to avoid accidental new Tarot/Summary actions.
+- Command bridge captures up to a bounded set of bot output message IDs for natural-language tools; Tarot/Summary outputs therefore become valid continuation targets.
+- Multi-message conversational responses keep all chunk IDs as valid reply targets.
+- For tool sessions, Context Builder reads the replied bot message live instead of trusting an old snapshot, so an edited/flipped Tarot Reading Board can contribute its current embed/image.
+- URLs from current/reply/recent context enable Gemini URL Context; Discord embed/attachment metadata is also captured.
+- PNG/JPEG/WEBP attachments are passed as multimodal parts.
+- Up to two images can remain in RAM inside the 20-minute session for follow-up; they are not persisted.
+- A 5-minute cleanup loop actively prunes expired sessions so image bytes do not remain in RAM indefinitely after TTL.
+- Added tests for other-user isolation, expired/old reply behavior, image attachment/reply/session carry-over, image-only routing, URL context and embed metadata.
+- Environment defaults document context/image bounds; no new secret is required.
 
 ## 3.1.2 dashboard telemetry
 

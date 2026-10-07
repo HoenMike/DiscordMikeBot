@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from features.assistant.context import ImagePayload
+
 
 SessionKey = Tuple[int, int, int]
 
@@ -21,6 +23,9 @@ class ConversationSession:
     updated_at: float
     intent: str = "chat"
     turns: List[ConversationTurn] = field(default_factory=list)
+    images: List[ImagePayload] = field(default_factory=list)
+    response_message_ids: List[int] = field(default_factory=list)
+    last_tool: Optional[str] = None
 
 
 class SessionStore:
@@ -51,14 +56,27 @@ class SessionStore:
         now = time.monotonic() if now is None else now
         return (now - session.updated_at) > self.ttl_seconds
 
+    def prune_expired(self, now: Optional[float] = None) -> int:
+        now = time.monotonic() if now is None else now
+        expired = [
+            key
+            for key, session in self._sessions.items()
+            if self._is_expired(session, now)
+        ]
+        for key in expired:
+            self._sessions.pop(key, None)
+        return len(expired)
+
     def get(self, message) -> Optional[ConversationSession]:
+        now = time.monotonic()
+        self.prune_expired(now)
         key = self.key_for(message)
         if key is None:
             return None
         session = self._sessions.get(key)
         if session is None:
             return None
-        if self._is_expired(session):
+        if self._is_expired(session, now):
             self._sessions.pop(key, None)
             return None
         return session
@@ -69,7 +87,11 @@ class SessionStore:
             return False
         reference = getattr(message, "reference", None)
         reply_id = getattr(reference, "message_id", None)
-        return bool(reply_id and int(reply_id) == session.last_response_message_id)
+        if not reply_id:
+            return False
+        reply_id = int(reply_id)
+        known_ids = session.response_message_ids or [session.last_response_message_id]
+        return reply_id in known_ids
 
     def record_exchange(
         self,
@@ -78,23 +100,46 @@ class SessionStore:
         user_text: str,
         assistant_text: str,
         intent: str = "chat",
+        images: Optional[List[ImagePayload]] = None,
+        response_message_ids: Optional[List[int]] = None,
+        tool: Optional[str] = None,
     ) -> Optional[ConversationSession]:
         key = self.key_for(message)
         if key is None:
             return None
 
         now = time.monotonic()
+        self.prune_expired(now)
         current = self._sessions.get(key)
         turns = [] if current is None or self._is_expired(current, now) else list(current.turns)
         turns.append(ConversationTurn(user=user_text.strip(), assistant=assistant_text.strip()))
         turns = turns[-self.max_turns :]
 
+        current_images = (
+            []
+            if current is None or self._is_expired(current, now)
+            else list(current.images)
+        )
+        if images:
+            current_images = list(images)[:2]
+
+        normalized_response_ids = [
+            int(item)
+            for item in (response_message_ids or [response_message_id])
+            if item is not None
+        ]
+        if not normalized_response_ids:
+            normalized_response_ids = [int(response_message_id)]
+
         session = ConversationSession(
             key=key,
-            last_response_message_id=int(response_message_id),
+            last_response_message_id=int(normalized_response_ids[-1]),
             updated_at=now,
             intent=intent,
             turns=turns,
+            images=current_images,
+            response_message_ids=normalized_response_ids[-8:],
+            last_tool=tool,
         )
         self._sessions[key] = session
         return session

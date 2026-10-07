@@ -7,6 +7,30 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.2.0] - 2026-10-07 — *Context + Lens*
+
+### Added
+- **Reply context**: tag Asumi while replying to a message and Asumi receives that message as bounded context.
+- **Selective recent context**: recent channel messages are fetched only for referential requests such as `cái này`, `cái trước`, `phía trên`, `vừa rồi`.
+- **Image Lens**: PNG/JPEG/WEBP can come from the current message or the replied message and are sent as multimodal input to Gemini 3.5 Flash-Lite.
+- **Image follow-up**: live sessions keep at most two bounded image snapshots in memory so a reply like `vậy sửa chỗ nào?` can still refer to the previous screenshot.
+- **Link Lens**: URLs are collected from current/reply/recent context; Gemini URL Context is enabled when URLs are present, with Discord embed metadata as fallback context.
+
+### Reliability
+- Replies to the latest live-session Asumi answer are conversational continuations and do **not** run Clef/tool routing again.
+- Natural-language Tarot/Summary tool calls capture a bounded set of bot output message IDs, so replies to tool output (including multi-message results) continue the same session.
+- Tool follow-up reads the replied bot message at reply time, allowing edited Tarot Reading Boards to provide current embed/image context.
+- Replies to older Asumi messages, replies from another user, and expired sessions do not inherit the original user's session.
+- Image-only mentions route to vision chat instead of Help.
+- Context/image counts and context-build latency are included in privacy-safe Asumi dashboard telemetry.
+
+### Privacy & bounds
+- Default recent history bound: 8 messages / 7000 context characters.
+- Default image bound: 2 images / 5 MiB each.
+- Image snapshots are in-memory only for the short live session; no DB/R2 persistence.
+- Expired sessions are actively pruned every 5 minutes so retained image bytes are released from RAM after TTL.
+- Audio/voice transcription remains out of scope.
+
 ## [3.1.2] - 2026-10-07 — *Dashboard AI telemetry*
 
 ### Added

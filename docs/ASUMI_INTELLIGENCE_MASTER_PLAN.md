@@ -10,10 +10,10 @@
 ## Release mapping
 
 ```text
-Asumi 3.1  Conversational Core
-Asumi 3.2  Context + Lens (image input required)
-Asumi 3.3  Asumi Archive
-Asumi 3.4  Intelligence Polish
+Asumi 3.1  Conversational Core        COMPLETE
+Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
+Asumi 3.3  Asumi Archive              NEXT AFTER 3.2 ACCEPTANCE
+Asumi 3.4  Intelligence Polish        PLANNED
 ```
 
 Audio / voice transcription is explicitly out of scope for Asumi 3.x unless the owner reopens it.
@@ -385,6 +385,9 @@ Tests:
 - TTL default 20 minutes.
 - Compact intent/tool/entity/result refs.
 - No continuation without a live session.
+- Natural-language tool outputs (Tarot/Summary/etc.) may register their bot response message IDs as continuation targets.
+- A multi-message assistant response must allow replies to any chunk belonging to the current response.
+- Tool-output follow-up must reuse the existing result; it must not re-run the tool or redraw Tarot.
 - Bound turns/context.
 
 Examples:
@@ -438,6 +441,8 @@ Do not duplicate Tarot/summary engines.
 
 ### T21.5 — Context Builder v2 / Lens text+link
 
+**Implementation status:** implemented in Asumi 3.2.0; live edge-case verification pending.
+
 - reply target;
 - bounded recent messages;
 - URLs/existing embed metadata;
@@ -452,6 +457,8 @@ Mai: @Asumi game này có mobile không?
 ```
 
 ### T21.6 — Image Lens
+
+**Implementation status:** implemented in Asumi 3.2.0; live edge-case verification pending.
 
 - image understanding from attachments and replied messages;
 - screenshot text reading / translation;
