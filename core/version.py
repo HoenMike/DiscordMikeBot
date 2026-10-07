@@ -12,12 +12,32 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.3.0"
+CURRENT_VERSION = "3.3.1"
 RELEASE_DATE = "2026-10-07"
-CODENAME = "Asumi 3.3 - Archive Core"
+CODENAME = "Asumi 3.3 - Archive Semantic"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.3.1",
+        "date": "2026-10-08",
+        "type": "bugfix",
+        "title": "Archive Semantic Retrieval",
+        "summary": "Thêm semantic retrieval tùy chọn cho Archive bằng Workers AI + Vectorize, luôn fallback về lexical nếu Cloudflare chưa bật hoặc lỗi.",
+        "changes": [
+            {"category": "🧠 Semantic Archive", "items": [
+                "BGE-M3 tạo embedding đa ngôn ngữ; Vectorize tìm nội dung gần nghĩa thay vì chỉ exact keyword.",
+                "Hybrid search ưu tiên semantic match rồi bổ sung lexical result, dedupe và giới hạn 5 mục.",
+                "Vectorize chỉ lưu derived vector/Archive ID theo namespace user; nội dung thật luôn đọc lại từ canonical Turso/SQLite.",
+                "Save/Forget đồng bộ Vectorize best-effort trong nền; lỗi semantic không làm hỏng Archive Core.",
+            ]},
+            {"category": "🔒 Fail-closed", "items": [
+                "Semantic mặc định OFF và cần CF_ARCHIVE_SEMANTIC_ENABLED=true.",
+                "Hỗ trợ CLOUDFLARE_VECTORIZE_TOKEN riêng để không thay token Workers AI/Clef đang chạy.",
+                "Thiếu quyền hoặc lỗi Vectorize sẽ circuit-break semantic và tiếp tục search lexical.",
+            ]},
+        ],
+    },
     {
         "version": "3.3.0",
         "date": "2026-10-08",
