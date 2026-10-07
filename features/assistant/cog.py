@@ -5,6 +5,7 @@ import time
 
 from discord.ext import commands
 
+from core.activity_logger import activity_logger
 from features.assistant.ai import generate_chat_reply
 from features.assistant.response import send_conversation_reply
 from features.assistant.router import route_message
@@ -43,6 +44,52 @@ class AssistantCog(commands.Cog):
             return strip_bot_mention(content, bot_user_id)
         return content.strip()
 
+    def _log_dashboard_activity(
+        self,
+        message,
+        *,
+        action_name: str,
+        status: str,
+        duration_ms: float,
+        details: dict,
+    ) -> None:
+        """Persist assistant performance metadata without archiving message bodies."""
+
+        try:
+            author = message.author
+            guild = getattr(message, "guild", None)
+            channel = getattr(message, "channel", None)
+            avatar = (
+                author.display_avatar.url
+                if getattr(author, "display_avatar", None)
+                else None
+            )
+            activity_logger.log(
+                action_type="assistant",
+                action_name=action_name,
+                user_id=author.id,
+                user_name=(
+                    getattr(author, "display_name", None)
+                    or getattr(author, "name", str(author))
+                ),
+                user_avatar=avatar,
+                guild_name=getattr(guild, "name", None),
+                guild_id=getattr(guild, "id", None),
+                channel_name=getattr(channel, "name", None),
+                channel_id=getattr(channel, "id", None),
+                prompt="",
+                response="",
+                status=status,
+                duration_ms=duration_ms,
+                details=details,
+            )
+        except Exception as exc:
+            print(
+                f"⚠️ [ActivityLogger] Lỗi ghi nhận Asumi Assistant: "
+                f"{type(exc).__name__}: {str(exc)[:160]}",
+                flush=True,
+            )
+
     async def handle_conversation_message(self, message) -> bool:
         if not self.should_handle(message):
             return False
@@ -72,6 +119,24 @@ class AssistantCog(commands.Cog):
                     f"tool_ms={tool_ms:.0f} total_ms={total_ms:.0f}",
                     flush=True,
                 )
+                self._log_dashboard_activity(
+                    message,
+                    action_name=f"Asumi → {decision.tool}",
+                    status="success",
+                    duration_ms=total_ms,
+                    details={
+                        "request_id": str(request_id),
+                        "path": "tool",
+                        "intent": decision.intent,
+                        "source": decision.source,
+                        "tool": decision.tool,
+                        "route_ms": round(route_ms, 1),
+                        "clef_ms": round(decision.clef_ms, 1),
+                        "tool_ms": round(tool_ms, 1),
+                        "total_ms": round(total_ms, 1),
+                        "query_chars": len(query),
+                    },
+                )
                 return True
 
         previous_session = self.sessions.get(message)
@@ -100,6 +165,23 @@ class AssistantCog(commands.Cog):
                 "Mình chưa gọi được AI lúc này. Các lệnh .m và / vẫn hoạt động bình thường.",
                 mention_author=False,
             )
+            self._log_dashboard_activity(
+                message,
+                action_name="Asumi Chat",
+                status="error",
+                duration_ms=total_ms,
+                details={
+                    "request_id": str(request_id),
+                    "path": "chat",
+                    "intent": decision.intent,
+                    "source": decision.source,
+                    "route_ms": round(route_ms, 1),
+                    "clef_ms": round(decision.clef_ms, 1),
+                    "total_ms": round(total_ms, 1),
+                    "error_type": type(exc).__name__,
+                    "query_chars": len(query),
+                },
+            )
             self.sessions.record_exchange(
                 message,
                 sent.id,
@@ -123,6 +205,27 @@ class AssistantCog(commands.Cog):
             flush=True,
         )
 
+        self._log_dashboard_activity(
+            message,
+            action_name="Asumi Chat",
+            status="success",
+            duration_ms=total_ms,
+            details={
+                "request_id": str(request_id),
+                "path": "chat",
+                "intent": decision.intent,
+                "source": decision.source,
+                "route_ms": round(route_ms, 1),
+                "clef_ms": round(decision.clef_ms, 1),
+                "ai_ms": round(ai_ms, 1),
+                "send_ms": round(send_ms, 1),
+                "total_ms": round(total_ms, 1),
+                "model": reply.model,
+                "attempts": reply.attempts,
+                "query_chars": len(query),
+                "response_chars": len(reply.text),
+            },
+        )
         self.sessions.record_exchange(
             message,
             sent.id,
