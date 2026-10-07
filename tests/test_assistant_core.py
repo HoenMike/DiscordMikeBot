@@ -156,17 +156,18 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(channel.history_called)
 
     async def test_recent_history_is_only_fetched_for_contextual_cues(self):
+        # discord.py history(oldest_first=False) yields newest -> oldest.
         recent = [
-            SimpleNamespace(
-                id=1,
-                content="game mới nè https://example.com/a",
-                author=SimpleNamespace(display_name="Theo"),
-                attachments=[],
-            ),
             SimpleNamespace(
                 id=2,
                 content="có vẻ hay",
                 author=SimpleNamespace(display_name="Mai"),
+                attachments=[],
+            ),
+            SimpleNamespace(
+                id=1,
+                content="game mới nè https://example.com/a",
+                author=SimpleNamespace(display_name="Theo"),
                 attachments=[],
             ),
         ]
