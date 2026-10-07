@@ -12,12 +12,33 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.2.1"
+CURRENT_VERSION = "3.3.0"
 RELEASE_DATE = "2026-10-07"
-CODENAME = "Asumi 3.2 - Context + Lens"
+CODENAME = "Asumi 3.3 - Archive Core"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.3.0",
+        "date": "2026-10-08",
+        "type": "minor",
+        "title": "Asumi Archive Core",
+        "summary": "Thêm bộ nhớ dài hạn explicit: Save / Search / Forget theo từng user, không archive chat ngầm.",
+        "changes": [
+            {"category": "🧠 Archive", "items": [
+                "Reply message/link/ảnh rồi nói @Asumi nhớ cái này để lưu source + metadata + Jump to Message.",
+                "Tìm lại Archive bằng câu tự nhiên như @Asumi tìm lại meme mèo Khai; trả tối đa 5 kết quả.",
+                "Xóa bằng @Asumi quên #ID; delete luôn scope theo owner_user_id nên user không thể xóa Archive của người khác.",
+                "Cùng một Discord message được dedupe cho cùng owner; save lại có thể cập nhật note thay vì tạo bản trùng.",
+            ]},
+            {"category": "🔒 Privacy & storage", "items": [
+                "Bare save phrase không reply/link/ảnh sẽ bị từ chối; Asumi không tự chọn nearby chat để lưu.",
+                "Canonical records dùng database adapter hiện có (Turso Cloud / SQLite fallback), không tạo thêm split-brain D1.",
+                "Slice 3.3.0 chỉ lưu metadata/URL của media, chưa copy binary sang R2.",
+                "Archive search/delete chỉ truy vấn dữ liệu thuộc user đã lưu.",
+            ]},
+        ],
+    },
     {
         "version": "3.2.1",
         "date": "2026-10-07",
