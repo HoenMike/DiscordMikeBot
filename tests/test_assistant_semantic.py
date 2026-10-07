@@ -64,6 +64,19 @@ class ArchiveSemanticConfigTests(unittest.TestCase):
         self.assertIn("cat.png", text)
 
 
+class ArchiveSemanticRouterTests(unittest.TestCase):
+    def test_router_preserves_original_query_for_embedding(self):
+        from features.assistant.router import route_locally
+
+        decision = route_locally("tìm lại meme mèo Khai")
+
+        self.assertEqual(decision.arguments["query"], "meme meo khai")
+        self.assertEqual(
+            decision.arguments["semantic_query"],
+            "tìm lại meme mèo Khai",
+        )
+
+
 class ArchiveSemanticApiTests(unittest.IsolatedAsyncioTestCase):
     def make_index(self):
         index = ArchiveSemanticIndex(
