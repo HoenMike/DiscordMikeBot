@@ -24,6 +24,8 @@ class ConversationSession:
     intent: str = "chat"
     turns: List[ConversationTurn] = field(default_factory=list)
     images: List[ImagePayload] = field(default_factory=list)
+    response_message_ids: List[int] = field(default_factory=list)
+    last_tool: Optional[str] = None
 
 
 class SessionStore:
@@ -72,7 +74,11 @@ class SessionStore:
             return False
         reference = getattr(message, "reference", None)
         reply_id = getattr(reference, "message_id", None)
-        return bool(reply_id and int(reply_id) == session.last_response_message_id)
+        if not reply_id:
+            return False
+        reply_id = int(reply_id)
+        known_ids = session.response_message_ids or [session.last_response_message_id]
+        return reply_id in known_ids
 
     def record_exchange(
         self,
@@ -82,6 +88,8 @@ class SessionStore:
         assistant_text: str,
         intent: str = "chat",
         images: Optional[List[ImagePayload]] = None,
+        response_message_ids: Optional[List[int]] = None,
+        tool: Optional[str] = None,
     ) -> Optional[ConversationSession]:
         key = self.key_for(message)
         if key is None:
@@ -101,13 +109,23 @@ class SessionStore:
         if images:
             current_images = list(images)[:2]
 
+        normalized_response_ids = [
+            int(item)
+            for item in (response_message_ids or [response_message_id])
+            if item is not None
+        ]
+        if not normalized_response_ids:
+            normalized_response_ids = [int(response_message_id)]
+
         session = ConversationSession(
             key=key,
-            last_response_message_id=int(response_message_id),
+            last_response_message_id=int(normalized_response_ids[-1]),
             updated_at=now,
             intent=intent,
             turns=turns,
             images=current_images,
+            response_message_ids=normalized_response_ids[-8:],
+            last_tool=tool,
         )
         self._sessions[key] = session
         return session
