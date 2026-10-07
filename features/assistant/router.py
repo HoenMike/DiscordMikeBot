@@ -34,24 +34,15 @@ def _extract_hours(text: str) -> float | None:
 
 
 def _is_obvious_chat(text: str) -> bool:
-    folded = _fold(text).strip(" !?.,")
+    folded = _fold(text).strip()
     if not folded:
         return False
 
-    greeting_prefixes = (
-        "hi",
-        "hello",
-        "hey",
-        "yo",
-        "alo",
-        "chao",
-        "xin chao",
-        "test",
-        "ping",
-    )
-    return any(
-        folded == prefix or folded.startswith(prefix + " ")
-        for prefix in greeting_prefixes
+    return bool(
+        re.match(
+            r"^(?:hi|hello|hey|yo|alo|chao|xin\s+chao|test|ping)\b[\s,!?.:;-]*",
+            folded,
+        )
     )
 
 
