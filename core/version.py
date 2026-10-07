@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.1.0"
+CURRENT_VERSION = "3.1.1"
 RELEASE_DATE = "2026-10-07"
 CODENAME = "Asumi 3.1 - Conversational Core"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.1.1",
+        "date": "2026-10-07",
+        "type": "bugfix",
+        "title": "Conversational latency hotfix",
+        "summary": "Giảm độ trễ @Asumi: dùng Gemini 3.5 Flash-Lite cho chat thường, bỏ Clef ở greeting/test rõ ràng, giới hạn fallback và thêm timing telemetry.",
+        "changes": [
+            {"category": "⚡ Conversational latency", "items": [
+                "Chat thường mặc định dùng gemini-3.5-flash-lite để ưu tiên RPD/throughput; 3.8 Flash chỉ còn fallback khi cần.",
+                "Greeting/test rõ ràng như hello/hi/ping bỏ qua Clef để tránh thêm một network round-trip.",
+                "Mỗi model conversational timeout mặc định 6 giây và tối đa 2 attempts để tránh fallback chain kéo dài.",
+            ]},
+            {"category": "📈 Observability", "items": [
+                "Render logs giờ có Asumi Timing cho route_ms, clef_ms, ai_ms, send_ms và total_ms.",
+                "Log AI ghi model, số attempt và thời gian từng model để xác định bottleneck nhanh.",
+            ]},
+        ],
+    },
     {
         "version": "3.1.0",
         "date": "2026-10-07",
