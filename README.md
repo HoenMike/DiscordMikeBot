@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Conversational (3.1)
+### Asumi Conversational + Context Lens (3.2)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -17,6 +17,11 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
 - Clef-flash trên Cloudflare là router tùy chọn; chưa có credential thì Asumi tự dùng local routing + Gemini hiện tại.
 - Admin Dashboard có filter **Asumi AI** để theo dõi model và latency từng tầng mà không cần đọc Render Logs.
+- Reply vào message rồi tag Asumi để hỏi trực tiếp về message/link/ảnh đó.
+- Follow-up bằng cách reply response mới nhất của Asumi; session đúng user/channel giữ context ngắn hạn và không reroute tool.
+- Hỗ trợ ảnh PNG/JPEG/WEBP từ attachment hoặc message được reply; ảnh có thể được giữ tạm trong live session để hỏi tiếp.
+- Với câu hỏi kiểu `cái này/cái trước/link phía trên`, Asumi chỉ lấy một cửa sổ recent chat nhỏ khi thật sự cần.
+- Link Lens dùng URL Context khi có URL và tận dụng metadata Discord embed làm fallback.
 
 ### Tóm tắt cuộc trò chuyện bằng AI
 
