@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 
 import discord
 from dataclasses import dataclass
 
 from features.assistant.archive import archive_store
+from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 
 
@@ -96,6 +98,8 @@ class CommandToolRegistry:
                 f"*Chỉ bạn mới có thể tìm/xóa mục Archive này.*",
                 mention_author=False,
             )
+            if archive_semantic.enabled:
+                asyncio.create_task(archive_semantic.upsert_item(item))
             return ToolExecutionResult(
                 handled=True,
                 response_message_ids=(int(sent.id),),
@@ -104,7 +108,41 @@ class CommandToolRegistry:
 
         if decision.tool == "archive.search":
             query = decision.arguments.get("query", "")
-            items = await archive_store.search(owner_user_id, query=query, limit=5)
+            lexical_items = await archive_store.search(
+                owner_user_id,
+                query=query,
+                limit=5,
+            )
+            items = list(lexical_items)
+
+            if query and archive_semantic.enabled:
+                matches = await archive_semantic.query(
+                    owner_user_id,
+                    query,
+                    top_k=8,
+                )
+                if matches:
+                    semantic_items = await archive_store.get_by_ids(
+                        owner_user_id,
+                        [match.archive_id for match in matches],
+                    )
+                    merged = []
+                    seen_ids = set()
+                    for item in [*semantic_items, *lexical_items]:
+                        item_id = int(item["id"])
+                        if item_id in seen_ids:
+                            continue
+                        seen_ids.add(item_id)
+                        merged.append(item)
+                        if len(merged) >= 5:
+                            break
+                    items = merged
+
+                # Existing 3.3.0 rows may predate semantic indexing. Lazily index
+                # the rows we already touched without delaying the response.
+                for item in lexical_items:
+                    asyncio.create_task(archive_semantic.upsert_item(item))
+
             if not items:
                 sent = await message.reply(
                     "🔎 **Archive:** Mình chưa tìm thấy mục nào khớp.",
@@ -147,6 +185,8 @@ class CommandToolRegistry:
                 owner_user_id,
                 archive_id,
             )
+            if deleted and archive_semantic.enabled:
+                asyncio.create_task(archive_semantic.delete_item(archive_id))
             text = (
                 f"🗑️ Đã xóa **Archive #{archive_id}**."
                 if deleted
