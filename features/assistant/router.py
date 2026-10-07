@@ -106,7 +106,7 @@ def route_locally(text: str) -> RouteDecision:
     if any(signal in folded for signal in search_signals):
         query = text.strip()
         cleanup = (
-            r"^\s*(?:tim\s+lai|tim\s+trong\s+archive|archive\s+tim|"
+            r"^\s*(?:tim\s+lai|kiem\s+lai|tim\s+trong\s+archive|archive\s+tim|"
             r"toi\s+da\s+luu|da\s+luu\s+gi|da\s+nho\s+gi|archive\s+cua\s+toi)"
             r"\s*[:\-]?\s*"
         )
