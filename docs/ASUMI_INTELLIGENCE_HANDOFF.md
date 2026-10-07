@@ -81,6 +81,10 @@ T21.8  Polish + observability + release            NOT STARTED
 
 ---
 
+## 3.2.1 Tarot UX follow-up
+
+During 3.2 live testing, the Daily result exposed a presentation issue: the AI-pending state was visually hidden below a tall Reading Board. 3.2.1 moves the pending status above the board and compacts one-card final results. Re-run the Tarot live case in the acceptance matrix after deploy.
+
 ## Exact next action
 
 **Deploy Asumi 3.2.0 and run the live edge-case matrix below.** Do not start Archive until reply/context/image behavior is accepted.
