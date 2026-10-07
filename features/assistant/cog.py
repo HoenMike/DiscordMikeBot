@@ -9,7 +9,7 @@ from core.activity_logger import activity_logger
 from features.assistant.ai import generate_chat_reply
 from features.assistant.context import ContextBuilder
 from features.assistant.response import send_conversation_reply
-from features.assistant.router import RouteDecision, route_message
+from features.assistant.router import RouteDecision, route_locally, route_message
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
@@ -26,6 +26,13 @@ async def choose_conversation_route(
     min_confidence: float,
 ) -> RouteDecision:
     """Choose routing without allowing a live reply to reopen tools."""
+
+    # Explicit Archive actions are user-requested persistence mutations and
+    # must beat continuation routing, including when the user replies directly
+    # to Asumi's latest response with "nhớ cái này" or "quên #12".
+    local = route_locally(query)
+    if local.tool and local.tool.startswith("archive."):
+        return local
 
     if is_live_continuation:
         return RouteDecision(
