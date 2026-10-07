@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,14 @@ class SemanticUnavailable(RuntimeError):
 class SemanticMatch:
     archive_id: int
     score: float
+
+
+@dataclass(frozen=True)
+class SemanticQueryReport:
+    matches: tuple[SemanticMatch, ...]
+    status: str
+    elapsed_ms: float = 0.0
+    error_type: str = ""
 
 
 class ArchiveSemanticIndex:
@@ -251,15 +260,26 @@ class ArchiveSemanticIndex:
             )
             return False
 
-    async def query(
+    async def query_report(
         self,
         owner_user_id: int,
         query: str,
         *,
         top_k: int = 8,
-    ) -> list[SemanticMatch]:
-        if not self.enabled or not (query or "").strip():
-            return []
+    ) -> SemanticQueryReport:
+        started = time.perf_counter()
+        if not self.enabled:
+            return SemanticQueryReport(
+                matches=(),
+                status="disabled",
+                elapsed_ms=0.0,
+            )
+        if not (query or "").strip():
+            return SemanticQueryReport(
+                matches=(),
+                status="empty_query",
+                elapsed_ms=0.0,
+            )
         try:
             await self.ensure_index()
             vector = await self._embed(query)
@@ -288,17 +308,52 @@ class ArchiveSemanticIndex:
                     continue
                 if score >= self.min_score:
                     output.append(SemanticMatch(archive_id=archive_id, score=score))
-            return output
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            return SemanticQueryReport(
+                matches=tuple(output),
+                status="ok" if output else "no_match",
+                elapsed_ms=elapsed_ms,
+            )
         except SemanticUnavailable as exc:
+            elapsed_ms = (time.perf_counter() - started) * 1000
             print(f"⚠️ [Asumi Archive Semantic] query fallback: {exc}", flush=True)
-            return []
+            return SemanticQueryReport(
+                matches=(),
+                status=(
+                    "permission_error"
+                    if self._blocked_reason.startswith("permission_")
+                    else "unavailable"
+                ),
+                elapsed_ms=elapsed_ms,
+                error_type=type(exc).__name__,
+            )
         except Exception as exc:
+            elapsed_ms = (time.perf_counter() - started) * 1000
             print(
                 f"⚠️ [Asumi Archive Semantic] query error: "
                 f"{type(exc).__name__}: {str(exc)[:160]}",
                 flush=True,
             )
-            return []
+            return SemanticQueryReport(
+                matches=(),
+                status="error",
+                elapsed_ms=elapsed_ms,
+                error_type=type(exc).__name__,
+            )
+
+    async def query(
+        self,
+        owner_user_id: int,
+        query: str,
+        *,
+        top_k: int = 8,
+    ) -> list[SemanticMatch]:
+        report = await self.query_report(
+            owner_user_id,
+            query,
+            top_k=top_k,
+        )
+        return list(report.matches)
 
     async def delete_item(self, archive_id: int) -> bool:
         if not self.enabled:
