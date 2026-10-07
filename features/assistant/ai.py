@@ -8,6 +8,7 @@ from google.genai import types
 
 import config
 from core.ai import bounded_ai_generate
+from features.assistant.context import AssistantContext
 from features.assistant.session import ConversationSession
 
 
@@ -49,7 +50,11 @@ def _candidate_models() -> list[str]:
     return ordered
 
 
-def _build_prompt(query: str, session: ConversationSession | None) -> str:
+def _build_prompt(
+    query: str,
+    session: ConversationSession | None,
+    context: AssistantContext | None,
+) -> str:
     parts: list[str] = []
     if session and session.turns:
         parts.append("Ngữ cảnh hội thoại gần đây:")
@@ -57,6 +62,11 @@ def _build_prompt(query: str, session: ConversationSession | None) -> str:
             user = turn.user[:1200]
             assistant = turn.assistant[:1200]
             parts.append(f"User: {user}\nAsumi: {assistant}")
+    if context is not None:
+        context_text = context.to_prompt_text()
+        if context_text:
+            parts.append("Context Discord chỉ dùng cho request hiện tại:\n" + context_text)
+
     parts.append(f"Tin nhắn hiện tại của user:\n{query[:4000]}")
     return "\n\n".join(parts)
 
@@ -64,13 +74,24 @@ def _build_prompt(query: str, session: ConversationSession | None) -> str:
 async def generate_chat_reply(
     query: str,
     session: ConversationSession | None = None,
+    context: AssistantContext | None = None,
 ) -> ChatReplyResult:
     generation_config = types.GenerateContentConfig(
         temperature=0.55,
         max_output_tokens=900,
         system_instruction=ASSISTANT_SYSTEM_PROMPT,
     )
-    prompt = _build_prompt(query, session)
+    prompt = _build_prompt(query, session, context)
+    content_parts = [types.Part.from_text(text=prompt)]
+    if context is not None:
+        for image in context.images:
+            content_parts.append(
+                types.Part.from_bytes(
+                    data=image.data,
+                    mime_type=image.mime_type,
+                )
+            )
+    contents = [types.Content(role="user", parts=content_parts)]
     timeout_sec = max(
         2.0,
         float(os.getenv("ASUMI_CHAT_MODEL_TIMEOUT_SECONDS", "6")),
@@ -87,7 +108,7 @@ async def generate_chat_reply(
         try:
             response = await bounded_ai_generate(
                 model=model,
-                contents=prompt,
+                contents=contents,
                 config=generation_config,
                 timeout_sec=timeout_sec,
                 label="Asumi Conversation",
