@@ -76,6 +76,7 @@ class ArchiveStore:
     @staticmethod
     def _payload(message) -> tuple[str, str, str, dict[str, Any]]:
         content = (getattr(message, "content", "") or "").strip()
+        had_original_text = bool(content)
         urls = [u.rstrip(".,!?)]}>") for u in URL_RE.findall(content)]
         attachments = []
         embeds = []
@@ -114,7 +115,7 @@ class ArchiveStore:
         primary_url = urls[0] if urls else (
             attachments[0]["url"] if attachments else ""
         )
-        if attachments and (urls or embeds or content):
+        if attachments and (urls or embeds or had_original_text):
             kind = "mixed"
         elif attachments:
             kind = "media"
