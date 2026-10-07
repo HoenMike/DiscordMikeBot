@@ -40,11 +40,10 @@ def _candidate_models() -> list[str]:
         os.getenv("ASUMI_CHAT_MODEL", "").strip()
         or "gemini-3.5-flash-lite"
     )
-    data_model = getattr(config, "GEMINI_DATA_MODEL", None)
     fallbacks = list(getattr(config, "SUMMARY_FALLBACK_MODELS", []) or [])
 
     ordered: list[str] = []
-    for model in [primary, data_model, *fallbacks]:
+    for model in [primary, *fallbacks]:
         if model and model not in ordered:
             ordered.append(model)
     return ordered
@@ -74,12 +73,16 @@ async def generate_chat_reply(
     prompt = _build_prompt(query, session)
     timeout_sec = max(
         2.0,
-        float(os.getenv("ASUMI_CHAT_MODEL_TIMEOUT_SECONDS", "8")),
+        float(os.getenv("ASUMI_CHAT_MODEL_TIMEOUT_SECONDS", "6")),
+    )
+    max_attempts = max(
+        1,
+        int(os.getenv("ASUMI_CHAT_MAX_ATTEMPTS", "2")),
     )
     total_started = time.perf_counter()
     last_error: Exception | None = None
 
-    for attempt, model in enumerate(_candidate_models(), start=1):
+    for attempt, model in enumerate(_candidate_models()[:max_attempts], start=1):
         attempt_started = time.perf_counter()
         try:
             response = await bounded_ai_generate(
