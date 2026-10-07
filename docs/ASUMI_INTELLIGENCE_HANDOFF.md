@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.1.1 LATENCY HOTFIX — Clef live routing validation pending  
+**Status:** ASUMI 3.1.2 DASHBOARD TELEMETRY — live validation pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -83,7 +83,7 @@ T21.8  Polish + observability + release            NOT STARTED
 
 ## Exact next action
 
-**Asumi 3.1.1 hotfix is ready.** Cloudflare credentials are configured. After deploy, verify latency with `[Asumi Timing]`: greeting should use `source=local_chat` and ambiguous tool-like text should show a non-zero `clef_ms`. Then continue Asumi 3.2 Context + Image Lens.
+**Asumi 3.1.2 adds dashboard-native telemetry.** After deploy, verify an Asumi AI activity row for a greeting and a non-zero `clef_ms` for an ambiguous request. Then continue Asumi 3.2 Context + Image Lens.
 
 First prove one end-to-end vertical slice:
 
@@ -108,6 +108,17 @@ guild suspension behavior
 The first implementation PR should add `features/assistant/` and tests before broad Cloudflare infrastructure.
 
 ---
+
+## 3.1.2 dashboard telemetry
+
+- Reuses the existing ActivityLogger + Admin Dashboard; no new DB table.
+- Adds activity type `assistant` and dashboard filter **Asumi AI**.
+- Stores performance metadata only: route/Clef/AI/send/total latency, model, attempts, source, intent, request id, query/response character counts.
+- Does **not** persist conversational prompt/response bodies.
+- The activity table shows total duration plus compact model / AI / Clef timing; full breakdown is available in the existing detail modal.
+- Production 3.1.1 validation observed greeting path: route 2ms, Clef 0ms, AI ~3.24s, Discord send ~0.43s, total ~3.67s with `gemini-3.5-flash-lite`.
+
+Next live verification: after 3.1.2 deploy, send one `@Asumi hello` and confirm a new **Asumi AI** row appears in the dashboard. Then test one ambiguous request that actually invokes Clef and verify non-zero `clef_ms`.
 
 ## 3.1.1 latency finding
 
