@@ -207,6 +207,10 @@
                         <i data-lucide="globe" class="w-3 h-3 inline mr-1 text-emerald-400"></i>
                         Auto Embed (<span id="filter-count-embed">0</span>)
                     </button>
+                    <button onclick="filterActivities('assistant')" id="filter-btn-assistant" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
+                        <i data-lucide="bot" class="w-3 h-3 inline mr-1 text-cyan-400"></i>
+                        Asumi AI (<span id="filter-count-assistant">0</span>)
+                    </button>
                     <button onclick="filterActivities('command')" id="filter-btn-command" class="activity-filter-btn px-2.5 py-1 rounded-lg text-xs font-medium bg-dark-surface text-slate-400 hover:text-white border border-dark-border">
                         <i data-lucide="terminal" class="w-3 h-3 inline mr-1 text-amber-400"></i>
                         Lệnh Bot (<span id="filter-count-command">0</span>)
@@ -1304,6 +1308,10 @@
                     return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                         <i data-lucide="globe" class="w-3 h-3 text-emerald-400"></i> Auto Embed
                     </span>`;
+                case 'assistant':
+                    return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                        <i data-lucide="bot" class="w-3 h-3 text-cyan-400"></i> Asumi AI
+                    </span>`;
                 case 'command':
                     return `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                         <i data-lucide="terminal" class="w-3 h-3 text-amber-400"></i> Lệnh Bot
@@ -1418,7 +1426,8 @@
                                 ${getActionBadge(a.action_type)}
                                 ${renderFeedbackPills(a.details)}
                             </div>
-                            <div class="text-[10px] text-slate-400 truncate max-w-[140px] mt-0.5" title="${escapeHtml(a.action_name)}">${escapeHtml(a.action_name)}</div>
+                            <div class="text-[10px] text-slate-400 truncate max-w-[180px] mt-0.5" title="${escapeHtml(a.action_name)}">${escapeHtml(a.action_name)}</div>
+                            ${renderAssistantTimingSummary(a)}
                         </td>
 
                         <!-- 5. Status & Duration -->
@@ -1448,6 +1457,24 @@
             }).join('');
 
             lucide.createIcons();
+        }
+
+        function formatTimingMs(value) {
+            const ms = Number(value);
+            if (!Number.isFinite(ms) || ms <= 0) return '';
+            return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : Math.round(ms) + 'ms';
+        }
+
+        function renderAssistantTimingSummary(activity) {
+            if (!activity || activity.action_type !== 'assistant') return '';
+            const d = activity.details || {};
+            const parts = [];
+            if (d.model) parts.push(String(d.model).replace('gemini-', ''));
+            if (Number(d.ai_ms) > 0) parts.push('AI ' + formatTimingMs(d.ai_ms));
+            if (Number(d.clef_ms) > 0) parts.push('Clef ' + formatTimingMs(d.clef_ms));
+            if (d.path === 'tool' && Number(d.tool_ms) > 0) parts.push('Tool ' + formatTimingMs(d.tool_ms));
+            if (!parts.length) return '';
+            return `<div class="text-[9px] text-cyan-300/80 code-font mt-0.5 truncate max-w-[210px]" title="${escapeHtml(parts.join(' • '))}">${escapeHtml(parts.join(' • '))}</div>`;
         }
 
         function renderFeedbackPills(details) {
@@ -1505,8 +1532,13 @@
             document.getElementById('modal-user-id').textContent = `(${item.user_id})`;
             document.getElementById('modal-location').textContent = `${item.guild_name} / #${item.channel_name}`;
             
-            document.getElementById('modal-prompt').textContent = item.prompt || '(Không có nội dung yêu cầu cụ thể)';
-            document.getElementById('modal-response').textContent = item.response || '(Không có nội dung phản hồi)';
+            const isAssistantTelemetry = item.action_type === 'assistant';
+            document.getElementById('modal-prompt').textContent = isAssistantTelemetry
+                ? '(Không lưu nội dung — telemetry hiệu năng only)'
+                : (item.prompt || '(Không có nội dung yêu cầu cụ thể)');
+            document.getElementById('modal-response').textContent = isAssistantTelemetry
+                ? '(Không lưu nội dung — telemetry hiệu năng only)'
+                : (item.response || '(Không có nội dung phản hồi)');
 
             // Render community feedback ratings if available
             const ratingsContainer = document.getElementById('modal-ratings-container');
@@ -2627,6 +2659,7 @@
                         document.getElementById('filter-count-tarot').textContent = actData.counts.tarot || 0;
                         document.getElementById('filter-count-summary').textContent = actData.counts.summary || 0;
                         document.getElementById('filter-count-embed').textContent = actData.counts.embed || 0;
+                        document.getElementById('filter-count-assistant').textContent = actData.counts.assistant || 0;
                         document.getElementById('filter-count-command').textContent = actData.counts.command || 0;
                     }
 
