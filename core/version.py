@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.1.1"
+CURRENT_VERSION = "3.1.2"
 RELEASE_DATE = "2026-10-07"
 CODENAME = "Asumi 3.1 - Conversational Core"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.1.2",
+        "date": "2026-10-07",
+        "type": "bugfix",
+        "title": "Dashboard AI telemetry",
+        "summary": "Đưa latency telemetry của @Asumi vào Admin Dashboard hiện có thay vì phải đọc Render Logs.",
+        "changes": [
+            {"category": "📊 Dashboard", "items": [
+                "Thêm filter Asumi AI trong Log Tương Tác.",
+                "Mỗi @Asumi request hiển thị tổng thời gian, model và AI/Clef latency ngắn gọn ngay trên bảng.",
+                "Modal Chi tiết lưu route_ms, clef_ms, ai_ms, send_ms, total_ms, model, attempts, source và intent.",
+            ]},
+            {"category": "🔒 Privacy", "items": [
+                "Telemetry Asumi không lưu nguyên prompt/response; chỉ lưu metadata hiệu năng, user/server/channel và kích thước input/output.",
+            ]},
+        ],
+    },
     {
         "version": "3.1.1",
         "date": "2026-10-07",
