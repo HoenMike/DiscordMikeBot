@@ -6,7 +6,7 @@ import time
 from discord.ext import commands, tasks
 
 from core.activity_logger import activity_logger
-from features.assistant.ai import generate_chat_reply
+from features.assistant.ai import ChatTimeoutBudgetError, generate_chat_reply
 from features.assistant.context import ContextBuilder
 from features.assistant.response import send_conversation_reply
 from features.assistant.router import RouteDecision, route_locally, route_message
@@ -249,8 +249,16 @@ class AssistantCog(commands.Cog):
                 f"total_ms={total_ms:.0f}",
                 flush=True,
             )
+            is_timeout = isinstance(exc, ChatTimeoutBudgetError)
             sent = await message.reply(
-                "Mình chưa gọi được AI lúc này. Các lệnh .m và / vẫn hoạt động bình thường.",
+                (
+                    "AI chat đang phản hồi quá chậm nên mình đã dừng sớm. "
+                    "Bạn thử lại sau một chút; các lệnh .m và / vẫn hoạt động bình thường."
+                    if is_timeout
+                    else
+                    "Mình chưa gọi được AI lúc này. "
+                    "Các lệnh .m và / vẫn hoạt động bình thường."
+                ),
                 mention_author=False,
             )
             self._log_dashboard_activity(
@@ -268,6 +276,20 @@ class AssistantCog(commands.Cog):
                     "clef_ms": round(decision.clef_ms, 1),
                     "total_ms": round(total_ms, 1),
                     "error_type": type(exc).__name__,
+                    "chat_models_tried": list(
+                        getattr(exc, "models_tried", ()) or ()
+                    ),
+                    "chat_attempts": int(
+                        getattr(exc, "attempts", 0) or 0
+                    ),
+                    "chat_budget_seconds": float(
+                        getattr(exc, "budget_seconds", 0.0) or 0.0
+                    ),
+                    "chat_last_error_type": getattr(
+                        exc,
+                        "last_error_type",
+                        type(exc).__name__,
+                    ),
                     "query_chars": len(query),
                     "reply_context": context.reply is not None,
                     "recent_messages": len(context.recent),
