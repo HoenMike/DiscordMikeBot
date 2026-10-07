@@ -83,6 +83,8 @@ T21.8  Polish + observability + release            NOT STARTED
 
 ## 3.3 Archive Core implementation
 
+Implementation PR: **#29 — feat: Asumi 3.3 Archive Core**.
+
 Owner explicitly advanced to 3.3 before every 3.2 edge case was live-accepted. Keep the remaining 3.2 regressions in the final polish matrix; they no longer block Archive development.
 
 3.3.0 ships:
