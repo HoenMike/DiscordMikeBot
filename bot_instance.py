@@ -19,6 +19,7 @@ FEATURE_EXTENSIONS = [
     "features.summary.cog",
     "features.tarot.cog",
     "features.cabin.cog",
+    "features.assistant.cog",
 ]
 
 # Danh sách các Slash Command cốt lõi bắt buộc phải có mặt trước khi được phép sync lên Discord
@@ -196,7 +197,7 @@ class SummaryBot(commands.Bot):
         if message.author.bot:
             return
 
-        # Nếu Server đang bị Admin tạm ngừng, phản hồi lý do nếu người dùng gõ lệnh .m
+        # Nếu Server đang bị Admin tạm ngừng, giữ nguyên behavior hiện tại.
         if message.guild and self.config_manager.is_guild_suspended(message.guild.id):
             if message.content.strip().startswith((".m", ".M")):
                 reason = self.config_manager.get_guild_suspension_reason(message.guild.id) or "Quản trị viên tạm ngừng"
@@ -209,14 +210,26 @@ class SummaryBot(commands.Bot):
                 await message.reply(msg, mention_author=False)
             return
 
-        # Nếu người dùng chỉ gõ đúng ".m" hoặc ".M" không kèm lệnh, hiển thị bảng hướng dẫn
+        # Command precedence: slash/prefix/mention command hợp lệ luôn chạy trước
+        # conversational assistant để tránh AI reinterpret behavior đã có.
+        ctx = await self.get_context(message)
+        if ctx.valid and ctx.command is not None:
+            await self.invoke(ctx)
+            return
+
+        # Nếu người dùng chỉ gõ đúng ".m" hoặc ".M" không kèm lệnh, hiển thị help.
         content_clean = message.content.strip().lower()
-        if content_clean in [".m", ".m help"]:
-            ctx = await self.get_context(message)
-            if not ctx.valid or ctx.command is None:
-                await send_bot_help(ctx)
+        if content_clean == ".m":
+            await send_bot_help(ctx)
+            return
+
+        assistant = self.get_cog("AssistantCog")
+        if assistant and assistant.should_handle(message):
+            handled = await assistant.handle_conversation_message(message)
+            if handled:
                 return
 
+        # Giữ fallback cũ cho unknown prefix (CommandNotFound được global handler bỏ qua).
         await self.process_commands(message)
 
 
