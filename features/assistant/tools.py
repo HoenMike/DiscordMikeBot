@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+
+import discord
 from dataclasses import dataclass
 
 from features.assistant.archive import archive_store
@@ -57,6 +59,7 @@ class CommandToolRegistry:
         text = " ".join((item.get("source_content") or "").split())
         if not text:
             text = item.get("source_url") or "(không có text)"
+        text = discord.utils.escape_mentions(text)
         return text[:180] + ("…" if len(text) > 180 else "")
 
     async def _execute_archive(
