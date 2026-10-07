@@ -80,12 +80,13 @@ Before any T21 work, read:
 - **T21.0 — Baseline + contracts: complete (docs).**
 - **Asumi 3.1 Conversational Core: implemented/released in 3.1.0.**
 - T21.1, T21.2 and T21.4 are complete; T21.3 Clef adapter is implemented but requires Cloudflare credentials for live verification.
-- **Asumi 3.2 Context + Lens is implemented; live reply/link/image edge-case verification is pending.** Image input is required and audio/voice transcription remains out of scope.
-- Asumi 3.3 Archive is next only after 3.2 live acceptance; Asumi 3.4 Intelligence Polish remains planned.
+- **Asumi 3.2 Context + Lens is implemented; remaining reply/link/image edge-case checks roll into the final regression matrix.** Image input is required and audio/voice transcription remains out of scope.
+- **Asumi 3.3 Archive Core is implemented on the active branch and requires live Save/Search/Forget validation.** Canonical Archive records use the existing core.db Turso/SQLite adapter; Vectorize/R2 are derived follow-ups, not canonical storage.
+- Asumi 3.4 Intelligence Polish remains planned after Archive acceptance.
 - Cloudflare/AI work is **free-only** and must fail closed rather than silently create paid usage.
 - Do not make Asumi respond to ordinary unmentioned server chat.
 - Clef-flash is a decision/router layer, not the primary prose model.
-- Persistent Archive/memory is explicit opt-in only and is not part of the first conversational slice.
+- Persistent Archive/memory is explicit opt-in only. Never add passive full-server logging. Search/delete must remain owner-scoped.
 
 ### T21 continuity rule
 
