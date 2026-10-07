@@ -1487,6 +1487,12 @@
             } else {
                 if (d.model) parts.push(String(d.model).replace('gemini-', ''));
                 if (Number(d.ai_ms) > 0) parts.push('AI ' + formatTimingMs(d.ai_ms));
+                if (d.error_type === 'ChatTimeoutBudgetError') {
+                    parts.push('AI budget timeout');
+                    if (Number(d.chat_budget_seconds) > 0) {
+                        parts.push(Number(d.chat_budget_seconds).toFixed(0) + 's budget');
+                    }
+                }
                 if (Number(d.clef_ms) > 0) parts.push('Clef ' + formatTimingMs(d.clef_ms));
                 if (d.source === 'local_clef_error') parts.push('Clef fallback');
                 if (d.source === 'local_low_confidence') parts.push('Clef low-confidence');
