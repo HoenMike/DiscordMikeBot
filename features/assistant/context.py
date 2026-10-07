@@ -93,6 +93,8 @@ def needs_recent_context(query: str) -> bool:
         "link tren",
         "link nay",
         "cai tren",
+        "cai nay",
+        "cai truoc",
         "doan chat",
         "dang noi gi",
         "dang ban gi",
@@ -122,9 +124,28 @@ def _author_name(message) -> str:
 
 def _line_from_message(message, max_chars: int = 1200) -> ContextLine:
     content = (getattr(message, "content", "") or "").strip()
-    urls = _extract_urls(content)
-    if not content and urls:
-        content = " ".join(urls)
+    extras: list[str] = []
+
+    for embed in list(getattr(message, "embeds", None) or [])[:2]:
+        title = (getattr(embed, "title", None) or "").strip()
+        description = (getattr(embed, "description", None) or "").strip()
+        url = (getattr(embed, "url", None) or "").strip()
+        summary = " — ".join(part for part in (title, description[:500]) if part)
+        if summary or url:
+            extras.append(f"[Embed] {summary} {url}".strip())
+
+    for attachment in list(getattr(message, "attachments", None) or [])[:4]:
+        filename = getattr(attachment, "filename", None)
+        content_type = getattr(attachment, "content_type", None)
+        if filename:
+            extras.append(
+                f"[Attachment] {filename}"
+                + (f" ({content_type})" if content_type else "")
+            )
+
+    if extras:
+        content = "\n".join(part for part in [content, *extras] if part)
+
     return ContextLine(
         author=_author_name(message),
         content=content[:max_chars],
