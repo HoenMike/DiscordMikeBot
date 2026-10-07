@@ -1,11 +1,22 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** PLANNED — implementation not started  
+**Status:** IMPLEMENTATION IN PROGRESS — Asumi 3.1 vertical slice  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
 ---
+
+## Locked release mapping
+
+```text
+Asumi 3.1  Conversational Core        IN PROGRESS
+Asumi 3.2  Context + Lens             PLANNED (image input required)
+Asumi 3.3  Asumi Archive              PLANNED
+Asumi 3.4  Intelligence Polish        PLANNED
+```
+
+Audio / voice transcription is explicitly excluded unless the owner reopens it.
 
 ## Product decision
 
@@ -39,6 +50,7 @@ No mention/reply => no conversational response.
 - Cloudflare usage is **free-only** and fails closed rather than creating paid usage.
 - Clef-flash is planned as a decision/router model, not the main prose model.
 - Cloudflare model names/quotas must be re-verified at implementation time.
+- Audio/voice transcription is out of scope.
 
 ---
 
@@ -57,12 +69,12 @@ No mention/reply => no conversational response.
 
 ```text
 T21.0  Baseline + contracts                         COMPLETE (docs)
-T21.1  Mention conversational vertical slice       NOT STARTED
-T21.2  Reply continuation + short session          NOT STARTED
+T21.1  Mention conversational vertical slice       IN PROGRESS
+T21.2  Reply continuation + short session          IN PROGRESS
 T21.3  Clef decision router                        NOT STARTED
-T21.4  Existing feature tool adapters              NOT STARTED
+T21.4  Existing feature tool adapters              IN PROGRESS
 T21.5  Context Builder v2 / Lens text+link         NOT STARTED
-T21.6  Multimodal Lens                             NOT STARTED
+T21.6  Image Lens                                  NOT STARTED
 T21.7  Asumi Archive / explicit memory             NOT STARTED
 T21.8  Polish + observability + release            NOT STARTED
 ```
@@ -71,7 +83,7 @@ T21.8  Polish + observability + release            NOT STARTED
 
 ## Exact next action
 
-Start **T21.1** only after reading the master plan.
+Continue the **Asumi 3.1 / T21.1–T21.4 vertical slice**. The next external dependency is Cloudflare/Clef credentials after the no-key core is verified.
 
 First prove one end-to-end vertical slice:
 
