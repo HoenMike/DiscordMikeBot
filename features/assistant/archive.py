@@ -303,6 +303,43 @@ class ArchiveStore:
         ranked.sort(key=lambda entry: (-entry[0], entry[1]))
         return [entry[2] for entry in ranked[:safe_limit]]
 
+    async def get_by_ids(
+        self,
+        owner_user_id: int,
+        archive_ids: list[int],
+    ) -> list[dict[str, Any]]:
+        await self.ensure_schema()
+        normalized = []
+        seen = set()
+        for value in archive_ids:
+            try:
+                archive_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if archive_id > 0 and archive_id not in seen:
+                seen.add(archive_id)
+                normalized.append(archive_id)
+
+        if not normalized:
+            return []
+
+        placeholders = ",".join("?" for _ in normalized)
+        params = (owner_user_id, *normalized)
+        async with db_client.execute(
+            f"""
+            SELECT id, owner_user_id, guild_id, channel_id, source_message_id,
+                   source_author_id, source_author_name, source_kind, source_content,
+                   source_jump_url, source_url, note, metadata_json, created_at
+            FROM asumi_archive
+            WHERE owner_user_id=? AND id IN ({placeholders})
+            """,
+            params,
+        ) as cur:
+            rows = await cur.fetchall()
+
+        by_id = {int(row[0]): self._decode(row) for row in rows}
+        return [by_id[item_id] for item_id in normalized if item_id in by_id]
+
     async def forget(self, owner_user_id: int, archive_id: int) -> bool:
         await self.ensure_schema()
         cur = await db_client.execute(

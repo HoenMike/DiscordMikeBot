@@ -7,6 +7,20 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.3.1] - 2026-10-08 — *Archive Semantic Retrieval*
+
+### Added
+- Optional multilingual semantic retrieval for Asumi Archive using Workers AI `@cf/baai/bge-m3` + Cloudflare Vectorize.
+- Hybrid result ranking: semantic matches first, lexical matches fill remaining slots, duplicates removed, maximum 5 Discord results.
+- Per-user Vectorize namespaces plus a second owner check against canonical Turso/SQLite rows before anything is shown.
+- Best-effort background upsert on Save and vector cleanup after Forget.
+
+### Reliability / privacy
+- Semantic mode is OFF by default and never blocks Archive Core.
+- A separate `CLOUDFLARE_VECTORIZE_TOKEN` is supported so the existing Workers AI/Clef credential does not need to be replaced.
+- Missing/invalid Vectorize permission or API failure falls back to lexical search; no paid provider fallback is introduced.
+- Vectorize is derived state only: canonical Archive content remains in `core.db` (Turso/SQLite).
+
 ## [3.3.0] - 2026-10-08 — *Asumi Archive Core*
 
 ### Added

@@ -119,7 +119,10 @@ def route_locally(text: str) -> RouteDecision:
         return RouteDecision(
             intent="archive_search",
             tool="archive.search",
-            arguments={"query": query},
+            arguments={
+                "query": query,
+                "semantic_query": text.strip(),
+            },
         )
 
     help_signals = (
