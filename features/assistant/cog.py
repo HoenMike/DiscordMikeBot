@@ -6,10 +6,11 @@ from discord.ext import commands
 
 from features.assistant.ai import generate_chat_reply
 from features.assistant.response import send_conversation_reply
-from features.assistant.router import route_locally
+from features.assistant.router import route_message
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
+from features.assistant.providers.cloudflare import CloudflareDecisionRouter
 
 
 class AssistantCog(commands.Cog):
@@ -25,6 +26,8 @@ class AssistantCog(commands.Cog):
         turns = int(os.getenv("ASUMI_SESSION_MAX_TURNS", "4"))
         self.sessions = SessionStore(ttl_seconds=ttl, max_turns=turns)
         self.tools = CommandToolRegistry(bot)
+        self.cloudflare_router = CloudflareDecisionRouter.from_env()
+        self.router_min_confidence = float(os.getenv("CF_ROUTER_MIN_CONFIDENCE", "0.55"))
 
     def should_handle(self, message) -> bool:
         bot_user_id = getattr(getattr(self.bot, "user", None), "id", None)
@@ -44,7 +47,11 @@ class AssistantCog(commands.Cog):
             return False
 
         query = self._query_from_message(message)
-        decision = route_locally(query)
+        decision = await route_message(
+            query,
+            cloudflare_router=self.cloudflare_router,
+            min_confidence=self.router_min_confidence,
+        )
 
         if decision.tool:
             result = await self.tools.execute(decision, message)
