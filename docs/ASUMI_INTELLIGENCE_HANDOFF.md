@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.1.0 IMPLEMENTED — Clef live validation pending credentials  
+**Status:** ASUMI 3.1.1 LATENCY HOTFIX — Clef live routing validation pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -83,7 +83,7 @@ T21.8  Polish + observability + release            NOT STARTED
 
 ## Exact next action
 
-**Asumi 3.1 code is complete.** Next external action: add Cloudflare Account ID + Workers AI API token and set `CF_ASSISTANT_ENABLED=true` for live Clef verification. Without them, 3.1 remains functional via deterministic routing + existing Gemini. After that, continue Asumi 3.2 Context + Image Lens.
+**Asumi 3.1.1 hotfix is ready.** Cloudflare credentials are configured. After deploy, verify latency with `[Asumi Timing]`: greeting should use `source=local_chat` and ambiguous tool-like text should show a non-zero `clef_ms`. Then continue Asumi 3.2 Context + Image Lens.
 
 First prove one end-to-end vertical slice:
 
@@ -108,6 +108,17 @@ guild suspension behavior
 The first implementation PR should add `features/assistant/` and tests before broad Cloudflare infrastructure.
 
 ---
+
+## 3.1.1 latency finding
+
+Render production log showed the first conversational request reaching `gemini-3.1-flash-lite` and timing out after about 12 seconds before fallback. The hotfix:
+- stops using the data model as conversational primary;
+- defaults chat to `gemini-3.5-flash-lite`;
+- skips Clef for obvious greetings/test pings;
+- caps chat generation to 6 seconds/model and 2 attempts;
+- adds per-stage timing telemetry.
+
+Next live verification should test one obvious chat request and one ambiguous request that really invokes Clef, then inspect `[Asumi Timing]` lines.
 
 ## 3.1 implementation result
 
