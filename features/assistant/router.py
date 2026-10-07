@@ -69,3 +69,37 @@ def route_locally(text: str) -> RouteDecision:
         return RouteDecision(intent="summary", tool="summary.catchup", arguments=args)
 
     return RouteDecision(intent="chat")
+
+
+async def route_message(text: str, cloudflare_router=None, min_confidence: float = 0.55) -> RouteDecision:
+    """Run deterministic routing first, then optional Clef classification."""
+
+    local = route_locally(text)
+    if local.tool or not (text or "").strip():
+        return local
+    if cloudflare_router is None or not getattr(cloudflare_router, "enabled", False):
+        return local
+
+    try:
+        clef = await cloudflare_router.classify(text)
+    except Exception as exc:
+        print(
+            f"⚠️ [Asumi Router] Clef unavailable: {type(exc).__name__}: {str(exc)[:160]}",
+            flush=True,
+        )
+        return local
+
+    if clef is None or clef.confidence < min_confidence:
+        return local
+
+    if clef.intent == "tarot":
+        return RouteDecision(intent="tarot", tool="tarot.launch")
+    if clef.intent == "summarize":
+        args: Dict[str, Any] = {}
+        hours = _extract_hours(text)
+        if hours is not None:
+            args["hours"] = hours
+        return RouteDecision(intent="summary", tool="summary.catchup", arguments=args)
+    if clef.intent == "help":
+        return RouteDecision(intent="help", tool="help.show")
+    return local
