@@ -16,6 +16,31 @@ from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 from features.assistant.providers.cloudflare import CloudflareDecisionRouter
 
 
+async def choose_conversation_route(
+    query: str,
+    *,
+    previous_session,
+    is_live_continuation: bool,
+    has_images: bool,
+    cloudflare_router,
+    min_confidence: float,
+) -> RouteDecision:
+    """Choose routing without allowing a live reply to reopen tools."""
+
+    if is_live_continuation:
+        return RouteDecision(
+            intent=getattr(previous_session, "intent", None) or "chat",
+            source="session_followup",
+        )
+    if not query and has_images:
+        return RouteDecision(intent="vision", source="image_only")
+    return await route_message(
+        query,
+        cloudflare_router=cloudflare_router,
+        min_confidence=min_confidence,
+    )
+
+
 class AssistantCog(commands.Cog):
     """Asumi conversational entrypoint.
 
@@ -112,19 +137,14 @@ class AssistantCog(commands.Cog):
         context_ms = (time.perf_counter() - context_started) * 1000
 
         route_started = time.perf_counter()
-        if is_live_continuation:
-            decision = RouteDecision(
-                intent=getattr(previous_session, "intent", None) or "chat",
-                source="session_followup",
-            )
-        elif not query and context.images:
-            decision = RouteDecision(intent="vision", source="image_only")
-        else:
-            decision = await route_message(
-                query,
-                cloudflare_router=self.cloudflare_router,
-                min_confidence=self.router_min_confidence,
-            )
+        decision = await choose_conversation_route(
+            query,
+            previous_session=previous_session,
+            is_live_continuation=is_live_continuation,
+            has_images=bool(context.images),
+            cloudflare_router=self.cloudflare_router,
+            min_confidence=self.router_min_confidence,
+        )
         route_ms = (time.perf_counter() - route_started) * 1000
 
         if decision.tool:
