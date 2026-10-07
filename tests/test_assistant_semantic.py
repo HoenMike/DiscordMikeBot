@@ -116,7 +116,7 @@ class ArchiveSemanticApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(await index.upsert_item(item))
 
-        raw = index._json_request.await_args.kwargs["data"].decode("utf-8")
+        raw = index._json_request.await_args.kwargs["file_body"].decode("utf-8")
         self.assertIn('"id": "12"', raw)
         self.assertIn('"namespace": "u99"', raw)
 
