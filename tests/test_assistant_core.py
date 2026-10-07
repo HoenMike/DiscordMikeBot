@@ -11,6 +11,7 @@ from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 from features.assistant.providers.cloudflare import ClefDecision, CloudflareDecisionRouter
+from features.assistant.response import send_conversation_reply
 
 
 def fake_message(
@@ -119,6 +120,38 @@ class AssistantSessionTests(unittest.TestCase):
         self.assertEqual(first.images[0].filename, "shot.png")
         followup = store.record_exchange(msg, 100, "where?", "there")
         self.assertEqual(followup.images[0].filename, "shot.png")
+
+
+    def test_any_chunk_of_latest_response_can_continue_session(self):
+        store = SessionStore(ttl_seconds=1200, max_turns=2)
+        msg = fake_message("hello")
+        store.record_exchange(
+            msg,
+            101,
+            "hello",
+            "long answer",
+            response_message_ids=[99, 100, 101],
+        )
+        self.assertTrue(store.is_live_reply(fake_message("part 1?", reply_id=99)))
+        self.assertTrue(store.is_live_reply(fake_message("part 2?", reply_id=100)))
+        self.assertTrue(store.is_live_reply(fake_message("part 3?", reply_id=101)))
+        self.assertFalse(store.is_live_reply(fake_message("old?", reply_id=98)))
+
+    def test_tool_session_tracks_all_tool_output_ids(self):
+        store = SessionStore(ttl_seconds=1200, max_turns=2)
+        msg = fake_message("tarot")
+        session = store.record_exchange(
+            msg,
+            201,
+            "tarot daily",
+            "tool output",
+            intent="tarot_daily",
+            response_message_ids=[200, 201],
+            tool="tarot.daily",
+        )
+        self.assertEqual(session.last_tool, "tarot.daily")
+        self.assertEqual(session.response_message_ids, [200, 201])
+        self.assertTrue(store.is_live_reply(fake_message("lá này?", reply_id=200)))
 
 
 class _FakeHistoryChannel:
@@ -275,6 +308,49 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(ctx.reply)
         self.assertTrue(ctx.used_session_images)
         self.assertEqual(ctx.images[0].filename, "screen.webp")
+
+    async def test_live_tool_followup_reads_current_edited_output_and_image(self):
+        attachment = SimpleNamespace(
+            content_type="image/png",
+            filename="tarot_spread.png",
+            size=3,
+            read=AsyncMock(return_value=b"img"),
+        )
+        embed = SimpleNamespace(
+            title="Daily Reading",
+            description="The Fool — bước khởi đầu mới",
+            url="",
+        )
+        bot_reply = SimpleNamespace(
+            id=99,
+            content="",
+            author=SimpleNamespace(display_name="Asumi"),
+            attachments=[attachment],
+            embeds=[embed],
+        )
+        session = SimpleNamespace(
+            last_response_message_id=99,
+            response_message_ids=[99],
+            last_tool="tarot.daily",
+            images=[],
+        )
+        msg = fake_message(
+            "lá này nghĩa sao?",
+            reply_id=99,
+            resolved=bot_reply,
+        )
+
+        ctx = await ContextBuilder().build(
+            msg,
+            "lá này nghĩa sao?",
+            session=session,
+            is_live_continuation=True,
+        )
+
+        self.assertIsNotNone(ctx.reply)
+        self.assertIn("The Fool", ctx.reply.content)
+        self.assertEqual(len(ctx.images), 1)
+        self.assertEqual(ctx.images[0].filename, "tarot_spread.png")
 
     async def test_oversize_image_is_skipped(self):
         attachment = SimpleNamespace(
@@ -470,7 +546,65 @@ class AssistantDashboardTelemetryTests(unittest.TestCase):
         self.assertEqual(result["items"][0]["details"]["ai_ms"], 3238.0)
 
 
+class AssistantDeliveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_split_response_returns_all_message_ids(self):
+        first = SimpleNamespace(id=501)
+        second = SimpleNamespace(id=502)
+        source = SimpleNamespace(
+            reply=AsyncMock(return_value=first),
+            channel=SimpleNamespace(send=AsyncMock(return_value=second)),
+        )
+        with patch(
+            "features.assistant.response.split_text",
+            return_value=["part one", "part two"],
+        ):
+            delivery = await send_conversation_reply(source, "ignored")
+
+        self.assertEqual(delivery.message_ids, (501, 502))
+        self.assertIs(delivery.last_message, second)
+
+
 class AssistantToolBridgeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tool_bridge_captures_bot_output_refs_and_context(self):
+        output = SimpleNamespace(
+            id=700,
+            author=SimpleNamespace(id=999),
+            content="",
+            embeds=[
+                SimpleNamespace(
+                    title="Daily Reading",
+                    description="The Fool",
+                    fields=[],
+                )
+            ],
+            attachments=[],
+        )
+
+        class Channel:
+            id = 20
+            def history(self, **kwargs):
+                async def _iter():
+                    yield output
+                return _iter()
+
+        bot = SimpleNamespace(
+            user=SimpleNamespace(id=999),
+            process_commands=AsyncMock(),
+        )
+        registry = CommandToolRegistry(bot)
+        source = fake_message(
+            "<@123> tarot daily",
+            channel=Channel(),
+        )
+        decision = route_locally("tarot daily")
+
+        result = await registry.execute(decision, source)
+
+        self.assertTrue(result.handled)
+        self.assertEqual(result.response_message_ids, (700,))
+        self.assertIn("Daily Reading", result.response_context)
+        self.assertIn("The Fool", result.response_context)
+
     async def test_tool_bridge_uses_synthetic_message_and_preserves_source(self):
         bot = SimpleNamespace(process_commands=AsyncMock())
         registry = CommandToolRegistry(bot)
