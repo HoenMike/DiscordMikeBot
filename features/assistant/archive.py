@@ -43,6 +43,11 @@ class ArchiveStore:
             CREATE INDEX IF NOT EXISTS idx_asumi_archive_owner
             ON asumi_archive(owner_user_id, id DESC)
         """)
+        await db_client.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_asumi_archive_owner_source
+            ON asumi_archive(owner_user_id, guild_id, channel_id, source_message_id)
+            WHERE source_message_id IS NOT NULL
+        """)
         await db_client.commit()
         self._ready = True
 
@@ -210,7 +215,7 @@ class ArchiveStore:
                 return item, "", False
 
         await db_client.execute("""
-            INSERT INTO asumi_archive (
+            INSERT OR IGNORE INTO asumi_archive (
                 owner_user_id, guild_id, channel_id, source_message_id,
                 source_author_id, source_author_name, source_kind, source_content,
                 source_jump_url, source_url, note, metadata_json
