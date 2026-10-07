@@ -42,6 +42,21 @@ class ArchiveRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.tool, "archive.search")
         self.assertIn("meme", decision.arguments["query"])
 
+    def test_save_url_does_not_become_note(self):
+        decision = route_locally("nhớ link này https://example.com/cat")
+        self.assertEqual(decision.tool, "archive.save")
+        self.assertEqual(decision.arguments["note"], "")
+
+    def test_explicit_note_is_parsed(self):
+        decision = route_locally("nhớ cái này ghi chú: meme hay")
+        self.assertEqual(decision.tool, "archive.save")
+        self.assertEqual(decision.arguments["note"], "meme hay")
+
+    def test_kiem_lai_synonym_cleans_query(self):
+        decision = route_locally("kiếm lại meme mèo Khai")
+        self.assertEqual(decision.tool, "archive.search")
+        self.assertEqual(decision.arguments["query"], "meme meo khai")
+
     def test_forget_requires_explicit_archive_id(self):
         decision = route_locally("quên #42")
         self.assertEqual(decision.intent, "archive_forget")
