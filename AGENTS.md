@@ -64,8 +64,36 @@ Tarot 2.0 release target T20.1–T20.5 is complete in v2.9.0; T20.6–T20.9 comp
 
 If you start, complete, reject or materially change a Tarot milestone, update `docs/TAROT_V2_HANDOFF.md` in the same PR so a future session can resume without the original conversation.
 
+
+## Active T21 — Asumi Intelligence / Conversational Core
+
+T21 is the planned natural-language assistant layer for Asumi. The primary UX is explicit `@Asumi ...` conversation plus reply continuation; existing slash/prefix/mention commands remain deterministic and take precedence.
+
+Before any T21 work, read:
+
+1. `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
+2. `docs/ASUMI_INTELLIGENCE_HANDOFF.md`
+3. current `bot_instance.py`, `core/ai.py`, and the affected `features/` modules
+
+### T21 status
+
+- **T21.0 — Baseline + contracts: complete (docs).**
+- **T21.1 — Mention conversational vertical slice: next.**
+- T21.2–T21.8: planned; see the master plan.
+- Cloudflare/AI work is **free-only** and must fail closed rather than silently create paid usage.
+- Do not make Asumi respond to ordinary unmentioned server chat.
+- Clef-flash is a decision/router layer, not the primary prose model.
+- Persistent Archive/memory is explicit opt-in only and is not part of the first conversational slice.
+
+### T21 continuity rule
+
+If you start, complete, reject or materially change a T21 milestone, update `docs/ASUMI_INTELLIGENCE_HANDOFF.md` in the same PR. Update the master plan when the product/architecture contract changes.
+
+
 ## Feature documentation
 
+- Asumi Intelligence master plan: `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
+- Asumi Intelligence handoff: `docs/ASUMI_INTELLIGENCE_HANDOFF.md`
 - Social embed pipeline: `docs/EMBED_PIPELINE.md`
 - Current Tarot system: `docs/TAROT_SYSTEM.md`
 - Tarot 2.0 master plan: `docs/TAROT_V2_MASTER_PLAN.md`
