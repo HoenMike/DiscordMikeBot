@@ -162,7 +162,7 @@ async def _read_images(
     warnings: list[str] = []
     seen: set[tuple[int | None, str]] = set()
 
-    for msg in messages:
+    for index, msg in enumerate(list(messages)):
         if msg is None:
             continue
         for attachment in list(getattr(msg, "attachments", None) or []):
@@ -213,7 +213,7 @@ async def _read_images(
                     mime_type="image/jpeg" if mime == "image/jpg" else mime,
                     filename=filename,
                     source_message_id=getattr(msg, "id", None),
-                    source="reply" if msg is not messages else "attachment",
+                    source="attachment" if index == 0 else "reply",
                 )
             )
 
