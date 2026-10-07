@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.4.0] - 2026-10-08 — *Intelligence Polish*
+
+### Observability
+- Asumi AI activity telemetry now records Archive save/search/forget, lexical vs semantic-hybrid/fallback mode, semantic latency and match counts.
+- Admin Dashboard shows Archive mode + Vectorize latency inline; semantic fallback is highlighted without exposing query/source content.
+- Clef error/low-confidence fallback is visible in the activity summary instead of requiring Render logs.
+
+### Reliability
+- Semantic query returns typed status/latency reports for `ok`, `no_match`, `permission_error`, `unavailable`, and `error` paths.
+- Archive semantic calls have a configurable concurrency guard (default 3).
+- First Vectorize index initialization is serialized to avoid concurrent auto-create races.
+- Added concurrency/load smoke coverage and regression coverage for semantic-to-lexical fallback metrics.
+
 ## [3.3.1] - 2026-10-08 — *Archive Semantic Retrieval*
 
 ### Added
