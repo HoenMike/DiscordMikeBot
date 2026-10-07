@@ -92,6 +92,12 @@ T21.8  Polish + observability + release            NOT STARTED
 2. reply latest Asumi response: "ý thứ 2 là sao?"
    -> source=session_followup, no Clef/tool reroute
 
+2b. @Asumi tarot daily -> complete/flip the reading -> reply Reading Board: "lá này nghĩa sao?"
+   -> same session, no new draw, current edited Reading Board is used as context
+
+2c. force a long Asumi answer that splits into 2+ messages -> reply chunk 1
+   -> still continues the same session
+
 3. another user replies to that Asumi response
    -> must NOT inherit the original user's session
 
@@ -147,6 +153,9 @@ The first implementation PR should add `features/assistant/` and tests before br
 - Reply target is resolved from Discord reference and passed to the AI only for the current request.
 - Recent channel history is fetched only for contextual/referential cues and is bounded by message count + character budget.
 - Live reply continuation bypasses Clef/tool routing to avoid accidental new Tarot/Summary actions.
+- Command bridge captures up to a bounded set of bot output message IDs for natural-language tools; Tarot/Summary outputs therefore become valid continuation targets.
+- Multi-message conversational responses keep all chunk IDs as valid reply targets.
+- For tool sessions, Context Builder reads the replied bot message live instead of trusting an old snapshot, so an edited/flipped Tarot Reading Board can contribute its current embed/image.
 - URLs from current/reply/recent context enable Gemini URL Context; Discord embed/attachment metadata is also captured.
 - PNG/JPEG/WEBP attachments are passed as multimodal parts.
 - Up to two images can remain in RAM inside the 20-minute session for follow-up; they are not persisted.
