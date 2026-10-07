@@ -266,6 +266,9 @@ class ArchiveHybridSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.details["semantic_status"], "ok")
         self.assertEqual(result.details["semantic_matches"], 1)
         self.assertEqual(result.details["semantic_ms"], 321.0)
+        self.assertNotIn("query", result.details)
+        self.assertNotIn("semantic_query", result.details)
+        self.assertNotIn("source_content", result.details)
 
     async def test_semantic_empty_result_keeps_lexical_search(self):
         registry = CommandToolRegistry(SimpleNamespace())
