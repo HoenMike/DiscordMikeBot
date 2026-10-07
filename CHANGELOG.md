@@ -7,6 +7,17 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.1.1] - 2026-10-07 — *Conversational latency hotfix*
+
+### Changed
+- Conversational chat mặc định chuyển sang **Gemini 3.5 Flash-Lite** để ưu tiên RPD/throughput; 3.8 Flash chỉ còn trong fallback chain.
+- Greeting/test rõ ràng như `hello`, `hi`, `ping` bỏ qua Clef để tránh một network round-trip không cần thiết.
+- Timeout conversational mặc định giảm còn **6 giây/model** và tối đa **2 attempts**.
+
+### Observability
+- Render log có `[Asumi Timing]` với `route_ms`, `clef_ms`, `ai_ms`, `send_ms`, `total_ms`, model và số attempt.
+- Lỗi model ghi luôn latency trước khi timeout/fallback để xác định bottleneck.
+
 ## [3.1.0] - 2026-10-07 — *Conversational Core*
 
 ### Added
