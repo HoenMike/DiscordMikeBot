@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 from core.activity_logger import ActivityLogger
 from features.assistant.ai import _candidate_models, _build_prompt, generate_chat_reply
 from features.assistant.context import AssistantContext, ContextBuilder, ImagePayload
+from features.assistant.cog import choose_conversation_route
 from features.assistant.router import route_locally, route_message
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
@@ -243,8 +244,8 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         attachment = SimpleNamespace(
             content_type="image/png",
             filename="huge.png",
-            size=1000,
-            read=AsyncMock(return_value=b"x" * 1000),
+            size=300000,
+            read=AsyncMock(return_value=b"x" * 300000),
         )
         msg = fake_message("<@123> xem ảnh", attachments=[attachment])
         ctx = await ContextBuilder(max_image_bytes=512).build(msg, "xem ảnh")
@@ -290,6 +291,44 @@ class AssistantChatModelTests(unittest.TestCase):
         ):
             models = _candidate_models()
         self.assertEqual(models[0], "gemini-custom-chat")
+
+
+class AssistantFollowupRoutingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_live_followup_never_reopens_tool_router(self):
+        previous = SimpleNamespace(intent="tarot")
+        router = SimpleNamespace(
+            enabled=True,
+            classify=AsyncMock(return_value=ClefDecision("tarot", 0.99)),
+        )
+        with patch(
+            "features.assistant.cog.route_message",
+            new=AsyncMock(),
+        ) as route:
+            decision = await choose_conversation_route(
+                "lá thứ 2 nghĩa sao?",
+                previous_session=previous,
+                is_live_continuation=True,
+                has_images=False,
+                cloudflare_router=router,
+                min_confidence=0.55,
+            )
+        self.assertEqual(decision.intent, "tarot")
+        self.assertIsNone(decision.tool)
+        self.assertEqual(decision.source, "session_followup")
+        route.assert_not_awaited()
+
+    async def test_image_only_request_goes_to_vision_chat_not_help(self):
+        decision = await choose_conversation_route(
+            "",
+            previous_session=None,
+            is_live_continuation=False,
+            has_images=True,
+            cloudflare_router=None,
+            min_confidence=0.55,
+        )
+        self.assertEqual(decision.intent, "vision")
+        self.assertIsNone(decision.tool)
+        self.assertEqual(decision.source, "image_only")
 
 
 class AssistantClefRouterTests(unittest.IsolatedAsyncioTestCase):
