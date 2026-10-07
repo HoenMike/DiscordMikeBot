@@ -1488,6 +1488,8 @@
                 if (d.model) parts.push(String(d.model).replace('gemini-', ''));
                 if (Number(d.ai_ms) > 0) parts.push('AI ' + formatTimingMs(d.ai_ms));
                 if (Number(d.clef_ms) > 0) parts.push('Clef ' + formatTimingMs(d.clef_ms));
+                if (d.source === 'local_clef_error') parts.push('Clef fallback');
+                if (d.source === 'local_low_confidence') parts.push('Clef low-confidence');
             }
 
             if (d.path === 'tool' && Number(d.tool_ms) > 0) {
