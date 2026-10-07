@@ -38,7 +38,7 @@ def _candidate_models() -> list[str]:
 
     primary = (
         os.getenv("ASUMI_CHAT_MODEL", "").strip()
-        or getattr(config, "GEMINI_SUMMARY_MODEL", None)
+        or "gemini-3.5-flash-lite"
     )
     data_model = getattr(config, "GEMINI_DATA_MODEL", None)
     fallbacks = list(getattr(config, "SUMMARY_FALLBACK_MODELS", []) or [])
