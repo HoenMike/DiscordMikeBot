@@ -53,6 +53,75 @@ def route_locally(text: str) -> RouteDecision:
     if not folded:
         return RouteDecision(intent="help", tool="help.show")
 
+    forget_signals = (
+        "quen #",
+        "xoa #",
+        "xoa muc",
+        "xoa archive",
+        "forget #",
+        "delete archive",
+    )
+    if any(signal in folded for signal in forget_signals):
+        match = re.search(r"(?:#|muc\s*#?|archive\s*#?)(\d+)\b", folded)
+        if match:
+            return RouteDecision(
+                intent="archive_forget",
+                tool="archive.forget",
+                arguments={"archive_id": int(match.group(1))},
+            )
+
+    save_signals = (
+        "nho cai nay",
+        "luu cai nay",
+        "save cai nay",
+        "archive cai nay",
+        "ghi nho cai nay",
+        "cat cai nay",
+        "cat lai cai nay",
+        "nho link nay",
+        "luu link nay",
+        "nho anh nay",
+        "luu anh nay",
+    )
+    if any(signal in folded for signal in save_signals):
+        note = ""
+        note_match = re.search(
+            r"(?:note|ghi\s*chu)\s*:\s*(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if note_match:
+            note = note_match.group(1).strip()[:500]
+        return RouteDecision(
+            intent="archive_save",
+            tool="archive.save",
+            arguments={"note": note},
+        )
+
+    search_signals = (
+        "tim lai",
+        "kiem lai",
+        "tim trong archive",
+        "archive tim",
+        "toi da luu",
+        "da luu gi",
+        "da nho gi",
+        "archive cua toi",
+    )
+    if any(signal in folded for signal in search_signals):
+        query = text.strip()
+        cleanup = (
+            r"^\s*(?:tim\s+lai|kiem\s+lai|tim\s+trong\s+archive|archive\s+tim|"
+            r"toi\s+da\s+luu|da\s+luu\s+gi|da\s+nho\s+gi|archive\s+cua\s+toi)"
+            r"\s*[:\-]?\s*"
+        )
+        query = re.sub(cleanup, "", _fold(query), flags=re.IGNORECASE).strip()
+        return RouteDecision(
+            intent="archive_search",
+            tool="archive.search",
+            arguments={"query": query},
+        )
+
     help_signals = (
         "help",
         "huong dan",

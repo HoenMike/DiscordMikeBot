@@ -245,19 +245,19 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         title=f"🤖 HƯỚNG DẪN SỬ DỤNG {BOT_BRAND_NAME.upper()} (TỔNG QUAN & TÍNH NĂNG MỚI)",
         description=(
             f"Chào mừng bạn đến với **{BOT_BRAND_NAME}**! Bot Discord đa tính năng tích hợp AI.\n\n"
-            f"💬 **Asumi 3.2:** tag **@{BOT_BRAND_NAME}** rồi nói tự nhiên; reply message/link/ảnh để hỏi theo context, hoặc reply response của Asumi để nói tiếp.\n"
+            f"💬 **Asumi 3.3:** nói tự nhiên, hiểu reply/link/ảnh và có **Archive** explicit để lưu/tìm/quên nội dung theo yêu cầu.\n"
             "⌨️ Slash Command (`/`) và Prefix Command (`.m`, `.M`) vẫn được giữ cho thao tác deterministic.\n\n"
             "💡 *Hãy sử dụng menu thả xuống bên dưới để tra cứu chi tiết từng tính năng & cơ chế QoL!*"
         ),
         color=0x7851A9
     )
     embed.add_field(
-        name="💬 ASUMI CONTEXT + LENS (3.2)",
+        name="💬 ASUMI INTELLIGENCE + ARCHIVE (3.3)",
         value=(
-            "• Tag bot rồi nói tự nhiên: `@Asumi tóm tắt 2 tiếng vừa rồi`, `@Asumi tarot daily đi`, hoặc hỏi chuyện bình thường.\n"
-            "• Reply một message/link/ảnh rồi tag Asumi để hỏi trực tiếp về nội dung đó; hỗ trợ PNG/JPG/WEBP.\n"
-            "• Reply response gần nhất của Asumi để follow-up cùng session mà không cần tag lại.\n"
-            "• Command cũ vẫn chạy trước AI; chat không tag/reply thì Asumi không tự chen vào."
+            "• Tag bot rồi nói tự nhiên; reply message/link/ảnh để hỏi theo context hoặc follow-up response gần nhất của Asumi.\n"
+            "• **Lưu:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.\n"
+            "• **Tìm:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.\n"
+            "• **Xóa:** `@Asumi quên #12`. Archive chỉ thuộc user đã lưu; Asumi không tự archive chat ngầm."
         ),
         inline=False
     )

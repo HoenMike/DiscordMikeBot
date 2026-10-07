@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.2.0 CONTEXT + LENS — implementation complete; live edge-case validation pending  
+**Status:** ASUMI 3.3.0 ARCHIVE CORE — implemented; live validation pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -12,7 +12,7 @@
 ```text
 Asumi 3.1  Conversational Core        COMPLETE
 Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
-Asumi 3.3  Asumi Archive              PLANNED
+Asumi 3.3  Asumi Archive              CORE IMPLEMENTED; SEMANTIC PENDING
 Asumi 3.4  Intelligence Polish        PLANNED
 ```
 
@@ -75,11 +75,67 @@ T21.3  Clef decision router                        IMPLEMENTED; credentials conf
 T21.4  Existing feature tool adapters              COMPLETE (Help/Tarot/Summary)
 T21.5  Context Builder v2 / Lens text+link         IMPLEMENTED; LIVE VERIFY
 T21.6  Image Lens                                  IMPLEMENTED; LIVE VERIFY
-T21.7  Asumi Archive / explicit memory             NOT STARTED
+T21.7  Asumi Archive / explicit memory             CORE IMPLEMENTED; LIVE VERIFY
 T21.8  Polish + observability + release            NOT STARTED
 ```
 
 ---
+
+## 3.3 Archive Core implementation
+
+Implementation PR: **#29 — feat: Asumi 3.3 Archive Core**.
+
+Owner explicitly advanced to 3.3 before every 3.2 edge case was live-accepted. Keep the remaining 3.2 regressions in the final polish matrix; they no longer block Archive development.
+
+3.3.0 ships:
+- explicit Save / Search / Forget tools;
+- user-owned records keyed by owner_user_id;
+- source text + author + guild/channel/message IDs + Jump to Message;
+- link/embed/attachment metadata;
+- dedupe of the same Discord source per owner;
+- bare save guard: no reply/link/attachment means nothing is persisted;
+- search result cap of 5 in Discord;
+- deterministic routing, so Archive actions do not spend Clef/Gemini quota;
+- DB failure degrades with a user-visible message and no confirmed mutation.
+
+Storage:
+- canonical Archive DB = existing core.db adapter (Turso Cloud / SQLite fallback);
+- D1 is no longer planned as a second canonical source;
+- Vectorize remains a derived semantic-search enhancement after live acceptance;
+- R2 remains optional for media binary retention; 3.3.0 stores metadata/URLs only.
+
+Live acceptance matrix:
+
+```text
+1. reply a normal user message -> @Asumi nhớ cái này
+   -> returns Archive #ID + Jump to Message
+
+2. repeat save of the same source
+   -> returns the same Archive item, no duplicate row
+
+3. @Asumi nhớ cái này without reply/link/attachment
+   -> refuses and tells user how to select a source
+
+4. @Asumi tìm lại <keywords / author>
+   -> returns only that user's matching Archive items
+
+5. @Asumi archive của tôi
+   -> returns latest items
+
+6. @Asumi quên #ID
+   -> deletes user's own item
+
+7. another user tries the same #ID
+   -> cannot retrieve/delete the first user's item
+
+8. save an image/link
+   -> source metadata is searchable; no media binary is copied
+
+9. reply latest Asumi response -> "nhớ cái này"
+   -> explicit Archive Save wins over session continuation
+```
+
+After core live acceptance, decide whether semantic misses justify 3.3.x Vectorize. Do not add Vectorize/R2 just because the roadmap mentioned them.
 
 ## 3.2.1 Tarot UX follow-up
 
@@ -125,7 +181,7 @@ Dashboard validation:
 - Asumi AI detail should show `context_ms`, `reply_context`, `recent_messages`, `images`, `session_images`.
 - Prompt/response bodies remain empty in telemetry.
 
-After live acceptance, next milestone is **Asumi 3.3 Archive / explicit memory**.
+Archive development has started by explicit owner request. Remaining 3.2 checks roll into the final regression matrix.
 
 First prove one end-to-end vertical slice:
 

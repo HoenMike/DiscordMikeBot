@@ -12,7 +12,7 @@
 ```text
 Asumi 3.1  Conversational Core        COMPLETE
 Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
-Asumi 3.3  Asumi Archive              NEXT AFTER 3.2 ACCEPTANCE
+Asumi 3.3  Asumi Archive              CORE IMPLEMENTED; SEMANTIC PENDING
 Asumi 3.4  Intelligence Polish        PLANNED
 ```
 
@@ -471,19 +471,32 @@ Cloudflare free model availability must be re-checked at implementation time; do
 
 ### T21.7 — Asumi Archive / explicit memory
 
-- explicit `Save / Nhớ` only;
-- source metadata for messages/links/media;
-- R2 where appropriate;
-- Vectorize semantic retrieval;
-- D1 canonical records;
-- delete/forget path;
-- no passive full-server logging.
+**Implementation status:** Archive Core implemented in Asumi 3.3.0; live verification and semantic retrieval follow-up pending.
+
+Core contract:
+- explicit `Save / Nhớ` only; no passive full-server logging;
+- every record is owned by `owner_user_id`; search/delete never cross users;
+- source metadata for messages/links/media plus Discord Jump to Message;
+- deterministic Save / Search / Forget tools run without Clef/Gemini;
+- delete/forget path uses stable Archive IDs;
+- duplicate saves of the same Discord source are deduped per owner.
+
+Storage decision:
+- **Canonical records use the existing `core.db` adapter (Turso Cloud with local SQLite fallback).**
+- Do not create a second D1 canonical database; that would introduce split-brain state and extra migration/ops cost.
+- Vectorize may be added as a derived semantic index in a later 3.3.x slice after core live acceptance.
+- R2 is optional for media binary retention only if product value justifies copying media; 3.3.0 stores source URL/attachment/embed metadata only.
+- If a derived Vectorize/R2 record is lost, canonical Archive records must remain intact.
 
 Examples:
 
 ```text
+(reply a source message)
 @Asumi nhớ cái này
-@Asumi tìm lại cái meme mèo Khai gửi hôm trước
+
+@Asumi tìm lại meme mèo Khai
+@Asumi archive của tôi
+@Asumi quên #12
 ```
 
 ### T21.8 — Polish + observability + release

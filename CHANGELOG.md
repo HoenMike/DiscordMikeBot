@@ -7,6 +7,22 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.3.0] - 2026-10-08 — *Asumi Archive Core*
+
+### Added
+- Explicit **Save / Search / Forget** long-term memory for @Asumi.
+- Reply a message/link/image then say @Asumi nhớ cái này to save source metadata and Jump to Message.
+- Search user-owned memory with natural phrases such as @Asumi tìm lại meme mèo Khai.
+- Delete by stable Archive ID with @Asumi quên #12.
+- Archive actions are deterministic tools and do not spend Clef/Gemini quota.
+
+### Privacy & storage
+- No passive logging: a bare save request without a replied source, direct link, or attachment is rejected.
+- Archive rows are scoped to owner_user_id; search/delete cannot cross users.
+- Existing core.db (Turso Cloud with SQLite fallback) is the canonical store to avoid a second D1 source of truth.
+- Media binary is not copied in 3.3.0; only source URL/attachment/embed metadata is stored.
+- Semantic Vectorize/R2 enhancement remains a follow-up after live validation of the core flow.
+
 ## [3.2.1] - 2026-10-07 — *Tarot finalizing UX hotfix*
 
 ### Fixed

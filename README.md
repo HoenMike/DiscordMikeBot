@@ -6,23 +6,23 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Conversational + Context Lens (3.2)
+### Asumi Intelligence + Archive (3.3)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
 - `@Asumi nay có gì vui không` → chat bằng AI.
 - `@Asumi tóm tắt 2 tiếng vừa rồi` → route về chính Summary engine hiện tại.
 - `@Asumi tarot daily đi` → dùng chính Tarot engine/cooldown hiện tại.
-- Reply trực tiếp response conversational gần nhất để tiếp tục một session ngắn mà không cần tag lại.
+- Reply vào message/link/ảnh rồi tag Asumi để hỏi theo context; PNG/JPEG/WEBP được hỗ trợ.
+- Reply response gần nhất của Asumi để follow-up session ngắn; tool output Tarot/Summary cũng có thể tiếp tục.
+- **Archive Save:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.
+- **Archive Search:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.
+- **Archive Forget:** `@Asumi quên #12`.
+- Archive chỉ được tạo khi user chủ động yêu cầu; bare save không reply/link/ảnh bị từ chối, không có passive full-server logging.
+- Archive search/delete luôn scope theo user đã lưu. Canonical records dùng `core.db` hiện có (Turso Cloud / SQLite fallback).
+- 3.3.0 chỉ lưu source text + URL/attachment/embed metadata; media binary chưa được copy sang R2.
 - Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
-- Clef-flash trên Cloudflare là router tùy chọn; chưa có credential thì Asumi tự dùng local routing + Gemini hiện tại.
-- Admin Dashboard có filter **Asumi AI** để theo dõi model và latency từng tầng mà không cần đọc Render Logs.
-- Reply vào message rồi tag Asumi để hỏi trực tiếp về message/link/ảnh đó.
-- Follow-up bằng cách reply response mới nhất của Asumi; session đúng user/channel giữ context ngắn hạn và không reroute tool.
-- Output do `@Asumi tarot...` / Summary sinh ra cũng có thể reply để hỏi tiếp; response dài chia nhiều message vẫn nhận diện các chunk thuộc cùng session.
-- Hỗ trợ ảnh PNG/JPEG/WEBP từ attachment hoặc message được reply; ảnh có thể được giữ tạm trong live session để hỏi tiếp.
-- Với câu hỏi kiểu `cái này/cái trước/link phía trên`, Asumi chỉ lấy một cửa sổ recent chat nhỏ khi thật sự cần.
-- Link Lens dùng URL Context khi có URL và tận dụng metadata Discord embed làm fallback.
+- Clef-flash trên Cloudflare là router tùy chọn; Admin Dashboard có filter **Asumi AI** để theo dõi latency/tool path.
 
 ### Tóm tắt cuộc trò chuyện bằng AI
 
