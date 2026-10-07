@@ -1,1 +1,1 @@
-"""Asumi 3.1 conversational assistant feature."""
+"""Asumi conversational Context + Lens feature package."""
