@@ -120,8 +120,8 @@ class CommandToolRegistry:
             for item in items:
                 snippet = self._archive_snippet(item)
                 author = discord.utils.escape_mentions(
-                item.get("source_author_name") or "Unknown"
-            )
+                    item.get("source_author_name") or "Unknown"
+                )
                 jump = item.get("source_jump_url") or item.get("source_url") or ""
                 line = f"**#{item['id']}** · {author}\n> {snippet}"
                 if jump:
