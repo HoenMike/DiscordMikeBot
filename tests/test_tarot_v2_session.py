@@ -138,6 +138,106 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         labels = [item.label for item in self.view.children if isinstance(item, discord.ui.Button)]
         self.assertEqual(labels, ["1", "✓ 2", "3", "✨ Lật hết"])
 
+    async def test_finalizing_state_is_visible_above_board_and_clearly_incomplete(self):
+        self.view.revealed_indices = {0, 1, 2}
+        embed = self.view.build_finalizing_embed()
+
+        self.assertIn("CHƯA XONG", embed.title)
+        self.assertIn("Phần lật bài đã xong", embed.description)
+        self.assertIn("đang viết phần luận giải cuối", embed.description)
+        self.assertIn("Không cần bấm gì thêm", embed.description)
+        self.assertEqual(embed.image.url, "attachment://tarot_spread.png")
+        self.assertIn("TỰ CẬP NHẬT", embed.footer.text)
+
+    async def test_one_card_final_payload_prioritizes_reading_in_single_embed(self):
+        one_card_task = asyncio.create_task(asyncio.sleep(60))
+        card = drawn("major_02", 0, "LÁ 1: NĂNG LƯỢNG NGÀY")
+        view = TarotFlipView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            spread_key="daily",
+            spread_info=SPREAD_DEFINITIONS["daily"],
+            drawn_cards=[card],
+            question=None,
+            context=None,
+            reader_style="auto",
+            ai_task=one_card_task,
+            tarot_manager=FakeManager(),
+        )
+        source_embed = discord.Embed(
+            title="Cards",
+            description="legacy card block",
+            color=0x7851A9,
+        )
+
+        embeds, attachment = view.build_final_payload(
+            source_embed,
+            "Thông điệp quan trọng nhất nằm ở đây.",
+        )
+
+        self.assertEqual(len(embeds), 1)
+        self.assertIsNone(attachment)
+        self.assertIn("HOÀN TẤT", embeds[0].description)
+        self.assertIn(card.card.name_vi, embeds[0].description)
+        self.assertIn("Thông điệp quan trọng nhất", embeds[0].description)
+        self.assertEqual(embeds[0].image.url, "attachment://tarot_spread.png")
+        self.assertIn("HOÀN TẤT", embeds[0].footer.text)
+
+        one_card_task.cancel()
+        try:
+            await one_card_task
+        except BaseException:
+            pass
+        view.stop()
+
+    async def test_yes_no_compact_result_keeps_verdict(self):
+        one_card_task = asyncio.create_task(asyncio.sleep(60))
+        card = drawn("major_02", 0, "LÁ 1: PHÁN QUYẾT")
+        view = TarotFlipView(
+            author_id=1,
+            author_name="Mai",
+            author_avatar_url=None,
+            spread_key="yes_no",
+            spread_info=SPREAD_DEFINITIONS["yes_no"],
+            drawn_cards=[card],
+            question="Có nên làm không?",
+            context=None,
+            reader_style="auto",
+            ai_task=one_card_task,
+            tarot_manager=FakeManager(),
+        )
+
+        embeds, _ = view.build_final_payload(
+            discord.Embed(title="Cards", color=0x7851A9),
+            "Giải thích.",
+        )
+
+        self.assertEqual(len(embeds), 1)
+        self.assertIn("Phán quyết", embeds[0].description)
+
+        one_card_task.cancel()
+        try:
+            await one_card_task
+        except BaseException:
+            pass
+        view.stop()
+
+    async def test_multi_card_final_payload_keeps_rich_two_embed_layout(self):
+        source_embed = discord.Embed(
+            title="Cards",
+            description="card summary",
+            color=0x7851A9,
+        )
+        embeds, attachment = self.view.build_final_payload(
+            source_embed,
+            "Reading",
+        )
+
+        self.assertEqual(len(embeds), 2)
+        self.assertIsNone(attachment)
+        self.assertEqual(embeds[0].title, "Cards")
+
     async def test_completed_ai_task_refreshes_ready_indicator_without_new_message(self):
         ready_task = asyncio.create_task(asyncio.sleep(0, result=("reading", "general", "", "", True)))
         view = TarotFlipView(

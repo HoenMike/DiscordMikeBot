@@ -1873,6 +1873,100 @@ class TarotFlipView(discord.ui.View):
             except Exception:
                 pass
 
+    def build_finalizing_embed(self) -> discord.Embed:
+        """Make the waiting state obvious without hiding it below the Reading Board."""
+        total = len(self.drawn_cards)
+        lines = [
+            f"**{self.spread_info['name']}**",
+            f"{build_reveal_progress(self.revealed_indices, total)}",
+            "",
+            "✅ **Phần lật bài đã xong.**",
+            "🧠 **Asumi đang viết phần luận giải cuối...**",
+        ]
+
+        if total == 1 and self.drawn_cards:
+            drawn = self.drawn_cards[0]
+            orientation = "NGƯỢC" if drawn.is_reversed else "XUÔI"
+            lines.extend([
+                f"🃏 **Lá đã mở:** **{drawn.card.name_vi}** (*{drawn.card.name_en}*) · `{orientation}`",
+                "",
+            ])
+        else:
+            lines.extend([
+                "🃏 Các lá đã được khóa; Asumi đang nối chúng thành phần đọc cuối.",
+                "",
+            ])
+
+        lines.append("⏳ *Không cần bấm gì thêm — kết quả sẽ tự cập nhật ngay tại tin nhắn này.*")
+
+        embed = discord.Embed(
+            title="⏳ ĐANG LUẬN GIẢI — CHƯA XONG",
+            description="\n".join(lines),
+            color=self.embed_color,
+        )
+        embed.set_image(url="attachment://tarot_spread.png")
+        embed.set_footer(
+            text=f"Quẻ bài của {self.author_name} • CHƯA XONG • TỰ CẬP NHẬT",
+            icon_url=self.author_avatar_url,
+        )
+        return embed
+
+    def build_final_payload(self, embed_cards: discord.Embed, ai_reading: str):
+        """Keep one-card results compact so the reading is visible before scrolling."""
+        if len(self.drawn_cards) != 1:
+            return build_reading_payload(
+                embed_cards,
+                ai_reading,
+                self.style_info.get("embed_title", "Tarot"),
+                f"Quẻ bài của {self.author_name}",
+                self.author_avatar_url,
+            )
+
+        drawn = self.drawn_cards[0]
+        orientation = "NGƯỢC" if drawn.is_reversed else "XUÔI"
+        position_label = drawn.position_title
+        if position_label.upper().startswith("LÁ ") and ":" in position_label:
+            position_label = position_label.split(":", 1)[1].strip()
+
+        summary_lines = [
+            "✅ **HOÀN TẤT**",
+            f"🃏 **{position_label}:** **{drawn.card.name_vi}** (*{drawn.card.name_en}*) · `{orientation}`",
+        ]
+
+        if self.spread_key == "yes_no":
+            badge, verdict_desc, _ = get_yes_no_verdict(drawn.card, drawn.is_reversed)
+            summary_lines.extend([
+                f"⚡ **Phán quyết:** {badge}",
+                f"> *{verdict_desc}*",
+            ])
+
+        prefix = "\n".join(summary_lines) + f"\n\n{WIDE_DIVIDER}\n\n"
+        notice = "\n\n*Bản đầy đủ: `tarot_reading.txt`*"
+        max_description = 4096
+        attachment = None
+        available = max(600, max_description - len(prefix))
+
+        if len(ai_reading) > available:
+            body = ai_reading[: max(0, available - len(notice))] + notice
+            attachment = discord.File(
+                io.BytesIO(ai_reading.encode("utf-8")),
+                filename="tarot_reading.txt",
+            )
+        else:
+            body = ai_reading
+
+        reading = discord.Embed(
+            title=self.style_info.get("embed_title", "Tarot")[:256],
+            description=(prefix + body)[:max_description],
+            color=self.embed_color,
+        )
+        reading.set_image(url="attachment://tarot_spread.png")
+        reading.set_footer(
+            text=f"Quẻ bài của {self.author_name} • HOÀN TẤT",
+            icon_url=self.author_avatar_url,
+        )
+        return [reading], attachment
+
     def build_session_embed(self, last_revealed_indices: Optional[Set[int]] = None) -> discord.Embed:
         """Build the FACE_DOWN/REVEALING session state for the single live message."""
         last_revealed = (
@@ -2092,26 +2186,15 @@ class TarotFlipView(discord.ui.View):
             )
             embed_cards.set_image(url="attachment://tarot_spread.png")
 
-            # If the user finishes revealing before AI is ready, keep the same
-            # session message and show a clear finalizing state.
+            # If the user finishes revealing before AI is ready, put the
+            # processing state ABOVE the board instead of hiding it in a second
+            # embed below a tall image.
             if not self.ai_task.done():
-                embed_loading = discord.Embed(
-                    title="✨ TẤT CẢ LÁ ĐÃ LẬT",
-                    description=(
-                        f"{build_reveal_progress(self.revealed_indices, len(self.drawn_cards))}\n\n"
-                        "Asumi đang hoàn tất việc nối các lá thành một câu chuyện. "
-                        "Ảnh trải bài đã được khóa, chỉ còn chờ phần luận giải."
-                    ),
-                    color=self.embed_color,
-                )
-                embed_loading.set_footer(
-                    text=f"Quẻ bài của {self.author_name} • ĐANG LUẬN GIẢI",
-                    icon_url=self.author_avatar_url,
-                )
+                embed_loading = self.build_finalizing_embed()
 
                 try:
                     await interaction.edit_original_response(
-                        embeds=[embed_cards, embed_loading],
+                        embed=embed_loading,
                         attachments=[file],
                         view=None,
                     )
@@ -2119,7 +2202,7 @@ class TarotFlipView(discord.ui.View):
                     if self.message:
                         try:
                             await self.message.edit(
-                                embeds=[embed_cards, embed_loading],
+                                embed=embed_loading,
                                 attachments=[file],
                                 view=None,
                             )
@@ -2228,11 +2311,11 @@ class TarotFlipView(discord.ui.View):
                 mood_tag=mood_tag
             )
 
-            # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
-            final_embeds, reading_file = build_reading_payload(
-                embed_cards, ai_reading,
-                self.style_info.get("embed_title", "Tarot"),
-                f"Quẻ bài của {self.author_name}", self.author_avatar_url
+            # Final one-card readings are intentionally compact: message first,
+            # board second. Multi-card spreads keep the richer two-embed layout.
+            final_embeds, reading_file = self.build_final_payload(
+                embed_cards,
+                ai_reading,
             )
 
             # View tương tác sau khi hoàn tất quẻ bài (Hỏi thêm AI & Đánh giá)
@@ -2436,11 +2519,11 @@ class TarotFlipView(discord.ui.View):
                 mood_tag=mood_tag
             )
 
-            # --- EMBED 2: THÔNG ĐIỆP TỪ VŨ TRỤ ---
-            final_embeds, reading_file = build_reading_payload(
-                embed_cards, ai_reading,
-                self.style_info.get("embed_title", "Tarot"),
-                f"Quẻ bài của {self.author_name}", self.author_avatar_url
+            # Final one-card readings are intentionally compact: message first,
+            # board second. Multi-card spreads keep the richer two-embed layout.
+            final_embeds, reading_file = self.build_final_payload(
+                embed_cards,
+                ai_reading,
             )
 
             action_view = TarotResultActionView(

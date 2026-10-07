@@ -7,6 +7,14 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.2.1] - 2026-10-07 — *Tarot finalizing UX hotfix*
+
+### Fixed
+- Khi user đã lật hết bài nhưng AI còn đang chạy, trạng thái **ĐANG LUẬN GIẢI — CHƯA XONG** giờ nằm ngay trên Reading Board thay vì ở embed thứ hai phía dưới ảnh.
+- Loading state nói rõ phần lật bài đã hoàn tất, Asumi vẫn đang viết luận giải, user không cần bấm gì thêm và message sẽ tự cập nhật.
+- Daily / Single / Yes-No một lá dùng layout final gọn một embed: **HOÀN TẤT → lá bài → luận giải → ảnh**, giảm scroll và bỏ phần card summary lặp.
+- Yes/No vẫn giữ verdict trong layout compact; multi-card spread giữ layout chi tiết hiện tại.
+
 ## [3.2.0] - 2026-10-07 — *Context + Lens*
 
 ### Added

@@ -12,12 +12,27 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.2.0"
+CURRENT_VERSION = "3.2.1"
 RELEASE_DATE = "2026-10-07"
 CODENAME = "Asumi 3.2 - Context + Lens"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.2.1",
+        "date": "2026-10-07",
+        "type": "bugfix",
+        "title": "Tarot finalizing UX hotfix",
+        "summary": "Làm rõ trạng thái Tarot đang chạy và rút gọn kết quả Daily/1 lá để user không phải đoán bot đã xong chưa.",
+        "changes": [
+            {"category": "🔮 Tarot UX", "items": [
+                "Khi đã lật hết nhưng AI chưa xong, trạng thái ĐANG LUẬN GIẢI — CHƯA XONG nằm ngay trên Reading Board thay vì bị đẩy xuống dưới ảnh.",
+                "Hiển thị rõ rằng phần lật bài đã xong, Asumi vẫn đang viết luận giải và user không cần bấm gì thêm; message sẽ tự cập nhật.",
+                "Daily / Single / Yes-No 1 lá dùng một embed gọn: trạng thái HOÀN TẤT + lá bài + luận giải xuất hiện trước ảnh, giảm scroll và bỏ block thông tin trùng.",
+                "Yes/No compact result vẫn giữ phán quyết; multi-card spreads giữ layout chi tiết hai embed hiện tại.",
+            ]},
+        ],
+    },
     {
         "version": "3.2.0",
         "date": "2026-10-07",
