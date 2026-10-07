@@ -139,6 +139,8 @@ After core live acceptance, decide whether semantic misses justify 3.3.x Vectori
 
 ## 3.3.1 Semantic Retrieval implementation
 
+Implementation PR: **#30 — feat: Asumi 3.3.1 Archive semantic retrieval**.
+
 Semantic retrieval is implemented as an **optional derived index**:
 - Workers AI `@cf/baai/bge-m3` generates 1024-d multilingual embeddings.
 - Cloudflare Vectorize index defaults to `asumi-archive-v1`, cosine metric.
