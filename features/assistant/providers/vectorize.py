@@ -97,22 +97,31 @@ class ArchiveSemanticIndex:
         *,
         token: str,
         json_body: dict[str, Any] | None = None,
-        data: str | bytes | None = None,
-        content_type: str = "application/json",
+        file_body: bytes | None = None,
         allow_404: bool = False,
     ) -> tuple[int, dict[str, Any]]:
         timeout = aiohttp.ClientTimeout(total=self.timeout_seconds)
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": content_type,
-        }
+        headers = {"Authorization": f"Bearer {token}"}
+        request_kwargs: dict[str, Any] = {}
+        if file_body is not None:
+            form = aiohttp.FormData()
+            form.add_field(
+                "body",
+                file_body,
+                filename="vectors.ndjson",
+                content_type="application/x-ndjson",
+            )
+            request_kwargs["data"] = form
+        else:
+            headers["Content-Type"] = "application/json"
+            request_kwargs["json"] = json_body
+
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.request(
                 method,
                 url,
                 headers=headers,
-                json=json_body if data is None else None,
-                data=data,
+                **request_kwargs,
             ) as response:
                 status = response.status
                 try:
@@ -228,8 +237,7 @@ class ArchiveSemanticIndex:
                     f"vectorize/v2/indexes/{self.index_name}/upsert"
                 ),
                 token=self.vectorize_token,
-                data=ndjson.encode("utf-8"),
-                content_type="application/x-ndjson",
+                file_body=ndjson.encode("utf-8"),
             )
             return True
         except SemanticUnavailable as exc:
