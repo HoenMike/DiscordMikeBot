@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from discord.ext import commands
 
@@ -46,29 +47,53 @@ class AssistantCog(commands.Cog):
         if not self.should_handle(message):
             return False
 
+        request_started = time.perf_counter()
+        request_id = getattr(message, "id", "unknown")
         query = self._query_from_message(message)
+
+        route_started = time.perf_counter()
         decision = await route_message(
             query,
             cloudflare_router=self.cloudflare_router,
             min_confidence=self.router_min_confidence,
         )
+        route_ms = (time.perf_counter() - route_started) * 1000
 
         if decision.tool:
+            tool_started = time.perf_counter()
             result = await self.tools.execute(decision, message)
+            tool_ms = (time.perf_counter() - tool_started) * 1000
             if result.handled:
+                total_ms = (time.perf_counter() - request_started) * 1000
+                print(
+                    f"⏱️ [Asumi Timing] id={request_id} path=tool "
+                    f"intent={decision.intent} source={decision.source} "
+                    f"route_ms={route_ms:.0f} clef_ms={decision.clef_ms:.0f} "
+                    f"tool_ms={tool_ms:.0f} total_ms={total_ms:.0f}",
+                    flush=True,
+                )
                 return True
 
         previous_session = self.sessions.get(message)
         try:
+            ai_started = time.perf_counter()
             async with message.channel.typing():
-                reply_text = await generate_chat_reply(
+                reply = await generate_chat_reply(
                     query or "Bạn có thể làm gì?",
                     previous_session,
                 )
+            ai_ms = (time.perf_counter() - ai_started) * 1000
         except Exception as exc:
+            total_ms = (time.perf_counter() - request_started) * 1000
             print(
                 f"❌ [Asumi Conversation] Không tạo được phản hồi: "
                 f"{type(exc).__name__}: {str(exc)[:180]}",
+                flush=True,
+            )
+            print(
+                f"⏱️ [Asumi Timing] id={request_id} path=chat status=error "
+                f"source={decision.source} route_ms={route_ms:.0f} "
+                f"clef_ms={decision.clef_ms:.0f} total_ms={total_ms:.0f}",
                 flush=True,
             )
             sent = await message.reply(
@@ -84,12 +109,25 @@ class AssistantCog(commands.Cog):
             )
             return True
 
-        sent = await send_conversation_reply(message, reply_text)
+        send_started = time.perf_counter()
+        sent = await send_conversation_reply(message, reply.text)
+        send_ms = (time.perf_counter() - send_started) * 1000
+        total_ms = (time.perf_counter() - request_started) * 1000
+
+        print(
+            f"⏱️ [Asumi Timing] id={request_id} path=chat status=ok "
+            f"intent={decision.intent} source={decision.source} "
+            f"route_ms={route_ms:.0f} clef_ms={decision.clef_ms:.0f} "
+            f"ai_ms={ai_ms:.0f} model={reply.model} attempts={reply.attempts} "
+            f"send_ms={send_ms:.0f} total_ms={total_ms:.0f}",
+            flush=True,
+        )
+
         self.sessions.record_exchange(
             message,
             sent.id,
             query,
-            reply_text,
+            reply.text,
             intent=decision.intent,
         )
         return True
