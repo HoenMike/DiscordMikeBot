@@ -3,7 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from core.activity_logger import ActivityLogger
-from features.assistant.ai import _candidate_models
+from features.assistant.ai import _candidate_models, _build_prompt, generate_chat_reply
+from features.assistant.context import AssistantContext, ContextBuilder, ImagePayload
 from features.assistant.router import route_locally, route_message
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
@@ -11,13 +12,26 @@ from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 from features.assistant.providers.cloudflare import ClefDecision, CloudflareDecisionRouter
 
 
-def fake_message(content="@Asumi hello", *, reply_id=None):
+def fake_message(
+    content="@Asumi hello",
+    *,
+    reply_id=None,
+    author_id=30,
+    channel=None,
+    attachments=None,
+    resolved=None,
+):
+    reference = None
+    if reply_id is not None:
+        reference = SimpleNamespace(message_id=reply_id, resolved=resolved)
     return SimpleNamespace(
+        id=1000 + author_id,
         content=content,
         guild=SimpleNamespace(id=10),
-        channel=SimpleNamespace(id=20),
-        author=SimpleNamespace(id=30),
-        reference=SimpleNamespace(message_id=reply_id) if reply_id else None,
+        channel=channel or SimpleNamespace(id=20),
+        author=SimpleNamespace(id=author_id, display_name=f"User{author_id}"),
+        reference=reference,
+        attachments=list(attachments or []),
     )
 
 
@@ -79,6 +93,187 @@ class AssistantSessionTests(unittest.TestCase):
         store.record_exchange(msg, 2, "u2", "a2")
         session = store.record_exchange(msg, 3, "u3", "a3")
         self.assertEqual([turn.user for turn in session.turns], ["u2", "u3"])
+
+
+    def test_other_user_cannot_continue_someone_elses_session(self):
+        store = SessionStore(ttl_seconds=1200, max_turns=2)
+        owner = fake_message("hello", author_id=30)
+        store.record_exchange(owner, 99, "hello", "hi")
+        other = fake_message("more", reply_id=99, author_id=31)
+        self.assertFalse(store.is_live_reply(other))
+
+    def test_expired_session_does_not_continue(self):
+        store = SessionStore(ttl_seconds=60, max_turns=2)
+        msg = fake_message("hello")
+        with patch("features.assistant.session.time.monotonic", return_value=10.0):
+            store.record_exchange(msg, 99, "hello", "hi")
+        with patch("features.assistant.session.time.monotonic", return_value=71.0):
+            self.assertFalse(store.is_live_reply(fake_message("more", reply_id=99)))
+
+    def test_session_keeps_bounded_image_snapshot_for_followup(self):
+        store = SessionStore(ttl_seconds=1200, max_turns=2)
+        msg = fake_message("image")
+        image = ImagePayload(b"img", "image/png", "shot.png")
+        first = store.record_exchange(msg, 99, "image", "seen", images=[image])
+        self.assertEqual(first.images[0].filename, "shot.png")
+        followup = store.record_exchange(msg, 100, "where?", "there")
+        self.assertEqual(followup.images[0].filename, "shot.png")
+
+
+class _FakeHistoryChannel:
+    def __init__(self, items):
+        self.id = 20
+        self.items = list(items)
+        self.history_called = False
+
+    def history(self, **kwargs):
+        self.history_called = True
+        async def _iterate():
+            for item in self.items:
+                yield item
+        return _iterate()
+
+
+class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reply_target_is_included_without_channel_history(self):
+        replied = SimpleNamespace(
+            id=77,
+            content="Theo gửi link https://example.com/game",
+            author=SimpleNamespace(display_name="Theo"),
+            attachments=[],
+        )
+        channel = _FakeHistoryChannel([])
+        msg = fake_message(
+            "<@123> game này có mobile không?",
+            reply_id=77,
+            resolved=replied,
+            channel=channel,
+        )
+        ctx = await ContextBuilder().build(msg, "game này có mobile không?")
+        self.assertEqual(ctx.reply.author, "Theo")
+        self.assertIn("https://example.com/game", ctx.urls)
+        self.assertFalse(channel.history_called)
+
+    async def test_recent_history_is_only_fetched_for_contextual_cues(self):
+        recent = [
+            SimpleNamespace(
+                id=1,
+                content="game mới nè https://example.com/a",
+                author=SimpleNamespace(display_name="Theo"),
+                attachments=[],
+            ),
+            SimpleNamespace(
+                id=2,
+                content="có vẻ hay",
+                author=SimpleNamespace(display_name="Mai"),
+                attachments=[],
+            ),
+        ]
+        channel = _FakeHistoryChannel(recent)
+        msg = fake_message("<@123> game Theo gửi phía trên là gì?", channel=channel)
+        ctx = await ContextBuilder(recent_limit=8).build(
+            msg,
+            "game Theo gửi phía trên là gì?",
+        )
+        self.assertTrue(channel.history_called)
+        self.assertTrue(ctx.used_recent_history)
+        self.assertEqual([x.author for x in ctx.recent], ["Theo", "Mai"])
+        self.assertIn("https://example.com/a", ctx.urls)
+
+    async def test_direct_image_attachment_is_loaded(self):
+        attachment = SimpleNamespace(
+            content_type="image/png",
+            filename="error.png",
+            size=3,
+            read=AsyncMock(return_value=b"png"),
+        )
+        msg = fake_message("<@123> lỗi gì đây?", attachments=[attachment])
+        ctx = await ContextBuilder().build(msg, "lỗi gì đây?")
+        self.assertEqual(len(ctx.images), 1)
+        self.assertEqual(ctx.images[0].filename, "error.png")
+        self.assertEqual(ctx.images[0].source, "attachment")
+
+    async def test_replied_image_is_loaded(self):
+        attachment = SimpleNamespace(
+            content_type="image/jpeg",
+            filename="meme.jpg",
+            size=4,
+            read=AsyncMock(return_value=b"jpeg"),
+        )
+        replied = SimpleNamespace(
+            id=77,
+            content="",
+            author=SimpleNamespace(display_name="Theo"),
+            attachments=[attachment],
+        )
+        msg = fake_message(
+            "<@123> meme này joke gì?",
+            reply_id=77,
+            resolved=replied,
+        )
+        ctx = await ContextBuilder().build(msg, "meme này joke gì?")
+        self.assertEqual(len(ctx.images), 1)
+        self.assertEqual(ctx.images[0].source, "reply")
+
+    async def test_live_followup_reuses_session_image_but_skips_bot_reply_text(self):
+        image = ImagePayload(b"img", "image/webp", "screen.webp")
+        session = SimpleNamespace(last_response_message_id=99, images=[image])
+        bot_reply = SimpleNamespace(
+            id=99,
+            content="Đây là lỗi config.",
+            author=SimpleNamespace(display_name="Asumi"),
+            attachments=[],
+        )
+        msg = fake_message(
+            "vậy sửa chỗ nào?",
+            reply_id=99,
+            resolved=bot_reply,
+        )
+        ctx = await ContextBuilder().build(
+            msg,
+            "vậy sửa chỗ nào?",
+            session=session,
+            is_live_continuation=True,
+        )
+        self.assertIsNone(ctx.reply)
+        self.assertTrue(ctx.used_session_images)
+        self.assertEqual(ctx.images[0].filename, "screen.webp")
+
+    async def test_oversize_image_is_skipped(self):
+        attachment = SimpleNamespace(
+            content_type="image/png",
+            filename="huge.png",
+            size=1000,
+            read=AsyncMock(return_value=b"x" * 1000),
+        )
+        msg = fake_message("<@123> xem ảnh", attachments=[attachment])
+        ctx = await ContextBuilder(max_image_bytes=512).build(msg, "xem ảnh")
+        self.assertEqual(ctx.images, [])
+        self.assertTrue(ctx.warnings)
+        attachment.read.assert_not_awaited()
+
+
+class AssistantMultimodalPromptTests(unittest.IsolatedAsyncioTestCase):
+    async def test_generate_chat_reply_sends_image_part(self):
+        context = AssistantContext(
+            images=[ImagePayload(b"img", "image/png", "shot.png")]
+        )
+        fake_response = SimpleNamespace(text="mình thấy ảnh")
+        with patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(return_value=fake_response),
+        ) as generate:
+            result = await generate_chat_reply("ảnh này là gì?", context=context)
+        self.assertEqual(result.text, "mình thấy ảnh")
+        contents = generate.await_args.kwargs["contents"]
+        self.assertEqual(len(contents[0].parts), 2)
+        self.assertEqual(contents[0].parts[1].inline_data.mime_type, "image/png")
+
+    def test_prompt_contains_reply_context(self):
+        ctx = AssistantContext()
+        ctx.reply = SimpleNamespace(author="Theo", content="test message")
+        prompt = _build_prompt("giải thích đi", None, ctx)
+        self.assertIn("Theo: test message", prompt)
 
 
 class AssistantChatModelTests(unittest.TestCase):
