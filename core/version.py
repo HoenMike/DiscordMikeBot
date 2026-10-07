@@ -29,6 +29,7 @@ CHANGELOG: List[Dict[str, Any]] = [
                 "Reply vào một message rồi tag Asumi sẽ đưa đúng message đó vào context.",
                 "Recent channel history chỉ được fetch khi câu hỏi có cue như cái này/cái trước/phía trên/vừa rồi, với số message và character budget bị giới hạn.",
                 "Reply đúng response conversational mới nhất tiếp tục session mà không gọi Clef/tool router lại; reply cũ, khác user hoặc session hết hạn không được tiếp tục.",
+                "Output từ natural-language Tarot/Summary cũng được bridge vào session; reply vào bất kỳ chunk/output được capture đều có thể follow-up mà không mở action mới.",
             ]},
             {"category": "🖼️ Image Lens", "items": [
                 "Nhận PNG/JPEG/WEBP từ attachment trực tiếp hoặc message được reply.",
