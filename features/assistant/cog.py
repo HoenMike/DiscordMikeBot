@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from core.activity_logger import activity_logger
 from features.assistant.ai import generate_chat_reply
@@ -57,6 +57,23 @@ class AssistantCog(commands.Cog):
         self.context_builder = ContextBuilder.from_env()
         self.cloudflare_router = CloudflareDecisionRouter.from_env()
         self.router_min_confidence = float(os.getenv("CF_ROUTER_MIN_CONFIDENCE", "0.55"))
+
+    async def cog_load(self):
+        if not self.session_cleanup_loop.is_running():
+            self.session_cleanup_loop.start()
+
+    async def cog_unload(self):
+        if self.session_cleanup_loop.is_running():
+            self.session_cleanup_loop.cancel()
+
+    @tasks.loop(minutes=5)
+    async def session_cleanup_loop(self):
+        removed = self.sessions.prune_expired()
+        if removed:
+            print(
+                f"🧹 [Asumi Session] Đã giải phóng {removed} session hết hạn.",
+                flush=True,
+            )
 
     def should_handle(self, message) -> bool:
         bot_user_id = getattr(getattr(self.bot, "user", None), "id", None)
