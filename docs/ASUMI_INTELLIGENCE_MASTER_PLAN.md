@@ -13,7 +13,7 @@
 Asumi 3.1  Conversational Core        COMPLETE
 Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
 Asumi 3.3  Asumi Archive              CORE + SEMANTIC IMPLEMENTED; LIVE VERIFY
-Asumi 3.4  Intelligence Polish        PLANNED
+Asumi 3.4  Intelligence Polish        IMPLEMENTED; LIVE REGRESSION PENDING
 ```
 
 Audio / voice transcription is explicitly out of scope for Asumi 3.x unless the owner reopens it.
@@ -63,7 +63,7 @@ The conversational layer is a **natural-language frontend**, not a replacement f
 4. **Bounded context**
    - Never dump an entire channel history into every prompt.
    - Prefer reply target, a small recent-message window, and compact session state.
-   - Long-term semantic memory is a later opt-in feature.
+   - Long-term Archive memory is explicit opt-in; semantic retrieval is an optional derived index.
 
 5. **Free-only / fail closed**
    - Cloudflare Workers AI, AI Gateway, storage and routing must remain within free allowances.
@@ -500,6 +500,8 @@ Examples:
 ```
 
 ### T21.8 — Polish + observability + release
+
+**Implementation status:** implemented in Asumi 3.4.0; production regression matrix remains pending.
 
 - help/docs updated;
 - route/provider/tool failure metrics;
