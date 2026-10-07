@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.4.1] - 2026-10-08 — *Conversational Timeout Budget*
+
+### Fixed
+- Replaced per-fallback full timeouts with a hard total conversational AI budget.
+- Defaults: 4s per model, 8s total AI budget, maximum 2 attempts.
+- Chat fallback order now prefers `gemini-3.1-flash-lite` before heavier summary models.
+- Later attempts only receive the remaining request budget; exhausted budget stops immediately.
+- Error telemetry now records `ai_ms`, models tried, attempts, budget and last provider error type.
+- Dashboard labels conversational timeout-budget failures explicitly.
+
 ## [3.4.0] - 2026-10-08 — *Intelligence Polish*
 
 ### Observability
