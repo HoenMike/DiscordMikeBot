@@ -12,7 +12,7 @@
 ```text
 Asumi 3.1  Conversational Core        COMPLETE
 Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
-Asumi 3.3  Asumi Archive              CORE IMPLEMENTED; SEMANTIC PENDING
+Asumi 3.3  Asumi Archive              CORE + SEMANTIC IMPLEMENTED; LIVE VERIFY
 Asumi 3.4  Intelligence Polish        PLANNED
 ```
 
@@ -471,7 +471,7 @@ Cloudflare free model availability must be re-checked at implementation time; do
 
 ### T21.7 — Asumi Archive / explicit memory
 
-**Implementation status:** Archive Core implemented in Asumi 3.3.0; live verification and semantic retrieval follow-up pending.
+**Implementation status:** Archive Core shipped in Asumi 3.3.0; optional semantic retrieval implemented in 3.3.1 and pending Vectorize credential/live validation.
 
 Core contract:
 - explicit `Save / Nhớ` only; no passive full-server logging;
@@ -484,8 +484,8 @@ Core contract:
 Storage decision:
 - **Canonical records use the existing `core.db` adapter (Turso Cloud with local SQLite fallback).**
 - Do not create a second D1 canonical database; that would introduce split-brain state and extra migration/ops cost.
-- Vectorize may be added as a derived semantic index in a later 3.3.x slice after core live acceptance.
-- R2 is optional for media binary retention only if product value justifies copying media; 3.3.0 stores source URL/attachment/embed metadata only.
+- Vectorize is implemented in 3.3.1 as an optional derived semantic index using per-user namespaces; canonical rows are owner-checked again before display.
+- R2 remains optional for media binary retention only if product value justifies copying media; 3.3.x still stores source URL/attachment/embed metadata only.
 - If a derived Vectorize/R2 record is lost, canonical Archive records must remain intact.
 
 Examples:
