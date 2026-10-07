@@ -181,8 +181,19 @@ class AssistantCog(commands.Cog):
                         "reply_context": context.reply is not None,
                         "recent_messages": len(context.recent),
                         "images": len(context.images),
+                        "tool_output_messages": len(result.response_message_ids),
                     },
                 )
+                if result.response_message_ids:
+                    self.sessions.record_exchange(
+                        message,
+                        result.response_message_ids[-1],
+                        query,
+                        result.response_context or f"[Tool {decision.tool} completed]",
+                        intent=decision.intent,
+                        response_message_ids=list(result.response_message_ids),
+                        tool=decision.tool,
+                    )
                 return True
 
         try:
@@ -250,7 +261,8 @@ class AssistantCog(commands.Cog):
             return True
 
         send_started = time.perf_counter()
-        sent = await send_conversation_reply(message, reply.text)
+        delivery = await send_conversation_reply(message, reply.text)
+        sent = delivery.last_message
         send_ms = (time.perf_counter() - send_started) * 1000
         total_ms = (time.perf_counter() - request_started) * 1000
 
@@ -297,6 +309,7 @@ class AssistantCog(commands.Cog):
             reply.text,
             intent=decision.intent,
             images=context.images,
+            response_message_ids=list(delivery.message_ids),
         )
         return True
 
