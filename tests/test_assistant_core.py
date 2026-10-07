@@ -137,6 +137,19 @@ class AssistantSessionTests(unittest.TestCase):
         self.assertTrue(store.is_live_reply(fake_message("part 3?", reply_id=101)))
         self.assertFalse(store.is_live_reply(fake_message("old?", reply_id=98)))
 
+    def test_prune_expired_releases_session_image_memory(self):
+        store = SessionStore(ttl_seconds=60, max_turns=2)
+        msg = fake_message("image")
+        image = ImagePayload(b"x" * 1024, "image/png", "shot.png")
+        with patch("features.assistant.session.time.monotonic", return_value=10.0):
+            store.record_exchange(msg, 99, "image", "seen", images=[image])
+        self.assertEqual(len(store._sessions), 1)
+
+        removed = store.prune_expired(now=71.0)
+
+        self.assertEqual(removed, 1)
+        self.assertEqual(len(store._sessions), 0)
+
     def test_tool_session_tracks_all_tool_output_ids(self):
         store = SessionStore(ttl_seconds=1200, max_turns=2)
         msg = fake_message("tarot")
