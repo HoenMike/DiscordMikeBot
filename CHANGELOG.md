@@ -7,6 +7,27 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.2.0] - 2026-10-07 — *Context + Lens*
+
+### Added
+- **Reply context**: tag Asumi while replying to a message and Asumi receives that message as bounded context.
+- **Selective recent context**: recent channel messages are fetched only for referential requests such as `cái này`, `cái trước`, `phía trên`, `vừa rồi`.
+- **Image Lens**: PNG/JPEG/WEBP can come from the current message or the replied message and are sent as multimodal input to Gemini 3.5 Flash-Lite.
+- **Image follow-up**: live sessions keep at most two bounded image snapshots in memory so a reply like `vậy sửa chỗ nào?` can still refer to the previous screenshot.
+- **Link Lens**: URLs are collected from current/reply/recent context; Gemini URL Context is enabled when URLs are present, with Discord embed metadata as fallback context.
+
+### Reliability
+- Replies to the latest live-session Asumi answer are conversational continuations and do **not** run Clef/tool routing again.
+- Replies to older Asumi messages, replies from another user, and expired sessions do not inherit the original user's session.
+- Image-only mentions route to vision chat instead of Help.
+- Context/image counts and context-build latency are included in privacy-safe Asumi dashboard telemetry.
+
+### Privacy & bounds
+- Default recent history bound: 8 messages / 7000 context characters.
+- Default image bound: 2 images / 5 MiB each.
+- Image snapshots are in-memory only for the short live session; no DB/R2 persistence.
+- Audio/voice transcription remains out of scope.
+
 ## [3.1.2] - 2026-10-07 — *Dashboard AI telemetry*
 
 ### Added
