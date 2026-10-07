@@ -1880,7 +1880,8 @@ class TarotFlipView(discord.ui.View):
             f"**{self.spread_info['name']}**",
             f"{build_reveal_progress(self.revealed_indices, total)}",
             "",
-            "🧠 **Asumi đang luận giải quẻ này...**",
+            "✅ **Phần lật bài đã xong.**",
+            "🧠 **Asumi đang viết phần luận giải cuối...**",
         ]
 
         if total == 1 and self.drawn_cards:
@@ -1899,13 +1900,13 @@ class TarotFlipView(discord.ui.View):
         lines.append("⏳ *Không cần bấm gì thêm — kết quả sẽ tự cập nhật ngay tại tin nhắn này.*")
 
         embed = discord.Embed(
-            title="⏳ ĐANG LUẬN GIẢI",
+            title="⏳ ĐANG LUẬN GIẢI — CHƯA XONG",
             description="\n".join(lines),
             color=self.embed_color,
         )
         embed.set_image(url="attachment://tarot_spread.png")
         embed.set_footer(
-            text=f"Quẻ bài của {self.author_name} • ĐANG XỬ LÝ • TỰ CẬP NHẬT",
+            text=f"Quẻ bài của {self.author_name} • CHƯA XONG • TỰ CẬP NHẬT",
             icon_url=self.author_avatar_url,
         )
         return embed
