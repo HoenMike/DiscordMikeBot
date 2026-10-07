@@ -108,6 +108,7 @@ class CommandToolRegistry:
 
         if decision.tool == "archive.search":
             query = decision.arguments.get("query", "")
+            semantic_query = decision.arguments.get("semantic_query", "") or query
             lexical_items = await archive_store.search(
                 owner_user_id,
                 query=query,
@@ -118,7 +119,7 @@ class CommandToolRegistry:
             if query and archive_semantic.enabled:
                 matches = await archive_semantic.query(
                     owner_user_id,
-                    query,
+                    semantic_query,
                     top_k=8,
                 )
                 if matches:
