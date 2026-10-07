@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+from core.activity_logger import ActivityLogger
 from features.assistant.ai import _candidate_models
 from features.assistant.router import route_locally, route_message
 from features.assistant.session import SessionStore
@@ -159,6 +160,33 @@ class CloudflareAdapterTests(unittest.TestCase):
         )
         self.assertTrue(router.enabled)
         self.assertEqual(router.model, "@cf/cloudflare/clef-flash")
+
+
+class AssistantDashboardTelemetryTests(unittest.TestCase):
+    def test_activity_logger_counts_assistant_telemetry(self):
+        logger = ActivityLogger(maxlen=5)
+        logger.log(
+            action_type="assistant",
+            action_name="Asumi Chat",
+            user_id=1,
+            user_name="Tester",
+            duration_ms=3672.0,
+            details={
+                "path": "chat",
+                "model": "gemini-3.5-flash-lite",
+                "route_ms": 2.0,
+                "clef_ms": 0.0,
+                "ai_ms": 3238.0,
+                "send_ms": 432.0,
+                "total_ms": 3672.0,
+            },
+        )
+
+        result = logger.get_activities(limit=5)
+
+        self.assertEqual(result["counts"]["assistant"], 1)
+        self.assertEqual(result["items"][0]["action_type"], "assistant")
+        self.assertEqual(result["items"][0]["details"]["ai_ms"], 3238.0)
 
 
 class AssistantToolBridgeTests(unittest.IsolatedAsyncioTestCase):

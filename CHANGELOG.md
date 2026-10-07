@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.1.2] - 2026-10-07 — *Dashboard AI telemetry*
+
+### Added
+- **Asumi AI** filter trong Admin Dashboard → Log Tương Tác.
+- Bảng activity hiển thị tổng latency hiện có cùng model và AI/Clef timing ngắn gọn cho request conversational.
+- Modal Chi tiết hiển thị toàn bộ timing metadata: route, Clef, AI, Discord send, total, model, attempts, source và intent.
+
+### Privacy
+- Conversational telemetry không lưu nguyên prompt/response; chỉ giữ metadata hiệu năng, user/server/channel và số ký tự input/output.
+
 ## [3.1.1] - 2026-10-07 — *Conversational latency hotfix*
 
 ### Changed

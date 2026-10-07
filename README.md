@@ -16,6 +16,7 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - Reply trực tiếp response conversational gần nhất để tiếp tục một session ngắn mà không cần tag lại.
 - Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
 - Clef-flash trên Cloudflare là router tùy chọn; chưa có credential thì Asumi tự dùng local routing + Gemini hiện tại.
+- Admin Dashboard có filter **Asumi AI** để theo dõi model và latency từng tầng mà không cần đọc Render Logs.
 
 ### Tóm tắt cuộc trò chuyện bằng AI
 
@@ -81,6 +82,7 @@ Giao diện web Flask hiển thị thông tin giám sát thời gian thực:
 - Số lượng máy chủ đang phục vụ, RAM sử dụng.
 - Console log trực tiếp.
 - Kết quả kiểm thử từ lệnh `/test_tomtat`.
+- Telemetry **Asumi AI**: tổng latency, route/Clef/AI/send timing, model và số attempt; không lưu nguyên nội dung chat.
 
 ### Graceful Shutdown
 
