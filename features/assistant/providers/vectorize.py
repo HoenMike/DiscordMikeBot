@@ -298,17 +298,17 @@ class ArchiveSemanticIndex:
                 await self.ensure_index()
                 vector = await self._embed(query)
                 _, body = await self._json_request(
-                "POST",
-                self._api(
-                    f"vectorize/v2/indexes/{self.index_name}/query"
-                ),
-                token=self.vectorize_token,
-                json_body={
-                    "vector": vector,
-                    "topK": max(1, min(int(top_k), 20)),
-                    "namespace": self.namespace(owner_user_id),
-                    "returnMetadata": "all",
-                    "returnValues": False,
+                    "POST",
+                    self._api(
+                        f"vectorize/v2/indexes/{self.index_name}/query"
+                    ),
+                    token=self.vectorize_token,
+                    json_body={
+                        "vector": vector,
+                        "topK": max(1, min(int(top_k), 20)),
+                        "namespace": self.namespace(owner_user_id),
+                        "returnMetadata": "all",
+                        "returnValues": False,
                     },
                 )
             result = body.get("result", body) if isinstance(body, dict) else {}
