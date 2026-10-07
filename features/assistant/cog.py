@@ -7,8 +7,9 @@ from discord.ext import commands
 
 from core.activity_logger import activity_logger
 from features.assistant.ai import generate_chat_reply
+from features.assistant.context import ContextBuilder
 from features.assistant.response import send_conversation_reply
-from features.assistant.router import route_message
+from features.assistant.router import RouteDecision, route_message
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
@@ -16,7 +17,7 @@ from features.assistant.providers.cloudflare import CloudflareDecisionRouter
 
 
 class AssistantCog(commands.Cog):
-    """Asumi 3.1 conversational entrypoint.
+    """Asumi conversational entrypoint.
 
     This cog deliberately has no on_message listener. bot_instance owns message
     dispatch so command precedence stays deterministic.
@@ -28,6 +29,7 @@ class AssistantCog(commands.Cog):
         turns = int(os.getenv("ASUMI_SESSION_MAX_TURNS", "4"))
         self.sessions = SessionStore(ttl_seconds=ttl, max_turns=turns)
         self.tools = CommandToolRegistry(bot)
+        self.context_builder = ContextBuilder.from_env()
         self.cloudflare_router = CloudflareDecisionRouter.from_env()
         self.router_min_confidence = float(os.getenv("CF_ROUTER_MIN_CONFIDENCE", "0.55"))
 
@@ -97,13 +99,32 @@ class AssistantCog(commands.Cog):
         request_started = time.perf_counter()
         request_id = getattr(message, "id", "unknown")
         query = self._query_from_message(message)
+        previous_session = self.sessions.get(message)
+        is_live_continuation = self.sessions.is_live_reply(message)
+
+        context_started = time.perf_counter()
+        context = await self.context_builder.build(
+            message,
+            query,
+            session=previous_session,
+            is_live_continuation=is_live_continuation,
+        )
+        context_ms = (time.perf_counter() - context_started) * 1000
 
         route_started = time.perf_counter()
-        decision = await route_message(
-            query,
-            cloudflare_router=self.cloudflare_router,
-            min_confidence=self.router_min_confidence,
-        )
+        if is_live_continuation:
+            decision = RouteDecision(
+                intent=getattr(previous_session, "intent", None) or "chat",
+                source="session_followup",
+            )
+        elif not query and context.images:
+            decision = RouteDecision(intent="vision", source="image_only")
+        else:
+            decision = await route_message(
+                query,
+                cloudflare_router=self.cloudflare_router,
+                min_confidence=self.router_min_confidence,
+            )
         route_ms = (time.perf_counter() - route_started) * 1000
 
         if decision.tool:
@@ -115,8 +136,9 @@ class AssistantCog(commands.Cog):
                 print(
                     f"⏱️ [Asumi Timing] id={request_id} path=tool "
                     f"intent={decision.intent} source={decision.source} "
-                    f"route_ms={route_ms:.0f} clef_ms={decision.clef_ms:.0f} "
-                    f"tool_ms={tool_ms:.0f} total_ms={total_ms:.0f}",
+                    f"context_ms={context_ms:.0f} route_ms={route_ms:.0f} "
+                    f"clef_ms={decision.clef_ms:.0f} tool_ms={tool_ms:.0f} "
+                    f"total_ms={total_ms:.0f}",
                     flush=True,
                 )
                 self._log_dashboard_activity(
@@ -130,22 +152,31 @@ class AssistantCog(commands.Cog):
                         "intent": decision.intent,
                         "source": decision.source,
                         "tool": decision.tool,
+                        "context_ms": round(context_ms, 1),
                         "route_ms": round(route_ms, 1),
                         "clef_ms": round(decision.clef_ms, 1),
                         "tool_ms": round(tool_ms, 1),
                         "total_ms": round(total_ms, 1),
                         "query_chars": len(query),
+                        "reply_context": context.reply is not None,
+                        "recent_messages": len(context.recent),
+                        "images": len(context.images),
                     },
                 )
                 return True
 
-        previous_session = self.sessions.get(message)
         try:
             ai_started = time.perf_counter()
             async with message.channel.typing():
+                default_query = (
+                    "Hãy xem ảnh này và mô tả hoặc giải thích nội dung chính."
+                    if context.images
+                    else "Bạn có thể làm gì?"
+                )
                 reply = await generate_chat_reply(
-                    query or "Bạn có thể làm gì?",
+                    query or default_query,
                     previous_session,
+                    context=context,
                 )
             ai_ms = (time.perf_counter() - ai_started) * 1000
         except Exception as exc:
@@ -157,8 +188,9 @@ class AssistantCog(commands.Cog):
             )
             print(
                 f"⏱️ [Asumi Timing] id={request_id} path=chat status=error "
-                f"source={decision.source} route_ms={route_ms:.0f} "
-                f"clef_ms={decision.clef_ms:.0f} total_ms={total_ms:.0f}",
+                f"source={decision.source} context_ms={context_ms:.0f} "
+                f"route_ms={route_ms:.0f} clef_ms={decision.clef_ms:.0f} "
+                f"total_ms={total_ms:.0f}",
                 flush=True,
             )
             sent = await message.reply(
@@ -175,11 +207,16 @@ class AssistantCog(commands.Cog):
                     "path": "chat",
                     "intent": decision.intent,
                     "source": decision.source,
+                    "context_ms": round(context_ms, 1),
                     "route_ms": round(route_ms, 1),
                     "clef_ms": round(decision.clef_ms, 1),
                     "total_ms": round(total_ms, 1),
                     "error_type": type(exc).__name__,
                     "query_chars": len(query),
+                    "reply_context": context.reply is not None,
+                    "recent_messages": len(context.recent),
+                    "images": len(context.images),
+                    "session_images": context.used_session_images,
                 },
             )
             self.sessions.record_exchange(
@@ -188,6 +225,7 @@ class AssistantCog(commands.Cog):
                 query,
                 "AI unavailable; deterministic commands remain available.",
                 intent="chat_error",
+                images=context.images,
             )
             return True
 
@@ -199,8 +237,9 @@ class AssistantCog(commands.Cog):
         print(
             f"⏱️ [Asumi Timing] id={request_id} path=chat status=ok "
             f"intent={decision.intent} source={decision.source} "
-            f"route_ms={route_ms:.0f} clef_ms={decision.clef_ms:.0f} "
-            f"ai_ms={ai_ms:.0f} model={reply.model} attempts={reply.attempts} "
+            f"context_ms={context_ms:.0f} route_ms={route_ms:.0f} "
+            f"clef_ms={decision.clef_ms:.0f} ai_ms={ai_ms:.0f} "
+            f"model={reply.model} attempts={reply.attempts} "
             f"send_ms={send_ms:.0f} total_ms={total_ms:.0f}",
             flush=True,
         )
@@ -215,6 +254,7 @@ class AssistantCog(commands.Cog):
                 "path": "chat",
                 "intent": decision.intent,
                 "source": decision.source,
+                "context_ms": round(context_ms, 1),
                 "route_ms": round(route_ms, 1),
                 "clef_ms": round(decision.clef_ms, 1),
                 "ai_ms": round(ai_ms, 1),
@@ -224,6 +264,10 @@ class AssistantCog(commands.Cog):
                 "attempts": reply.attempts,
                 "query_chars": len(query),
                 "response_chars": len(reply.text),
+                "reply_context": context.reply is not None,
+                "recent_messages": len(context.recent),
+                "images": len(context.images),
+                "session_images": context.used_session_images,
             },
         )
         self.sessions.record_exchange(
@@ -232,6 +276,7 @@ class AssistantCog(commands.Cog):
             query,
             reply.text,
             intent=decision.intent,
+            images=context.images,
         )
         return True
 
