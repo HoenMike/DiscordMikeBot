@@ -119,7 +119,9 @@ class CommandToolRegistry:
             lines = ["🧠 **ASUMI ARCHIVE**"]
             for item in items:
                 snippet = self._archive_snippet(item)
-                author = item.get("source_author_name") or "Unknown"
+                author = discord.utils.escape_mentions(
+                item.get("source_author_name") or "Unknown"
+            )
                 jump = item.get("source_jump_url") or item.get("source_url") or ""
                 line = f"**#{item['id']}** · {author}\n> {snippet}"
                 if jump:
@@ -222,7 +224,23 @@ class CommandToolRegistry:
 
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
         if decision.tool and decision.tool.startswith("archive."):
-            return await self._execute_archive(decision, message)
+            try:
+                return await self._execute_archive(decision, message)
+            except Exception as exc:
+                print(
+                    f"❌ [Asumi Archive] {type(exc).__name__}: {str(exc)[:180]}",
+                    flush=True,
+                )
+                sent = await message.reply(
+                    "⚠️ Archive đang tạm thời không truy cập được. "
+                    "Không có dữ liệu nào được lưu/xóa trong lần thử này.",
+                    mention_author=False,
+                )
+                return ToolExecutionResult(
+                    handled=True,
+                    response_message_ids=(int(sent.id),),
+                    response_context="Archive unavailable; no mutation confirmed.",
+                )
 
         command_text = self._command_for(decision)
         if not command_text:
