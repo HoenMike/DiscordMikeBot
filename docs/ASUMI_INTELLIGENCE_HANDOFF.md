@@ -159,6 +159,7 @@ The first implementation PR should add `features/assistant/` and tests before br
 - URLs from current/reply/recent context enable Gemini URL Context; Discord embed/attachment metadata is also captured.
 - PNG/JPEG/WEBP attachments are passed as multimodal parts.
 - Up to two images can remain in RAM inside the 20-minute session for follow-up; they are not persisted.
+- A 5-minute cleanup loop actively prunes expired sessions so image bytes do not remain in RAM indefinitely after TTL.
 - Added tests for other-user isolation, expired/old reply behavior, image attachment/reply/session carry-over, image-only routing, URL context and embed metadata.
 - Environment defaults document context/image bounds; no new secret is required.
 
