@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+from features.assistant.ai import _candidate_models
 from features.assistant.router import route_locally, route_message
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
@@ -79,7 +80,34 @@ class AssistantSessionTests(unittest.TestCase):
         self.assertEqual([turn.user for turn in session.turns], ["u2", "u3"])
 
 
+class AssistantChatModelTests(unittest.TestCase):
+    def test_chat_defaults_to_high_rpd_flash_lite(self):
+        with patch.dict("os.environ", {}, clear=True):
+            models = _candidate_models()
+        self.assertEqual(models[0], "gemini-3.5-flash-lite")
+
+    def test_chat_model_can_be_overridden(self):
+        with patch.dict(
+            "os.environ",
+            {"ASUMI_CHAT_MODEL": "gemini-custom-chat"},
+            clear=True,
+        ):
+            models = _candidate_models()
+        self.assertEqual(models[0], "gemini-custom-chat")
+
+
 class AssistantClefRouterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_obvious_greeting_skips_clef(self):
+        router = SimpleNamespace(
+            enabled=True,
+            classify=AsyncMock(return_value=ClefDecision("summarize", 0.99)),
+        )
+        decision = await route_message("hello, test tes", router, 0.55)
+        self.assertEqual(decision.intent, "chat")
+        self.assertIsNone(decision.tool)
+        self.assertEqual(decision.source, "local_chat")
+        router.classify.assert_not_awaited()
+
     async def test_high_confidence_clef_can_route_ambiguous_summary(self):
         router = SimpleNamespace(
             enabled=True,
