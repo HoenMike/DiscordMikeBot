@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.4.0 INTELLIGENCE POLISH — implemented; Vectorize credential + final production regression pending  
+**Status:** ASUMI 3.4.1 CHAT TIMEOUT HOTFIX — implemented; Vectorize credential + final production regression pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -162,6 +162,22 @@ CF_ARCHIVE_VECTOR_DIMENSIONS=1024
 ```
 
 Use a **separate Vectorize token** rather than replacing the existing Workers AI token. The code auto-creates the index on first enabled semantic request.
+
+## 3.4.1 Chat timeout hotfix
+
+Live log #1247 exposed a conversational fallback UX problem: Clef completed in ~704ms, while the chat generation path timed out and the old configuration could spend 6s on each of two models, producing ~14s total latency.
+
+3.4.1 changes:
+- per-model chat timeout default: 4s;
+- hard total chat AI budget default: 8s;
+- max attempts remains 2;
+- default lightweight fallback: `gemini-3.1-flash-lite` before heavier models;
+- each later attempt gets only the remaining total budget;
+- timeout raises typed `ChatTimeoutBudgetError`;
+- error telemetry includes `ai_ms`, models tried, attempts, budget and last provider error type;
+- dashboard labels AI budget timeout explicitly.
+
+Regression tests lock both budget exhaustion and remaining-budget clipping.
 
 ## 3.4 Intelligence Polish implementation
 
