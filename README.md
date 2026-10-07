@@ -201,6 +201,8 @@ Prefix tương đương: `.m tarot journey`.
 Repository có tài liệu để các session/agent khác tiếp tục công việc mà không cần dựa vào chat cũ:
 
 - `AGENTS.md` — quy tắc làm việc và entry point cho agent/session mới.
+- `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md` — roadmap T21 cho conversational core: `@Asumi ...`, reply continuation, Clef routing, tool calling, Lens và Archive (planned).
+- `docs/ASUMI_INTELLIGENCE_HANDOFF.md` — trạng thái/next action T21 để session/agent mới tiếp tục mà không cần chat cũ.
 - `docs/EMBED_PIPELINE.md` — contract của social embed pipeline.
 - `docs/TAROT_SYSTEM.md` — kiến trúc Tarot đang chạy hiện tại.
 - `docs/TAROT_V2_MASTER_PLAN.md` — master plan Tarot 2.0.
