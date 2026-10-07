@@ -289,27 +289,35 @@ class ContextBuilder:
         ctx = AssistantContext()
         reply_message = await _resolve_reply_message(message)
 
-        # A reply to Asumi's own live-session answer is already represented by
-        # session turns. Do not duplicate that bot response as explicit context.
-        if reply_message is not None:
-            is_session_bot_reply = (
-                is_live_continuation
-                and session is not None
-                and getattr(reply_message, "id", None)
-                == getattr(session, "last_response_message_id", None)
+        # Plain chat replies are already represented by bounded session turns.
+        # Tool outputs are different: Tarot/Summary messages can be edited or
+        # enriched after command execution, so read the replied bot message live.
+        session_response_ids = []
+        if session is not None:
+            session_response_ids = list(
+                getattr(session, "response_message_ids", None)
+                or [getattr(session, "last_response_message_id", None)]
             )
-            if not is_session_bot_reply:
-                ctx.reply = _line_from_message(reply_message)
-                ctx.urls.extend(_extract_urls(ctx.reply.content))
+        is_session_bot_reply = (
+            is_live_continuation
+            and session is not None
+            and getattr(reply_message, "id", None) in session_response_ids
+        )
+        should_read_live_tool_output = bool(
+            is_session_bot_reply and getattr(session, "last_tool", None)
+        )
+
+        if reply_message is not None and (
+            not is_session_bot_reply or should_read_live_tool_output
+        ):
+            ctx.reply = _line_from_message(reply_message)
+            ctx.urls.extend(_extract_urls(ctx.reply.content))
 
         ctx.urls.extend(_extract_urls(getattr(message, "content", "") or ""))
 
         image_sources = [message]
-        if reply_message is not None and not (
-            is_live_continuation
-            and session is not None
-            and getattr(reply_message, "id", None)
-            == getattr(session, "last_response_message_id", None)
+        if reply_message is not None and (
+            not is_session_bot_reply or should_read_live_tool_output
         ):
             image_sources.append(reply_message)
 
