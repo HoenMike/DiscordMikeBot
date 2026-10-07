@@ -56,14 +56,27 @@ class SessionStore:
         now = time.monotonic() if now is None else now
         return (now - session.updated_at) > self.ttl_seconds
 
+    def prune_expired(self, now: Optional[float] = None) -> int:
+        now = time.monotonic() if now is None else now
+        expired = [
+            key
+            for key, session in self._sessions.items()
+            if self._is_expired(session, now)
+        ]
+        for key in expired:
+            self._sessions.pop(key, None)
+        return len(expired)
+
     def get(self, message) -> Optional[ConversationSession]:
+        now = time.monotonic()
+        self.prune_expired(now)
         key = self.key_for(message)
         if key is None:
             return None
         session = self._sessions.get(key)
         if session is None:
             return None
-        if self._is_expired(session):
+        if self._is_expired(session, now):
             self._sessions.pop(key, None)
             return None
         return session
@@ -96,6 +109,7 @@ class SessionStore:
             return None
 
         now = time.monotonic()
+        self.prune_expired(now)
         current = self._sessions.get(key)
         turns = [] if current is None or self._is_expired(current, now) else list(current.turns)
         turns.append(ConversationTurn(user=user_text.strip(), assistant=assistant_text.strip()))
