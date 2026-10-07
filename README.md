@@ -19,6 +19,7 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - Admin Dashboard có filter **Asumi AI** để theo dõi model và latency từng tầng mà không cần đọc Render Logs.
 - Reply vào message rồi tag Asumi để hỏi trực tiếp về message/link/ảnh đó.
 - Follow-up bằng cách reply response mới nhất của Asumi; session đúng user/channel giữ context ngắn hạn và không reroute tool.
+- Output do `@Asumi tarot...` / Summary sinh ra cũng có thể reply để hỏi tiếp; response dài chia nhiều message vẫn nhận diện các chunk thuộc cùng session.
 - Hỗ trợ ảnh PNG/JPEG/WEBP từ attachment hoặc message được reply; ảnh có thể được giữ tạm trong live session để hỏi tiếp.
 - Với câu hỏi kiểu `cái này/cái trước/link phía trên`, Asumi chỉ lấy một cửa sổ recent chat nhỏ khi thật sự cần.
 - Link Lens dùng URL Context khi có URL và tận dụng metadata Discord embed làm fallback.
