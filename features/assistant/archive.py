@@ -222,14 +222,29 @@ class ArchiveStore:
         ))
         await db_client.commit()
 
-        async with db_client.execute("""
-            SELECT id, owner_user_id, guild_id, channel_id, source_message_id,
-                   source_author_id, source_author_name, source_kind, source_content,
-                   source_jump_url, source_url, note, metadata_json, created_at
-            FROM asumi_archive
-            WHERE owner_user_id=?
-            ORDER BY id DESC LIMIT 1
-        """, (owner_user_id,)) as cur:
+        if source_message_id is not None:
+            query = """
+                SELECT id, owner_user_id, guild_id, channel_id, source_message_id,
+                       source_author_id, source_author_name, source_kind, source_content,
+                       source_jump_url, source_url, note, metadata_json, created_at
+                FROM asumi_archive
+                WHERE owner_user_id=? AND guild_id IS ? AND channel_id IS ?
+                  AND source_message_id=?
+                ORDER BY id DESC LIMIT 1
+            """
+            params = (owner_user_id, guild_id, channel_id, source_message_id)
+        else:
+            query = """
+                SELECT id, owner_user_id, guild_id, channel_id, source_message_id,
+                       source_author_id, source_author_name, source_kind, source_content,
+                       source_jump_url, source_url, note, metadata_json, created_at
+                FROM asumi_archive
+                WHERE owner_user_id=?
+                ORDER BY id DESC LIMIT 1
+            """
+            params = (owner_user_id,)
+
+        async with db_client.execute(query, params) as cur:
             row = await cur.fetchone()
 
         return (self._decode(row), "", True) if row else (
