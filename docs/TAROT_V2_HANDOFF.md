@@ -91,6 +91,13 @@ Always re-check current main before work starts.
 
 ---
 
+### 3.2.1 Tarot finalizing UX maintenance note
+
+- The user can now tell immediately whether a revealed reading is still processing: the waiting embed says **ĐANG LUẬN GIẢI — CHƯA XONG** above the Reading Board and explicitly says the message will update itself.
+- One-card results (Daily / Single / Yes-No) are compacted into one final embed so the actual reading appears before the image instead of below a redundant card-summary embed.
+- Yes/No keeps its deterministic verdict; multi-card result layout remains unchanged.
+- This is presentation-only maintenance: card draw authority, AI reading, cooldown/history, follow-up, clarifier, Why and Recap contracts are unchanged.
+
 ## 4. Current Tarot capabilities that already exist
 
 Do not accidentally re-build these as if they were new:
