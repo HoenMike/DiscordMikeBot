@@ -85,8 +85,13 @@ def route_locally(text: str) -> RouteDecision:
     )
     if any(signal in folded for signal in save_signals):
         note = ""
-        if ":" in text:
-            note = text.split(":", 1)[1].strip()[:500]
+        note_match = re.search(
+            r"(?:note|ghi\s*chu)\s*:\s*(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if note_match:
+            note = note_match.group(1).strip()[:500]
         return RouteDecision(
             intent="archive_save",
             tool="archive.save",
