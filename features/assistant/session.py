@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from features.assistant.context import ImagePayload
+
 
 SessionKey = Tuple[int, int, int]
 
@@ -21,6 +23,7 @@ class ConversationSession:
     updated_at: float
     intent: str = "chat"
     turns: List[ConversationTurn] = field(default_factory=list)
+    images: List[ImagePayload] = field(default_factory=list)
 
 
 class SessionStore:
@@ -78,6 +81,7 @@ class SessionStore:
         user_text: str,
         assistant_text: str,
         intent: str = "chat",
+        images: Optional[List[ImagePayload]] = None,
     ) -> Optional[ConversationSession]:
         key = self.key_for(message)
         if key is None:
@@ -89,12 +93,21 @@ class SessionStore:
         turns.append(ConversationTurn(user=user_text.strip(), assistant=assistant_text.strip()))
         turns = turns[-self.max_turns :]
 
+        current_images = (
+            []
+            if current is None or self._is_expired(current, now)
+            else list(current.images)
+        )
+        if images:
+            current_images = list(images)[:2]
+
         session = ConversationSession(
             key=key,
             last_response_message_id=int(response_message_id),
             updated_at=now,
             intent=intent,
             turns=turns,
+            images=current_images,
         )
         self._sessions[key] = session
         return session
