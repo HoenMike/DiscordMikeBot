@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
+from features.assistant.archive import archive_store
 from features.assistant.router import RouteDecision
 
 
@@ -50,6 +51,110 @@ class CommandToolRegistry:
 
     def __init__(self, bot):
         self.bot = bot
+
+    @staticmethod
+    def _archive_snippet(item: dict) -> str:
+        text = " ".join((item.get("source_content") or "").split())
+        if not text:
+            text = item.get("source_url") or "(không có text)"
+        return text[:180] + ("…" if len(text) > 180 else "")
+
+    async def _execute_archive(
+        self,
+        decision: RouteDecision,
+        message,
+    ) -> ToolExecutionResult:
+        owner_user_id = int(message.author.id)
+
+        if decision.tool == "archive.save":
+            item, error, created = await archive_store.save(
+                owner_user_id,
+                message,
+                note=decision.arguments.get("note", ""),
+            )
+            if item is None:
+                sent = await message.reply(
+                    f"🧠 **Archive:** {error}",
+                    mention_author=False,
+                )
+                return ToolExecutionResult(
+                    handled=True,
+                    response_message_ids=(int(sent.id),),
+                    response_context=error,
+                )
+
+            state = "Đã lưu" if created else "Mục này đã có trong Archive"
+            snippet = self._archive_snippet(item)
+            jump = item.get("source_jump_url") or item.get("source_url") or ""
+            jump_text = f"\n🔗 [Jump to Message]({jump})" if jump else ""
+            sent = await message.reply(
+                f"✅ **{state} · #{item['id']}**\n"
+                f"> {snippet}{jump_text}\n"
+                f"*Chỉ bạn mới có thể tìm/xóa mục Archive này.*",
+                mention_author=False,
+            )
+            return ToolExecutionResult(
+                handled=True,
+                response_message_ids=(int(sent.id),),
+                response_context=f"Archive #{item['id']}: {snippet}",
+            )
+
+        if decision.tool == "archive.search":
+            query = decision.arguments.get("query", "")
+            items = await archive_store.search(owner_user_id, query=query, limit=5)
+            if not items:
+                sent = await message.reply(
+                    "🔎 **Archive:** Mình chưa tìm thấy mục nào khớp.",
+                    mention_author=False,
+                )
+                return ToolExecutionResult(
+                    handled=True,
+                    response_message_ids=(int(sent.id),),
+                    response_context="Archive search returned no matches.",
+                )
+
+            lines = ["🧠 **ASUMI ARCHIVE**"]
+            for item in items:
+                snippet = self._archive_snippet(item)
+                author = item.get("source_author_name") or "Unknown"
+                jump = item.get("source_jump_url") or item.get("source_url") or ""
+                line = f"**#{item['id']}** · {author}\n> {snippet}"
+                if jump:
+                    line += f"\n[Jump to Message]({jump})"
+                lines.append(line)
+
+            sent = await message.reply(
+                "\n\n".join(lines)[:1900],
+                mention_author=False,
+            )
+            return ToolExecutionResult(
+                handled=True,
+                response_message_ids=(int(sent.id),),
+                response_context="\n".join(
+                    f"Archive #{item['id']}: {self._archive_snippet(item)}"
+                    for item in items
+                )[:6000],
+            )
+
+        if decision.tool == "archive.forget":
+            archive_id = int(decision.arguments.get("archive_id", 0) or 0)
+            deleted = archive_id > 0 and await archive_store.forget(
+                owner_user_id,
+                archive_id,
+            )
+            text = (
+                f"🗑️ Đã xóa **Archive #{archive_id}**."
+                if deleted
+                else f"Không tìm thấy **Archive #{archive_id}** thuộc về bạn."
+            )
+            sent = await message.reply(text, mention_author=False)
+            return ToolExecutionResult(
+                handled=True,
+                response_message_ids=(int(sent.id),),
+                response_context=text,
+            )
+
+        return ToolExecutionResult(handled=False)
 
     @staticmethod
     def _command_for(decision: RouteDecision) -> str | None:
@@ -113,6 +218,9 @@ class CommandToolRegistry:
         return message_ids[-8:], "\n\n".join(rendered)[:6000]
 
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        if decision.tool and decision.tool.startswith("archive."):
+            return await self._execute_archive(decision, message)
+
         command_text = self._command_for(decision)
         if not command_text:
             return ToolExecutionResult(handled=False)
