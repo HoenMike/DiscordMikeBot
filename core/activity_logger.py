@@ -119,7 +119,7 @@ class ActivityLogger:
 
     def log(
         self,
-        action_type: str,  # 'tarot' | 'summary' | 'embed' | 'command'
+        action_type: str,  # 'tarot' | 'summary' | 'embed' | 'command' | 'assistant'
         action_name: str,
         user_id: int,
         user_name: str,
@@ -285,6 +285,7 @@ class ActivityLogger:
             "summary": sum(1 for a in self._activities if a["action_type"] == "summary"),
             "embed": sum(1 for a in self._activities if a["action_type"] == "embed"),
             "command": sum(1 for a in self._activities if a["action_type"] == "command"),
+            "assistant": sum(1 for a in self._activities if a["action_type"] == "assistant"),
         }
 
         return {
