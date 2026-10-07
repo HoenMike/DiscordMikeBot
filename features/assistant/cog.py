@@ -206,6 +206,7 @@ class AssistantCog(commands.Cog):
                         "recent_messages": len(context.recent),
                         "images": len(context.images),
                         "tool_output_messages": len(result.response_message_ids),
+                        **result.details,
                     },
                 )
                 if result.response_message_ids:
