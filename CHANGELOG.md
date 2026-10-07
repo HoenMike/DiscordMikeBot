@@ -18,6 +18,8 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Reliability
 - Replies to the latest live-session Asumi answer are conversational continuations and do **not** run Clef/tool routing again.
+- Natural-language Tarot/Summary tool calls capture a bounded set of bot output message IDs, so replies to tool output (including multi-message results) continue the same session.
+- Tool follow-up reads the replied bot message at reply time, allowing edited Tarot Reading Boards to provide current embed/image context.
 - Replies to older Asumi messages, replies from another user, and expired sessions do not inherit the original user's session.
 - Image-only mentions route to vision chat instead of Help.
 - Context/image counts and context-build latency are included in privacy-safe Asumi dashboard telemetry.
