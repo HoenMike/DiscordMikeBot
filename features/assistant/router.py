@@ -75,6 +75,9 @@ def route_locally(text: str) -> RouteDecision:
         "luu cai nay",
         "save cai nay",
         "archive cai nay",
+        "ghi nho cai nay",
+        "cat cai nay",
+        "cat lai cai nay",
         "nho link nay",
         "luu link nay",
         "nho anh nay",
@@ -92,6 +95,7 @@ def route_locally(text: str) -> RouteDecision:
 
     search_signals = (
         "tim lai",
+        "kiem lai",
         "tim trong archive",
         "archive tim",
         "toi da luu",
