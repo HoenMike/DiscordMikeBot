@@ -43,6 +43,7 @@ class ArchiveSemanticConfigTests(unittest.TestCase):
         self.assertEqual(index.ai_token, "ai-token")
         self.assertEqual(index.vectorize_token, "vec-token")
         self.assertEqual(index.dimensions, 1024)
+        self.assertEqual(index.max_concurrency, 3)
 
     def test_namespace_is_owner_scoped(self):
         self.assertEqual(ArchiveSemanticIndex.namespace(123), "u123")
@@ -151,6 +152,40 @@ class ArchiveSemanticApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(list(report.matches), [])
         self.assertEqual(report.status, "unavailable")
         self.assertEqual(report.error_type, "SemanticUnavailable")
+
+
+class ArchiveSemanticConcurrencyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_query_concurrency_is_bounded(self):
+        index = ArchiveSemanticIndex(
+            account_id="account",
+            ai_token="ai",
+            vectorize_token="vec",
+            enabled=True,
+            max_concurrency=2,
+        )
+        index._index_ready = True
+        index._embed = AsyncMock(return_value=[0.0] * 1024)
+
+        active = 0
+        max_active = 0
+
+        async def fake_request(*args, **kwargs):
+            nonlocal active, max_active
+            active += 1
+            max_active = max(max_active, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return 200, {"result": {"matches": []}}
+
+        index._json_request = AsyncMock(side_effect=fake_request)
+
+        reports = await asyncio.gather(*[
+            index.query_report(99, f"query {i}")
+            for i in range(8)
+        ])
+
+        self.assertLessEqual(max_active, 2)
+        self.assertTrue(all(report.status == "no_match" for report in reports))
 
 
 class ArchiveHybridSearchTests(unittest.IsolatedAsyncioTestCase):
