@@ -28,6 +28,7 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Default recent history bound: 8 messages / 7000 context characters.
 - Default image bound: 2 images / 5 MiB each.
 - Image snapshots are in-memory only for the short live session; no DB/R2 persistence.
+- Expired sessions are actively pruned every 5 minutes so retained image bytes are released from RAM after TTL.
 - Audio/voice transcription remains out of scope.
 
 ## [3.1.2] - 2026-10-07 — *Dashboard AI telemetry*
