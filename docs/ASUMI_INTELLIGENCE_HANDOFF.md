@@ -165,6 +165,8 @@ Use a **separate Vectorize token** rather than replacing the existing Workers AI
 
 ## 3.4 Intelligence Polish implementation
 
+Implementation PR: **#31 — feat: Asumi 3.4 Intelligence Polish**.
+
 3.4.0 closes the implementation side of T21.8:
 - Archive tool telemetry now exposes action, lexical/semantic-hybrid/fallback mode, semantic status, semantic latency, semantic/lexical match counts and result count.
 - Tool/provider metrics are merged into the existing privacy-safe Asumi AI ActivityLogger record; prompt/response bodies remain blank.
