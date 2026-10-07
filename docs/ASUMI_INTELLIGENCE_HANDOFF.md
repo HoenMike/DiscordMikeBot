@@ -1,7 +1,7 @@
 # T21 — Asumi Intelligence Handoff
 
 **Initiative:** Asumi Intelligence / Conversational Core  
-**Status:** ASUMI 3.3.0 ARCHIVE CORE — implemented; live validation pending  
+**Status:** ASUMI 3.3.1 ARCHIVE SEMANTIC — implemented behind feature flag; Vectorize credential + live validation pending  
 **Planned from:** Asumi 3.0.1, `main` commit `1df48c459cc10fda54b1f652245af1f437006fbd`  
 **Primary spec:** `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 
@@ -12,7 +12,7 @@
 ```text
 Asumi 3.1  Conversational Core        COMPLETE
 Asumi 3.2  Context + Lens             IMPLEMENTED; LIVE VERIFY
-Asumi 3.3  Asumi Archive              CORE IMPLEMENTED; SEMANTIC PENDING
+Asumi 3.3  Asumi Archive              CORE + SEMANTIC IMPLEMENTED; LIVE VERIFY
 Asumi 3.4  Intelligence Polish        PLANNED
 ```
 
@@ -75,7 +75,7 @@ T21.3  Clef decision router                        IMPLEMENTED; credentials conf
 T21.4  Existing feature tool adapters              COMPLETE (Help/Tarot/Summary)
 T21.5  Context Builder v2 / Lens text+link         IMPLEMENTED; LIVE VERIFY
 T21.6  Image Lens                                  IMPLEMENTED; LIVE VERIFY
-T21.7  Asumi Archive / explicit memory             CORE IMPLEMENTED; LIVE VERIFY
+T21.7  Asumi Archive / explicit memory             CORE + SEMANTIC IMPLEMENTED; LIVE VERIFY
 T21.8  Polish + observability + release            NOT STARTED
 ```
 
@@ -137,73 +137,59 @@ Live acceptance matrix:
 
 After core live acceptance, decide whether semantic misses justify 3.3.x Vectorize. Do not add Vectorize/R2 just because the roadmap mentioned them.
 
+## 3.3.1 Semantic Retrieval implementation
+
+Semantic retrieval is implemented as an **optional derived index**:
+- Workers AI `@cf/baai/bge-m3` generates 1024-d multilingual embeddings.
+- Cloudflare Vectorize index defaults to `asumi-archive-v1`, cosine metric.
+- Vector namespace is `u{owner_user_id}`; semantic matches are still re-resolved through owner-scoped canonical Turso/SQLite before display.
+- Save performs best-effort background upsert; Forget deletes canonical DB first and then best-effort removes the vector.
+- Search is hybrid: semantic matches first, then lexical matches fill remaining slots, de-duped to max 5 Discord results.
+- Existing 3.3.0 behavior remains authoritative if Vectorize is disabled/unavailable.
+- 401/403 or Vectorize failure degrades to lexical search; no paid fallback is introduced.
+- The HTTP upsert uses Cloudflare's multipart NDJSON file contract.
+- Original Vietnamese search wording is preserved for the embedding model while lexical ranking uses normalized text.
+
+Feature flag / credentials:
+```text
+CF_ARCHIVE_SEMANTIC_ENABLED=false
+CLOUDFLARE_VECTORIZE_TOKEN=
+CF_ARCHIVE_VECTORIZE_INDEX=asumi-archive-v1
+CF_ARCHIVE_EMBEDDING_MODEL=@cf/baai/bge-m3
+CF_ARCHIVE_VECTOR_DIMENSIONS=1024
+```
+
+Use a **separate Vectorize token** rather than replacing the existing Workers AI token. The code auto-creates the index on first enabled semantic request.
+
 ## 3.2.1 Tarot UX follow-up
 
 During 3.2 live testing, the Daily result exposed a presentation issue: the AI-pending state was visually hidden below a tall Reading Board. 3.2.1 moves the pending status above the board and compacts one-card final results. Re-run the Tarot live case in the acceptance matrix after deploy.
 
 ## Exact next action
 
-**Deploy Asumi 3.2.0 and run the live edge-case matrix below.** Do not start Archive until reply/context/image behavior is accepted.
+**Manual blocker: enable Vectorize on Render for live semantic validation.**
 
+1. Create a Cloudflare API token with **Vectorize Read + Vectorize Write** for the same account.
+2. Add it to Render as `CLOUDFLARE_VECTORIZE_TOKEN`.
+3. Set `CF_ARCHIVE_SEMANTIC_ENABLED=true`.
+4. Redeploy. Do not replace `CLOUDFLARE_API_TOKEN`; that existing token continues to handle Workers AI embeddings/Clef.
+5. No manual Vectorize index creation is required; Asumi creates `asumi-archive-v1` (1024 dimensions / cosine) on first use.
+
+Live semantic acceptance:
 ```text
-1. @Asumi hello
-   -> normal conversational response
+reply source "con mèo nằm ngủ trên bàn" -> @Asumi nhớ cái này
+@Asumi tìm lại cái meme con vật nằm ngủ
+-> should recover the saved item even when wording differs
 
-2. reply latest Asumi response: "ý thứ 2 là sao?"
-   -> source=session_followup, no Clef/tool reroute
+another user runs the same semantic query
+-> must not receive the first user's Archive item
 
-2b. @Asumi tarot daily -> complete/flip the reading -> reply Reading Board: "lá này nghĩa sao?"
-   -> same session, no new draw, current edited Reading Board is used as context
-
-2c. force a long Asumi answer that splits into 2+ messages -> reply chunk 1
-   -> still continues the same session
-
-3. another user replies to that Asumi response
-   -> must NOT inherit the original user's session
-
-4. reply an older Asumi response from the same user
-   -> must NOT continue the live session
-
-5. reply a normal user message/link + @Asumi "cái này nói gì?"
-   -> replied message + URL/embed metadata are context
-
-6. upload PNG/JPG/WEBP + @Asumi "lỗi gì đây?"
-   -> image is understood
-
-7. reply the image answer: "vậy sửa chỗ nào?"
-   -> previous image remains available from in-memory session
-
-8. @Asumi "game Theo gửi phía trên là gì?"
-   -> bounded recent history is fetched; no full-channel dump
+disable/remove Vectorize token
+-> same Archive search must continue through lexical fallback without breaking Save/Search/Forget
 ```
 
-Dashboard validation:
-- Asumi AI detail should show `context_ms`, `reply_context`, `recent_messages`, `images`, `session_images`.
-- Prompt/response bodies remain empty in telemetry.
+Also keep the remaining 3.2 reply/image/Tarot regression matrix for **T21.8 final polish**.
 
-Archive development has started by explicit owner request. Remaining 3.2 checks roll into the final regression matrix.
-
-First prove one end-to-end vertical slice:
-
-```text
-@Asumi hello
-  -> trigger gate
-  -> bounded context
-  -> minimal assistant route
-  -> Discord response
-```
-
-Prove these regressions do not occur:
-
-```text
-@Asumi tarot
-.m tarot
-/tarot
-normal unmentioned chat
-guild suspension behavior
-```
-
-The first implementation PR should add `features/assistant/` and tests before broad Cloudflare infrastructure.
 
 ---
 
