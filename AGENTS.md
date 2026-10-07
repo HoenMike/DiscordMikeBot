@@ -81,7 +81,7 @@ Before any T21 work, read:
 - **Asumi 3.1 Conversational Core: implemented/released in 3.1.0.**
 - T21.1, T21.2 and T21.4 are complete; T21.3 Clef adapter is implemented but requires Cloudflare credentials for live verification.
 - **Asumi 3.2 Context + Lens is implemented; remaining reply/link/image edge-case checks roll into the final regression matrix.** Image input is required and audio/voice transcription remains out of scope.
-- **Asumi 3.3 Archive Core is implemented on the active branch and requires live Save/Search/Forget validation.** Canonical Archive records use the existing core.db Turso/SQLite adapter; Vectorize/R2 are derived follow-ups, not canonical storage.
+- **Asumi 3.3 Archive Core is shipped; 3.3.1 optional semantic retrieval is implemented behind `CF_ARCHIVE_SEMANTIC_ENABLED` and requires Vectorize credential/live validation.** Canonical Archive records use the existing core.db Turso/SQLite adapter; Vectorize is derived state only and R2 remains optional.
 - Asumi 3.4 Intelligence Polish remains planned after Archive acceptance.
 - Cloudflare/AI work is **free-only** and must fail closed rather than silently create paid usage.
 - Do not make Asumi respond to ordinary unmentioned server chat.
