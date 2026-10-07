@@ -14,6 +14,12 @@ SUPPORTED_IMAGE_TYPES = {
     "image/jpg",
     "image/webp",
 }
+IMAGE_EXTENSION_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+}
 
 
 @dataclass(frozen=True)
@@ -192,6 +198,12 @@ async def _read_images(
 
             mime = (getattr(attachment, "content_type", None) or "").lower()
             filename = getattr(attachment, "filename", "image")
+            if not mime:
+                lower_name = filename.lower()
+                for extension, inferred_mime in IMAGE_EXTENSION_TYPES.items():
+                    if lower_name.endswith(extension):
+                        mime = inferred_mime
+                        break
             key = (getattr(msg, "id", None), filename)
             if key in seen:
                 continue
@@ -288,7 +300,7 @@ class ContextBuilder:
             )
             if not is_session_bot_reply:
                 ctx.reply = _line_from_message(reply_message)
-                ctx.urls.extend(_extract_urls(getattr(reply_message, "content", "") or ""))
+                ctx.urls.extend(_extract_urls(ctx.reply.content))
 
         ctx.urls.extend(_extract_urls(getattr(message, "content", "") or ""))
 
