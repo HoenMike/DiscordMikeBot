@@ -62,6 +62,7 @@ class ArchiveSemanticIndex:
         self.min_score = max(0.0, min(float(min_score), 1.0))
         self.max_concurrency = max(1, min(int(max_concurrency), 10))
         self._semaphore = asyncio.Semaphore(self.max_concurrency)
+        self._index_lock = asyncio.Lock()
         self._index_ready = False
         self._blocked_reason = ""
 
@@ -187,28 +188,32 @@ class ArchiveSemanticIndex:
         if self._index_ready:
             return True
 
-        status, _ = await self._json_request(
-            "GET",
-            self._api(f"vectorize/v2/indexes/{self.index_name}"),
-            token=self.vectorize_token,
-            allow_404=True,
-        )
-        if status == 404:
-            await self._json_request(
-                "POST",
-                self._api("vectorize/v2/indexes"),
+        async with self._index_lock:
+            if self._index_ready:
+                return True
+
+            status, _ = await self._json_request(
+                "GET",
+                self._api(f"vectorize/v2/indexes/{self.index_name}"),
                 token=self.vectorize_token,
-                json_body={
-                    "name": self.index_name,
-                    "description": "Derived semantic index for Asumi Archive",
-                    "config": {
-                        "dimensions": self.dimensions,
-                        "metric": "cosine",
-                    },
-                },
+                allow_404=True,
             )
-        self._index_ready = True
-        return True
+            if status == 404:
+                await self._json_request(
+                    "POST",
+                    self._api("vectorize/v2/indexes"),
+                    token=self.vectorize_token,
+                    json_body={
+                        "name": self.index_name,
+                        "description": "Derived semantic index for Asumi Archive",
+                        "config": {
+                            "dimensions": self.dimensions,
+                            "metric": "cosine",
+                        },
+                    },
+                )
+            self._index_ready = True
+            return True
 
     @staticmethod
     def document_text(item: dict[str, Any]) -> str:
