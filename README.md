@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligence + Archive (3.3)
+### Asumi Intelligence + Archive (3.3.1)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -18,9 +18,11 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - **Archive Save:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.
 - **Archive Search:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.
 - **Archive Forget:** `@Asumi quên #12`.
+- **Semantic Search (optional):** khi bật Vectorize, Archive có thể tìm theo ý nghĩa gần nhau chứ không chỉ exact keyword; nếu Cloudflare unavailable thì tự fallback lexical.
 - Archive chỉ được tạo khi user chủ động yêu cầu; bare save không reply/link/ảnh bị từ chối, không có passive full-server logging.
 - Archive search/delete luôn scope theo user đã lưu. Canonical records dùng `core.db` hiện có (Turso Cloud / SQLite fallback).
 - 3.3.0 chỉ lưu source text + URL/attachment/embed metadata; media binary chưa được copy sang R2.
+- Vectorize chỉ là derived index; canonical Archive vẫn ở Turso/SQLite và mỗi semantic result được owner-check lại trước khi hiển thị.
 - Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
 - Clef-flash trên Cloudflare là router tùy chọn; Admin Dashboard có filter **Asumi AI** để theo dõi latency/tool path.
 
