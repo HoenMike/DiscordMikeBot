@@ -1,11 +1,22 @@
-# T21 — Asumi Intelligence / Conversational Core
+# T21 — Asumi 3.x Intelligence Roadmap
 
-**Status:** PLANNED  
+**Status:** LOCKED / APPROVED  
 **Owner intent:** Make `@Asumi ...` a natural-language front door for existing and future Asumi capabilities without replacing deterministic commands.  
 **Cost constraint:** **Free-only.** No T21 component may silently enable paid usage or automatic paid fallback.  
 **Baseline when planned:** `main` at Asumi 3.0.1 (`1df48c4`, 2026-10-05).
 
 ---
+
+## Release mapping
+
+```text
+Asumi 3.1  Conversational Core
+Asumi 3.2  Context + Lens (image input required)
+Asumi 3.3  Asumi Archive
+Asumi 3.4  Intelligence Polish
+```
+
+Audio / voice transcription is explicitly out of scope for Asumi 3.x unless the owner reopens it.
 
 ## 1. Goal
 
@@ -230,7 +241,6 @@ intent:
   help
   archive
   vision
-  audio
   unknown
 
 needs_recent_context:
@@ -290,7 +300,6 @@ Later:
 
 ```text
 lens.inspect_image
-audio.transcribe
 archive.save
 archive.search
 ```
@@ -442,13 +451,14 @@ Theo: <game link>
 Mai: @Asumi game này có mobile không?
 ```
 
-### T21.6 — Multimodal Lens
+### T21.6 — Image Lens
 
-- image understanding;
-- voice/audio transcription;
-- transcript -> summarize/translate;
-- reuse media pipeline;
-- strict file size/time limits.
+- image understanding from attachments and replied messages;
+- screenshot text reading / translation;
+- meme/context explanation;
+- reuse media pipeline where practical;
+- strict file size/time limits;
+- **audio/voice transcription is excluded from Asumi 3.x.**
 
 Cloudflare free model availability must be re-checked at implementation time; do not hard-lock the feature contract to a specific generation model.
 
@@ -491,7 +501,7 @@ T21.0 docs/contracts
   -> T21.3 Clef router
   -> T21.4 Tarot + Summary tools
   -> T21.5 contextual text/link
-  -> T21.6 multimodal
+  -> T21.6 image lens
   -> T21.7 Archive
   -> T21.8 release polish
 ```
@@ -518,6 +528,7 @@ Each milestone should be independently testable and user-visible.
 
 ## 13. Explicit non-goals for first release
 
+- voice/audio transcription;
 - autonomous messages without mention/reply;
 - replacing slash/prefix commands;
 - moving Discord Gateway to Cloudflare Workers;

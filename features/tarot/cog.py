@@ -684,6 +684,13 @@ class TarotCog(commands.Cog):
         if spread_lower in SPREAD_ALIASES:
             spread_key = SPREAD_ALIASES[spread_lower]
             question = rest.strip() if rest else None
+            if spread_key == "daily" and question:
+                daily_fillers = {
+                    "đi", "di", "nha", "nhé", "nhe",
+                    "cho tôi", "cho toi", "cho mình", "cho minh",
+                }
+                if question.lower().strip(" !?.") in daily_fillers:
+                    question = None
             await self._execute_tarot_flow(
                 user=ctx.author,
                 spread_key=spread_key,

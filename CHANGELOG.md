@@ -7,6 +7,23 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.1.0] - 2026-10-07 — *Conversational Core*
+
+### Added
+- **@Asumi conversational entrypoint**: tag bot rồi nói tự nhiên; câu không khớp command cũ sẽ đi vào assistant.
+- **Reply continuation**: reply response conversational gần nhất để tiếp tục bounded session mà không cần tag lại.
+- **Typed tool routing**: natural language route về Help, Tarot launcher/Daily và Summary/Catch-up bằng chính command engine hiện có.
+- **Optional Clef-flash router**: Workers AI decision router đã có adapter nhưng mặc định tắt cho tới khi cấu hình Cloudflare credentials.
+
+### Reliability
+- Valid slash / `.m` / mention commands luôn được ưu tiên trước conversational AI.
+- Normal unmentioned chat không kích hoạt assistant.
+- Session chỉ giữ vài turn gần nhất, mặc định TTL 20 phút; không tạo transcript database.
+- Command bridge dùng shallow-copy message nên không mutate gateway event và vẫn giữ command checks/cooldowns.
+- Clef thiếu credentials, timeout hoặc confidence thấp sẽ fail safe về local router; deterministic commands vẫn hoạt động.
+- Daily mention flow bỏ filler tự nhiên như `đi`, `nha`, `cho tôi` thay vì coi đó là câu hỏi Tarot.
+- Audio/voice transcription bị loại khỏi roadmap Asumi 3.x; image input vẫn là requirement của 3.2.
+
 ## [3.0.1] - 2026-10-05 — *Tarot renderer title hotfix*
 
 ### Fixed

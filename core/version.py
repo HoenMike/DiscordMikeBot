@@ -12,12 +12,36 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.0.1"
-RELEASE_DATE = "2026-10-05"
-CODENAME = "Asumi 3.0 - Tarot-first UX"
+CURRENT_VERSION = "3.1.0"
+RELEASE_DATE = "2026-10-07"
+CODENAME = "Asumi 3.1 - Conversational Core"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.1.0",
+        "date": "2026-10-07",
+        "type": "minor",
+        "title": "Conversational Core",
+        "summary": "Thêm conversational entrypoint @Asumi với reply continuation, bounded session, typed tool routing và Clef-flash optional router; command cũ vẫn luôn được ưu tiên.",
+        "changes": [
+            {"category": "💬 Conversational UX", "items": [
+                "Có thể tag @Asumi rồi nói tự nhiên; câu không khớp command sẽ đi vào assistant thay vì bị bỏ qua.",
+                "Reply trực tiếp response conversational gần nhất để tiếp tục session ngắn 20 phút mà không cần tag lại.",
+                "Normal chat không tag/reply không kích hoạt assistant; slash/.m/mention command hợp lệ vẫn chạy deterministic trước AI.",
+            ]},
+            {"category": "🧰 Tool routing", "items": [
+                "Natural language có thể route vào Help, Tarot launcher/Daily và Summary/Catch-up bằng command bridge dùng chính command engine hiện tại.",
+                "Command bridge dùng synthetic message copy nên không mutate gateway message và vẫn giữ checks/cooldowns của command cũ.",
+                "Daily mention flow bỏ qua filler tự nhiên như đi/nha/cho tôi để không biến filler thành câu hỏi Tarot.",
+            ]},
+            {"category": "☁️ Cloudflare-ready", "items": [
+                "Thêm optional Clef-flash decision router qua Workers AI REST API, disabled-by-default khi chưa có Cloudflare credentials.",
+                "Thiếu key, timeout hoặc confidence thấp sẽ fail safe về local router + AI path hiện tại; deterministic commands không phụ thuộc Cloudflare.",
+                "Audio/voice transcription không nằm trong roadmap 3.x; image input được giữ cho Asumi 3.2.",
+            ]},
+        ],
+    },
     {
         "version": "3.0.1",
         "date": "2026-10-05",

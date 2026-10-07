@@ -6,6 +6,17 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
+### Asumi Conversational (3.1)
+
+Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
+
+- `@Asumi nay có gì vui không` → chat bằng AI.
+- `@Asumi tóm tắt 2 tiếng vừa rồi` → route về chính Summary engine hiện tại.
+- `@Asumi tarot daily đi` → dùng chính Tarot engine/cooldown hiện tại.
+- Reply trực tiếp response conversational gần nhất để tiếp tục một session ngắn mà không cần tag lại.
+- Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
+- Clef-flash trên Cloudflare là router tùy chọn; chưa có credential thì Asumi tự dùng local routing + Gemini hiện tại.
+
 ### Tóm tắt cuộc trò chuyện bằng AI
 
 Bot quét lịch sử tin nhắn trong kênh chat và sử dụng mô hình Gemma 4 để tạo bản tóm tắt.
@@ -210,7 +221,7 @@ Repository có tài liệu để các session/agent khác tiếp tục công vi�
 - `docs/TAROT_V2_PROMPT_SPEC.md` — persona, system-prompt direction, reading schema và tiêu chí chống văn phong máy móc.
 - `docs/TAROT_V2_RENDERER_SPEC.md` — Reading Board, visual direction, responsive layout và contract renderer.
 
-> **Asumi 3.0.0** là major release đưa Tarot 2.x thành trải nghiệm mặc định dễ dùng hơn: question-first, one-tap Daily và one-click recommendation. Roadmap T20.1–T20.9 vẫn là baseline đã hoàn tất.
+> **Asumi 3.1.0** thêm Conversational Core trên nền Asumi 3.0: user có thể tag `@Asumi` để nói tự nhiên và gọi lại các feature hiện có mà không cần nhớ syntax. Tarot 2.x/T20.1–T20.9 vẫn là baseline ổn định.
 
 ---
 

@@ -78,8 +78,10 @@ Before any T21 work, read:
 ### T21 status
 
 - **T21.0 — Baseline + contracts: complete (docs).**
-- **T21.1 — Mention conversational vertical slice: next.**
-- T21.2–T21.8: planned; see the master plan.
+- **Asumi 3.1 Conversational Core: implemented/released in 3.1.0.**
+- T21.1, T21.2 and T21.4 are complete; T21.3 Clef adapter is implemented but requires Cloudflare credentials for live verification.
+- Asumi 3.2 requires image input; audio/voice transcription is explicitly out of scope.
+- Asumi 3.3 Archive and Asumi 3.4 Intelligence Polish remain planned.
 - Cloudflare/AI work is **free-only** and must fail closed rather than silently create paid usage.
 - Do not make Asumi respond to ordinary unmentioned server chat.
 - Clef-flash is a decision/router layer, not the primary prose model.
