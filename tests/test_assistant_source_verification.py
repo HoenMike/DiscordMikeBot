@@ -160,11 +160,14 @@ class VerifiedFuelToolTests(unittest.IsolatedAsyncioTestCase):
                    new=AsyncMock(return_value=bravo)), patch(
             "features.assistant.tools.pvoil_reader.fetch",
             new=AsyncMock(return_value=VerifiedFuelReport(status="unavailable")),
+        ), patch(
+            "features.assistant.tools.vietfuel_reader.fetch",
+            new=AsyncMock(return_value=SimpleNamespace(status="unavailable", rows=(), elapsed_ms=0)),
         ), patch.object(registry, "_summarize_public_search",
                         new=AsyncMock(return_value="Chưa xác minh được giá.")):
             result = await registry.execute(route_locally("tìm trên web giá xăng hôm nay"), msg)
         embed = msg.reply.await_args.kwargs["embed"]
-        self.assertIn("chưa đủ để xác minh", embed.description)
+        self.assertIn("chưa đủ để xác nhận", embed.description)
         self.assertIn("https://example.org/gas", embed.fields[0].value)
         self.assertEqual(result.details["first_party_status"], "unavailable")
         self.assertNotIn("query", result.details)
