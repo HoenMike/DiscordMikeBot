@@ -77,6 +77,21 @@ SCHEMA = (
     END
     """,
     """
+    CREATE TRIGGER IF NOT EXISTS feedback_review_event
+    AFTER UPDATE OF status ON asumi_feedback
+    WHEN NEW.status <> OLD.status
+    BEGIN
+      INSERT INTO asumi_feedback_events
+      (ticket_id, actor_id, action, old_status, new_status, reason, created_at)
+      VALUES (NEW.ticket_id, 'dashboard-admin', 'review', OLD.status, NEW.status,
+              NEW.review_reason, NEW.updated_at);
+      INSERT INTO asumi_feedback_notifications
+      (notification_id, ticket_id, reporter_id, event_type, created_at)
+      VALUES (NEW.ticket_id || ':' || NEW.status || ':' || NEW.updated_at,
+              NEW.ticket_id, NEW.reporter_id, NEW.status, NEW.updated_at);
+    END
+    """,
+    """
     CREATE TABLE IF NOT EXISTS asumi_feedback_notifications (
       notification_id TEXT PRIMARY KEY,
       ticket_id TEXT NOT NULL,
@@ -193,6 +208,101 @@ class FeedbackStore:
         if not db_client.is_cloud:
             raise FeedbackStorageError("Không đọc được từ Turso Cloud.")
         return FeedbackTicket(*record) if record else None
+
+
+    async def admin_list(self, *, status: str = "", limit: int = 50) -> list[dict]:
+        await self._require_cloud()
+        limit = max(1, min(100, int(limit)))
+        sql = (
+            "SELECT ticket_id, status, title, category, created_at, review_reason, "
+            "reporter_id, bot_version, guild_id, channel_id, description, "
+            "user_explanation, evidence_json FROM asumi_feedback"
+        )
+        args = ()
+        if status:
+            sql += " WHERE status=?"
+            args = (status[:30],)
+        sql += f" ORDER BY created_at DESC LIMIT {limit}"
+        async with db_client.execute(sql, args) as cursor:
+            rows = await cursor.fetchall()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Turso unavailable")
+        fields = ("id", "status", "title", "category", "created_at", "reason",
+                  "reporter_id", "bot_version", "guild_id", "channel_id",
+                  "description", "user_explanation", "evidence")
+        output = []
+        for row in rows:
+            entry = dict(zip(fields, row))
+            try:
+                entry["evidence"] = json.loads(entry["evidence"] or "[]")
+            except ValueError:
+                entry["evidence"] = []
+            output.append(entry)
+        return output
+
+    async def review(
+        self, *, ticket_id: str, status: str, reason: str,
+        actor_id: str, verified_version: str = ""
+    ) -> None:
+        """Owner review with atomic status, event and notification via SQL trigger."""
+        allowed = {
+            "triage", "needs_info", "approved", "rejected", "duplicate",
+            "deferred", "planned", "in_progress", "in_review", "deployed",
+            "verified", "closed", "reopened",
+        }
+        if status not in allowed:
+            raise FeedbackStorageError("Trạng thái không hợp lệ")
+        reason = reason.strip()
+        if status in {"rejected", "duplicate", "deferred", "needs_info", "verified"} and not reason:
+            raise FeedbackStorageError("Cần ghi lý do quyết định")
+        if status == "verified" and not verified_version.strip():
+            raise FeedbackStorageError("Cần phiên bản đã triển khai và nghiệm thu")
+        await self._require_cloud()
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        # Single atomic guarded UPDATE, trigger writes event/outbox on success.
+        async with db_client.execute(
+            "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=? "
+            "WHERE ticket_id=? AND status<>?",
+            (status, (reason + (f" [release: {verified_version[:50]}]" if verified_version else ""))[:1800],
+             now, ticket_id.upper(), status),
+        ) as cursor:
+            changed = cursor.rowcount
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không xác minh được ghi nhận trên Turso")
+        if changed != 1:
+            raise FeedbackStorageError("Không thấy ticket hoặc trạng thái đã được cập nhật")
+
+    async def pending_notifications(self, limit: int = 20) -> list[tuple]:
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT n.notification_id, n.ticket_id, n.reporter_id, n.event_type, "
+            "f.review_reason, f.status FROM asumi_feedback_notifications n "
+            "JOIN asumi_feedback f ON f.ticket_id=n.ticket_id "
+            "WHERE n.state='pending' AND n.attempts<5 "
+            "ORDER BY n.created_at ASC LIMIT ?",
+            (min(50,max(1,int(limit))),),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không thể đọc notification outbox")
+        return rows
+
+    async def mark_notification(self, notification_id: str, *, delivered: bool, error: str = "") -> None:
+        await self._require_cloud()
+        await db_client.execute(
+            "UPDATE asumi_feedback_notifications "
+            "SET state=CASE WHEN ? THEN 'delivered' ELSE 'pending' END, "
+            "attempts=attempts+1, last_error=?, "
+            "delivered_at=CASE WHEN ? THEN ? ELSE NULL END "
+            "WHERE notification_id=? AND state='pending'",
+            (1 if delivered else 0, error[:100], 1 if delivered else 0,
+             datetime.now(timezone.utc).isoformat(timespec="seconds"),
+             notification_id),
+        )
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không thể cập nhật outbox")
+
+
 
 
 feedback_store = FeedbackStore()
