@@ -84,7 +84,14 @@ class InCodeSearchPolicyTests(unittest.IsolatedAsyncioTestCase):
             author=SimpleNamespace(id=1),
             reply=AsyncMock(return_value=SimpleNamespace(id=3)),
         )
-        with patch("features.assistant.tools.brave_search.search",
+        with patch("features.assistant.tools.pvoil_reader.fetch",
+                   new=AsyncMock(return_value=SimpleNamespace(
+                       status="unavailable", rows=(), elapsed_ms=0,
+                       attempts=("pvoil_1:http_403",)))), patch(
+            "features.assistant.tools.webgia_reader.fetch",
+            new=AsyncMock(return_value=SimpleNamespace(
+                status="unavailable", rows=(), elapsed_ms=0,
+            ))), patch("features.assistant.tools.brave_search.search",
                    new=AsyncMock(return_value=SimpleNamespace(
                        status="disabled", hits=(), elapsed_ms=0.0,
                        cache_hit=False, remaining=None))):
