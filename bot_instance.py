@@ -268,7 +268,9 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
             "• **Xóa:** `@Asumi quên #12`. Archive chỉ thuộc user đã lưu.\n"
             "• **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` (opt-in).\n"
             "• **Tìm tin nhắn cũ:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → Jump to Message (opt-in).\n"
-            "• **Auto Search:** Khi admin bật, Clef tự chọn Brave / Discord History / Archive theo nội dung hỏi; có kiểm soát quyền, nguồn và quota."
+            "• **Auto Search:** Khi admin bật, Clef tự chọn Brave / Discord History / Archive theo nội dung hỏi; có kiểm soát quyền, nguồn và quota.\n"
+            "• **Feedback (3.8):** Tag Asumi báo lỗi/góp ý (có thể đính ảnh) hoặc dùng /feedback report, /feedback suggest; "
+            "Asumi sẽ hỏi lại theo thiết kế và luôn cho phép gửi ticket. Dùng /feedback status để theo dõi."
         ),
         inline=False
     )
