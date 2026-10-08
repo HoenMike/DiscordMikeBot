@@ -134,7 +134,7 @@ Classification output is **advisory**: `potential_usage_confusion`, `possibly_re
 16. R2 upload succeeds but Turso fails (or vice versa): never acknowledge a complete ticket; perform safe cleanup/retry reconciliation and avoid orphaned/leaked evidence.
 17. Bot's design documentation/version disagrees or is unavailable: do not assert that user used it wrong, ask clarifying question and allow feedback as-is.
 
-No code was implemented in this proposal. Await explicit owner approval before T23.1.
+Owner has authorized beginning T23. Code is under review in draft PR #45; deployment remains blocked on private R2 provisioning, live Turso/R2 verification and acceptance. Track milestones in GitHub issue #46.
 
 
 ## T23.1 implementation handoff — first PR (2026-10-08)
@@ -157,3 +157,5 @@ Branch: `feat/asumi-t23-1-feedback-mvp` (not yet in main, do not claim live). Fi
 5. Never mark T23 done merely because this implementation branch/CI is green; require a real Discord reporter-to-admin acceptance test.
 
 Potential follow-up: add owner-only dashboard listing and private R2 image reader, then manual approve/reject with mandatory reasons and outbox delivery; only after this can ChatGPT-side triage/agent workflow be connected.
+
+Tracking: [T23 parent issue #46](https://github.com/HoenMike/DiscordMikeBot/issues/46), [T23.1 draft PR #45](https://github.com/HoenMike/DiscordMikeBot/pull/45).
