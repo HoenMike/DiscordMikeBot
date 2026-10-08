@@ -1,4 +1,4 @@
-# T24 — Asumi Admin Console 2.0 / UX & Information Architecture Plan
+> **SUPERSEDED FOR UI DIRECTION (2026-10-08):** Owner explicitly requested the original pre-T24 Admin Dashboard. See [ASUMI_HISTORICAL_DASHBOARD_DECISION.md](ASUMI_HISTORICAL_DASHBOARD_DECISION.md). Keep T23/T24 backend features; do not continue sidebar redesign as the visual baseline.\n\n# T24 — Asumi Admin Console 2.0 / UX & Information Architecture Plan
 
 **Status:** SHIPPED as Asumi 3.9.0 on 2026-10-08. T24.0–T24.7 code integrated via PR #53 (commit 312b02c7), GitHub Actions passed, Render deploy dep-db3ko8rl550s73akdct0 LIVE, Discord Gateway connected. Remaining acceptance: manual authenticated UI/mobile smoke and any owner-requested visual refinements. This document is the source of truth for rollout.
 **Baseline:** main as inspected on 2026-10-08. Keep the Flask app, authentication and existing data stores.

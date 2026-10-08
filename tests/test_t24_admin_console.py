@@ -86,18 +86,39 @@ class ConsoleFlaskTests(unittest.TestCase):
             session["logged_in"] = True
             session["feedback_csrf"] = "test-safe-token"
 
-    def test_login_required_and_all_page_routes(self):
+    def test_historical_dashboard_is_primary_and_feedback_kept(self):
         self.assertEqual(self.client.get("/admin").status_code, 302)
         self.login()
-        paths = ["/admin", "/admin/activity", "/admin/monitoring",
-                 "/admin/assistant", "/admin/tarot", "/admin/cabin",
-                 "/admin/guilds", "/admin/presence", "/admin/releases",
-                 "/admin/feedback", "/admin/feedback/FB-TEST-15"]
-        for path in paths:
+        response = self.client.get("/admin")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"tab-btn-activity", response.data)
+        self.assertIn(b"tab-btn-guilds", response.data)
+        self.assertIn(b"tab-btn-tarot", response.data)
+        self.assertIn(b"tab-btn-logs", response.data)
+        self.assertIn(b"Feedback Inbox", response.data)
+        self.assertNotIn(b"asumi-sidebar", response.data)
+        for path in ("/admin/feedback", "/admin/feedback/FB-TEST-15"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_newer_dashboard_bookmarks_redirect_to_old_tabs(self):
+        self.login()
+        expected = {
+            "/admin/activity": "/admin?tab=activity",
+            "/admin/monitoring": "/admin?tab=logs",
+            "/admin/assistant": "/admin?tab=activity",
+            "/admin/tarot": "/admin?tab=tarot",
+            "/admin/cabin": "/admin?tab=cabin",
+            "/admin/guilds": "/admin?tab=guilds",
+            "/admin/presence": "/admin?tab=presence",
+            "/admin/releases": "/admin?tab=version",
+            "/admin/legacy": "/admin",
+        }
+        for path, target in expected.items():
             with self.subTest(path=path):
                 response = self.client.get(path)
-                self.assertEqual(response.status_code, 200)
-                self.assertIn(b"asumi-sidebar", response.data)
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.headers["Location"].endswith(target))
         self.assertEqual(self.client.get("/admin/unknown").status_code, 404)
 
     def test_destructive_legacy_routes_require_csrf(self):

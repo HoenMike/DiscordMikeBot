@@ -112,6 +112,14 @@ jobs:
           PY
           node --check /tmp/asumi-t23-admin.js
           node --check web/static/admin_console.js
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("web/templates/dashboard.html").read_text(encoding="utf-8")
+          Path("/tmp/asumi-classic-admin.js").write_text(
+              source.rsplit("<script>", 1)[1].split("</script>", 1)[0], encoding="utf-8"
+          )
+          PY
+          node --check /tmp/asumi-classic-admin.js
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
           python -m unittest discover -s tests -p "test_assistant_semantic.py" -v

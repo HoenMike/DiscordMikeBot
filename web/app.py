@@ -181,30 +181,39 @@ def admin_csrf_token():
     return session["feedback_csrf"]
 
 
+# The historical tabbed Admin Dashboard is the owner's preferred UI.
+# Preserve Flask APIs, CSRF protection and standalone T23 Feedback Center.
+# Routes introduced in T24 are kept as redirects to their historical tabs
+# so shared/bookmarked links remain usable without a competing dashboard.
+HISTORICAL_ADMIN_TABS = {
+    "overview": "overview",
+    "activity": "activity",
+    "monitoring": "logs",
+    "assistant": "activity",
+    "tarot": "tarot",
+    "cabin": "cabin",
+    "guilds": "guilds",
+    "presence": "presence",
+    "releases": "version",
+}
+
+
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    return render_template('admin_console.html', page="overview",
-                           page_title=ADMIN_PAGES["overview"],
-                           feedback_csrf=admin_csrf_token())
+    return render_template('dashboard.html', feedback_csrf=admin_csrf_token())
 
 
 @app.route('/admin/<page>')
 @login_required
 def admin_page(page):
-    if page not in ADMIN_PAGES or page == "overview":
-        from flask import abort
+    from flask import abort
+    if page == "legacy":
+        return redirect(url_for("admin_dashboard"))
+    tab = HISTORICAL_ADMIN_TABS.get(page)
+    if not tab:
         abort(404)
-    return render_template('admin_console.html', page=page,
-                           page_title=ADMIN_PAGES[page],
-                           feedback_csrf=admin_csrf_token())
-
-
-@app.route('/admin/legacy')
-@login_required
-def admin_legacy():
-    """Temporary fallback during phased migration, not part of navigation."""
-    return render_template('dashboard.html', feedback_csrf=admin_csrf_token())
+    return redirect(url_for("admin_dashboard", tab=tab))
 
 
 @app.route('/home')
