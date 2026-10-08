@@ -84,6 +84,52 @@ function choose(id){
       area.append(a);area.append(node('span',' · '));
     }
   }
+  // GitHub implementation handoff is allowed only for an approved ticket.
+  if(t.source_message_id && t.guild_id && t.channel_id){
+    const url='https://discord.com/channels/'+t.guild_id+'/'+t.channel_id+'/'+t.source_message_id;
+    const source=document.createElement('a');source.href=url;source.target='_blank';source.rel='noopener';
+    source.textContent='Xem tin nhắn feedback gốc';area.append(source);
+  }
+  const handoff=document.createElement('section');handoff.className='panel';area.append(handoff);
+  add(handoff,'h4','GitHub / Codex handoff');
+  if(t.github_issue_url){const a=document.createElement('a');a.href=t.github_issue_url;a.textContent='Issue đã liên kết';a.target='_blank';a.rel='noopener';handoff.append(a)}
+  if(t.github_pr_url){const a=document.createElement('a');a.href=t.github_pr_url;a.textContent=' PR đã liên kết';a.target='_blank';a.rel='noopener';handoff.append(a)}
+  const buildIssue=node('button','Sao chép Issue draft');handoff.append(buildIssue);
+  buildIssue.onclick=()=>{
+    const source=(t.guild_id&&t.channel_id&&t.source_message_id)
+      ? 'https://discord.com/channels/'+t.guild_id+'/'+t.channel_id+'/'+t.source_message_id : 'N/A';
+    const draft='[Asumi Feedback] '+t.id+' — '+t.title+'\n\n'
+      +'Status: '+t.status+'\nCategory: '+t.category+'\nAsumi version: '+t.bot_version
+      +'\nDiscord source: '+source+'\n\nReport:\n'+t.description
+      +'\n\nClarification:\n'+(t.user_explanation||'(none)')
+      +'\n\nAcceptance:\n- Add regression for the reproduced behavior.\n'
+      +'- Keep the reporter data private and respect Discord ACLs.\n'
+      +'- CI green, deploy confirmed, retest before marking verified.\n';
+    navigator.clipboard.writeText(draft).then(()=>window.alert('Đã sao chép issue draft'),
+      ()=>window.alert('Không sao chép được vào clipboard'));
+  };
+  if(['approved','planned','in_progress','in_review','deployed','verified','closed'].includes(t.status)){
+    const issue=document.createElement('input');issue.placeholder='GitHub Issue URL';
+    issue.value=t.github_issue_url||'';handoff.append(issue);
+    const pr=document.createElement('input');pr.placeholder='GitHub PR URL';
+    pr.value=t.github_pr_url||'';handoff.append(pr);
+    const release=document.createElement('input');release.placeholder='Phiên bản triển khai';
+    release.value=t.resolved_version||'';handoff.append(release);
+    const save=node('button','Lưu liên kết triển khai');handoff.append(save);
+    save.onclick=async()=>{
+      if(!window.confirm('Xác nhận liên kết Issue/PR cho '+id+'?'))return;
+      const result=await fetch('/api/admin/feedback/'+encodeURIComponent(id)+'/links',{
+        method:'POST',credentials:'same-origin',
+        headers:{'Content-Type':'application/json',
+          'X-CSRF-Token':document.querySelector('meta[name=csrf-token]').content},
+        body:JSON.stringify({issue_url:issue.value,pr_url:pr.value,version:release.value})
+      });
+      const body=await result.json();
+      if(result.ok)await reload();else window.alert(body.error||'Không thể lưu liên kết');
+    };
+  }else{
+    add(handoff,'p','Chỉ được liên kết implementation sau khi ticket được duyệt.').className='muted small';
+  }
   const suggested=document.createElement('section');
   suggested.className='panel';
   add(suggested,'h4','Đề xuất review từ AI (chưa có hiệu lực)');
