@@ -12,7 +12,7 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.4"
+CURRENT_VERSION = "3.7.5"
 RELEASE_DATE = "2026-10-08"
 CODENAME = "Asumi 3.7.4 - Compact Search Results"
 
