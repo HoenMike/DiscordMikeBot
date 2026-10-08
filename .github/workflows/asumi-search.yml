@@ -27,7 +27,10 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: |
+          # audioop-lts targets Python 3.13+; Python 3.12 still ships audioop.
+          grep -v '^audioop-lts' requirements.txt > /tmp/asumi-search-requirements.txt
+          python -m pip install -r /tmp/asumi-search-requirements.txt
       - name: Test Brave Search and Discord History
         run: |
           python -m unittest discover -s tests -p "test_assistant_brave.py" -v
