@@ -290,6 +290,7 @@ class CommandToolRegistry:
         notices = {
             "disabled": "Web Search chưa bật. Cần BRAVE_SEARCH_API_KEY và ASUMI_WEB_SEARCH_ENABLED=true trên Render.",
             "empty_query": "Bạn hãy ghi chủ đề cần tìm sau 'tìm trên web', ví dụ: @Asumi tìm trên web game mới tháng này.",
+            "private_reference": "Không gửi link tin nhắn hoặc mention Discord lên web. Hãy hỏi riêng về nội dung công khai, hoặc dùng Discord History Search khi tính năng đó được bật.",
             "cooldown": "Bạn vừa tìm kiếm; đợi một chút rồi thử lại để tránh tốn quota Brave.",
             "quota_exhausted": "Đã đạt giới hạn Brave Search tháng này. Asumi sẽ không gửi thêm request tính phí.",
             "quota_unavailable": "Không kiểm tra được quota bền vững, nên Asumi tạm dừng tìm kiếm để tránh chi phí.",
