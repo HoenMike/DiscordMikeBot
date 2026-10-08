@@ -49,6 +49,9 @@ SCHEMA = (
       evidence_json TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'submitted',
       review_reason TEXT NOT NULL DEFAULT '',
+      github_issue_url TEXT NOT NULL DEFAULT '',
+      github_pr_url TEXT NOT NULL DEFAULT '',
+      resolved_version TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       UNIQUE(guild_id, source_message_id)
@@ -216,7 +219,7 @@ class FeedbackStore:
         sql = (
             "SELECT ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
-            "user_explanation, evidence_json FROM asumi_feedback"
+            "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version FROM asumi_feedback"
         )
         args = ()
         if status:
@@ -229,7 +232,7 @@ class FeedbackStore:
             raise FeedbackStorageError("Turso unavailable")
         fields = ("id", "status", "title", "category", "created_at", "reason",
                   "reporter_id", "bot_version", "guild_id", "channel_id",
-                  "description", "user_explanation", "evidence")
+                  "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version")
         output = []
         for row in rows:
             entry = dict(zip(fields, row))
@@ -271,6 +274,25 @@ class FeedbackStore:
             raise FeedbackStorageError("Không xác minh được ghi nhận trên Turso")
         if changed != 1:
             raise FeedbackStorageError("Không thấy ticket hoặc trạng thái đã được cập nhật")
+
+    async def link_delivery(
+        self, *, ticket_id: str, issue_url: str = "", pr_url: str = "",
+        version: str = "",
+    ) -> None:
+        """Owner-approved refs only, never trusted from reporter ticket text."""
+        for value, required in ((issue_url, "/issues/"), (pr_url, "/pull/")):
+            if value and (not value.startswith("https://github.com/HoenMike/DiscordMikeBot")
+                          or required not in value or len(value)>200):
+                raise FeedbackStorageError("GitHub link không hợp lệ.")
+        await self._require_cloud()
+        await db_client.execute(
+            "UPDATE asumi_feedback SET github_issue_url=?, github_pr_url=?, "
+            "resolved_version=?, updated_at=? WHERE ticket_id=?",
+            (issue_url, pr_url, version[:50],
+             datetime.now(timezone.utc).isoformat(timespec="seconds"), ticket_id.upper()),
+        )
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không thể cập nhật Turso")
 
     async def pending_notifications(self, limit: int = 20) -> list[tuple]:
         await self._require_cloud()
