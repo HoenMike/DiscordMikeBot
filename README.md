@@ -4,6 +4,15 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ---
 
+## Asumi 3.8.3 — Feedback đánh số #N và review đầy đủ
+
+- Người báo dùng `@Asumi báo lỗi: ...` kèm ảnh, chọn **Vẫn gửi feedback → Gửi ticket**. Nhận **Ticket #1**, **#2**, ... theo thứ tự, không phải nhớ mã `FB-01401CE0D1`. UUID cũ vẫn dùng được làm internal key.
+- `/feedback status` nhận `#1`, `1` hoặc mã `FB-` cũ (quyền của người báo); `/feedback add_info` trả lời khi admin cần bổ sung, `/feedback reopen` báo lại khi lỗi chưa hết.
+- ChatGPT Web: MCP `list_feedback_tickets` / `get_feedback_ticket` / `get_feedback_evidence` đọc mô tả và screenshot riêng tư, đề xuất `propose_feedback_review` chỉ là **draft**, không đổi trạng thái.
+- Admin: `https://discordmikebot.onrender.com/admin/feedback` chọn ticket, xem ảnh, xác nhận **Chấp nhận đề xuất** hoặc review trực tiếp với lý do. Trạng thái duyệt/từ chối kích hoạt DM cho reporter; verified chỉ sau deploy và nghiệm thu thật, có phiên bản phát hành.
+- Khi owner đã duyệt, ChatGPT/GitHub agent có thể dùng ticket + evidence để lập Issue, branch, PR, tests và deploy theo yêu cầu owner. Liên kết Issue/PR lưu trong Dashboard; **không có lệnh auto-approve hoặc auto-merge**.
+- Một bước nghiệm thu thực tế cuối: test MCP ảnh → owner approve → DM/status, không dùng ticket đang chờ FB-01401CE0D1 làm test tự động.
+
 ## Asumi 3.8.2 — Đăng nhập ChatGPT Feedback qua OAuth
 
 - ChatGPT plugin sử dụng MCP `https://discordmikebot.onrender.com/api/feedback-connector/mcp`, xác thực OAuth 2.1 Authorization Code + PKCE S256.
