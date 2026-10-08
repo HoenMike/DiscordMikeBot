@@ -313,6 +313,13 @@ class FeedbackStore:
             if value and (not value.startswith("https://github.com/HoenMike/DiscordMikeBot")
                           or required not in value or len(value)>200):
                 raise FeedbackStorageError("GitHub link không hợp lệ.")
+        current = await self.admin_detail(ticket_id)
+        if current is None:
+            raise FeedbackStorageError("Không tìm thấy ticket")
+        if issue_url and current["status"] not in {
+            "approved", "planned", "in_progress", "in_review", "deployed", "verified", "closed"
+        }:
+            raise FeedbackStorageError("Chỉ tạo GitHub Issue sau khi duyệt feedback")
         await self._require_cloud()
         await db_client.execute(
             "UPDATE asumi_feedback SET github_issue_url=?, github_pr_url=?, "
