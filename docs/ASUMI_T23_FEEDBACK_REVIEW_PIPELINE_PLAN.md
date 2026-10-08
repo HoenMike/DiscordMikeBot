@@ -201,3 +201,17 @@ The plugin package and actual user connection need a separate confirmation and
 compatible host credential flow. Never bundle a bearer token in `mcp.json` or GitHub.
 CI verifies MCP JSON-RPC initialize/list/call, strips R2 private keys and requires
 proposal-only behavior. Live connected-plugin validation is still pending.
+
+
+## 2026-10-08 — User enabled ASUMI_FEEDBACK_CONNECTOR_TOKEN; OAuth migration for plugin
+
+Screenshot confirms Render has the new `ASUMI_FEEDBACK_CONNECTOR_TOKEN` secret. Do not read/reveal it. **Important integration discovery:** ChatGPT plugin packaging with `mcp.json` and a remote HTTPS server does NOT automatically forward Render environment secrets to ChatGPT. The initial `/api/feedback-connector/mcp` was bearer-key protected and therefore could not complete a ChatGPT linking handshake. The official ChatGPT MCP auth path is OAuth 2.1 (or no auth, which is inappropriate for private Discord tickets).
+
+The `feat/t23-oauth-mcp-connection` branch adds:
+- OAuth protected-resource metadata and authorization-server metadata
+- ChatGPT-restricted dynamic registration, PKCE authorization-code flow, explicit logged-in owner consent
+- Access + refresh tokens stored as hashes in Turso Cloud, bounded TTL and scope, OAuth-protected MCP
+- Owner-only token revocation and regression tests
+- MCP tools remain strictly `list_feedback_tickets`, `get_feedback_ticket`, `propose_feedback_review`; no approval or rejection tool. FB-01401CE0D1 still `submitted`.
+
+After CI/deploy, owner completes a single *ChatGPT plugin connection* and Asumi Dashboard login on the consent page. No Render key is pasted into chat. Actual connection success must be verified by reading the real FB ticket through MCP, without changing its status.
