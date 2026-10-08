@@ -25,6 +25,34 @@ app.config.update(
 )
 
 
+
+
+ADMIN_MUTATION_PATHS = frozenset({
+    '/api/activities/clear', '/api/logs/clear',
+    '/api/guilds/suspend', '/api/guilds/unsuspend', '/api/guilds/leave',
+    '/api/tarot/reset-cooldown', '/api/tarot/reset-all-cooldowns',
+    '/api/cabin/shields/toggle', '/api/cabin/sessions/stop', '/api/presence',
+})
+
+
+@app.before_request
+def guard_admin_mutations():
+    """Require anti-CSRF for all legacy dashboard writes as well as T24 pages.
+
+    Connector OAuth/API endpoints have separate authentication and are not covered
+    here; per-feedback review APIs keep their own existing CSRF checks.
+    """
+    if request.method != 'POST' or request.path not in ADMIN_MUTATION_PATHS:
+        return None
+    if not session.get('logged_in'):
+        return jsonify({"error": "Unauthorized"}), 401
+    token = session.get('feedback_csrf')
+    if not token or not hmac.compare_digest(request.headers.get('X-CSRF-Token', ''), token):
+        return jsonify({"error": "Invalid CSRF token"}), 403
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "JSON required"}), 415
+    return None
+
 @app.context_processor
 def release_template_context():
     from core.version import RELEASE_DATE, CODENAME, CHANGELOG
@@ -129,10 +157,49 @@ def guest_home():
     return render_template('guest.html')
 
 
+ADMIN_PAGES = {
+    "overview": "Tổng quan",
+    "activity": "Tương tác",
+    "monitoring": "Sức khỏe & Logs",
+    "assistant": "AI & Search",
+    "tarot": "Tarot",
+    "cabin": "Cabin",
+    "guilds": "Máy chủ",
+    "presence": "Trạng thái Bot",
+    "releases": "Phiên bản & Kết nối",
+}
+
+
+def admin_csrf_token():
+    import secrets
+    if not session.get("feedback_csrf"):
+        session["feedback_csrf"] = secrets.token_urlsafe(32)
+    return session["feedback_csrf"]
+
+
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    """Bảng điều khiển Quản trị viên (Protected) - Yêu cầu đăng nhập."""
+    return render_template('admin_console.html', page="overview",
+                           page_title=ADMIN_PAGES["overview"],
+                           feedback_csrf=admin_csrf_token())
+
+
+@app.route('/admin/<page>')
+@login_required
+def admin_page(page):
+    if page not in ADMIN_PAGES or page == "overview":
+        from flask import abort
+        abort(404)
+    return render_template('admin_console.html', page=page,
+                           page_title=ADMIN_PAGES[page],
+                           feedback_csrf=admin_csrf_token())
+
+
+@app.route('/admin/legacy')
+@login_required
+def admin_legacy():
+    """Temporary fallback during phased migration, not part of navigation."""
     return render_template('dashboard.html')
 
 
@@ -878,6 +945,20 @@ def feedback_inbox():
         return jsonify({"error": "Không thể kết nối Turso"}), 503
 
 
+
+
+@app.route('/api/admin/feedback/<ticket_id>', methods=['GET'])
+@login_required
+def feedback_ticket_detail(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        ticket = asyncio.run(feedback_store.admin_detail(ticket_id))
+        if ticket is None:
+            return jsonify({"error": "Ticket not found"}), 404
+        return jsonify({"ticket": ticket})
+    except FeedbackStorageError:
+        return jsonify({"error": "Turso unavailable"}), 503
+
 @app.route('/api/admin/feedback/<ticket_id>/events', methods=['GET'])
 @login_required
 def feedback_admin_events(ticket_id: str):
@@ -911,12 +992,11 @@ def feedback_review(ticket_id: str):
 
 
 @app.route('/admin/feedback', methods=['GET'])
+@app.route('/admin/feedback/<ticket_id>', methods=['GET'])
 @login_required
-def feedback_dashboard():
-    import secrets
-    if not session.get('feedback_csrf'):
-        session['feedback_csrf'] = secrets.token_urlsafe(32)
-    return render_template('feedback.html', feedback_csrf=session['feedback_csrf'])
+def feedback_dashboard(ticket_id=""):
+    return render_template('feedback.html', feedback_csrf=admin_csrf_token(),
+                           page="feedback", selected_ticket=ticket_id)
 
 
 @app.route('/api/admin/feedback/<ticket_id>/evidence/<int:index>', methods=['GET'])
