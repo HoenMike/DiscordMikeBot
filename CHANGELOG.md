@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.0] - 2026-10-08 — *T22.3 Intelligent Source Routing*
+
+### Added
+- Optional Clef source selection among public Brave web, historical Discord messages, and user-owned Archive.
+- Typed Python safety gate: provider must be enabled; private Discord references cannot become automatic public web queries.
+- Clear current/public-info questions can trigger Brave automatically; clear historical messages use Discord Search, explicitly saved content uses Archive.
+- Optional Gemini short grounded synthesis for Clef-selected Brave results, showing original source URLs and falling back to source list on AI timeout.
+
+### Safety
+- `ASUMI_AUTO_SEARCH_ENABLED=false` by default; no auto Brave/Discord requests until manually enabled.
+- Ordinary conversation/reply follow-up and deterministic commands still take priority; no recursive tool loop.
+- Existing per-provider quota, history permissions, time budget and privacy limits still apply.
+
 ## [3.6.0] - 2026-10-08 — *T22.2 Discord History Search*
 
 ### Added
