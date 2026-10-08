@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asumi · Legacy Admin Console</title>
+    <title>Asumi · Admin & Activity Console</title>
     <meta name="csrf-token" content="{{ feedback_csrf }}">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1098,8 +1098,8 @@
         // ==========================================
         // TOAST / SNACKBAR NOTIFICATION SYSTEM
         // ==========================================
-        // T24 compatibility: legacy writes carry the same session CSRF token.
-        // New console uses explicit headers; remove this shim with legacy page.
+        // Historical Admin Dashboard: retain the current server-side CSRF protection
+        // for existing controls without changing their user-facing behavior.
         const legacyFetch = window.fetch.bind(window);
         window.fetch = function(resource, init) {
             const opts = init ? {...init} : {};
@@ -3018,7 +3018,15 @@
             fetchPresenceData();
             fetchVersionData();
             fetchCabinData();
-            setInterval(fetchDashboardData, 3000);
+            // Preserve bookmarked T24 links by selecting the corresponding old tab.
+            // Direct /admin visits retain the original Activity landing tab.
+            const requestedTab = new URLSearchParams(location.search).get('tab');
+            if (requestedTab && ['activity','presence','version','tarot','cabin','guilds','overview','logs'].includes(requestedTab)) {
+                switchTab(requestedTab);
+            }
+            setInterval(() => {
+                if (!document.hidden) fetchDashboardData();
+            }, 10000);
         });
     </script>
 </body>
