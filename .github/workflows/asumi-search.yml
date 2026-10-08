@@ -32,6 +32,9 @@ jobs:
           grep -v '^audioop-lts' requirements.txt > /tmp/asumi-search-requirements.txt
           python -m pip install -r /tmp/asumi-search-requirements.txt
       - name: Test Brave Search and Discord History
+        env:
+          ADMIN_PASSWORD: ci-only-placeholder
+          FLASK_SECRET_KEY: ci-only-placeholder-not-a-production-secret
         run: |
           python -m unittest discover -s tests -p "test_assistant_brave.py" -v
           python -m unittest discover -s tests -p "test_assistant_history.py" -v
