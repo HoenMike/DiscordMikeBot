@@ -1028,3 +1028,24 @@ def feedback_metrics():
         return jsonify(asyncio.run(feedback_store.review_metrics()))
     except FeedbackStorageError:
         return jsonify({"error": "Turso unavailable"}), 503
+
+
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>/links', methods=['POST'])
+@feedback_connector_required
+def connector_feedback_links(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if request.mimetype != "application/json":
+        return jsonify({"error":"JSON required"}), 415
+    data = request.get_json(silent=True) or {}
+    if data.get("owner_approved") is not True:
+        return jsonify({"error":"Explicit owner approval required"}), 403
+    try:
+        asyncio.run(feedback_store.link_delivery(
+            ticket_id=ticket_id,
+            issue_url=str(data.get("issue_url") or ""),
+            pr_url=str(data.get("pr_url") or ""),
+            version=str(data.get("version") or ""),
+        ))
+        return jsonify({"ok":True})
+    except FeedbackStorageError as exc:
+        return jsonify({"error":str(exc)}), 400
