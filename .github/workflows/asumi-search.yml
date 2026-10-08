@@ -65,42 +65,25 @@ jobs:
         continue-on-error: true
         run: |
           python - <<'PY'
-          import json
           import urllib.request
+          from features.assistant.providers.webgia_prices import parse_webgia_fuel
           urls = [
               ("official", "https://www.pvoil.com.vn/tin-gia-xang-dau"),
-              ("community", "https://vietfuel-api.tranqui.workers.dev/api/fuel-prices"),
               ("webgia", "https://webgia.tv/xang-dau/petrolimex"),
-              ("webgia_history", "https://webgia.tv/xang-dau/lich-su"),
-              ("petrolimex", "https://www.petrolimex.com.vn/ndi/gia-ban-le.html"),
           ]
           for label, url in urls:
               try:
-                  req = urllib.request.Request(url, headers={"User-Agent": "AsumiBot/3.7.7", "Accept": "application/json,text/html"})
+                  req = urllib.request.Request(url, headers={
+                      "User-Agent": "AsumiBot/3.7.7", "Accept": "text/html"
+                  })
                   with urllib.request.urlopen(req, timeout=6) as response:
-                      body = response.read(180000 if label == "webgia" else 16384)
-                      print(f"{label} status={response.status} content_type={response.headers.get('Content-Type')}")
+                      body = response.read(180000)
+                      print(f"{label} status={response.status}")
                       if label == "webgia":
-                          import re
-                          html = body.decode("utf-8", "replace")
-                          from features.assistant.providers.webgia_prices import parse_webgia_fuel
-                          live = parse_webgia_fuel(html)
-                          print("webgia parsed status=", live.status,
-                                "period=", live.effective_date,
-                                "price_rows=", len(live.rows))
-                          print("webgia bytes=", len(body), "has table=", "<table" in html.lower(),
-                                "has E10=", "E10" in html, "tr_count=", html.lower().count("<tr"))
-                          pos = html.find("E10")
-                          if pos >= 0:
-                              print("webgia E10 markup=", re.sub(r"\\s+", " ", html[max(0,pos-800):pos+350])[:1150])
-                      if label == "community" and "json" in response.headers.get("Content-Type", ""):
-                          result = json.loads(body)
-                          meta = result.get("meta", {})
-                          print("community data_status=", result.get("status"),
-                                "priceDate=", meta.get("priceDate"),
-                                "scrapedAt=", meta.get("scrapedAt"),
-                                "sourceCount=", meta.get("sourceCount"),
-                                "products=", len(result.get("data", [])))
+                          parsed = parse_webgia_fuel(body.decode("utf-8", "replace"))
+                          print("webgia parsed=", parsed.status,
+                                "date=", parsed.effective_date,
+                                "items=", len(parsed.rows))
               except Exception as exc:
                   print(f"{label} error={type(exc).__name__}: {str(exc)[:140]}")
           PY
