@@ -40,6 +40,10 @@ class HistoryFilterTests(unittest.TestCase):
             ("mua xe", "đổi xe", "xe mới"),
         )
 
+    def test_ambiguous_tim_xem_is_not_forced_into_history(self):
+        decision = route_locally("tìm xem giá xe hôm nay thế nào")
+        self.assertIsNone(decision.tool)
+
     def test_local_route_is_history_not_archive(self):
         self.assertEqual(
             route_locally("hãy tìm xem đầu năm @Theo có nhắn gì về mua xe").tool,
