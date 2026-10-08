@@ -6,7 +6,7 @@ import time
 from discord.ext import commands, tasks
 
 from core.activity_logger import activity_logger
-from features.assistant.ai import generate_chat_reply
+from features.assistant.ai import ChatTimeoutBudgetError, generate_chat_reply
 from features.assistant.context import ContextBuilder
 from features.assistant.response import send_conversation_reply
 from features.assistant.router import RouteDecision, route_locally, route_message
@@ -236,6 +236,7 @@ class AssistantCog(commands.Cog):
                 )
             ai_ms = (time.perf_counter() - ai_started) * 1000
         except Exception as exc:
+            ai_ms = (time.perf_counter() - ai_started) * 1000
             total_ms = (time.perf_counter() - request_started) * 1000
             print(
                 f"❌ [Asumi Conversation] Không tạo được phản hồi: "
@@ -246,11 +247,19 @@ class AssistantCog(commands.Cog):
                 f"⏱️ [Asumi Timing] id={request_id} path=chat status=error "
                 f"source={decision.source} context_ms={context_ms:.0f} "
                 f"route_ms={route_ms:.0f} clef_ms={decision.clef_ms:.0f} "
-                f"total_ms={total_ms:.0f}",
+                f"ai_ms={ai_ms:.0f} total_ms={total_ms:.0f}",
                 flush=True,
             )
+            is_timeout = isinstance(exc, ChatTimeoutBudgetError)
             sent = await message.reply(
-                "Mình chưa gọi được AI lúc này. Các lệnh .m và / vẫn hoạt động bình thường.",
+                (
+                    "AI chat đang phản hồi quá chậm nên mình đã dừng sớm. "
+                    "Bạn thử lại sau một chút; các lệnh .m và / vẫn hoạt động bình thường."
+                    if is_timeout
+                    else
+                    "Mình chưa gọi được AI lúc này. "
+                    "Các lệnh .m và / vẫn hoạt động bình thường."
+                ),
                 mention_author=False,
             )
             self._log_dashboard_activity(
@@ -266,8 +275,23 @@ class AssistantCog(commands.Cog):
                     "context_ms": round(context_ms, 1),
                     "route_ms": round(route_ms, 1),
                     "clef_ms": round(decision.clef_ms, 1),
+                    "ai_ms": round(ai_ms, 1),
                     "total_ms": round(total_ms, 1),
                     "error_type": type(exc).__name__,
+                    "chat_models_tried": list(
+                        getattr(exc, "models_tried", ()) or ()
+                    ),
+                    "chat_attempts": int(
+                        getattr(exc, "attempts", 0) or 0
+                    ),
+                    "chat_budget_seconds": float(
+                        getattr(exc, "budget_seconds", 0.0) or 0.0
+                    ),
+                    "chat_last_error_type": getattr(
+                        exc,
+                        "last_error_type",
+                        type(exc).__name__,
+                    ),
                     "query_chars": len(query),
                     "reply_context": context.reply is not None,
                     "recent_messages": len(context.recent),

@@ -3,7 +3,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from core.activity_logger import ActivityLogger
-from features.assistant.ai import _candidate_models, _build_prompt, generate_chat_reply
+from features.assistant.ai import (
+    ChatTimeoutBudgetError,
+    _candidate_models,
+    _build_prompt,
+    _chat_limits,
+    generate_chat_reply,
+)
 from features.assistant.context import AssistantContext, ContextBuilder, ImagePayload
 from features.assistant.cog import choose_conversation_route
 from features.assistant.router import route_locally, route_message
@@ -488,6 +494,70 @@ class AssistantChatModelTests(unittest.TestCase):
         ):
             models = _candidate_models()
         self.assertEqual(models[0], "gemini-custom-chat")
+
+
+class AssistantChatTimeoutBudgetTests(unittest.IsolatedAsyncioTestCase):
+    def test_default_chat_limits_are_fast_fail(self):
+        with patch.dict("os.environ", {}, clear=True):
+            per_model, total_budget, max_attempts = _chat_limits()
+        self.assertEqual(per_model, 4.0)
+        self.assertEqual(total_budget, 8.0)
+        self.assertEqual(max_attempts, 2)
+
+    def test_default_fallback_prefers_lightweight_model(self):
+        with patch.dict("os.environ", {}, clear=True):
+            models = _candidate_models()
+        self.assertEqual(models[0], "gemini-3.5-flash-lite")
+        self.assertEqual(models[1], "gemini-3.1-flash-lite")
+
+    async def test_total_budget_prevents_second_attempt_after_exhaustion(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "ASUMI_CHAT_MODEL_TIMEOUT_SECONDS": "4",
+                "ASUMI_CHAT_TOTAL_BUDGET_SECONDS": "8",
+                "ASUMI_CHAT_MAX_ATTEMPTS": "2",
+            },
+            clear=True,
+        ), patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(side_effect=TimeoutError()),
+        ) as generate, patch(
+            "features.assistant.ai.time.perf_counter",
+            side_effect=[0.0, 0.0, 0.0, 4.0, 8.0],
+        ):
+            with self.assertRaises(ChatTimeoutBudgetError) as ctx:
+                await generate_chat_reply("hello")
+
+        self.assertEqual(generate.await_count, 1)
+        self.assertEqual(ctx.exception.attempts, 1)
+        self.assertEqual(ctx.exception.budget_seconds, 8.0)
+
+    async def test_second_attempt_uses_only_remaining_budget(self):
+        fake_response = SimpleNamespace(text="fallback ok")
+        with patch.dict(
+            "os.environ",
+            {
+                "ASUMI_CHAT_MODEL_TIMEOUT_SECONDS": "4",
+                "ASUMI_CHAT_TOTAL_BUDGET_SECONDS": "8",
+                "ASUMI_CHAT_MAX_ATTEMPTS": "2",
+            },
+            clear=True,
+        ), patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(side_effect=[TimeoutError(), fake_response]),
+        ) as generate, patch(
+            "features.assistant.ai.time.perf_counter",
+            side_effect=[0.0, 0.0, 0.0, 5.0, 5.0, 5.0, 6.0, 6.2],
+        ):
+            result = await generate_chat_reply("hello")
+
+        self.assertEqual(result.text, "fallback ok")
+        self.assertEqual(generate.await_count, 2)
+        first_timeout = generate.await_args_list[0].kwargs["timeout_sec"]
+        second_timeout = generate.await_args_list[1].kwargs["timeout_sec"]
+        self.assertEqual(first_timeout, 4.0)
+        self.assertEqual(second_timeout, 3.0)
 
 
 class AssistantFollowupRoutingTests(unittest.IsolatedAsyncioTestCase):

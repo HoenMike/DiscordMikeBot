@@ -34,20 +34,65 @@ class ChatReplyResult:
     attempts: int
 
 
+class ChatTimeoutBudgetError(TimeoutError):
+    def __init__(
+        self,
+        *,
+        models_tried: list[str],
+        attempts: int,
+        budget_seconds: float,
+        last_error_type: str = "TimeoutError",
+    ):
+        super().__init__(
+            f"Chat AI exceeded {budget_seconds:g}s budget after "
+            f"{attempts} attempt(s)."
+        )
+        self.models_tried = tuple(models_tried)
+        self.attempts = int(attempts)
+        self.budget_seconds = float(budget_seconds)
+        self.last_error_type = last_error_type
+
+
 def _candidate_models() -> list[str]:
-    """Conversation should prefer the strong/fast chat model, not the data model."""
+    """Conversation prefers low-latency models before heavier summary models."""
 
     primary = (
         os.getenv("ASUMI_CHAT_MODEL", "").strip()
         or "gemini-3.5-flash-lite"
     )
-    fallbacks = list(getattr(config, "SUMMARY_FALLBACK_MODELS", []) or [])
+    configured = [
+        model.strip()
+        for model in os.getenv(
+            "ASUMI_CHAT_FALLBACK_MODELS",
+            "gemini-3.1-flash-lite,gemini-3.5-flash",
+        ).split(",")
+        if model.strip()
+    ]
+    repository_fallbacks = list(
+        getattr(config, "SUMMARY_FALLBACK_MODELS", []) or []
+    )
 
     ordered: list[str] = []
-    for model in [primary, *fallbacks]:
+    for model in [primary, *configured, *repository_fallbacks]:
         if model and model not in ordered:
             ordered.append(model)
     return ordered
+
+
+def _chat_limits() -> tuple[float, float, int]:
+    per_model_timeout = max(
+        1.0,
+        float(os.getenv("ASUMI_CHAT_MODEL_TIMEOUT_SECONDS", "4")),
+    )
+    total_budget = max(
+        per_model_timeout,
+        float(os.getenv("ASUMI_CHAT_TOTAL_BUDGET_SECONDS", "8")),
+    )
+    max_attempts = max(
+        1,
+        int(os.getenv("ASUMI_CHAT_MAX_ATTEMPTS", "2")),
+    )
+    return per_model_timeout, total_budget, max_attempts
 
 
 def _build_prompt(
@@ -95,25 +140,27 @@ async def generate_chat_reply(
                 )
             )
     contents = [types.Content(role="user", parts=content_parts)]
-    timeout_sec = max(
-        2.0,
-        float(os.getenv("ASUMI_CHAT_MODEL_TIMEOUT_SECONDS", "6")),
-    )
-    max_attempts = max(
-        1,
-        int(os.getenv("ASUMI_CHAT_MAX_ATTEMPTS", "2")),
-    )
+    per_model_timeout, total_budget, max_attempts = _chat_limits()
     total_started = time.perf_counter()
     last_error: Exception | None = None
+    models_tried: list[str] = []
+    timeout_seen = False
 
     for attempt, model in enumerate(_candidate_models()[:max_attempts], start=1):
+        elapsed_total = time.perf_counter() - total_started
+        remaining_budget = total_budget - elapsed_total
+        if remaining_budget <= 0.1:
+            break
+
+        attempt_timeout = min(per_model_timeout, remaining_budget)
         attempt_started = time.perf_counter()
+        models_tried.append(model)
         try:
             response = await bounded_ai_generate(
                 model=model,
                 contents=contents,
                 config=generation_config,
-                timeout_sec=timeout_sec,
+                timeout_sec=attempt_timeout,
                 label="Asumi Conversation",
             )
             elapsed_ms = (time.perf_counter() - attempt_started) * 1000
@@ -134,10 +181,24 @@ async def generate_chat_reply(
         except Exception as exc:
             elapsed_ms = (time.perf_counter() - attempt_started) * 1000
             last_error = exc
+            if isinstance(exc, TimeoutError):
+                timeout_seen = True
             print(
-                f"⚠️ [Asumi Conversation] Model '{model}' lỗi sau {elapsed_ms:.0f}ms: "
+                f"⚠️ [Asumi Conversation] Model '{model}' lỗi sau {elapsed_ms:.0f}ms "
+                f"(timeout={attempt_timeout:.1f}s): "
                 f"{type(exc).__name__}: {str(exc)[:160]}",
                 flush=True,
             )
 
+    if timeout_seen:
+        raise ChatTimeoutBudgetError(
+            models_tried=models_tried,
+            attempts=len(models_tried),
+            budget_seconds=total_budget,
+            last_error_type=(
+                type(last_error).__name__
+                if last_error is not None
+                else "TimeoutError"
+            ),
+        )
     raise last_error or RuntimeError("Không có model conversational khả dụng.")

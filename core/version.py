@@ -12,12 +12,32 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.4.0"
+CURRENT_VERSION = "3.4.1"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.4 - Intelligence Polish"
+CODENAME = "Asumi 3.4 - Chat Timeout Hotfix"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.4.1",
+        "date": "2026-10-08",
+        "type": "bugfix",
+        "title": "Conversational Timeout Budget",
+        "summary": "Giảm thời gian chờ khi Gemini chat treo và làm telemetry timeout rõ nguyên nhân hơn.",
+        "changes": [
+            {"category": "⚡ Chat reliability", "items": [
+                "Conversation dùng hard total AI budget thay vì cho mỗi fallback model một timeout đầy đủ.",
+                "Mặc định mỗi model tối đa 4s, toàn bộ AI chat tối đa 8s, 2 attempts.",
+                "Fallback chat ưu tiên gemini-3.1-flash-lite trước model nặng hơn.",
+                "Attempt sau chỉ dùng phần budget còn lại; hết budget thì dừng ngay.",
+            ]},
+            {"category": "📊 Diagnostics", "items": [
+                "Timeout log ghi ai_ms riêng thay vì chỉ total_ms.",
+                "Telemetry ghi models tried, attempts, total budget và last error type.",
+                "Dashboard gắn nhãn AI budget timeout để phân biệt với Clef/router latency.",
+            ]},
+        ],
+    },
     {
         "version": "3.4.0",
         "date": "2026-10-08",
