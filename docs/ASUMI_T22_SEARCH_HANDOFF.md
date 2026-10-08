@@ -182,7 +182,7 @@ Status/acceptance: CI proves the local behavior and safety fixtures, but product
 
 - Source order: **PVOIL first-party** → **WebGia.TV dated community HTML** → **Brave**.
 - First party: report each URL status via `first_party_reason`; no raw HTML or private content logged. Reject invalid or future date.
-- Community API: one fixed HTTPS URL, no redirects, 128KiB response cap, short timeout/cache; require Vùng 1 table header, recent effective date, plausible VND/lít prices for at least two products. No user text is sent to API.
+- Community HTML fallback: one fixed HTTPS WebGia.TV page, no redirects, 192KiB response cap, short timeout/cache; require exact Vùng 1 header, matching product names, recent effective date and plausible VND/lít prices for at least two products. No user text is sent to WebGia.
 - If community API succeeds, present a clearly labeled **non-official, Vùng 1, dated reference price**. Never call it directly PVOIL-verified. No Brave request is needed.
 - If both fail, Brave fallback cannot hallucinate a live price or claim a new adjustment date.
 - Dashboard supports `first_party_reason`, `aggregate_status`, source count and latency even for non-Brave output; logs report bounded provider statuses.
