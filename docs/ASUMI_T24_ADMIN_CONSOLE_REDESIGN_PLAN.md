@@ -28,9 +28,9 @@
 | Tính năng | AI & Search | /admin/assistant | Assistant/Brave/Discord History/Archive/Clef/Vectorize routing and safe telemetry |
 | Tính năng | Tarot | /admin/tarot | Rating metrics, cooldown lists and reset actions |
 | Tính năng | Cabin | /admin/cabin | Active sessions, immunity shields and authorized management |
-| Quản trị | Máy chủ | /admin/guilds | Participating guilds, suspend/unsuspend/leave |
-| Quản trị | Trạng thái Bot | /admin/presence | Presence preview/editor, auto-rotation and presets |
-| Quản trị | Phiên bản & kết nối | /admin/releases | Version/changelog; read-only provider/MCP health and authorization if available |
+| Cộng đồng | Máy chủ | /admin/guilds | Participating guilds, suspend/unsuspend/leave |
+| Hệ thống | Trạng thái Bot | /admin/presence | Presence preview/editor, auto-rotation and presets |
+| Hệ thống | Phiên bản & kết nối | /admin/releases | Version/changelog; read-only provider/MCP health and authorization if available |
 
 This means ten focused primary pages plus ticket drilldown, distributed over five sections, with only current context expanded. Do not create top-level entries for every low-level setting. Preserve /admin and /admin/feedback old bookmarks.
 
