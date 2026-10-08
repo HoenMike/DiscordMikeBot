@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.4] - 2026-10-08 — *Brave Search UX Polish*
+
+### Changed
+- Replace long plain-text Brave search results with a concise, answer-first Discord Embed: brief grounded synthesis plus up to three clickable original sources.
+- Clean HTML tags, Markdown injection/mentions and numeric citation placeholders from provider snippets before display.
+- For Vietnamese fuel prices, use a more targeted *single* Brave query with local date/RON95/E10/official seller context; prefer direct publisher domains in presentation and demote aggregators/chart sites.
+- Grounded summarizer must avoid claiming a live price unless snippets actually contain an identifiable value, unit and relevant timestamp.
+- Source cap is controlled by `ASUMI_WEB_SEARCH_DISPLAY_SOURCES` in `core/constants.py`, not an environment flag. Existing 500/month request cap and safe provider boundaries unchanged.
+- CI includes UI, sanitization, source prioritization and new fuel-query regression. Live data correctness still requires inspecting source publication dates.
+
 ## [3.7.3] - 2026-10-08 — *Code-owned Asumi Search Configuration*
 
 ### Changed
