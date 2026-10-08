@@ -50,7 +50,8 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertEqual(set(READER_STYLES), {"auto", "neutral", "healer", "chaos"})
         self.assertTrue(all("Orion" not in value["name"] and "Celeste" not in value["name"] and "Jester" not in value["name"] for value in READER_STYLES.values()))
         prompt = _build_tarot_prompt("daily", "Daily", [], None, "Mai")
-        self.assertIn("Bạn là Asumi", prompt)
+        self.assertIn("Đọc quẻ Tarot cho", prompt)
+        self.assertIn("Asumi", prompt)
         self.assertNotIn("Orion", prompt)
         malformed = parse_tarot_ai_response('{"is_valid": false, "full_reading": "Xin lỗi"')
         self.assertNotIn('{"is_valid"', malformed[0])
@@ -292,7 +293,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("facebed.com", find_proxy.await_args.kwargs["excluded_domains"])
         self.assertIn("facebed.seria.moe", sent_kwargs["view"].payload["tried_domains"])
 
-    async def test_facebook_is_not_supported_by_ytdlp_fallback_anymore(self):
+    async def test_facebook_nonvideo_posts_never_invoke_ytdlp(self):
         result = await self.cog._try_ytdlp_fallback(
             self.msg,
             "facebook",
@@ -507,7 +508,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
                 "action_required", "proxy", "unfurl_timeout", "facebook", origin_message_id=10
             )
             await self.cog.on_message(msg)
-            msg.edit.assert_awaited_once_with(suppress=True)
+            msg.edit.assert_not_awaited()
 
     async def test_cancellation_removes_temporary_preview(self):
         waiting = asyncio.Event()
