@@ -18,7 +18,7 @@ class FeedbackNotifier:
             items = await feedback_store.pending_notifications()
         except FeedbackStorageError:
             return
-        for notice_id, ticket_id, user_id, action, reason, status in items:
+        for notice_id, ticket_id, user_id, action, reason, status, number in items:
             # PR merge / deploy isn't a verified fix; don't promise resolution.
             if action not in ("needs_info", "rejected", "duplicate", "deferred",
                               "approved", "verified", "closed", "reopened"):
@@ -29,9 +29,9 @@ class FeedbackNotifier:
                 continue
             safe_reason = discord.utils.escape_mentions(str(reason or "Chưa có chi tiết."))[:1200]
             text = (
-                f"📩 Phản hồi {ticket_id}: {status}\n"
+                f"📩 Ticket #{number}: {status}\n"
                 f"Lý do / cập nhật: {safe_reason}\n"
-                f"Bạn có thể dùng /feedback status để xem trạng thái riêng tư."
+                f"Dùng /feedback status với mã #{number} để xem chi tiết riêng tư."
             )
             try:
                 user = self.bot.get_user(int(user_id)) or await self.bot.fetch_user(int(user_id))
