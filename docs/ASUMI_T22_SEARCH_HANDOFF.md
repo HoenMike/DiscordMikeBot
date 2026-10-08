@@ -119,3 +119,15 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - New unit suite `tests/test_assistant_search_followup.py` and CI coverage. Review PR check results before claiming code-complete.
 - Live acceptance blocked on `BRAVE_SEARCH_API_KEY`, conservative Brave billing guard, `ASUMI_WEB_SEARCH_ENABLED`, `ASUMI_DISCORD_HISTORY_ENABLED`, actual bot-token guild search and requester ACL, followed by carefully enabling `ASUMI_AUTO_SEARCH_ENABLED`.
 - **Next T22.5**: user-confirmed cross-source plan (Discord evidence -> public entity selection -> Brave), improved result ranking/cross-source evidence, optional supervised tool handoff. Never auto-export raw private source text.
+
+
+## T22.4c / Asumi 3.7.3 — code-owned configuration migration (2026-10-08)
+
+- **Decision:** env is for secrets and environment-specific connection identifiers ONLY. All Asumi behavior switches, AI model defaults, budgets/limits, cache and context sizes live in `core/constants.py`.
+- Branch `refactor/asumi-search-policy-in-code`; version 3.7.3. Entry points `CloudflareDecisionRouter.from_env`, `BraveSearchAdapter.from_env`, `DiscordHistorySearcher.from_env`, `ArchiveSemanticIndex.from_env` keep their names for compatibility, but now read ONLY required account IDs/tokens from env; feature policy comes from constants. Legacy env feature flags do not override code policy.
+- Code policy enables Brave auto detection, Clef and on-demand Discord History, but missing provider credential always blocks external API execution. Archive semantic remains code-OFF for live Vectorize/cost review.
+- `@Asumi giá xăng hôm nay như nào` now deterministically selects Brave Web Search without requiring Clef; when key missing, return a truthful missing-key message. Narrow public commodity query gate prevents uploading mentions/channel context.
+- Brave billable calls require healthy **durable cloud Turso quota store**; ephemeral SQLite is not sufficient to enforce a monthly ceiling across Render restarts. Default cap 500/month, absolute hard max 900; validate Brave dashboard billing limits separately.
+- `.env.example` trimmed to credentials. User only needs `BRAVE_SEARCH_API_KEY` in Render (and existing Turso credentials): no `ASUMI_WEB_SEARCH_ENABLED` etc. After changing `core/constants.py`, redeploy from main.
+- New regression `tests/test_assistant_policy_config.py`; other existing Asumi tests updated for source configuration and included in CI. Before accepting: green CI, real Brave query + quota, Discord bot-token Search/ACL, negative private-source test. If native bot-token Search is unauthorized, do not claim production History is usable.
+- Next: T22.5 multi-source confirm-before-public-search. T21 Vectorize permission/live acceptance remains independent.
