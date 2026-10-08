@@ -266,17 +266,41 @@ class DiscordHistorySearcher:
                             if not self._can_show(guild, requester, channel_id):
                                 rejected += 1
                                 continue
-                            content = str(item.get("content") or "").strip()
+                            # Discord search index can lag behind edits/deletes.
+                            # Re-fetch the live message (bounded by max_results)
+                            # after requester + bot ACL checks, then use its text.
+                            channel = (
+                                guild.get_channel_or_thread(channel_id)
+                                if hasattr(guild, "get_channel_or_thread")
+                                else guild.get_channel(channel_id)
+                            )
+                            fetch_message = getattr(channel, "fetch_message", None)
+                            if fetch_message is None:
+                                continue
+                            try:
+                                live = await asyncio.wait_for(
+                                    fetch_message(msg_id), timeout=2.0,
+                                )
+                            except Exception:
+                                continue
+                            live_author = getattr(getattr(live, "author", None), "id", None)
+                            if live_author != user_id or getattr(live, "id", None) != msg_id:
+                                continue
+                            content = (getattr(live, "content", "") or "").strip()
                             if not content:
                                 continue
-                            # Discord search can provide approximate hits; let
-                            # user verify via original source, never invent text.
+
                             seen.add(msg_id)
                             hits.append(HistoryHit(
                                 message_id=msg_id,
                                 channel_id=channel_id,
                                 author_id=user_id,
-                                author_name=str(author.get("global_name") or author.get("username") or "Unknown")[:80],
+                                author_name=str(
+                                    getattr(live.author, "display_name", None)
+                                    or author.get("global_name")
+                                    or author.get("username")
+                                    or "Unknown"
+                                )[:80],
                                 content=content[:600],
                                 date=str(item.get("timestamp") or "")[:10],
                                 jump_url=(
