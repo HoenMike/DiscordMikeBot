@@ -37,6 +37,43 @@ class SummaryRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.tool, "summary.member")
         self.assertEqual(decision.arguments["hours"], 1.0)
 
+    async def test_fb_01401ce0d1_12_hour_member_scope(self):
+        # Exact production feedback: duration between "tin nhắn" and "của".
+        for query in (
+            f"tóm tắt tin nhắn 12h qua của <@{USER_ID}>",
+            f"tóm tắt 12h qua của <@!{USER_ID}>",
+            f"tóm tắt tin nhắn trong 12 giờ qua của <@{USER_ID}>",
+            f"tóm tắt tin nhắn 12h qua của <@{USER_ID}> đã gửi",
+        ):
+            with self.subTest(query=query):
+                result = route_locally(query)
+                self.assertEqual(result.tool, "summary.member")
+                self.assertEqual(result.arguments["author_ids"], [USER_ID])
+                self.assertEqual(result.arguments["hours"], 12.0)
+                via_clef = await route_message(query)
+                self.assertEqual(via_clef.tool, "summary.member")
+
+    async def test_member_mentioned_as_topic_does_not_filter_author(self):
+        # A mention in a generic channel recap is NOT proof of author scope.
+        query = f"tóm tắt 12h qua khi mọi người thảo luận về <@{USER_ID}>"
+        self.assertEqual(route_locally(query).tool, "summary.catchup")
+        self.assertEqual(route_locally("tóm tắt 12h qua").tool, "summary.catchup")
+
+    async def test_no_silent_one_of_many_author_choice(self):
+        q = f"tóm tắt tin nhắn 12h qua của <@{USER_ID}> và <@{OTHER_ID}>"
+        result = route_locally(q)
+        self.assertEqual(result.tool, "summary.member")
+        self.assertEqual(result.arguments["author_ids"], [USER_ID, OTHER_ID])
+
+    async def test_12h_author_request_overrides_live_chat_followup(self):
+        q = f"tóm tắt tin nhắn 12h qua của <@{USER_ID}>"
+        result = await choose_conversation_route(
+            q, previous_session=SimpleNamespace(intent="chat"),
+            is_live_continuation=True, has_images=False,
+            cloudflare_router=None, min_confidence=0.55,
+        )
+        self.assertEqual(result.tool, "summary.member")
+
     async def test_non_member_summary_remains_original(self):
         self.assertEqual(route_locally("tóm tắt 2 giờ qua").tool, "summary.catchup")
         self.assertEqual(
