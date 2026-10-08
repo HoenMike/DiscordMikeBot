@@ -224,3 +224,11 @@ User test (Discord screenshot): `@Asumi tóm tắt xem qua giờ @i'm_bd đã nh
 - New regression `tests/test_assistant_member_summary.py`: exact screenshot phrase, numeric hours, multi-tag rejection, validated mention, channel ACL, three scanner modes, no-match behavior, live reply override. CI includes changes in `features/summary/**`.
 
 **Acceptance:** green CI required; on Discord, ask the screenshot phrase in a busy channel with a low-activity tagged user and confirm that the count/summary are only that author's actual messages, not everyone's. Do not mark live acceptance until observed. No new API key or Render env config.
+
+
+## Clef routing calibration / live acceptance checkpoint — 2026-10-08
+
+- T22.3 Clef source routing is present and code-enabled in `core/constants.py`; credentials must actually exist on Render for `CloudflareDecisionRouter` to be enabled. **Code enabled is not proof of a successful live call.**
+- Routing now rejects unknown/uncalibrated/non-finite Clef options, retains Python provider/source-privacy gates and observes `clef_ms` metadata.
+- Added safe regression tests and an explicit, maximum-three-inference `scripts/smoke_clef_routing.py --live`; it does **not** execute Brave or Discord requests. See `docs/ASUMI_CLEF_ROUTING_ACCEPTANCE.md`.
+- No version bump or production acceptance claim from these changes. Next: CI, live authorized Clef smoke, bot-token/Brave live tool tests. T22.5 cross-source chaining is a separate goal and remains **PLANNED**.
