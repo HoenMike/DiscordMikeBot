@@ -188,9 +188,10 @@ class BraveProviderTests(unittest.IsolatedAsyncioTestCase):
             result = await registry.execute(
                 route_locally("tìm trên web tin mới"), message,
             )
-        body = message.reply.await_args.args[0]
-        self.assertIn("https://example.org/news", body)
-        self.assertNotIn("@everyone", body)
+        embed = message.reply.await_args.kwargs["embed"]
+        self.assertIn("https://example.org/news", embed.fields[0].value)
+        self.assertNotIn("@everyone", embed.fields[0].value)
+        self.assertEqual(embed.title.startswith("🔎 "), True)
         self.assertEqual(result.details["web_provider"], "brave")
         self.assertNotIn("query", result.details)
         self.assertNotIn("source_content", result.details)
