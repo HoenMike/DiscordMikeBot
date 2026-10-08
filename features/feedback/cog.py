@@ -480,6 +480,26 @@ class FeedbackCog(commands.Cog):
             ephemeral=True,
         )
 
+    @feedback.command(name="mine", description="Xem tất cả feedback bạn đã gửi")
+    async def mine(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Chỉ hỗ trợ xem feedback trong server.", ephemeral=True
+            )
+            return
+        from features.feedback.user_views import MyFeedbackView
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            view = await MyFeedbackView.load(
+                owner_id=interaction.user.id, guild_id=interaction.guild.id,
+            )
+        except FeedbackStorageError:
+            await interaction.followup.send(
+                "Tạm thời không đọc được danh sách feedback từ Turso.", ephemeral=True
+            )
+            return
+        await interaction.followup.send(embed=view.embed(), view=view, ephemeral=True)
+
     @feedback.command(name="status", description="Xem trạng thái ticket feedback của chính bạn")
     @app_commands.describe(ticket_id="Số ticket, ví dụ #15 (hoặc mã FB- cũ)")
     async def status(self, interaction: discord.Interaction, ticket_id: str):

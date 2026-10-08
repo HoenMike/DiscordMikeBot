@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.8.3"
+CURRENT_VERSION = "3.8.4"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.8.3 - Numbered Feedback Tickets"
+CODENAME = "Asumi 3.8.4 - Feedback Center & My Tickets"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.8.4", "date": "2026-10-08", "type": "minor",
+        "title": "T23: New Feedback Center and My Tickets",
+        "summary": "Admin Inbox mới gọn và dễ duyệt; người gửi xem, sửa thành ticket mới hoặc xóa mềm, không mất lịch sử.",
+        "changes": [
+            {"category": "📨 My Feedback", "items": [
+                "/feedback mine hiển thị danh sách ticket riêng tư theo số #N, trạng thái và lý do.",
+                "Sửa tạo ticket mới và giữ ảnh; ticket cũ đánh dấu đã xóa/thay thế, có lịch sử và link.",
+                "Xóa chỉ đánh dấu deleted và ẩn khỏi danh sách mặc định, không xóa Turso/R2/audit.",
+            ]},
+            {"category": "🛡️ Feedback Center", "items": [
+                "Redesign quản trị responsive với lọc/tìm, tổng quan, quyết định nhanh, ảnh preview và timeline.",
+                "AI tiếp tục chỉ đề xuất; owner xác nhận thay đổi trạng thái và lý do.",
+                "Turso migration backfill cột vòng đời và bảo vệ ticket đã xóa khỏi thao tác duyệt lại.",
+            ]},
+        ],
+    },
     {
         "version": "3.8.3", "date": "2026-10-08", "type": "bugfix",
         "title": "T23 completion: Feedback #N, private screenshot review",
