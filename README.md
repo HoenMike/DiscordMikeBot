@@ -8,7 +8,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 - **Admin:** `/admin/feedback` mới có danh sách dạng inbox, lọc tìm, hành động theo trạng thái ở đầu, xem ảnh R2 private, lịch sử quyết định và mục GitHub handoff riêng. Quyết định chỉ có hiệu lực khi admin xác nhận, không tự approve theo AI.
 - **Discord user:** `/feedback mine` hiện danh sách ticket `#N` riêng tư, phân trang, đọc trạng thái và lý do, kể cả ticket đã xóa nếu bật bộ lọc.
-- **Sửa:** ticket `submitted/triage/needs_info/deferred/reopened` có thể sửa qua modal. Hệ thống **tạo ticket mới** `#N+1`, giữ ảnh evidence cũ và **đánh dấu ticket cũ deleted** có `replaced_by_ticket_id` để truy vết. Không thay trực tiếp nội dung ticket đã duyệt.
+- **Sửa:** chủ ticket có thể sửa qua modal với bất kỳ ticket chưa xóa. Hệ thống **tạo ticket mới** với số thứ tự tiếp theo, giữ ảnh evidence cũ và **đánh dấu ticket cũ deleted** có `replaced_by_ticket_id` để truy vết. Nội dung, quyết định duyệt cũ và audit giữ nguyên để tham khảo; ticket mới luôn quay về `submitted`, không tự thừa kế quyết định của admin.
 - **Xóa:** hỏi xác nhận hai bước, chỉ soft-delete trong Turso (`deleted_at` + event audit), giữ nội dung và ảnh private để admin có thể kiểm tra; không xóa vật lý khỏi R2. Ticket không còn xuất hiện trong danh sách người dùng mặc định.
 - **Migration:** tự thêm cột lifecycle không phá dữ liệu hiện có, khởi tạo trigger atomic và test SQLite. Không thay đổi ticket số #1 đã được owner duyệt; AI không thể tự mở lại ticket deleted.
 
