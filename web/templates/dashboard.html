@@ -1553,7 +1553,35 @@
             const d = activity.details || {};
             const parts = [];
 
-            if (d.web_provider || d.history_status) {
+            if (d.multisource_status) {
+                // T22.5: show BOTH permitted sources; never log query bodies.
+                parts.push('Multi-source ' + String(d.multisource_status));
+                parts.push(String(Number(d.multisource_steps) || 0) + '/2 bước');
+                parts.push('Discord ' + String(d.history_status || 'unknown'));
+                parts.push(String(Number(d.history_result_count) || 0) + ' tin');
+                if (Number(d.history_api_calls) > 0) {
+                    parts.push(String(d.history_api_calls) + ' History API');
+                }
+                if (Number(d.history_permission_filtered) > 0) {
+                    parts.push(String(d.history_permission_filtered) + ' ẩn do quyền');
+                }
+                if (Number(d.history_search_ms) > 0) {
+                    parts.push('History ' + formatTimingMs(d.history_search_ms));
+                }
+                if (d.web_provider) {
+                    parts.push(String(d.web_provider).toUpperCase() + ' ' + String(d.web_search_status || 'unknown'));
+                    parts.push(String(Number(d.web_result_count) || 0) + ' nguồn công khai');
+                    if (d.web_cache_hit === true) parts.push('cache hit');
+                    if (d.web_quota_remaining !== null && d.web_quota_remaining !== undefined) {
+                        parts.push('còn ' + String(d.web_quota_remaining) + ' request');
+                    }
+                    if (Number(d.web_search_ms) > 0) {
+                        parts.push('Web ' + formatTimingMs(d.web_search_ms));
+                    }
+                } else {
+                    parts.push('Web không được gọi');
+                }
+            } else if (d.web_provider || d.history_status) {
                 if (d.web_provider) {
                     parts.push(String(d.web_provider).toUpperCase() + ' ' + String(d.web_search_status || 'unknown'));
                     parts.push(String(Number(d.web_result_count) || 0) + ' nguồn');
@@ -1638,7 +1666,8 @@
             }
             if (!parts.length) return '';
 
-            const isFallback = d.archive_search_mode === 'semantic_fallback';
+            const isFallback = d.archive_search_mode === 'semantic_fallback'
+                || (Boolean(d.multisource_status) && d.multisource_status !== 'completed');
             const tone = isFallback ? 'text-amber-300/90' : 'text-cyan-300/80';
             const titleParts = [...parts];
             if (d.semantic_status) {
