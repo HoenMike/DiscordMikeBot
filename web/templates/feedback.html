@@ -175,7 +175,7 @@ function renderMain(t){
    const i=n('input');i.className='field';i.placeholder='Issue URL';i.value=t.github_issue_url||'';inputs.append(i);
    const p=n('input');p.className='field';p.placeholder='PR URL';p.value=t.github_pr_url||'';inputs.append(p);
    const v=n('input');v.className='field';v.placeholder='Phiên bản triển khai';v.value=t.resolved_version||'';inputs.append(v);
-   inputs.append(btn('Lưu liên kết',async()=>{
+   inputs.append(btn('Lưu liên kết triển khai',async()=>{
      if(!confirm('Lưu liên kết triển khai cho '+(t.display_id||t.id)+'?'))return;
      try{await post('/api/admin/feedback/'+encodeURIComponent(t.id)+'/links',{issue_url:i.value,pr_url:p.value,version:v.value});await reload()}
      catch(e){setError('Không lưu được link: '+e.message)}
@@ -245,8 +245,8 @@ async function loadProposals(t,host){
      append(header,'span','Đề xuất AI','pill open');
      append(block,'p',p.reason,'copy');
      const row=append(block,'div',undefined,'buttons');
-     row.append(btn('Bỏ qua',()=>resolveProposal(t,p,false)));
-     row.append(btn('Chấp nhận',()=>resolveProposal(t,p,true),'primary'));
+     row.append(btn('Bỏ qua đề xuất',()=>resolveProposal(t,p,false)));
+     row.append(btn('Chấp nhận đề xuất',()=>resolveProposal(t,p,true),'primary'));
    }
  }catch(e){host.textContent='Không tải được đề xuất: '+e.message}
 }
