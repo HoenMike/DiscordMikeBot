@@ -435,6 +435,26 @@ class FeedbackCog(commands.Cog):
             "Quay lại bản nháp và xác nhận gửi ticket.", ephemeral=True
         )
 
+    @feedback.command(name="reopen", description="Mở lại feedback đã xử lý nếu lỗi vẫn còn")
+    @app_commands.describe(ticket_id="Mã ticket FB-...", explanation="Giải thích lỗi còn gặp")
+    async def reopen(self, interaction: discord.Interaction, ticket_id: str, explanation: str):
+        if interaction.guild is None:
+            await interaction.response.send_message("Chỉ dùng lệnh trong server.", ephemeral=True)
+            return
+        try:
+            await feedback_store.reopen_own(
+                ticket_id=ticket_id, reporter_id=interaction.user.id,
+                explanation=explanation,
+            )
+        except FeedbackStorageError as exc:
+            await interaction.response.send_message(_safe(str(exc)), ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "✅ Feedback đã được mở lại và chuyển về hàng chờ review. "
+            "Admin sẽ xem giải thích bổ sung của bạn.",
+            ephemeral=True,
+        )
+
     @feedback.command(name="status", description="Xem trạng thái ticket feedback của chính bạn")
     @app_commands.describe(ticket_id="Mã ticket, ví dụ FB-000123")
     async def status(self, interaction: discord.Interaction, ticket_id: str):
