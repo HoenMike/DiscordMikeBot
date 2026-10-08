@@ -232,3 +232,17 @@ User test (Discord screenshot): `@Asumi tóm tắt xem qua giờ @i'm_bd đã nh
 - Routing now rejects unknown/uncalibrated/non-finite Clef options, retains Python provider/source-privacy gates and observes `clef_ms` metadata.
 - Added safe regression tests and an explicit, maximum-three-inference `scripts/smoke_clef_routing.py --live`; it does **not** execute Brave or Discord requests. See `docs/ASUMI_CLEF_ROUTING_ACCEPTANCE.md`.
 - No version bump or production acceptance claim from these changes. Next: CI, live authorized Clef smoke, bot-token/Brave live tool tests. T22.5 cross-source chaining is a separate goal and remains **PLANNED**.
+
+
+## T22.5 supervised multi-source handoff (2026-10-08)
+
+**Status: CODE IMPLEMENTED IN FEATURE PR; CI AND LIVE SEARCH ACCEPTANCE PENDING.**
+Primary spec: `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md`.
+
+- New `features/assistant/multisource.py` parses a two-part message and validates the **literal user-authored** public query. `router.route_locally` only accepts it when the first segment independently maps to `discord_history.search`.
+- `choose_conversation_route` preserves the explicit combined action even when replying in a live session; Clef routing remains available for single-source intents and is never authorized to derive web queries from private chat.
+- `CommandToolRegistry` runs a single bounded, ACL-checked Discord History search first. Only with actual hits and a safe explicitly written public query does it call the existing public web/fact provider. It displays each source separately, links original messages and public URLs, notes that entity identity is not automatically verified, and retains history output if Brave fails.
+- Stable local reranking on original, verified relevance-history hits prioritizes words in the user-written public query. The optional semantic Vectorize index is not enabled and is not used to crawl guild history.
+- Tests cover explicit consent, vague references, no-match/private/permission failure, stable local ranking, exact Brave query isolation, provider failure and session follow-up. CI workflow runs the regression.
+- No new environment flags, secrets, provider accounts, unbounded requests or hidden paid fallback. Source of truth for policy stays `core/constants.py`; Render env stays credential-only.
+- **Next:** CI pass → merge → confirm deploy → live Discord user/bot permission checks + Brave factual source checks; then update this status. No actual private Discord conversation may enter Brave payloads. Manual acceptance remains required; automated tests alone do not establish it.

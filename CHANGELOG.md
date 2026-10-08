@@ -7,6 +7,15 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.10.0] - 2026-10-08 — *T22.5 Supervised Multi-source Search*
+
+### Added
+- Explicit two-source lookup: find a permission-checked Discord History message, then fetch current public results only for the **standalone web query typed by the requester**, for example "rồi tìm trên web giá Honda SH160i hôm nay".
+- Rerank verified relevance-mode history hits locally using literal public-subject terms; retain source dates, channel, Jump to Message links and separate public source URLs.
+- Never infer/export raw private history content or an AI-extracted product into Brave; ambiguous "mẫu đó" asks for a concrete public search phrase instead.
+- Stop before public API usage if history search is forbidden, indexing, unavailable or empty; retain a verified history result when Brave is unavailable.
+- No new paid fallback, crawling or index; existing quotas and Discord ACL continue to apply. Automated regressions added; end-to-end Render/Discord source verification remains pending.
+
 ## [3.7.8] - 2026-10-08 — *Author-scoped Chat Summary*
 
 - Fix user stress test: `@Asumi tóm tắt xem qua giờ @user đã nhắn gì` must summarize **the user's own messages** in the current channel, not the entire group.

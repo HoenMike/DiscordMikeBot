@@ -1,3 +1,16 @@
+## T22.5 — Tìm Discord rồi tra cứu nguồn công khai (code-ready; live acceptance pending)
+
+Asumi hỗ trợ tra hai nguồn **trong một yêu cầu** khi người dùng tự ghi một truy vấn công khai tách biệt:
+
+```text
+@Asumi tìm xem hồi đầu năm @Theo có nhắn gì về mua xe rồi tìm trên web giá Honda SH160i hôm nay
+```
+
+- Asumi tìm **tin nhắn Discord được phép xem** trước, hiện tin gốc và Jump to Message; chỉ khi có kết quả và câu hỏi web **do người dùng ghi rõ** mới tiếp tục tới nguồn công khai (Brave hoặc factual-provider đã có).
+- Nếu hỏi `rồi kiểm tra giá mẫu đó`, Asumi **không tự đoán** tên mẫu xe từ tin riêng tư để gửi ra web. Bot hiển thị tin nhắn tìm được và đề nghị nhập tên/truy vấn công khai. Nếu không tìm được tin nhắn hoặc không có quyền, dừng trước bước web.
+- Hai kết quả có nguồn và link riêng; không tự kết luận chúng nói về cùng một sản phẩm. Giữ giới hạn quota, cooldown và quyền truy cập cũ. Clef vẫn chọn công cụ cho yêu cầu không rõ một nguồn; T22.5 là luồng hai nguồn **explicit**, không phải AI tự điều phối không giới hạn.
+- Đã có tests; vẫn cần thử thực tế trên Discord + Brave credentials/bot-token/ACL trước khi coi là production-accepted.
+
 ## Feedback in the original Admin Dashboard
 
 Feedback is now integrated into the historical Admin Dashboard as a tab alongside Activity, Presence, Version, Tarot, Cabin, Guilds, Overview and Logs. Use `/admin?tab=feedback` and share `/admin?tab=feedback&ticket=<ticket-id>`; old Feedback links automatically redirect to the main Dashboard. This keeps private ticket review in one Admin navigation flow rather than opening a separate dashboard.

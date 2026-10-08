@@ -33,6 +33,7 @@ on:
       - "tests/test_assistant_fuel_aggregate.py"
       - "tests/test_assistant_fact_answers.py"
       - "tests/test_assistant_source_routing.py"
+      - "tests/test_assistant_multisource.py"
       - "tests/test_assistant_clef_acceptance.py"
       - "tests/test_assistant_member_summary.py"
       - ".github/workflows/asumi-search.yml"
@@ -92,6 +93,7 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_public_pages.py" -v
           python -m unittest discover -s tests -p "test_assistant_fuel_aggregate.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_routing.py" -v
+          python -m unittest discover -s tests -p "test_assistant_multisource.py" -v
           python -m unittest discover -s tests -p "test_assistant_clef_acceptance.py" -v
           python -m unittest discover -s tests -p "test_assistant_member_summary.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23.py" -v

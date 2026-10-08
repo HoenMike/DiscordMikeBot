@@ -132,6 +132,23 @@ def route_locally(text: str) -> RouteDecision:
     if not folded:
         return RouteDecision(intent="help", tool="help.show")
 
+    # T22.5: a multi-source request is permitted only when the first stage
+    # independently resolves to Discord History. Never extract a public search
+    # term from a private result or ask Clef to compose an outbound query.
+    from features.assistant.multisource import split_cross_source_request
+    cross = split_cross_source_request(text)
+    if cross and route_locally(cross.history_query).tool == "discord_history.search":
+        return RouteDecision(
+            intent="multi_source",
+            tool="multi_source.search",
+            arguments={
+                "history_query": cross.history_query,
+                "public_query": cross.public_query,
+                "explicit_web": cross.explicit_web,
+            },
+            source="local_explicit_multisource",
+        )
+
     # T22.1 is explicitly invoked only. T22.3 adds Clef source selection.
     # Keep the literal user wording for Brave (including Vietnamese accents).
     web_match = re.match(

@@ -12,12 +12,28 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.9.2"
+CURRENT_VERSION = "3.10.0"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.9.2 - Integrated Feedback Tab"
+CODENAME = "Asumi 3.10.0 - Supervised Multi-source Search"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.10.0", "date": "2026-10-08", "type": "minor",
+        "title": "T22.5: Supervised Cross-source Retrieval",
+        "summary": "Tìm tin nhắn Discord và tra cứu công khai trong một yêu cầu có chỉ định nguồn rõ ràng, giữ quyền riêng tư và nguồn gốc.",
+        "changes": [
+            {"category": "Intelligent Search", "items": [
+                "Yêu cầu hai bước tìm Discord rồi tìm trên web chỉ chạy web khi người dùng ghi rõ chủ đề công khai và lịch sử có tin được phép xem.",
+                "Ưu tiên tin nhắn có từ khóa khớp truy vấn công khai, giữ nguyên Jump to Message và liên kết nguồn gốc.",
+                "Không tự suy đoán tên sản phẩm từ tin nhắn riêng tư; hỏi thêm khi người dùng chỉ nói mẫu đó.",
+            ]},
+            {"category": "Privacy & Reliability", "items": [
+                "Giữ quota Brave, quyền đọc channel, fallback và giới hạn số lần tìm; kết quả công khai không có nội dung chat riêng tư.",
+                "Trình bày hai nguồn tách biệt và nhắc rằng kết quả chưa đủ chứng minh cùng một sản phẩm.",
+            ]},
+        ],
+    },
     {
         "version": "3.9.2", "date": "2026-10-08", "type": "bugfix",
         "title": "Feedback Inside Classic Dashboard",

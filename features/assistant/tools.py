@@ -6,7 +6,7 @@ import os
 import time
 
 import discord
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from core import constants as policy
 from features.assistant.archive import archive_store
@@ -549,11 +549,18 @@ class CommandToolRegistry:
         )
 
     async def _execute_history_search(
-        self, decision: RouteDecision, message
+        self, decision: RouteDecision, message, *, rank_query: str = ""
     ) -> ToolExecutionResult:
         report = await self.history.search(
             message, str(decision.arguments.get("query") or "")
         )
+        # Rerank only ACL-verified, relevance-sorted history hits in memory.
+        # Never send their content to the public web provider.
+        if report.status == "ok" and report.sort_mode == "relevance" and rank_query:
+            from features.assistant.multisource import rank_verified_history_hits
+            report = replace(
+                report, hits=rank_verified_history_hits(report.hits, rank_query),
+            )
         status_text = {
             "disabled": "Tìm tin nhắn cũ đang tắt theo chính sách trong core/constants.py. Không cần bật bằng Render Environment.",
             "guild_only": "Chỉ hỗ trợ tìm trong server Discord hiện tại.",
@@ -819,7 +826,115 @@ class CommandToolRegistry:
 
         return message_ids[-8:], "\n\n".join(rendered)[:6000]
 
+    async def _execute_multi_source(
+        self, decision: RouteDecision, message
+    ) -> ToolExecutionResult:
+        """At most one Discord History request, then one literal public lookup.
+
+        A model may not extract an entity or reuse Discord text as a Brave query.
+        History must have permission-checked real hits before the web stage.
+        """
+        from features.assistant.multisource import safe_literal_public_query
+        from features.assistant.router import route_locally
+
+        history_query = str(decision.arguments.get("history_query") or "").strip()
+        public_query = str(decision.arguments.get("public_query") or "").strip()
+        explicit_web = decision.arguments.get("explicit_web") is True
+
+        # Defense-in-depth: synthetic/modified tool arguments are not a bypass.
+        if route_locally(history_query).tool != "discord_history.search":
+            sent = await message.reply(
+                "Hãy bắt đầu bằng một yêu cầu tìm tin nhắn Discord cụ thể.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return ToolExecutionResult(
+                handled=True, response_message_ids=(int(sent.id),),
+                response_context="Multi-source: invalid history stage.",
+                details={"multisource_status": "invalid_history", "multisource_steps": 0},
+            )
+
+        safe_public = explicit_web and safe_literal_public_query(public_query)
+        history = await self._execute_history_search(
+            RouteDecision(
+                intent="discord_history", tool="discord_history.search",
+                arguments={"query": history_query}, source="multisource_history",
+            ),
+            message,
+            rank_query=public_query if safe_public else "",
+        )
+        base_details = {
+            **history.details,
+            "multisource_explicit_web": explicit_web,
+            "multisource_history_hits": history.details.get("history_result_count", 0),
+            "multisource_public_query_valid": bool(safe_public),
+            "multisource_steps": 1,
+        }
+        if (
+            history.details.get("history_status") != "ok"
+            or not history.details.get("history_result_count")
+        ):
+            return replace(
+                history, details={**base_details, "multisource_status": "history_unavailable"},
+            )
+
+        if not safe_public:
+            sent = await message.reply(
+                "Mình đã đưa các tin nhắn Discord tìm được ở trên. Để kiểm tra "
+                "thông tin bên ngoài, bạn hãy **ghi rõ truy vấn công khai** "
+                "(ví dụ: `@Asumi tìm trên web giá Honda SH160i hôm nay`). "
+                "Mình sẽ không tự suy đoán mẫu xe từ lời nhắn riêng tư.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return ToolExecutionResult(
+                handled=True,
+                response_message_ids=history.response_message_ids + (int(sent.id),),
+                response_context=history.response_context,
+                details={**base_details, "multisource_status": "needs_public_query"},
+            )
+
+        # Only user-authored text goes to Brave. Source intentionally avoids
+        # AI synthesis with conversation/history context.
+        web = await self._execute_web_search(
+            RouteDecision(
+                intent="web_search", tool="web.search",
+                arguments={"query": public_query}, source="multisource_explicit_public",
+            ),
+            message,
+        )
+        successful_web = web.details.get("web_search_status") in {
+            "ok", "verified_fact", "aggregate_dated",
+        }
+        ids = history.response_message_ids + web.response_message_ids
+        if successful_web:
+            note = await message.reply(
+                "Đã hiển thị **tin nhắn Discord có Jump to Message** và **nguồn "
+                "công khai riêng biệt**. Việc hai kết quả xuất hiện cùng nhau "
+                "**không chứng minh** chúng nói về cùng một mẫu xe/sự kiện; "
+                "hãy kiểm tra tên và thời điểm ở nguồn gốc.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            ids += (int(note.id),)
+
+        return ToolExecutionResult(
+            handled=True,
+            response_message_ids=ids,
+            response_context=(
+                history.response_context + "\n\n" + web.response_context
+            )[:4200],
+            details={
+                **base_details, **web.details,
+                "multisource_status": "completed" if successful_web else "web_unavailable",
+                "multisource_steps": 2,
+                "multisource_public_origin": "user_literal",
+            },
+        )
+
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        if decision.tool == "multi_source.search":
+            return await self._execute_multi_source(decision, message)
         if decision.tool == "weather.forecast":
             return await self._execute_weather(decision, message)
         if decision.tool == "web.search":

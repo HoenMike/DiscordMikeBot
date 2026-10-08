@@ -100,7 +100,7 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | T22.3 | Clef source selection / controlled one-tool retrieval | IMPLEMENTED; LIVE VERIFY PENDING |
 | T22.4a | Chronological first/last by @author, optional topic, 1–5 hits | IMPLEMENTED; LIVE API VERIFY PENDING |
 | T22.4b | Bounded source follow-up, safe explicit web lookup, source/channel UX, cache and Dashboard search tracing | IMPLEMENTED; LIVE VERIFY PENDING |
-| T22.5 | Cross-source planning with validated public entity, explicit consent gates and retrieval ranking | PLANNED |
+| T22.5 | Supervised Discord History → literal public Web query, safe gates, stable local ranking, clear source provenance | IMPLEMENTED IN PR; LIVE VERIFY PENDING |
 
 Acceptance — live server:
 1. Find an old 'buying a car' message by @author + early-year time hint, even though it was never saved in Archive.
@@ -185,3 +185,22 @@ Asumi runtime non-secret feature policy, models and quotas now live in `core/con
 ### T22 UX regression — member-only recap (2026-10-08)
 
 The stress-test `@Asumi tóm tắt xem qua giờ @user đã nhắn gì` incorrectly summarized all recent channel authors because the natural-language summary route discarded the mentioned author. Asumi 3.7.8 separates `summary.member` from `summary.catchup`, validates the member and channel ACL, and filters by author ID before AI. The default unqualified lookback is 2 hours in the current channel, clearly labeled. Production test with mismatched message counts required before marking the fix accepted. This scoped-summary bugfix is independent of unfinished T22.5 cross-source search and T21 Vectorize work.
+
+
+### T22.5 — supervised two-source lookup implementation (2026-10-08)
+
+**Scope:** A user can request both searches in one message only by supplying a fully standalone **public web query literally**. Example:
+
+```
+@Asumi tìm xem hồi đầu năm @Theo có nhắn gì về mua xe rồi tìm trên web giá Honda SH160i hôm nay
+```
+
+- Local deterministic parser splits `discord_history.search` and a separate literal `web.search`. This is a bounded two-stage plan, not an LLM-generated/free-form agent loop. Clef still decides ambiguous **single-source** requests as T22.3 intended; Slash/prefix and explicit tools keep precedence.
+- The first-stage query must independently qualify for Discord History; search verifies both requester and bot channel permissions. If no verified hits, permission denied, indexing or timeout, **stop before web**.
+- Second-stage query must be user-authored, independently public and not refer to `mẫu đó`, Discord mentions/messages, links or vague private context. No text extracted from history, Archive, images or model output may form the Brave request. Ambiguous requests such as `rồi kiểm tra giá mẫu đó` return real Discord results (if available) and ask the user to provide a public search phrase.
+- Rerank only verified relevance-mode Discord hits by lexical overlap with **explicit public query terms**; never reorder a chronological earliest/latest result. Original Jump links and source dates remain intact. Brave public result ordering uses existing provider heuristics. Results are displayed separately with source attribution and a disclaimer: presence of both results does not establish product/person identity.
+- Existing Brave Cloud/Turso quota, cooldown, official fuel-source hierarchy, source URL rendering, failure messages and Discord permission limits remain authoritative. If Brave fails/quota is exhausted, the already-verified Discord result remains visible. No new paid/recursive provider fallback.
+- Dashboard operational metadata may record `multisource_status`, `multisource_steps`, verified hit count and public-provider status; **never** record the query text or private Discord excerpts.
+- Implementation tests live in `tests/test_assistant_multisource.py`, run by the Asumi Search Regression workflow. Automated tests do **not** prove real bot-token search compatibility or Brave key availability.
+
+**Live acceptance still required:** Test one combined request in a permitted guild, a denied private channel, a vague product reference, no-match and unavailable Brave. Inspect only status/latency in Dashboard. Do not mark T22 end-to-end accepted until Discord bot-token and provider live checks pass. No unsolicited backfill/indexing or Vectorize enable.
