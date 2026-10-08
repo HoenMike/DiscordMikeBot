@@ -38,7 +38,7 @@ class ReviewPolicyTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(len(db.calls),1)
         self.assertIn("WHERE ticket_id=?",db.calls[0][0])
-        self.assertEqual(db.calls[0][1][3],"FB-ABCD")
+        self.assertEqual(db.calls[0][1][4],"FB-ABCD")
 
 
 class DashboardPrivacyTests(unittest.TestCase):
