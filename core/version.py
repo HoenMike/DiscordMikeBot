@@ -12,9 +12,9 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.5"
+CURRENT_VERSION = "3.7.6"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.5 - Verified Live Source Facts"
+CODENAME = "Asumi 3.7.6 - Answer-first Fact Retrieval"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
