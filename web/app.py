@@ -853,3 +853,43 @@ def api_version():
 
 
 
+
+
+# ==========================================
+# T23.2 Feedback triage — protected dashboard only
+# ==========================================
+@app.route('/api/admin/feedback', methods=['GET'])
+@login_required
+def feedback_inbox():
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    status = (request.args.get("status") or "").strip()[:30]
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        limit = 50
+    try:
+        results = asyncio.run(feedback_store.admin_list(status=status, limit=limit))
+        # Object keys are internal storage identifiers, NOT public links.
+        return jsonify({"tickets": results, "count": len(results)})
+    except FeedbackStorageError:
+        return jsonify({"error": "Không thể kết nối kho feedback Turso"}), 503
+
+
+@app.route('/api/admin/feedback/<ticket_id>/review', methods=['POST'])
+@login_required
+def feedback_review(ticket_id: str):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if not (ticket_id.startswith("FB-") and len(ticket_id) <= 30):
+        return jsonify({"error": "Ticket không hợp lệ"}), 400
+    payload = request.get_json(silent=True) or {}
+    try:
+        asyncio.run(feedback_store.review(
+            ticket_id=ticket_id,
+            status=str(payload.get("status", "")),
+            reason=str(payload.get("reason", "")),
+            actor_id="dashboard-admin",
+            verified_version=str(payload.get("verified_version", "")),
+        ))
+        return jsonify({"ok": True, "ticket_id": ticket_id, "status": payload.get("status")})
+    except FeedbackStorageError as exc:
+        return jsonify({"error": str(exc)}), 400
