@@ -1,6 +1,6 @@
 # T24 — Asumi Admin Console 2.0 / UX & Information Architecture Plan
 
-**Status:** APPROVED 2026-10-08. T24.1–T24.6 implementation drafted on feature/t24-admin-console; T24.7 CI/live verification pending. This document is the source of truth for rollout.
+**Status:** SHIPPED as Asumi 3.9.0 on 2026-10-08. T24.0–T24.7 code integrated via PR #53 (commit 312b02c7), GitHub Actions passed, Render deploy dep-db3ko8rl550s73akdct0 LIVE, Discord Gateway connected. Remaining acceptance: manual authenticated UI/mobile smoke and any owner-requested visual refinements. This document is the source of truth for rollout.
 **Baseline:** main as inspected on 2026-10-08. Keep the Flask app, authentication and existing data stores.
 **Decision:** No separate Request Review approval UI. ChatGPT only creates proposals. The owner decides within the Feedback ticket detail view.
 
@@ -132,4 +132,19 @@ Each implementation goal: one manageable PR, update handoff/this plan, preserve 
 - Current feedback has its own style and CSRF token flow; reuse verified backend methods rather than create a second review API.
 - New routes are **proposals**; implement only after owner approval. Preserve code-level semantics of current feature modules.
 - To approve: five-group navigation, targeted pages above, AI & Search P2, and incremental Flask/Jinja refactor (not a full React rewrite).
-- **2026-10-08 checkpoint:** Owner approved T24 IA and staged delivery. Shared nav/layout, page-specific refresh, nine console route handlers, unified Feedback with ticket deep links/pagination, and tests are in implementation PR; CI/deploy/live Discord smoke remain gates. Keep this status accurate as PR progresses.
+- **2026-10-08 final implementation checkpoint:** Approved T24 IA delivered in PR #53. New shared nav/layout, page-scoped refresh, nine console routes, unified Feedback/ticket deep links/pagination, CSRF regression coverage and Asumi 3.9.0 release note are in main. GitHub Actions passed and Render reported live; startup logs confirmed Feedback/Turso, OAuth tables, 23 slash commands and Discord Gateway connection. **Still pending owner/browser UI acceptance:** visually exercise all pages at desktop/mobile, request live private R2 evidence, approve/reject a test ticket only with owner consent, verify status history and terminal-only DMs. No claim of live admin click verification without owner login.
+
+## Completion / handover checklist (2026-10-08)
+
+- [x] T24.0 audit and owner-approved IA (PR #52).
+- [x] T24.1 common shell, responsive nav, page routes and old links (PR #53).
+- [x] T24.2 overview, per-page loading, remove mandatory 3-second dashboard polling.
+- [x] T24.3 unified feedback review, server search/paging, deep links and final-only notification copy.
+- [x] T24.4 activity/monitoring pages and safe admin actions.
+- [x] T24.5 Tarot, Cabin, AI/Search pages (AI metrics shown only where real telemetry exists).
+- [x] T24.6 Guilds, Presence and Releases/Connections pages.
+- [x] T24.7 automated regressions, CSRF and Node syntax checks, deployment completed and Discord connected.
+- [ ] Authenticated visual and interactive acceptance from owner on desktop + mobile: cannot be performed using deploy logs alone.
+- [ ] Private R2 screenshot and terminal DM round-trip on a non-production test ticket (owner to initiate/approve if desired).
+
+**Rollback:** /admin/legacy remains available during follow-up. To revert entire UI changes, revert PR #53; do not reset Turso/R2 or delete feedback records.
