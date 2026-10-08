@@ -97,6 +97,19 @@ ASUMI_FUEL_SOURCE_TIMEOUT_SECONDS = 3.5
 ASUMI_FUEL_SOURCE_CACHE_SECONDS = 300
 ASUMI_FUEL_SOURCE_MAX_RESPONSE_BYTES = 512 * 1024
 
+# Public weather facts: Open-Meteo has no secret required for eligible use.
+# Never use AQI or a generic search snippet as a weather forecast substitute.
+ASUMI_WEATHER_ENABLED = True
+ASUMI_WEATHER_TIMEOUT_SECONDS = 5
+ASUMI_WEATHER_CACHE_SECONDS = 300
+
+# Generic public-page fact reading, only on an audited HTTPS domain allowlist.
+# This does not authorize crawling Discord content or arbitrary user URLs.
+ASUMI_PUBLIC_PAGE_READING_ENABLED = True
+ASUMI_PUBLIC_PAGE_MAX_SOURCES = 2
+ASUMI_PUBLIC_PAGE_TIMEOUT_SECONDS = 2.5
+ASUMI_PUBLIC_PAGE_MAX_BYTES = 192 * 1024
+
 ASUMI_WEB_SEARCH_TIMEOUT_SECONDS = 5
 ASUMI_WEB_SEARCH_USER_COOLDOWN_SECONDS = 15
 ASUMI_WEB_SEARCH_CACHE_TTL_SECONDS = 180

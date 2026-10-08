@@ -157,3 +157,20 @@ Remaining search roadmap: T22.5 supervised cross-source retrieval; also provider
 - `core/constants.py` defines enable/timeout/cache/body cap; no Render env flags. Dashboard observes `first_party_source/status/rows/ms` without raw response body or query.
 - Tests in `tests/test_assistant_source_verification.py` integrated into search CI. **Do not claim production extraction accepted until tested from the actual Render IP against PVOIL**, because bot access/HTML rendering may differ from browsers/search indexes; 403/JS-only content must fail safely.
 - T22.5 still planned: generalized safe public-source reading and multi-source result ranking/citation. Keep allowlist and SSRF mitigation for any later generalization.
+
+
+## T22 Answer-first / Asumi 3.7.6 (2026-10-08)
+
+Real Discord reports at 10:31 showed *both* answers inadequate: weather for Biên Hòa was answered from AQI/air-quality snippets (not temperature/rain), and a fuel lookup again fell back to a list of websites despite known PVOIL price tables. The prior changes improved UI but not the factual answer pipeline.
+
+Principle: **ANSWER (actual relevant values) → EVIDENCE (effective time/unit/provider) → SOURCES (small footprint)**. Never substitute irrelevant AQI for weather or invent numbers from web snippets.
+
+Implementation:
+- New `features/assistant/providers/weather.py` — structured weather facts from Open-Meteo's public API for a declared city (hardcoded grounded Biên Hòa and common Vietnamese cities, country-restricted geocoding for other public place names). Data includes observed/forecast temperature, feels-like, humidity, condition, daily min/max and maximum rain probability. Time check, bounded timeout/cache, no new Render API secret. Unknown city gets a clear follow-up rather than hallucinated location.
+- `features/assistant/router.py` — deterministic private-safe daily weather routing to `weather.forecast` instead of Clef/Brave snippets. Weather data mismatch is no longer possible in this flow.
+- `features/assistant/tools.py` — **PVOIL-first** fuel prices: only fall back to one existing bounded Brave search when the primary structured source cannot be verified. Brave quota is not spent for successful first-party prices; add PVOIL public news page as additional attempt.
+- New `features/assistant/providers/public_pages.py` — fact-grounding from at most 2 public allowlisted HTTPS pages of Brave results, no redirects, capped HTML bytes/time and no arbitrary URL/private Discord content. Generic source synthesis uses full-page excerpts where available, otherwise falls back to Brave evidence.
+- New answer-first Weather embed with values as first content and one small source link. Existing fuel embed unchanged if valid.
+- Tests `tests/test_assistant_fact_answers.py` + `tests/test_assistant_public_pages.py` extend the Search Regression CI.
+
+Status/acceptance: CI proves the local behavior and safety fixtures, but production Open-Meteo calls, Render PVOIL reachability and broader search usefulness still need live guild verification. Don't claim every internet question can be answered; if the information cannot be corroborated the bot must state its limitation concisely. T22.5 remains planned for ranking, verified alternative data sources and calibrated research beyond this limited source allowlist.

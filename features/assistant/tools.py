@@ -12,10 +12,12 @@ from features.assistant.archive import archive_store
 from features.assistant.providers.brave import brave_search
 from features.assistant.providers.discord_history import DiscordHistorySearcher
 from features.assistant.providers.pvoil_prices import pvoil_reader
+from features.assistant.providers.weather import weather_provider
+from features.assistant.providers.public_pages import fetch_public_page_evidence
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 from features.assistant.search_presenter import (
-    build_search_embed, build_verified_fuel_embed,
+    build_search_embed, build_verified_fuel_embed, build_weather_embed,
     prioritize_sources, _plain, _fuel_query,
 )
 
@@ -282,13 +284,19 @@ class CommandToolRegistry:
         """Synthesize public Brave snippets only; never Discord private context."""
         from features.assistant.ai import generate_chat_reply
 
+        page_evidence = await fetch_public_page_evidence(query, hits[:3])
+        full_text_by_url = {item.url: item.text for item in page_evidence}
         evidence = []
         for index, item in enumerate(hits[:3], start=1):
-            evidence.append(
+            section = (
                 f"[{index}] {item.title[:130]}\n"
                 f"URL: {item.url[:450]}\n"
                 f"Excerpt: {item.description[:300]}"
             )
+            page_text = full_text_by_url.get(item.url)
+            if page_text:
+                section += f"\nPublic page body (có thể cũ): {page_text[:1400]}"
+            evidence.append(section)
         prompt = (
             "Chỉ dùng 1-2 câu tiếng Việt (tối đa 400 ký tự) trả lời TRỰC TIẾP "
             "câu hỏi dựa trên trích đoạn các nguồn công khai dưới đây. "
@@ -297,6 +305,9 @@ class CommandToolRegistry:
             "Nếu hỏi mức giá hôm nay: CHỈ nêu con số khi nguồn có rõ giá, "
             "đơn vị và thời điểm phù hợp; nếu không đủ bằng chứng, nói ngắn "
             "gọn là chưa xác minh được giá chính xác. "
+            "Ưu tiên trả lời rõ kết quả người dùng hỏi, không biến câu "
+            "trả lời thành danh sách nguồn. Không đánh đồng thông tin "
+            "AQI với nhiệt độ/dự báo thời tiết. "
             "Không tự bịa số liệu, ngày tháng, nguồn, URL. "
             "KHÔNG dùng ký hiệu [1], [2], [3], không liệt kê lại nguồn "
             "vì Discord sẽ hiển thị nguồn riêng ở dưới.\n\n"
@@ -316,6 +327,54 @@ class CommandToolRegistry:
         # Only the current user's explicit query reaches Brave. Never attach
         # conversation session, replied Discord text, or Archive content.
         query = str(decision.arguments.get("query") or "").strip()
+        # Fetch structured facts FIRST. A verified first-party value is an
+        # actual answer, and must not depend on Brave quota/search snippets.
+        source_details = {}
+        if _fuel_query(query):
+            try:
+                source = await pvoil_reader.fetch()
+                source_details = {
+                    "first_party_source": "pvoil",
+                    "first_party_status": source.status,
+                    "first_party_ms": round(source.elapsed_ms, 1),
+                    "first_party_rows": len(source.rows),
+                }
+                if source.status == "ok":
+                    sent = await message.reply(
+                        embed=build_verified_fuel_embed(query, source),
+                        mention_author=False,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    context_rows = "\n".join(
+                        f"{row.label}: {row.vnd_per_liter} VND/lít"
+                        for row in source.rows
+                    )
+                    return ToolExecutionResult(
+                        handled=True,
+                        response_message_ids=(int(sent.id),),
+                        response_context=(
+                            "PVOIL official published retail prices, effective from "
+                            + source.effective_at.isoformat()
+                            + "\n" + context_rows
+                            + "\nOriginal source: " + source.source_url
+                        )[:1800],
+                        details={
+                            **source_details,
+                            "web_provider": "pvoil",
+                            "web_search_status": "verified_fact",
+                            "web_search_ms": 0,
+                            "web_result_count": 0,
+                            "web_cache_hit": False,
+                            "web_quota_remaining": None,
+                        },
+                    )
+            except Exception as exc:
+                print(f"⚠️ [Asumi Facts] fuel source failed: {type(exc).__name__}", flush=True)
+                source_details = {
+                    "first_party_source": "pvoil",
+                    "first_party_status": "error",
+                    "first_party_rows": 0,
+                }
         report = await brave_search.search(query, user_id=int(message.author.id))
         details = {
             "web_provider": "brave",
@@ -324,6 +383,7 @@ class CommandToolRegistry:
             "web_result_count": len(report.hits),
             "web_cache_hit": report.cache_hit,
             "web_quota_remaining": report.remaining,
+            **source_details,
         }
 
         notices = {
@@ -340,36 +400,6 @@ class CommandToolRegistry:
             "no_results": "Không thấy kết quả web phù hợp. Hãy thử từ khóa khác.",
         }
 
-        # Brave finds candidate pages; for fuel quotes, additionally read the
-        # source publisher's live HTML instead of trusting an excerpt. The
-        # first-party lookup is public/allowlisted and has no Brave API charge.
-        if report.status == "ok" and _fuel_query(query):
-            source = await pvoil_reader.fetch()
-            details["first_party_source"] = "pvoil"
-            details["first_party_status"] = source.status
-            details["first_party_ms"] = round(source.elapsed_ms, 1)
-            details["first_party_rows"] = len(source.rows)
-            if source.status == "ok":
-                sent = await message.reply(
-                    embed=build_verified_fuel_embed(query, source),
-                    mention_author=False,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-                context_rows = "\n".join(
-                    f"{row.label}: {row.vnd_per_liter} VND/lít"
-                    for row in source.rows
-                )
-                return ToolExecutionResult(
-                    handled=True,
-                    response_message_ids=(int(sent.id),),
-                    response_context=(
-                        "PVOIL official published retail prices; effective from "
-                        + source.effective_at.isoformat()
-                        + "\n" + context_rows
-                        + "\nOriginal source: " + source.source_url
-                    )[:1800],
-                    details=details,
-                )
         if report.status == "ok":
             display_hits = prioritize_sources(query, report.hits)
             details["web_displayed_count"] = len(display_hits)
@@ -417,6 +447,48 @@ class CommandToolRegistry:
                 else f"Web Search: {report.status}"
             ),
             details=details,
+        )
+
+    async def _execute_weather(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        query = str(decision.arguments.get("query") or "").strip()
+        facts = await weather_provider.fetch(query)
+        details = {
+            "weather_provider": "open_meteo",
+            "weather_status": facts.status,
+            "weather_ms": round(facts.elapsed_ms, 1),
+        }
+        if facts.status == "ok":
+            sent = await message.reply(
+                embed=build_weather_embed(query, facts),
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            context = (
+                f"Open-Meteo forecast for {facts.place}, time {facts.measured_at}: "
+                f"{facts.temp_c}°C ({facts.condition}); feels {facts.feels_c}°C; "
+                f"min/max {facts.low_c}/{facts.high_c}°C; "
+                f"rain probability max {facts.rain_probability_pct}%; "
+                f"source: https://open-meteo.com/"
+            )
+        else:
+            notices = {
+                "missing_location": "Bạn muốn xem thời tiết ở đâu? Ví dụ: @Asumi thời tiết Biên Hòa hôm nay.",
+                "unknown_location": "Mình chưa xác định được địa điểm. Bạn thử ghi rõ thành phố và tỉnh nhé.",
+                "disabled": "Nguồn dự báo thời tiết đang tạm tắt.",
+                "stale": "Dữ liệu thời tiết nhận được đã cũ; mình chưa thể xác nhận tình hình hiện tại.",
+            }
+            sent = await message.reply(
+                "🌤️ **Thời tiết:** " + notices.get(
+                    facts.status,
+                    "Chưa lấy được dữ liệu dự báo trực tiếp. Mình không muốn đoán nhiệt độ hoặc khả năng mưa.",
+                ),
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            context = f"Weather provider: {facts.status}"
+        return ToolExecutionResult(
+            handled=True, response_message_ids=(int(sent.id),),
+            response_context=context[:1600], details=details,
         )
 
     async def _execute_history_search(
@@ -574,6 +646,8 @@ class CommandToolRegistry:
         return message_ids[-8:], "\n\n".join(rendered)[:6000]
 
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        if decision.tool == "weather.forecast":
+            return await self._execute_weather(decision, message)
         if decision.tool == "web.search":
             return await self._execute_web_search(decision, message)
         if decision.tool == "discord_history.search":

@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.5"
+CURRENT_VERSION = "3.7.6"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.5 - Verified Live Source Facts"
+CODENAME = "Asumi 3.7.6 - Answer-first Fact Retrieval"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.6", "date": "2026-10-08",
+        "type": "bugfix", "title": "Answer-first Fact Retrieval",
+        "summary": "Thời tiết trả nhiệt độ/mưa thật; giá xăng ưu tiên bảng giá trước Brave; web tự đọc thêm trang công khai.",
+        "changes": [
+            {"category": "🌤️ Structured answers", "items": [
+                "Thời tiết địa phương trả nhiệt độ, cảm giác như, độ ẩm, mức cao/thấp và dự báo mưa qua Open-Meteo.",
+                "Thời tiết không còn lấy dữ liệu AQI từ Brave rồi trả lời nhầm câu hỏi.",
+                "Giá xăng ưu tiên bảng PVOIL có ngày hiệu lực ngay trước khi gọi Brave API có quota.",
+                "Khi không đủ dữ liệu, trả lời rõ giới hạn và không sáng tác con số.",
+            ]},
+            {"category": "🔎 Retrieval quality", "items": [
+                "Synthesis có thể đọc HTML nguồn công khai trong allowlist, tối đa hai trang và giới hạn dung lượng/time.",
+                "Giữ kiểm soát URL, không redirect, không gửi nội dung Discord ra web và không tăng Brave API calls.",
+                "Thêm regression cho câu hỏi thực tế của người dùng, bảo mật và thời tiết.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.5", "date": "2026-10-08",
         "type": "bugfix", "title": "Verified First-Party Price Sources",

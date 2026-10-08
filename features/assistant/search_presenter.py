@@ -129,3 +129,42 @@ def build_verified_fuel_embed(query: str, report) -> discord.Embed:
         text="Đã đọc bảng giá PVOIL trực tiếp · Ngày hiệu lực không phải ngày truy vấn"
     )
     return embed
+
+
+def build_weather_embed(query: str, report) -> discord.Embed:
+    """Current temperature + today's forecast; keep AQI out of weather."""
+    if report.status != "ok" or report.temp_c is None:
+        raise ValueError("Current weather facts required")
+
+    def temp(v):
+        return f"{v:.0f}°C" if v is not None else "Chưa có"
+    answer = f"**{temp(report.temp_c)} · {report.condition}**"
+    if report.feels_c is not None:
+        answer += f"\nCảm giác như **{temp(report.feels_c)}**"
+    if report.humidity_pct is not None:
+        answer += f" · Độ ẩm **{report.humidity_pct}%**"
+    embed = discord.Embed(
+        title=f"🌤️ Thời tiết {report.place} — hôm nay",
+        description=answer,
+        color=0x4A91AE,
+    )
+    embed.add_field(
+        name="Trong ngày",
+        value=f"Cao nhất **{temp(report.high_c)}** · "
+              f"Thấp nhất **{temp(report.low_c)}**",
+        inline=False,
+    )
+    if report.rain_probability_pct is not None:
+        rain = f"Xác suất mưa cao nhất **{report.rain_probability_pct}%**"
+        if report.rain_mm is not None:
+            rain += f" · Lượng mưa dự báo **{report.rain_mm:g} mm**"
+        embed.add_field(name="Mưa", value=rain, inline=False)
+    embed.add_field(
+        name="Nguồn dự báo",
+        value="[Open-Meteo](https://open-meteo.com/)",
+        inline=False,
+    )
+    embed.set_footer(
+        text=f"Thời điểm dữ liệu: {report.measured_at.replace('T', ' ')} (giờ VN) · Dự báo có thể thay đổi"
+    )
+    return embed

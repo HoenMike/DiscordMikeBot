@@ -92,6 +92,19 @@ def _obvious_fresh_public_search(text: str) -> bool:
     return timely and topics
 
 
+def _current_weather_query(text: str) -> bool:
+    """Daily/local weather is structured data, never raw AQI web snippets."""
+    if not _safe_public_web_query(text):
+        return False
+    folded = _fold(text)
+    if not any(x in folded for x in ("thoi tiet", "du bao thoi tiet", "nhiet do")):
+        return False
+    return any(x in folded for x in (
+        "hom nay", "bay gio", "hien tai", "toi nay", "sang nay", "nhu nao",
+        "the nao", "bao nhieu", "o bien hoa", "ngay mai",
+    ))
+
+
 def _safe_history_query(text: str) -> bool:
     """Only route bounded, explicitly history-related questions to guild search."""
     folded = _fold(text).replace("đ", "d")
@@ -320,6 +333,16 @@ async def route_message(
             tool="web.search",
             arguments={"query": text.strip()},
             source="local_fresh_public",
+            route_ms=(time.perf_counter() - started) * 1000,
+        )
+
+    # Never synthesize local weather from Brave AQI snippets: fetch actual
+    # temperature, conditions and forecast from a dedicated weather API.
+    if policy.ASUMI_WEATHER_ENABLED and _current_weather_query(text):
+        return RouteDecision(
+            intent="weather", tool="weather.forecast",
+            arguments={"query": text.strip()},
+            source="local_weather_facts",
             route_ms=(time.perf_counter() - started) * 1000,
         )
 

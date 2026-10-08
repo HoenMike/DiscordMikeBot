@@ -11,6 +11,9 @@ on:
       - "tests/test_assistant_policy_config.py"
       - "tests/test_assistant_search_ux.py"
       - "tests/test_assistant_source_verification.py"
+      - "tests/test_assistant_fact_answers.py"
+      - "tests/test_assistant_public_pages.py"
+      - "tests/test_assistant_fact_answers.py"
       - "tests/test_assistant_source_routing.py"
       - ".github/workflows/asumi-search.yml"
   push:
@@ -49,6 +52,9 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_policy_config.py" -v
           python -m unittest discover -s tests -p "test_assistant_search_ux.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_verification.py" -v
+          python -m unittest discover -s tests -p "test_assistant_fact_answers.py" -v
+          python -m unittest discover -s tests -p "test_assistant_public_pages.py" -v
+          python -m unittest discover -s tests -p "test_assistant_fact_answers.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_routing.py" -v
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
