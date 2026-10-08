@@ -17,6 +17,7 @@ on:
       - "tests/test_feedback_t23_completion.py"
       - "tests/test_feedback_mcp.py"
       - "tests/test_feedback_oauth.py"
+      - "tests/test_t24_admin_console.py"
       - "web/**"
       - "docs/T23_FEEDBACK_CONNECTOR_OPENAPI.yaml"
       - "bot_instance.py"
@@ -101,6 +102,7 @@ jobs:
           python -m unittest discover -s tests -p "test_feedback_t23_completion.py" -v
           python -m unittest discover -s tests -p "test_feedback_mcp.py" -v
           python -m unittest discover -s tests -p "test_feedback_oauth.py" -v
+          python -m unittest discover -s tests -p "test_t24_admin_console.py" -v
           python -m compileall -q features/feedback web/app.py
           python - <<'PY'
           from pathlib import Path
@@ -109,6 +111,7 @@ jobs:
           Path("/tmp/asumi-t23-admin.js").write_text(js,encoding="utf-8")
           PY
           node --check /tmp/asumi-t23-admin.js
+          node --check web/static/admin_console.js
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
           python -m unittest discover -s tests -p "test_assistant_semantic.py" -v
