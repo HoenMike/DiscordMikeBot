@@ -18,6 +18,19 @@ class OwnerGateTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(issue=issue), self.assertRaises(FeedbackStorageError):
                 await store.link_delivery(ticket_id="FB-1", issue_url=issue)
 
+    async def test_unapproved_ticket_cannot_link_pr_or_release(self):
+        store=FeedbackStore()
+        with patch.object(store,"admin_detail",new=AsyncMock(return_value={
+            "id":"FB-ABC","status":"submitted"
+        })):
+            for urls in (
+                {"pr_url":"https://github.com/HoenMike/DiscordMikeBot/pull/49"},
+                {"version":"3.8.3"},
+                {"issue_url":"https://github.com/HoenMike/DiscordMikeBot/issues/46"},
+            ):
+                with self.subTest(urls=urls), self.assertRaises(FeedbackStorageError):
+                    await store.link_delivery(ticket_id="FB-ABC",**urls)
+
     async def test_reopen_requires_explanation(self):
         store = FeedbackStore()
         with self.assertRaises(FeedbackStorageError):
@@ -40,7 +53,9 @@ class OwnerGateTests(unittest.IsolatedAsyncioTestCase):
                     async def __aexit__(self, *e): return None
                 return Cursor()
         db = DB()
-        with patch("features.feedback.store.db_client", db):
+        with patch("features.feedback.store.db_client", db), patch.object(
+            FeedbackStore, "resolve_id", new=AsyncMock(return_value="FB-1")
+        ):
             await FeedbackStore().reopen_own(
                 ticket_id="FB-1", reporter_id=123,
                 explanation="The same bug still occurs after the shipped fix.",
@@ -48,7 +63,9 @@ class OwnerGateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reporter_id=?",db.sql)
         self.assertIn("status IN ('rejected','duplicate','verified','closed')", db.sql)
         self.assertEqual(db.args[-1],"123")
-        with patch("features.feedback.store.db_client", DB(rowcount=0)):
+        with patch("features.feedback.store.db_client", DB(rowcount=0)), patch.object(
+            FeedbackStore, "resolve_id", new=AsyncMock(return_value="FB-1")
+        ):
             with self.assertRaises(FeedbackStorageError):
                 await FeedbackStore().reopen_own(
                     ticket_id="FB-1", reporter_id=987,

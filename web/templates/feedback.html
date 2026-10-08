@@ -55,7 +55,7 @@ async function reload(){
     const data=await response.json(); tickets=data.tickets||[];
     const entries=document.getElementById('entries');entries.replaceChildren();
     for(const t of tickets){
-      const b=node('button',t.id+' · '+t.category+' · '+t.status+'\n'+t.title);
+      const b=node('button',(t.display_id||t.id)+' · '+t.category+' · '+t.status+'\n'+t.title);
       b.className='entry'+(selected===t.id?' active':'');
       b.onclick=()=>choose(t.id);entries.append(b)
     }
@@ -68,7 +68,7 @@ function add(parent,tag,text){const n=node(tag,text);parent.append(n);return n}
 function choose(id){
   selected=id;const t=tickets.find(x=>x.id===id);if(!t)return;
   const area=document.getElementById('detail');area.replaceChildren();
-  add(area,'h3',t.id+' · '+t.title);
+  add(area,'h3','Ticket '+(t.display_id||t.id)+' · '+t.title);
   add(area,'p','Trạng thái: '+t.status+' · '+t.category+' · Asumi '+t.bot_version);
   add(area,'p','Người báo: '+t.reporter_id+' · Ngày: '+t.created_at).className='muted small';
   add(area,'h4','Nội dung báo cáo');
@@ -98,7 +98,7 @@ function choose(id){
   buildIssue.onclick=()=>{
     const source=(t.guild_id&&t.channel_id&&t.source_message_id)
       ? 'https://discord.com/channels/'+t.guild_id+'/'+t.channel_id+'/'+t.source_message_id : 'N/A';
-    const draft='[Asumi Feedback] '+t.id+' — '+t.title+'\n\n'
+    const draft='[Asumi Feedback '+(t.display_id||t.id)+'] '+t.title+'\n\n'
       +'Status: '+t.status+'\nCategory: '+t.category+'\nAsumi version: '+t.bot_version
       +'\nDiscord source: '+source+'\n\nReport:\n'+t.description
       +'\n\nClarification:\n'+(t.user_explanation||'(none)')
@@ -154,7 +154,7 @@ function choose(id){
     }catch(e){window.alert('Lưu thất bại: '+e.message)}
   };
   area.append(btn);
-  document.querySelectorAll('.entry').forEach(b=>b.classList.toggle('active',b.textContent.startsWith(id+' ·')));
+  document.querySelectorAll('.entry').forEach(b=>b.classList.toggle('active',b.textContent.startsWith((t.display_id||id)+' ·')));
 }
 async function loadReviewProposals(ticketId,container){
   try{

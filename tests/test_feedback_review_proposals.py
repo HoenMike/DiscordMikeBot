@@ -56,7 +56,7 @@ class ProposalTests(unittest.IsolatedAsyncioTestCase):
     async def test_proposal_never_calls_review_or_changes_ticket_status(self):
         db = _CloudDB()
         store = FeedbackStore()
-        ticket = {"status": "submitted", "category": "bug"}
+        ticket = {"id": "FB-AAA", "status": "submitted", "category": "bug"}
         with patch("features.feedback.store.db_client", db), patch.object(
             store, "admin_detail", new=AsyncMock(return_value=ticket)
         ), patch.object(store, "review", new=AsyncMock()) as review:

@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.8.2"
+CURRENT_VERSION = "3.8.3"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.8.2 - Private ChatGPT OAuth"
+CODENAME = "Asumi 3.8.3 - Numbered Feedback Tickets"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.8.3", "date": "2026-10-08", "type": "bugfix",
+        "title": "T23 completion: Feedback #N, private screenshot review",
+        "summary": "Ticket có số thứ tự dễ nhớ, ChatGPT đọc được ảnh lỗi riêng tư; reporter nhận thông báo số ticket và trả lời khi cần bổ sung.",
+        "changes": [
+            {"category": "📝 Feedback ticket #N", "items": [
+                "Feedback mới nhận số thứ tự tự động #1, #2...; ticket cũ được backfill theo ngày tạo, giữ mã nội bộ.",
+                "Discord, DM, Dashboard và ChatGPT ưu tiên hiển thị mã #N; hỗ trợ tra cứu bằng #N hoặc FB-UUID cũ.",
+                "/feedback add_info cho phép bổ sung giải thích khi admin yêu cầu, /feedback reopen cho lỗi tái diễn.",
+            ]},
+            {"category": "🔒 Screenshot & owner review", "items": [
+                "ChatGPT MCP có tool đọc preview ảnh private R2 đúng ticket với kiểm tra checksum, guild và dung lượng.",
+                "Đề xuất AI không tự duyệt; chỉ owner xác nhận trong Feedback Inbox, thông báo DM có lý do và trạng thái tiếng Việt.",
+                "Không tự sửa hoặc merge code khi ticket chưa được owner duyệt.",
+            ]},
+        ],
+    },
     {
         "version": "3.8.2", "date": "2026-10-08", "type": "bugfix",
         "title": "T23.3: Private ChatGPT OAuth Connection",

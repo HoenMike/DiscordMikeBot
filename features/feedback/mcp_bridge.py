@@ -9,9 +9,11 @@ Security rule: only PROPOSE, NEVER perform an approval through MCP.
 from __future__ import annotations
 
 import json
+import base64
 from typing import Any
 
 from features.feedback.store import feedback_store, FeedbackStorageError
+from features.feedback.evidence import evidence_store, EvidenceError
 
 SUPPORTED_PROTOCOLS = {"2025-03-26", "2025-06-18", "2025-11-25"}
 DEFAULT_PROTOCOL = "2025-06-18"
@@ -37,7 +39,21 @@ TOOL_DEFINITIONS = [
         "description": "Read one private ticket, including description and explanation, but NOT private screenshot bytes.",
         "inputSchema": {
             "type": "object",
-            "properties": {"ticket_id": {"type": "string", "pattern": "^FB-[A-Z0-9]+$"}},
+            "properties": {"ticket_id": {"type": "string", "pattern": "^(?:FB-[A-Z0-9]+|#?[1-9][0-9]*)$"}},
+            "required": ["ticket_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "get_feedback_evidence",
+        "title": "View a private feedback screenshot",
+        "description": "Read exactly one screenshot for an authenticated owner ticket. Returns a bounded inline image, never an R2 URL or storage key. Read-only.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ticket_id": {"type": "string", "pattern": "^(?:FB-[A-Z0-9]+|#?[1-9][0-9]*)$"},
+                "index": {"type": "integer", "minimum": 0, "maximum": 2},
+            },
             "required": ["ticket_id"],
             "additionalProperties": False,
         },
@@ -49,7 +65,7 @@ TOOL_DEFINITIONS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "ticket_id": {"type": "string", "pattern": "^FB-[A-Z0-9]+$"},
+                "ticket_id": {"type": "string", "pattern": "^(?:FB-[A-Z0-9]+|#?[1-9][0-9]*)$"},
                 "status": {"type": "string", "enum": ["approved", "rejected", "deferred", "needs_info", "duplicate"]},
                 "reason": {"type": "string", "minLength": 10, "maxLength": 1800},
             },
@@ -131,7 +147,7 @@ async def handle_mcp(payload: Any) -> dict | None:
             result = {"tickets": tickets}
         elif name == "get_feedback_ticket":
             ticket_id = str(args.get("ticket_id") or "").strip().upper()
-            if not ticket_id.startswith("FB-") or len(ticket_id) > 30:
+            if not ticket_id or len(ticket_id) > 30:
                 raise ValueError("Invalid ticket ID")
             ticket = await feedback_store.admin_detail(ticket_id)
             if ticket is None:
@@ -139,6 +155,37 @@ async def handle_mcp(payload: Any) -> dict | None:
             else:
                 ticket["evidence_count"] = len(ticket.pop("evidence", []))
                 result = {"ticket": ticket, "found": True}
+        elif name == "get_feedback_evidence":
+            ticket_id = str(args.get("ticket_id") or "").strip().upper()
+            index = args.get("index", 0)
+            if type(index) is not int or index not in (0, 1, 2):
+                raise ValueError("Invalid image index")
+            ticket = await feedback_store.admin_detail(ticket_id)
+            if not ticket:
+                raise ValueError("Ticket not found")
+            manifest = ticket.get("evidence") or []
+            if index >= len(manifest):
+                raise ValueError("This ticket has no screenshot at that index")
+            meta = manifest[index]
+            data = await evidence_store.read_preview(
+                key=meta["key"], guild_id=ticket["guild_id"],
+                sha256=meta["sha256"],
+            )
+            response = {
+                "content": [
+                    {"type": "image", "data": base64.b64encode(data).decode("ascii"),
+                     "mimeType": "image/jpeg"},
+                    {"type": "text", "text": f"Private evidence {index+1} for ticket {ticket['display_id']}"},
+                ],
+                "structuredContent": {
+                    "ticket_id": ticket["id"],
+                    "display_id": ticket["display_id"],
+                    "image_index": index,
+                    "mimeType": "image/jpeg",
+                },
+                "isError": False,
+            }
+            return _answer(request_id, response)
         else:
             ticket_id = str(args.get("ticket_id") or "").strip().upper()
             proposal_id = await feedback_store.propose_review(
@@ -150,5 +197,5 @@ async def handle_mcp(payload: Any) -> dict | None:
             result = {"proposal_id": proposal_id, "ticket_id": ticket_id,
                       "state": "pending_owner_review", "ticket_changed": False}
         return _answer(request_id, _tool_result(result))
-    except (ValueError, TypeError, FeedbackStorageError) as exc:
+    except (ValueError, TypeError, FeedbackStorageError, EvidenceError, KeyError) as exc:
         return _answer(request_id, _tool_result({"error": str(exc)}, error=True))

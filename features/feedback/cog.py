@@ -105,11 +105,11 @@ class ConfirmView(discord.ui.View):
         self.owner.discard(self.draft)
         self.stop()
         try:
-            await interaction.message.edit(content=f"✅ Đã tiếp nhận feedback **{ticket.id}**. Trạng thái: **{ticket.status}**.", embed=None, view=None)
+            await interaction.message.edit(content=f"✅ Đã tiếp nhận **ticket {ticket.label}**. Trạng thái: **{ticket.status}**.", embed=None, view=None)
         except (discord.HTTPException, AttributeError):
             pass
         await interaction.followup.send(
-            f"✅ **{ticket.id}** đã được lưu bền vững. Admin sẽ review thủ công. "
+            f"✅ **Ticket {ticket.label}** đã được lưu bền vững. Admin sẽ review thủ công. "
             f"Xem trạng thái bằng `/feedback status` với ID này.",
             ephemeral=True,
         )
@@ -442,8 +442,26 @@ class FeedbackCog(commands.Cog):
             "Quay lại bản nháp và xác nhận gửi ticket.", ephemeral=True
         )
 
+    @feedback.command(name="add_info", description="Trả lời yêu cầu bổ sung thông tin cho ticket")
+    @app_commands.describe(ticket_id="Số ticket, ví dụ #15", explanation="Giải thích hoặc bước tái hiện lỗi")
+    async def add_info(self, interaction: discord.Interaction, ticket_id: str, explanation: str):
+        if interaction.guild is None:
+            await interaction.response.send_message("Chỉ dùng lệnh trong server.", ephemeral=True)
+            return
+        try:
+            await feedback_store.add_info_own(
+                ticket_id=ticket_id, reporter_id=interaction.user.id,
+                explanation=explanation,
+            )
+        except FeedbackStorageError as exc:
+            await interaction.response.send_message(_safe(str(exc)), ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "✅ Đã cập nhật giải thích và chuyển ticket về hàng chờ review.", ephemeral=True
+        )
+
     @feedback.command(name="reopen", description="Mở lại feedback đã xử lý nếu lỗi vẫn còn")
-    @app_commands.describe(ticket_id="Mã ticket FB-...", explanation="Giải thích lỗi còn gặp")
+    @app_commands.describe(ticket_id="Số ticket, ví dụ #15 (hoặc mã FB- cũ)", explanation="Giải thích lỗi còn gặp")
     async def reopen(self, interaction: discord.Interaction, ticket_id: str, explanation: str):
         if interaction.guild is None:
             await interaction.response.send_message("Chỉ dùng lệnh trong server.", ephemeral=True)
@@ -463,7 +481,7 @@ class FeedbackCog(commands.Cog):
         )
 
     @feedback.command(name="status", description="Xem trạng thái ticket feedback của chính bạn")
-    @app_commands.describe(ticket_id="Mã ticket, ví dụ FB-000123")
+    @app_commands.describe(ticket_id="Số ticket, ví dụ #15 (hoặc mã FB- cũ)")
     async def status(self, interaction: discord.Interaction, ticket_id: str):
         try:
             result = await feedback_store.own_ticket(ticket_id, reporter_id=interaction.user.id)
@@ -479,7 +497,7 @@ class FeedbackCog(commands.Cog):
             return
         reason = f"\n**Lý do:** {_safe(result.reason, 800)}" if result.reason else ""
         await interaction.response.send_message(
-            f"**{result.id}** · {_safe(result.title)}\n"
+            f"**Ticket {result.label}** · {_safe(result.title)}\n"
             f"Trạng thái: **{_safe(result.status)}**{reason}",
             ephemeral=True,
         )

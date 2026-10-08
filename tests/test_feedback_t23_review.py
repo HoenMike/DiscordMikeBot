@@ -31,7 +31,9 @@ class ReviewPolicyTests(unittest.IsolatedAsyncioTestCase):
             def execute(self,sql,args):
                 self.calls.append((sql,args));return Cursor()
         db=DB()
-        with patch("features.feedback.store.db_client",db):
+        with patch("features.feedback.store.db_client",db), patch.object(
+            FeedbackStore, "resolve_id", new=AsyncMock(return_value="FB-ABCD")
+        ):
             await FeedbackStore().review(
                 ticket_id="FB-ABCD",status="rejected",reason="Wrong usage; documented behavior",
                 actor_id="dashboard-admin",

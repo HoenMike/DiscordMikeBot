@@ -111,6 +111,47 @@ class PrivateEvidenceStore:
             sha256=digest, source_message_id=int(source_message_id),
         )
 
+    async def read_preview(self, *, key: str, guild_id: str, sha256: str) -> bytes:
+        """Authenticated owner-only MCP image preview; NEVER return a public R2 URL."""
+        if not key.startswith(f"feedback/{int(guild_id)}/") or not key.endswith(".png"):
+            raise EvidenceError("Ảnh không thuộc ticket này.")
+        if not self.bucket:
+            raise EvidenceError("Kho ảnh chưa sẵn sàng.")
+
+        def download_and_preview() -> bytes:
+            try:
+                obj = self._s3().get_object(Bucket=self.bucket, Key=key)
+                body = obj["Body"]
+                try:
+                    raw = body.read(settings.ASUMI_FEEDBACK_IMAGE_MAX_BYTES + 1)
+                finally:
+                    if hasattr(body, "close"):
+                        body.close()
+                if not raw or len(raw) > settings.ASUMI_FEEDBACK_IMAGE_MAX_BYTES:
+                    raise EvidenceError("Ảnh quá lớn hoặc trống.")
+                if hashlib.sha256(raw).hexdigest() != sha256:
+                    raise EvidenceError("Ảnh evidence bị thay đổi so với lúc lưu.")
+                with Image.open(io.BytesIO(raw)) as picture:
+                    if picture.format != "PNG" or picture.width * picture.height > settings.ASUMI_FEEDBACK_IMAGE_MAX_PIXELS:
+                        raise EvidenceError("Ảnh evidence không hợp lệ.")
+                    picture.load()
+                    preview = picture.convert("RGB")
+                    preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    preview.save(output, "JPEG", quality=76, optimize=True)
+                    if output.tell() > 1_500_000:
+                        output = io.BytesIO()
+                        preview.thumbnail((1100, 1100), Image.Resampling.LANCZOS)
+                        preview.save(output, "JPEG", quality=65, optimize=True)
+                    if output.tell() > 1_500_000:
+                        raise EvidenceError("Ảnh preview vượt giới hạn.")
+                    return output.getvalue()
+            except EvidenceError:
+                raise
+            except Exception as exc:
+                raise EvidenceError("Không đọc được ảnh riêng tư từ R2.") from exc
+        return await asyncio.to_thread(download_and_preview)
+
     async def delete(self, key: str) -> None:
         if not key.startswith("feedback/") or not self.bucket:
             return
