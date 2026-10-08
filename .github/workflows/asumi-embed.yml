@@ -1,0 +1,43 @@
+name: Asumi Embed Regression
+
+on:
+  pull_request:
+    paths:
+      - "features/embed/**"
+      - "core/constants.py"
+      - "tests/test_embed_resilience.py"
+      - "tests/test_embed_audit.py"
+      - "tests/test_release28.py"
+      - ".github/workflows/asumi-embed.yml"
+  push:
+    branches: [main]
+    paths:
+      - "features/embed/**"
+      - "core/constants.py"
+      - "tests/test_embed_resilience.py"
+      - "tests/test_embed_audit.py"
+      - "tests/test_release28.py"
+
+jobs:
+  embed-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          grep -v '^audioop-lts' requirements.txt > /tmp/asumi-embed-requirements.txt
+          python -m pip install -r /tmp/asumi-embed-requirements.txt
+      - name: Validate embed pipeline
+        env:
+          ADMIN_PASSWORD: ci-only-placeholder
+          FLASK_SECRET_KEY: ci-only-placeholder-not-production
+        run: |
+          python -m compileall -q features/embed
+          python -m unittest discover -s tests -p "test_embed_resilience.py" -v
+          python -m unittest discover -s tests -p "test_release28.py" -v
+          python -m unittest discover -s tests -p "test_embed_audit.py" -v
