@@ -18,6 +18,19 @@ class OwnerGateTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(issue=issue), self.assertRaises(FeedbackStorageError):
                 await store.link_delivery(ticket_id="FB-1", issue_url=issue)
 
+    async def test_unapproved_ticket_cannot_link_pr_or_release(self):
+        store=FeedbackStore()
+        with patch.object(store,"admin_detail",new=AsyncMock(return_value={
+            "id":"FB-ABC","status":"submitted"
+        })):
+            for urls in (
+                {"pr_url":"https://github.com/HoenMike/DiscordMikeBot/pull/49"},
+                {"version":"3.8.3"},
+                {"issue_url":"https://github.com/HoenMike/DiscordMikeBot/issues/46"},
+            ):
+                with self.subTest(urls=urls), self.assertRaises(FeedbackStorageError):
+                    await store.link_delivery(ticket_id="FB-ABC",**urls)
+
     async def test_reopen_requires_explanation(self):
         store = FeedbackStore()
         with self.assertRaises(FeedbackStorageError):
