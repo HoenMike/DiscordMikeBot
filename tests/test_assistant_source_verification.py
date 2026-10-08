@@ -124,7 +124,7 @@ class VerifiedFuelToolTests(unittest.IsolatedAsyncioTestCase):
             reply=AsyncMock(return_value=SimpleNamespace(id=125)),
         )
         report = VerifiedFuelReport(
-            status="ok", effective_at=AT,
+            status="ok", effective_at=datetime(2026, 10, 1, 15, 0, tzinfo=VN_TZ),
             rows=(VerifiedFuelPrice("Xăng E10 RON95-III", 27180),
                   VerifiedFuelPrice("Xăng E5 RON92-II", 26560)),
             source_url=OFFICIAL_PVOIL_URLS[0], elapsed_ms=29,
@@ -164,7 +164,7 @@ class VerifiedFuelToolTests(unittest.IsolatedAsyncioTestCase):
                         new=AsyncMock(return_value="Chưa xác minh được giá.")):
             result = await registry.execute(route_locally("tìm trên web giá xăng hôm nay"), msg)
         embed = msg.reply.await_args.kwargs["embed"]
-        self.assertIn("Chưa xác minh", embed.description)
+        self.assertIn("chưa đủ để xác minh", embed.description)
         self.assertIn("https://example.org/gas", embed.fields[0].value)
         self.assertEqual(result.details["first_party_status"], "unavailable")
         self.assertNotIn("query", result.details)
