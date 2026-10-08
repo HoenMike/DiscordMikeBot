@@ -138,3 +138,8 @@ A Brave result is only an excerpt and URL; never treat it as a verified full pri
 ## Fact-first retrieval policy — Asumi 3.7.6
 
 When the user asks for a value (price, weather, date, count), prioritize **structured factual retrieval** over web snippets and answer with value/unit/time first. Weather uses Open-Meteo (separate from AQI). Fuel calls PVOIL prior to Brave; do not spend Brave quota on a valid first-party answer. General public snippets can be enriched from two bounded, HTTPS allowlisted pages; NEVER turn this into an arbitrary private Discord URL fetch, allow redirects, or scrape privileged chat. Keep runtime toggles/limits in `core/constants.py`. Every fact retrieval change needs regression tests and live acceptance in Discord; passing mocks alone is insufficient.
+
+
+## Fuel source fallback — Asumi 3.7.7
+
+If direct PVOIL HTML is inaccessible (e.g. HTTP 403), try strictly validated fresh VietFuelAPI *community aggregated* data, then Brave. Never present community prices as first-party official PVOIL data or hardcode a pump price. Preserve true dates and Vùng 1 pricing; reject stale, missing or implausible data. Keep diagnostics of HTTP/parse failures in Dashboard, not raw payloads, and do not equate CI mocks with Render network access.
