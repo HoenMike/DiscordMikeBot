@@ -7,6 +7,7 @@ import os
 import discord
 from dataclasses import dataclass, field
 
+from core import constants as policy
 from features.assistant.archive import archive_store
 from features.assistant.providers.brave import brave_search
 from features.assistant.providers.discord_history import DiscordHistorySearcher
@@ -317,7 +318,7 @@ class CommandToolRegistry:
         }
 
         notices = {
-            "disabled": "Web Search chưa bật. Cần BRAVE_SEARCH_API_KEY và ASUMI_WEB_SEARCH_ENABLED=true trên Render.",
+            "disabled": "Brave Search đã tích hợp nhưng chưa có API key. Admin chỉ cần thêm BRAVE_SEARCH_API_KEY trong Render Environment.",
             "empty_query": "Bạn hãy ghi chủ đề cần tìm sau 'tìm trên web', ví dụ: @Asumi tìm trên web game mới tháng này.",
             "private_reference": "Không gửi link tin nhắn hoặc mention Discord lên web. Hãy hỏi riêng về nội dung công khai, hoặc dùng Discord History Search khi tính năng đó được bật.",
             "cooldown": "Bạn vừa tìm kiếm; đợi một chút rồi thử lại để tránh tốn quota Brave.",
@@ -333,10 +334,8 @@ class CommandToolRegistry:
         if report.status == "ok":
             summary = ""
             should_synthesize = (
-                decision.source == "clef_web_search"
-                and os.getenv(
-                    "ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED", "true"
-                ).strip().lower() in {"1", "true", "yes", "on"}
+                decision.source in {"clef_web_search", "local_fresh_public"}
+                and policy.ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED
             )
             if should_synthesize:
                 try:
@@ -404,7 +403,7 @@ class CommandToolRegistry:
             message, str(decision.arguments.get("query") or "")
         )
         status_text = {
-            "disabled": "Tìm tin nhắn cũ chưa bật. Admin cần đặt ASUMI_DISCORD_HISTORY_ENABLED=true.",
+            "disabled": "Tìm tin nhắn cũ đang tắt theo chính sách trong core/constants.py. Không cần bật bằng Render Environment.",
             "guild_only": "Chỉ hỗ trợ tìm trong server Discord hiện tại.",
             "multiple_authors": "Hãy tag một người cần tìm trong mỗi lần tìm kiếm.",
             "missing_topic": "Hãy thêm chủ đề, ví dụ: @Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?",
