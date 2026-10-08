@@ -1018,3 +1018,13 @@ def connector_feedback_detail(ticket_id):
         return jsonify({"ticket":data})
     except FeedbackStorageError:
         return jsonify({"error":"Unavailable"}), 503
+
+
+@app.route('/api/admin/feedback/metrics', methods=['GET'])
+@login_required
+def feedback_metrics():
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        return jsonify(asyncio.run(feedback_store.review_metrics()))
+    except FeedbackStorageError:
+        return jsonify({"error": "Turso unavailable"}), 503
