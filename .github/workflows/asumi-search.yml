@@ -83,6 +83,11 @@ jobs:
                       if label == "webgia":
                           import re
                           html = body.decode("utf-8", "replace")
+                          from features.assistant.providers.webgia_prices import parse_webgia_fuel
+                          live = parse_webgia_fuel(html)
+                          print("webgia parsed status=", live.status,
+                                "period=", live.effective_date,
+                                "price_rows=", len(live.rows))
                           print("webgia bytes=", len(body), "has table=", "<table" in html.lower(),
                                 "has E10=", "E10" in html, "tr_count=", html.lower().count("<tr"))
                           pos = html.find("E10")
