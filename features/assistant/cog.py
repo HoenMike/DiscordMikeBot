@@ -227,6 +227,9 @@ class AssistantCog(commands.Cog):
                         "recent_messages": len(context.recent),
                         "images": len(context.images),
                         "tool_output_messages": len(result.response_message_ids),
+                        "followup_source_tool": (
+                            previous_session.last_tool if is_live_continuation and previous_session else None
+                        ),
                         **result.details,
                     },
                 )
@@ -370,6 +373,9 @@ class AssistantCog(commands.Cog):
                 "recent_messages": len(context.recent),
                 "images": len(context.images),
                 "session_images": context.used_session_images,
+                "followup_source_tool": (
+                    previous_session.last_tool if is_live_continuation and previous_session else None
+                ),
             },
         )
         self.sessions.record_exchange(

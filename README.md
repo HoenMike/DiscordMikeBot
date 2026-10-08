@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligent Search (3.7.1)
+### Asumi Intelligent Search (3.7.2)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -21,6 +21,7 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` → trả URL nguồn công khai từ Brave (opt-in; cần API key).
 - **Discord History Search:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → tìm tin nhắn cũ trong server, có Jump to Message (opt-in; bot token hiện tại, cần quyền xem lịch sử).
 - **T22.4a — tìm theo thời gian:** `@Asumi tìm lại tin nhắn đầu tiên của @user trong server`, `@Asumi tìm 5 tin nhắn đầu tiên của @user`, `@Asumi tìm tin nhắn gần nhất của @user`, `@Asumi lần đầu @user nhắc tới Minecraft là khi nào?`. Không cần từ khóa khi chỉ tìm tin đầu/ cuối; có từ khóa thì lọc theo chủ đề. Phải tag chính xác **một người**. Trả tin còn được lập chỉ mục và trong kênh có quyền đọc; không khẳng định tìm được tin đầu tiên tuyệt đối.
+- **T22.4b — follow-up từ kết quả tìm kiếm:** Reply vào kết quả Brave/Discord History để hỏi về nội dung hoặc các link Asumi vừa đưa. Nếu muốn cập nhật dữ liệu web mới, hỏi rõ `@Asumi tìm tiếp trên web giá Honda SH160i hôm nay` (cần API Key Brave). Asumi không tự suy luận từ tin nhắn riêng tư để gửi truy vấn ra Brave.
 - **Clef auto-source (3.7, optional):** khi `ASUMI_AUTO_SEARCH_ENABLED=true`, Clef có thể chọn Brave / Discord History / Archive cho câu hỏi rõ ràng; Brave auto-search có Gemini tổng hợp ngắn, vẫn kèm link nguồn. Luôn kiểm tra provider đã bật và bảo vệ nội dung Discord riêng tư; History Search không ghi toàn bộ lịch sử vào Archive.
 - **Semantic Search (optional):** khi bật Vectorize, Archive có thể tìm theo ý nghĩa gần nhau chứ không chỉ exact keyword; nếu Cloudflare unavailable thì tự fallback lexical.
 - Archive chỉ được tạo khi user chủ động yêu cầu; bare save không reply/link/ảnh bị từ chối, không có passive full-server logging.
@@ -30,6 +31,7 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - Tin nhắn bình thường không tag/reply không kích hoạt assistant; slash command và `.m` vẫn được ưu tiên.
 - Clef-flash trên Cloudflare là router tùy chọn; Admin Dashboard có filter **Asumi AI** để theo dõi latency/tool path.
 - 3.4 Dashboard phân biệt Archive lexical / semantic-hybrid / fallback, Vectorize latency và Clef fallback mà không lưu nguyên nội dung hội thoại.
+- 3.7.2 Dashboard hiện trạng thái Brave/History, hit count, cache/quota/API calls, nguồn follow-up (metadata only; không lưu nội dung chat).
 - Semantic requests có concurrency guard riêng (mặc định 3) để tránh burst request khi nhiều Save/Search cùng lúc.
 
 ### Tóm tắt cuộc trò chuyện bằng AI

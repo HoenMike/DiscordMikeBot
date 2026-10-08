@@ -450,8 +450,12 @@ class CommandToolRegistry:
                 body = discord.utils.escape_markdown(
                     discord.utils.escape_mentions(" ".join(hit.content.split())[:250])
                 )
+                channel_name = discord.utils.escape_markdown(
+                    discord.utils.escape_mentions(hit.channel_name)
+                ) if hit.channel_name else ""
+                channel_label = f" · #{channel_name}" if channel_name else ""
                 entry = (
-                    f"**{idx}. {author} · {hit.date}**\n"
+                    f"**{idx}. {author} · {hit.date}{channel_label}**\n"
                     f"> {body}\n"
                     f"[Jump to Message]({hit.jump_url})"
                 )
@@ -472,7 +476,17 @@ class CommandToolRegistry:
         return ToolExecutionResult(
             handled=True,
             response_message_ids=(int(sent.id),),
-            response_context=f"Discord History: {len(report.hits)} results; status={report.status}",
+            response_context=(
+                "Discord History: verified source links from the actual Discord guild.\n"
+                + "\n".join(
+                    f"[{i}] {hit.author_name[:65]} ({hit.date}) "
+                    f"#{hit.channel_name[:50]}: {hit.content[:220]} "
+                    f"({hit.jump_url})"
+                    for i, hit in enumerate(report.hits[:4], 1)
+                )[:2400]
+                if report.status == "ok"
+                else f"Discord History: {report.status}"
+            ),
             details=details,
         )
 

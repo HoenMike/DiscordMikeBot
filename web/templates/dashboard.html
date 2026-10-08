@@ -1470,7 +1470,34 @@
             const d = activity.details || {};
             const parts = [];
 
-            if (d.archive_action) {
+            if (d.web_provider === 'brave' || d.history_status) {
+                if (d.web_provider === 'brave') {
+                    parts.push('Brave ' + String(d.web_search_status || 'unknown'));
+                    parts.push(String(Number(d.web_result_count) || 0) + ' nguồn');
+                    if (d.web_cache_hit === true) parts.push('cache hit');
+                    if (d.web_quota_remaining !== null && d.web_quota_remaining !== undefined) {
+                        parts.push('còn ' + String(d.web_quota_remaining) + ' request');
+                    }
+                    if (Number(d.web_search_ms) > 0) {
+                        parts.push('Web ' + formatTimingMs(d.web_search_ms));
+                    }
+                } else {
+                    parts.push('Discord History ' + String(d.history_status));
+                    parts.push(String(Number(d.history_result_count) || 0) + ' tin');
+                    if (d.history_sort_mode && d.history_sort_mode !== 'relevance') {
+                        parts.push(String(d.history_sort_mode));
+                    }
+                    if (Number(d.history_api_calls) > 0) {
+                        parts.push(String(d.history_api_calls) + ' API');
+                    }
+                    if (Number(d.history_permission_filtered) > 0) {
+                        parts.push(String(d.history_permission_filtered) + ' ẩn do quyền');
+                    }
+                    if (Number(d.history_search_ms) > 0) {
+                        parts.push('History ' + formatTimingMs(d.history_search_ms));
+                    }
+                }
+            } else if (d.archive_action) {
                 parts.push('Archive ' + String(d.archive_action));
                 if (d.archive_search_mode) {
                     const mode = String(d.archive_search_mode)
@@ -1498,6 +1525,9 @@
                 if (d.source === 'local_low_confidence') parts.push('Clef low-confidence');
             }
 
+            if (d.followup_source_tool) {
+                parts.push('Follow-up ' + String(d.followup_source_tool));
+            }
             if (d.path === 'tool' && Number(d.tool_ms) > 0) {
                 parts.push('Tool ' + formatTimingMs(d.tool_ms));
             }

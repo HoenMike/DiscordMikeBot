@@ -26,6 +26,7 @@ class HistoryHit:
     content: str
     date: str
     jump_url: str
+    channel_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -378,6 +379,7 @@ class DiscordHistorySearcher:
                                     )[:80],
                                     content=content[:600],
                                     date=str(item.get("timestamp") or "")[:10],
+                                    channel_name=str(getattr(channel, "name", "") or "")[:80],
                                     jump_url=(
                                         f"https://discord.com/channels/{guild.id}/{channel_id}/{msg_id}"
                                     ),

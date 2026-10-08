@@ -1,9 +1,9 @@
 # T22 — Asumi Intelligent Search / Brave + Discord History
 
-**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3 IMPLEMENTED / T22.4a TEMPORAL HISTORY IMPLEMENTED (LIVE VERIFY PENDING); T22.4b REMAINS
+**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3 IMPLEMENTED / T22.4a TEMPORAL HISTORY IMPLEMENTED (LIVE VERIFY PENDING); T22.4b FOLLOW-UP/DASHBOARD IMPLEMENTED (LIVE VERIFY PENDING); T22.5 MULTI-SOURCE PLANNED
 **Date:** 2026-10-08
 **Owner decision:** Use **Brave Search API** for external web search, and add **on-demand Discord History Search** to recover old messages that were never saved into Archive.
-**Current implementation:** Asumi 3.7.1 T22.4a staged; T21 production acceptance remains pending.
+**Current implementation:** Asumi 3.7.2 T22.4b staged; T21 production acceptance remains pending.
 **Cost contract:** free-credit / no unexpected charge; no paid fallback, explicit circuit-breaker and request caps.
 
 ## 1. Desired user experience
@@ -99,7 +99,8 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | T22.2 | Discord native History Search + author/date filters + Jump links | IMPLEMENTED; LIVE BOT API VERIFY PENDING |
 | T22.3 | Clef source selection / controlled one-tool retrieval | IMPLEMENTED; LIVE VERIFY PENDING |
 | T22.4a | Chronological first/last by @author, optional topic, 1–5 hits | IMPLEMENTED; LIVE API VERIFY PENDING |
-| T22.4b | Multi-source follow-up, further ranking/cache/dashboard and edge-case regression | NOT STARTED |
+| T22.4b | Bounded source follow-up, safe explicit web lookup, source/channel UX, cache and Dashboard search tracing | IMPLEMENTED; LIVE VERIFY PENDING |
+| T22.5 | Cross-source planning with validated public entity, explicit consent gates and retrieval ranking | PLANNED |
 
 Acceptance — live server:
 1. Find an old 'buying a car' message by @author + early-year time hint, even though it was never saved in Archive.
@@ -156,3 +157,12 @@ User-requested case: `@Asumi tìm lại tin nhắn đầu tiên của @user tron
 Requester AND bot must be authorized for the source channel. Re-fetch live content before returning a Jump link; enforce the current three-call/time/verification budgets. The result is **earliest/latest found**, not a claim to have located the absolute first ever message: deletions, partial Discord indexing, unavailable channels and budgets limit coverage.
 
 T22.4a is only the chronological search slice; T22.4b remains for multi-source follow-ups, further ranking/cache improvements and Dashboard search tracing. Live bot-token authorization/permissions checks must precede production activation.
+
+
+### T22.4b implementation note — 2026-10-08
+
+- Preserve the approved one-tool-per-turn privacy model. Explicit `tìm tiếp trên web <public query>` can be used after a Discord History result without silently exporting a private Discord message or inferred entity to Brave.
+- Search output follow-ups are answered from source snippets and exact links in the most recent session/replied message; no fabricated new search. A vague "giá cái đó?" cannot cause an outbound request or automatic source change. When necessary, ask for a concrete public model/name.
+- Discord history snippets include the verified source channel (only after effective requester+bot ACL). Brave cache discards expired entries; private Discord-relative web phrases fail before quota reservation.
+- Dashboard search metadata now visibly shows provider/status, source count, cache hit, remaining quota, API call count, permission filtered count and follow-up source, but never stores private query or message text.
+- T22.5 is a separate explicit future milestone for sequential multi-source plans/ranking after live API/provider permission checks. Do not authorize automatic history -> Brave extraction by model guesswork.

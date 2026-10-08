@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.1"
+CURRENT_VERSION = "3.7.2"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.1 - Temporal Discord History Search"
+CODENAME = "Asumi 3.7.2 - Search Follow-up and Observability"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.2", "date": "2026-10-08",
+        "type": "bugfix", "title": "Search Follow-up and Dashboard (T22.4b)",
+        "summary": "Reply vào kết quả tìm kiếm rõ nguồn hơn, thêm explicit web follow-up và telemetry tìm kiếm.",
+        "changes": [
+            {"category": "🔎 Search UX", "items": [
+                "Nhận câu tìm tiếp trên web với từ khóa công khai cụ thể, vẫn qua Brave quota và privacy gate.",
+                "Reply kết quả Discord History có thêm channel và source context đã xác minh.",
+                "Chat follow-up chỉ giải thích nguồn đã thấy; không tự động search mới hoặc suy đoán nội dung.",
+            ]},
+            {"category": "📊 Observability", "items": [
+                "Dashboard hiển thị trạng thái Brave/Discord History, số nguồn, cache, quota và API calls.",
+                "Giữ logs không chứa truy vấn và nội dung tin nhắn riêng tư.",
+                "Các provider vẫn tắt mặc định đến khi được kiểm thử live.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.1", "date": "2026-10-08",
         "type": "bugfix", "title": "Temporal Discord History Search (T22.4a)",

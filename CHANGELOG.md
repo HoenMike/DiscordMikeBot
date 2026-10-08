@@ -7,6 +7,18 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.2] - 2026-10-08 — *T22.4b Search Follow-up & Observability*
+
+### Added
+- Allow explicitly saying `@Asumi tìm tiếp trên web giá Honda SH160i hôm nay`. Only the user's current public query reaches Brave; provider quota/private-reference guards continue to apply.
+- Reply to Search results with bounded conversational context and a stronger no-fabricated-evidence instruction; do not automatically rerun a tool on vague follow-up.
+- Display Discord History source channel when known and the requester has permission; original Jump links remain.
+- Dashboard activity rows show Brave status/results/cache/quota and Discord History status/results/API calls/permission filtering; no prompt or private search content.
+- Evict expired Brave cache entries on lookup; fail safely for explicit web queries referencing private Discord context.
+
+### Remaining
+- Provider keys/feature flags and real-server permissions smoke tests are still required. Multi-source chained search without exposing private history to a public provider is deferred to T22.5.
+
 ## [3.7.1] - 2026-10-08 — *T22.4a Temporal Discord History Search*
 
 ### Added

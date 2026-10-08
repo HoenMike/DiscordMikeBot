@@ -1,6 +1,6 @@
 # T22 — Intelligent Search Handoff
 
-**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 IMPLEMENTED / T22.4a TEMPORAL HISTORY STAGED / T22.4b NEXT
+**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 IMPLEMENTED / T22.4a TEMPORAL HISTORY STAGED / T22.4b IMPLEMENTED (LIVE VERIFY PENDING); T22.5 NEXT
 **Recorded:** 2026-10-08
 **Primary spec:** docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md
 **Baseline:** Asumi 3.4.1 (`main`), T21 final production acceptance remains outstanding.
@@ -108,3 +108,14 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - Tests in `tests/test_assistant_temporal_history.py` wired into CI; previous History/Brave/Router/Core/Archive/Semantic suites continue running.
 - **Next acceptance:** require green CI and real-server bot-token test for oldest/newest/5-oldest/topic/hidden channel/removed messages/index-lag. Feature remains opt-in behind `ASUMI_DISCORD_HISTORY_ENABLED`. Do not mark T22 fully accepted yet.
 - Remaining T22.4b: richer multi-source follow-up, ranking/cache/dashboard search tracing. T21 Vectorize acceptance also outstanding.
+
+
+## T22.4b implementation handoff — 2026-10-08
+
+- Target release **Asumi 3.7.2**, branch `feat/asumi-t22-4b-followup-observability`. Search follow-up stays bounded by existing user/channel session; no recursive multi-tool action or hidden public web requests.
+- Explicit `@Asumi tìm tiếp trên web <public terms>` routes to Brave, only after Brave feature flag and API key are configured. Private Discord URL/mention/channel-context wording is rejected before outgoing request or quota reservation; users must provide public search terms themselves.
+- Discord History response now includes source channel name after ACL validation, actual Jump links and compact context; AI follow-up must stay grounded in source text and not hallucinate a new verification.
+- Admin Dashboard shows compact source-specific status, latency, count, Brave cache/quota, History API/permission-filtered counts; no raw user prompt, Archive or Discord content in telemetry. Expired Brave search cache entries are purged on lookup.
+- New unit suite `tests/test_assistant_search_followup.py` and CI coverage. Review PR check results before claiming code-complete.
+- Live acceptance blocked on `BRAVE_SEARCH_API_KEY`, conservative Brave billing guard, `ASUMI_WEB_SEARCH_ENABLED`, `ASUMI_DISCORD_HISTORY_ENABLED`, actual bot-token guild search and requester ACL, followed by carefully enabling `ASUMI_AUTO_SEARCH_ENABLED`.
+- **Next T22.5**: user-confirmed cross-source plan (Discord evidence -> public entity selection -> Brave), improved result ranking/cross-source evidence, optional supervised tool handoff. Never auto-export raw private source text.
