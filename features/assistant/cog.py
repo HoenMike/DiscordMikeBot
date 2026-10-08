@@ -33,7 +33,10 @@ async def choose_conversation_route(
     local = route_locally(query)
     if local.tool and (
         local.tool.startswith("archive.")
-        or local.tool in {"web.search", "discord_history.search", "summary.member"}
+        or local.tool in {
+            "web.search", "discord_history.search", "summary.member",
+            "multi_source.search",
+        }
     ):
         return local
 
