@@ -59,6 +59,9 @@ SCHEMA = (
       github_issue_url TEXT NOT NULL DEFAULT '',
       github_pr_url TEXT NOT NULL DEFAULT '',
       resolved_version TEXT NOT NULL DEFAULT '',
+      replaces_ticket_id TEXT,
+      replaced_by_ticket_id TEXT,
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       UNIQUE(guild_id, source_message_id)
@@ -147,6 +150,44 @@ SCHEMA = (
     """,
 )
 
+# Installed AFTER adding missing columns to existing 3.8.3 databases.
+LIFECYCLE_TRIGGERS = (
+    """
+    CREATE TRIGGER IF NOT EXISTS feedback_revision_guard
+    BEFORE INSERT ON asumi_feedback
+    WHEN NEW.replaces_ticket_id IS NOT NULL
+    BEGIN
+      SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM asumi_feedback original
+        WHERE original.ticket_id=NEW.replaces_ticket_id
+          AND original.reporter_id=NEW.reporter_id
+          AND original.guild_id=NEW.guild_id
+          AND original.status IN ('submitted','triage','needs_info','deferred','reopened')
+          AND original.replaced_by_ticket_id IS NULL
+      ) THEN RAISE(ABORT,'Feedback revision not permitted') END;
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS feedback_revision_retire
+    AFTER INSERT ON asumi_feedback
+    WHEN NEW.replaces_ticket_id IS NOT NULL
+    BEGIN
+      UPDATE asumi_feedback
+      SET status='deleted', replaced_by_ticket_id=NEW.ticket_id,
+          deleted_at=NEW.created_at, updated_at=NEW.created_at,
+          last_reviewer_id=NEW.reporter_id,
+          review_reason='Người gửi đã thay thế bằng một ticket mới'
+      WHERE ticket_id=NEW.replaces_ticket_id;
+    END
+    """,
+)
+
+LIFECYCLE_COLUMNS = {
+    "replaces_ticket_id": "TEXT",
+    "replaced_by_ticket_id": "TEXT",
+    "deleted_at": "TEXT",
+}
+
 
 class FeedbackStore:
     async def _require_cloud(self) -> None:
@@ -163,6 +204,15 @@ class FeedbackStore:
                 await db_client.execute(statement)
                 if not db_client.is_cloud:
                     raise FeedbackStorageError("Mất kết nối Turso trong lúc tạo schema.")
+            async with db_client.execute("PRAGMA table_info(asumi_feedback)") as cursor:
+                columns = {str(row[1]) for row in await cursor.fetchall()}
+            for name, kind in LIFECYCLE_COLUMNS.items():
+                if name not in columns:
+                    await db_client.execute(f"ALTER TABLE asumi_feedback ADD COLUMN {name} {kind}")
+            for statement in LIFECYCLE_TRIGGERS:
+                await db_client.execute(statement)
+            if not db_client.is_cloud:
+                raise FeedbackStorageError("Mất Turso trong lúc cập nhật vòng đời ticket.")
             # Existing UUID tickets get stable numbers in chronological order.
             # New inserts are numbered atomically by the database trigger.
             await db_client.execute(
@@ -327,6 +377,108 @@ class FeedbackStore:
         if not db_client.is_cloud or changed != 1:
             raise FeedbackStorageError("Ticket không yêu cầu bổ sung hoặc không thuộc về bạn.")
 
+    async def own_list(
+        self, *, reporter_id: int, guild_id: int, limit: int = 10,
+        offset: int = 0, include_deleted: bool = False,
+    ) -> list[dict]:
+        """Private reporter-only paginated list. Never expose another guild/user."""
+        await self._require_cloud()
+        limit = min(20, max(1, int(limit)))
+        offset = min(10000, max(0, int(offset)))
+        sql = (
+            "SELECT f.ticket_id, n.number, f.title, f.category, f.status, "
+            "f.description, f.user_explanation, f.review_reason, f.bot_version, "
+            "f.created_at, f.replaces_ticket_id, f.replaced_by_ticket_id, "
+            "(SELECT newer.number FROM asumi_feedback_numbers newer "
+            "WHERE newer.ticket_id=f.replaced_by_ticket_id) "
+            "FROM asumi_feedback f "
+            "JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id "
+            "WHERE f.reporter_id=? AND f.guild_id=? "
+        )
+        if not include_deleted:
+            sql += "AND f.status<>'deleted' "
+        sql += "ORDER BY n.number DESC LIMIT ? OFFSET ?"
+        async with db_client.execute(
+            sql, (str(reporter_id), str(guild_id), limit, offset),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không đọc được lịch sử feedback.")
+        names = ("id", "number", "title", "category", "status", "description",
+                 "explanation", "reason", "bot_version", "created_at",
+                 "replaces_ticket_id", "replaced_by_ticket_id", "replacement_number")
+        return [dict(zip(names, row)) for row in rows]
+
+    async def soft_delete_own(self, *, ticket_id: str, reporter_id: int, guild_id: int) -> int:
+        """Soft-delete; keep immutable report, evidence and history for audit."""
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            raise FeedbackStorageError("Ticket không tồn tại.")
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        async with db_client.execute(
+            "UPDATE asumi_feedback SET status='deleted', deleted_at=?, updated_at=?, "
+            "review_reason='Người gửi đã xóa ticket', last_reviewer_id=? "
+            "WHERE ticket_id=? AND reporter_id=? AND guild_id=? AND status<>'deleted'",
+            (now, now, str(reporter_id), resolved, str(reporter_id), str(guild_id)),
+        ) as cursor:
+            changed = cursor.rowcount
+        if not db_client.is_cloud or changed != 1:
+            raise FeedbackStorageError("Ticket không thuộc bạn hoặc đã được xóa.")
+        async with db_client.execute(
+            "SELECT number FROM asumi_feedback_numbers WHERE ticket_id=?", (resolved,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return int(row[0]) if row else 0
+
+    async def replace_own(
+        self, *, ticket_id: str, reporter_id: int, guild_id: int,
+        source_message_id: int, bot_version: str, description: str,
+        explanation: str = "",
+    ) -> FeedbackTicket:
+        """Single INSERT statement + DB trigger atomically retires old ticket.
+
+        Shares immutable private R2 evidence metadata; neither ticket's image
+        is deleted. The original stays in the audited timeline as 'deleted'.
+        """
+        title = description.strip()[:110]
+        description = description.strip()
+        if not 10 <= len(description) <= 3000:
+            raise FeedbackStorageError("Mô tả mới phải có từ 10 đến 3000 ký tự.")
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            raise FeedbackStorageError("Không tìm thấy ticket cần thay thế.")
+        new_id = "FB-" + uuid.uuid4().hex[:10].upper()
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        await self._require_cloud()
+        async with db_client.execute(
+            "INSERT INTO asumi_feedback "
+            "(ticket_id,source_message_id,guild_id,channel_id,reporter_id,"
+            "reply_to_message_id,reported_bot_message_id,bot_version,category,"
+            "title,description,user_explanation,design_rule,evidence_json,"
+            "replaces_ticket_id,created_at,updated_at) "
+            "SELECT ?,?,f.guild_id,f.channel_id,f.reporter_id,"
+            "f.reply_to_message_id,f.reported_bot_message_id,?,f.category,"
+            "?,?,?,f.design_rule,f.evidence_json,f.ticket_id,?,? "
+            "FROM asumi_feedback f "
+            "WHERE f.ticket_id=? AND f.reporter_id=? AND f.guild_id=? "
+            "AND f.replaced_by_ticket_id IS NULL "
+            "AND f.status IN ('submitted','triage','needs_info','deferred','reopened')",
+            (new_id, str(source_message_id), bot_version, title, description,
+             explanation[:1800], now, now, resolved, str(reporter_id), str(guild_id)),
+        ) as cursor:
+            changed = cursor.rowcount
+        if not db_client.is_cloud or changed != 1:
+            raise FeedbackStorageError(
+                "Không thể thay thế ticket (có thể đã duyệt hoặc bị xóa)."
+            )
+        created = await self.own_ticket(new_id, reporter_id=reporter_id)
+        if created is None:
+            raise FeedbackStorageError(
+                "Ticket mới có thể đã được lưu; vui lòng xem /feedback mine.",
+                may_have_committed=True,
+            )
+        return created
+
     async def admin_list(self, *, status: str = "", limit: int = 50) -> list[dict]:
         await self._require_cloud()
         limit = max(1, min(100, int(limit)))
@@ -419,7 +571,7 @@ class FeedbackStore:
         # Single atomic guarded UPDATE, trigger writes event/outbox on success.
         async with db_client.execute(
             "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=?, last_reviewer_id=? "
-            "WHERE ticket_id=? AND status<>?",
+            "WHERE ticket_id=? AND status<>? AND status<>'deleted'",
             (status, (reason + (f" [release: {verified_version[:50]}]" if verified_version else ""))[:1800],
              now, actor_id[:80], resolved, status),
         ) as cursor:
