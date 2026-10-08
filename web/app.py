@@ -878,6 +878,16 @@ def feedback_inbox():
         return jsonify({"error": "Không thể kết nối Turso"}), 503
 
 
+@app.route('/api/admin/feedback/<ticket_id>/events', methods=['GET'])
+@login_required
+def feedback_admin_events(ticket_id: str):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        return jsonify({"events": asyncio.run(feedback_store.admin_events(ticket_id=ticket_id))})
+    except FeedbackStorageError:
+        return jsonify({"error": "Turso unavailable"}), 503
+
+
 @app.route('/api/admin/feedback/<ticket_id>/review', methods=['POST'])
 @login_required
 def feedback_review(ticket_id: str):
