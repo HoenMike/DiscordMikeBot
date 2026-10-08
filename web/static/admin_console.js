@@ -80,9 +80,31 @@ async function cabin(){
  root.innerHTML='<div class="asumi-grid">'+metric('Phiên trực tiếp',ss.status==='fulfilled'?sessions.length:'—')+metric('Khiên đang bật',cc.status==='fulfilled'?shields.length:'—')+'</div><div class="asumi-cols">'+card('Phiên đang chạy',sessions.map(s=>row(s.target_name||s.target_id,(s.guild_name||s.guild_id)+' · '+(s.remaining_str||'—'),button('Dừng phiên','cabin-stop',s.guild_id+':'+s.target_id,'asumi-btn-danger'))).join('')||empty('Không có phiên hoạt động.'))+card('Khiên miễn nhiễm','<div class="asumi-form"><label class="asumi-field">Guild ID<input id="shield-guild" class="asumi-input" inputmode="numeric"></label><label class="asumi-field">User ID<input id="shield-user" class="asumi-input" inputmode="numeric"></label>'+button('Thêm khiên','cabin-add','')+'</div>'+shields.map(s=>row(s.user_name||s.user_id,s.guild_name||s.guild_id,button('Gỡ','cabin-remove',s.guild_id+':'+s.user_id))).join('')+(!shields.length?empty('Chưa có khiên được bật.'):''))+'</div>';
  if(ss.status==='rejected'||cc.status==='rejected')error('Một số dữ liệu Cabin chưa tải được.');
 }
+function renderGuildRows(){
+ const q=(byId('guild-query')?.value||'').trim().toLowerCase();
+ const filter=byId('guild-filter')?.value||'all';
+ const servers=(cache.guilds||[]).filter(g=>{
+  const matchesText=String(g.name||'').toLowerCase().includes(q)||String(g.id||'').includes(q);
+  const matchesStatus=filter==='all'||(filter==='active'&&!g.is_suspended)||(filter==='suspended'&&g.is_suspended);
+  return matchesText&&matchesStatus;
+ });
+ const host=byId('guild-rows');if(!host)return;
+ host.innerHTML=servers.map(g=>{
+  const image=safeLink(g.icon);
+  const avatar=image?'<img class="asumi-guild-avatar" src="'+esc(image)+'" alt="" loading="lazy">':'<span class="asumi-guild-avatar" aria-hidden="true">'+esc(String(g.name||'?').charAt(0).toUpperCase())+'</span>';
+  const badge=g.is_suspended?'<span class="asumi-pill bad">Tạm ngưng</span>':'<span class="asumi-pill good">Hoạt động</span>';
+  const actions=button(g.is_suspended?'Mở lại':'Tạm ngưng',g.is_suspended?'guild-unsuspend':'guild-suspend',g.id,'asumi-btn-quiet');
+  const danger='<details class="asumi-more"><summary aria-label="Thao tác khác cho '+esc(g.name)+'" title="Thao tác khác">•••</summary><div class="asumi-more-menu">'+button('Rời máy chủ','guild-leave',g.id,'asumi-btn-danger')+'</div></details>';
+  return '<div class="asumi-guild-row">'+avatar+'<div class="asumi-guild-info"><div class="asumi-guild-name">'+asText(g.name)+'</div><div class="asumi-guild-meta">'+badge+'<span>'+asText(g.member_count)+' thành viên</span><span class="asumi-guild-meta-id" title="ID máy chủ">ID '+asText(g.id)+'</span></div></div><div class="asumi-guild-actions">'+actions+danger+'</div></div>';
+ }).join('')||empty('Không tìm thấy máy chủ phù hợp.');
+ const counter=byId('guild-count');if(counter)counter.textContent=servers.length+' / '+cache.guilds.length+' máy chủ';
+}
 async function guilds(){
  const d=await api('/api/guilds');cache.guilds=d.guilds||[];
- root.innerHTML=card('Máy chủ đang tham gia','<p class="asumi-help">'+asText(d.total)+' máy chủ. Thao tác Suspend và Leave sẽ ảnh hưởng trực tiếp đến bot.</p>'+cache.guilds.map(g=>row(g.name,'ID '+g.id+' · '+g.member_count+' thành viên · '+(g.is_suspended?'Đang tạm ngưng':'Hoạt động'),'<div class="asumi-actions">'+button(g.is_suspended?'Mở lại':'Tạm ngưng',g.is_suspended?'guild-unsuspend':'guild-suspend',g.id)+button('Rời máy chủ','guild-leave',g.id,'asumi-btn-danger')+'</div>')).join('')+(!cache.guilds.length?empty('Bot chưa tham gia máy chủ nào hoặc đang offline.'):''));
+ const filters='<div class="asumi-guild-filters"><input id="guild-query" class="asumi-input" aria-label="Tìm máy chủ" placeholder="Tìm theo tên hoặc ID"><select id="guild-filter" class="asumi-input" aria-label="Lọc trạng thái"><option value="all">Tất cả trạng thái</option><option value="active">Hoạt động</option><option value="suspended">Tạm ngưng</option></select></div>';
+ const toolbar='<div class="asumi-guild-toolbar"><p class="asumi-help">Quản lý các Discord server hiện có của Asumi. Thao tác rời máy chủ nằm trong menu tùy chọn.</p>'+filters+'</div>';
+ root.innerHTML=card('Máy chủ đang tham gia',toolbar+'<div id="guild-rows" class="asumi-guild-list"></div>','<span id="guild-count" class="asumi-guild-count"></span>');
+ root.firstElementChild?.classList.add('asumi-guild-card');renderGuildRows();
 }
 async function presence(){
  const d=await api('/api/presence');cache.presence=d;
@@ -104,6 +126,8 @@ async function load(){
  }
  try{await loaders[page]?.();stamp()}catch(e){root.innerHTML='<div class="asumi-alert" role="alert">Không tải được trang: '+esc(e.message)+'</div>'}finally{busy=false;byId('refresh').disabled=false}
 }
+root.addEventListener('input',ev=>{if(page==='guilds'&&ev.target.id==='guild-query')renderGuildRows()});
+root.addEventListener('change',ev=>{if(page==='guilds'&&ev.target.id==='guild-filter')renderGuildRows()});
 document.addEventListener('click',async ev=>{
  const b=ev.target.closest('[data-action]');if(!b)return;
  const action=b.dataset.action,id=b.dataset.id;
