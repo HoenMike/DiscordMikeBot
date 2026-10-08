@@ -29,6 +29,11 @@ class FeedbackTicket:
     category: str
     created_at: str
     reason: str = ""
+    number: int | None = None
+
+    @property
+    def label(self) -> str:
+        return f"#{self.number}" if self.number else self.id
 
 
 SCHEMA = (
@@ -58,6 +63,19 @@ SCHEMA = (
       updated_at TEXT NOT NULL,
       UNIQUE(guild_id, source_message_id)
     )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS asumi_feedback_numbers (
+      number INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id TEXT NOT NULL UNIQUE REFERENCES asumi_feedback(ticket_id)
+    )
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS feedback_allocate_number
+    AFTER INSERT ON asumi_feedback
+    BEGIN
+      INSERT OR IGNORE INTO asumi_feedback_numbers(ticket_id) VALUES (NEW.ticket_id);
+    END
     """,
     """
     CREATE TABLE IF NOT EXISTS asumi_feedback_events (
@@ -145,18 +163,45 @@ class FeedbackStore:
                 await db_client.execute(statement)
                 if not db_client.is_cloud:
                     raise FeedbackStorageError("Mất kết nối Turso trong lúc tạo schema.")
+            # Existing UUID tickets get stable numbers in chronological order.
+            # New inserts are numbered atomically by the database trigger.
+            await db_client.execute(
+                "INSERT OR IGNORE INTO asumi_feedback_numbers(ticket_id) "
+                "SELECT f.ticket_id FROM asumi_feedback f "
+                "LEFT JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id "
+                "WHERE n.ticket_id IS NULL ORDER BY f.created_at, f.ticket_id"
+            )
+            if not db_client.is_cloud:
+                raise FeedbackStorageError("Turso không sẵn sàng để đánh số ticket.")
             return True
         except Exception as exc:
             print(f"[Feedback] Durable DB unavailable at startup: {type(exc).__name__}", flush=True)
             return False
+
+    async def resolve_id(self, reference: str) -> str | None:
+        """Resolve #15, 15, or the original FB-UUID. IDs never change."""
+        value = str(reference or "").strip().upper()
+        number = value[1:] if value.startswith("#") else value
+        await self._require_cloud()
+        if number.isdecimal() and 0 < len(number) <= 12 and int(number) > 0:
+            async with db_client.execute(
+                "SELECT ticket_id FROM asumi_feedback_numbers WHERE number=?",
+                (int(number),),
+            ) as cursor:
+                row = await cursor.fetchone()
+            if not db_client.is_cloud:
+                raise FeedbackStorageError("Không thể tra số ticket trong Turso.")
+            return str(row[0]) if row else None
+        return value if value.startswith("FB-") and len(value) <= 30 else None
 
     async def find_source(
         self, *, guild_id: int, source_message_id: int, reporter_id: int
     ) -> FeedbackTicket | None:
         await self._require_cloud()
         async with db_client.execute(
-            "SELECT ticket_id, status, title, category, created_at, review_reason "
-            "FROM asumi_feedback WHERE guild_id=? AND source_message_id=? AND reporter_id=?",
+            "SELECT f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, n.number "
+            "FROM asumi_feedback f JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id "
+            "WHERE f.guild_id=? AND f.source_message_id=? AND f.reporter_id=?",
             (str(guild_id), str(source_message_id), str(reporter_id)),
         ) as cursor:
             row = await cursor.fetchone()
@@ -203,8 +248,9 @@ class FeedbackStore:
             if not db_client.is_cloud:
                 raise FeedbackStorageError("Mất Turso; không xác nhận ticket.", may_have_committed=True)
             async with db_client.execute(
-                "SELECT ticket_id, status, title, category, created_at, review_reason "
-                "FROM asumi_feedback WHERE guild_id=? AND source_message_id=? AND reporter_id=?",
+                "SELECT f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, n.number "
+                "FROM asumi_feedback f JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id "
+                "WHERE f.guild_id=? AND f.source_message_id=? AND f.reporter_id=?",
                 (str(guild_id), str(source_message_id), str(reporter_id)),
             ) as cursor:
                 record = await cursor.fetchone()
@@ -221,10 +267,14 @@ class FeedbackStore:
 
     async def own_ticket(self, ticket_id: str, *, reporter_id: int) -> FeedbackTicket | None:
         await self._require_cloud()
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            return None
         async with db_client.execute(
-            "SELECT ticket_id, status, title, category, created_at, review_reason "
-            "FROM asumi_feedback WHERE ticket_id=? AND reporter_id=?",
-            (ticket_id.strip().upper(), str(reporter_id)),
+            "SELECT f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, n.number "
+            "FROM asumi_feedback f JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id "
+            "WHERE f.ticket_id=? AND f.reporter_id=?",
+            (resolved, str(reporter_id)),
         ) as cursor:
             record = await cursor.fetchone()
         if not db_client.is_cloud:
@@ -239,14 +289,16 @@ class FeedbackStore:
         reason = explanation.strip()
         if not 10 <= len(reason) <= 1000:
             raise FeedbackStorageError("Hãy giải thích ngắn gọn vì sao lỗi vẫn còn (10–1000 ký tự).")
-        await self._require_cloud()
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            raise FeedbackStorageError("Không tìm thấy ticket.")
         now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
         async with db_client.execute(
             "UPDATE asumi_feedback "
             "SET status='reopened',review_reason=?,updated_at=?,last_reviewer_id=? "
             "WHERE ticket_id=? AND reporter_id=? "
             "AND status IN ('rejected','duplicate','verified','closed')",
-            (reason, now, str(reporter_id), ticket_id.upper(), str(reporter_id)),
+            (reason, now, str(reporter_id), resolved, str(reporter_id)),
         ) as cursor:
             count = cursor.rowcount
         if not db_client.is_cloud or count != 1:
