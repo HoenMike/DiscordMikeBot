@@ -1,0 +1,18 @@
+<aside class="asumi-sidebar" id="asumi-sidebar" aria-label="Điều hướng quản trị">
+  <a class="asumi-brand" href="/admin"><span class="asumi-brand-icon">A</span><span><strong>Asumi Console</strong><small>Administration</small></span></a>
+  {% set groups = [
+    ('Điều hành', [('overview','Tổng quan','/admin'), ('feedback','Feedback','/admin/feedback')]),
+    ('Quan sát', [('activity','Tương tác','/admin/activity'), ('monitoring','Sức khỏe & Logs','/admin/monitoring')]),
+    ('Tính năng', [('assistant','AI & Search','/admin/assistant'), ('tarot','Tarot','/admin/tarot'), ('cabin','Cabin','/admin/cabin')]),
+    ('Cộng đồng', [('guilds','Máy chủ','/admin/guilds')]),
+    ('Hệ thống', [('presence','Trạng thái Bot','/admin/presence'), ('releases','Phiên bản & Kết nối','/admin/releases')])
+  ] %}
+  <nav class="asumi-nav">{% for group, items in groups %}
+    <div class="asumi-nav-group"><div class="asumi-nav-label">{{ group }}</div>
+    {% for slug, text, link in items %}
+      <a class="asumi-nav-item {% if page == slug %}is-active{% endif %}" href="{{ link }}" {% if page == slug %}aria-current="page"{% endif %}>{{ text }}</a>
+    {% endfor %}</div>
+  {% endfor %}</nav>
+  <div class="asumi-sidebar-foot"><a href="/" target="_blank" rel="noopener noreferrer">Trang công khai ↗</a><a href="/api/auth/logout">Đăng xuất</a></div>
+</aside>
+<div class="asumi-overlay" id="asumi-overlay"></div>
