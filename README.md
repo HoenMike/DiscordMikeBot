@@ -1,10 +1,10 @@
-## T24 — Asumi Admin Console 2.0 (implementation pending CI/deploy)
+## Asumi 3.9.0 — T24 Admin Console 2.0 (live, manual UI acceptance pending)
 
 - Admin console now uses a common grouped sidebar: Overview, Feedback, Activity, Monitoring, AI & Search, Tarot, Cabin, Guilds, Presence and Releases/Connections.
 - Navigable routes: `/admin`, `/admin/feedback`, `/admin/activity`, `/admin/monitoring`, `/admin/assistant`, `/admin/tarot`, `/admin/cabin`, `/admin/guilds`, `/admin/presence`, `/admin/releases`. Temporary `/admin/legacy` remains as a fallback.
 - Feedback review proposals stay inside ticket detail; `/admin/feedback/<ticket-id>` supports a reloadable deep link. Inbox queries are bounded/server-paginated. User reports/attachments remain in existing Turso/R2.
 - Read-only dashboards fetch data by active page; no global 3-second polling. Dangerous actions ask for confirmation and older admin POST endpoints require session CSRF. Existing feature backend/API contracts remain.
-- **Release gate:** verify CI and real Render/Discord production before claiming any T24 feature shipped. Development status is in `docs/ASUMI_T24_ADMIN_CONSOLE_REDESIGN_PLAN.md`.
+- **Release:** PR #53 merged, automated CI passed, Render service reports live and Discord Gateway connected. Authenticated visual/mobile smoke and owner-operated ticket actions still need manual acceptance. Deployment/status is in `docs/ASUMI_T24_ADMIN_CONSOLE_REDESIGN_PLAN.md`.
 
 # Asumi - Bot Discord đa tính năng
 
