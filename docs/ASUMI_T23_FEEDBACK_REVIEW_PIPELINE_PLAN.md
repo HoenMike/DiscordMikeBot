@@ -1,6 +1,6 @@
 # T23 — Asumi Feedback, Review & Implementation Pipeline
 
-Status: **T23.1 IMPLEMENTATION IN PROGRESS / NOT DEPLOYED** (2026-10-08). User requested to proceed. T23.2–T23.5 remain planned.
+Status: **Asumi T23.1–3 deployed in 3.8.2; 3.8.3 final usability/acceptance changes under PR** (2026-10-08). No ticket is approved automatically.
 Owner feedback v0.2: mandatory reporter notifications with reasons; actual image attachments in the MVP; design-aware clarification before submission, without blocking or auto-rejecting reports.
 Owner: Asumi Discord Bot project.
 This is a design proposal, NOT a shipped capability, deployed API, authorized auto-fix system, or a ticket created from user chat.
@@ -215,3 +215,24 @@ The `feat/t23-oauth-mcp-connection` branch adds:
 - MCP tools remain strictly `list_feedback_tickets`, `get_feedback_ticket`, `propose_feedback_review`; no approval or rejection tool. FB-01401CE0D1 still `submitted`.
 
 After CI/deploy, owner completes a single *ChatGPT plugin connection* and Asumi Dashboard login on the consent page. No Render key is pasted into chat. Actual connection success must be verified by reading the real FB ticket through MCP, without changing its status.
+
+
+## T23.5 final acceptance addendum — 3.8.3
+
+**Sequential ticket IDs (owner requested):**
+- Internal `ticket_id=FB-UUID` stays immutable. Add table `asumi_feedback_numbers(number INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id UNIQUE)`; SQL trigger assigns the number in the SAME write as the ticket.
+- On startup run idempotent ordered backfill for existing legacy tickets, sorted by `created_at, ticket_id`. Never reset or recompute existing numbers. New requests receive the next monotonically increasing number; gaps remain gaps if IDs were removed, never renumber.
+- Discord submit, `/feedback status`, admin inbox and DM use human-readable `#1`/ `#15`; old `FB-` IDs keep working. ChatGPT MCP supports `#N` in its tools.
+- User's previously submitted `FB-01401CE0D1` is expected to become `#1` only if it is the oldest feedback when migration runs; verify actual number through MCP after deploy, do not invent the mapping before reading production.
+
+**Screenshot to AI:** owner-authenticated `get_feedback_evidence` tool reads private R2 object by manifest index only, checks ticket guild path and stored SHA-256 checksum, produces bounded JPEG preview via MCP ImageContent. No public R2 URL or bucket keys returned to model. Test rejects cross-guild or tampered files.
+
+**Full reviewer flow:**
+1. Reporter submits report/image and sees `#N`.
+2. ChatGPT Web lists ticket, reads text and private image, researches verified current design/code. It may propose an outcome and reason, but never approve.
+3. Owner opens Feedback Inbox, reads AI suggestion, clicks **Chấp nhận đề xuất** (or direct status change with confirmation). Dismissing proposal leaves reporter ticket unchanged.
+4. Notification outbox sends DM in Vietnamese with `#N` and exact historical reason. If DM unavailable, reporter can check `/feedback status #N`.
+5. After owner approval, implementation can proceed via GitHub Issue/PR; only mark `verified` after deployment + live owner acceptance and release version. DM reports fixed version. Reporter may reopen or answer needs-info.
+6. Real acceptance still pending until owner has exercised owner-confirmed decision + DM in Discord. Do not auto-approve FB-01401CE0D1.
+
+**Live limitations:** GitHub Issue drafting/linking is supported, but unattended Codex task creation/automatic deployment is deliberately NOT enabled, for code/reporter privacy and approval safety.
