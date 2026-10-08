@@ -1,3 +1,7 @@
+## Asumi 3.9.1 — Original Admin Dashboard restored
+
+The familiar pre-T24 eight-tab Admin Dashboard is once again the primary UI at `/admin`. The 3.9.0 sidebar design and subsequent stand-alone prototype are **not** the visual baseline. Existing Feedback Center, ticket lifecycle and Discord controls are retained. Previous /admin/* bookmarks redirect to their classic tab counterparts. See `docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md` for the authoritative future design direction.
+
 ## Asumi 3.9.0 — T24 Admin Console 2.0 (live, manual UI acceptance pending)
 
 - Admin console now uses a common grouped sidebar: Overview, Feedback, Activity, Monitoring, AI & Search, Tarot, Cabin, Guilds, Presence and Releases/Connections.
