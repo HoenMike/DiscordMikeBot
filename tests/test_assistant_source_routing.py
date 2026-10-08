@@ -129,6 +129,83 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.tool, "discord_history.search")
         self.assertEqual(route_locally("tìm lại meme mèo").tool, "archive.search")
 
+    async def test_public_search_synthesis_uses_only_brave_snippets(self):
+        from features.assistant.providers.brave import BraveHit, BraveSearchResult
+        from features.assistant.tools import CommandToolRegistry
+
+        registry = CommandToolRegistry(SimpleNamespace())
+        message = SimpleNamespace(
+            author=SimpleNamespace(id=44),
+            reply=AsyncMock(return_value=SimpleNamespace(id=456)),
+        )
+        brave_report = BraveSearchResult(
+            status="ok",
+            hits=(BraveHit(
+                title="EV report",
+                url="https://example.com/ev",
+                description="Public EV update",
+            ),),
+        )
+        with patch(
+            "features.assistant.tools.brave_search.search",
+            new=AsyncMock(return_value=brave_report),
+        ), patch.object(
+            registry, "_summarize_public_search",
+            new=AsyncMock(return_value="Thông tin này mới [1]."),
+        ) as synth, patch.dict(
+            "os.environ", {"ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED": "true"}
+        ):
+            result = await registry.execute(
+                await self.decision(
+                    "Giá xe điện hôm nay bao nhiêu?",
+                    "web_search", {"web.search"},
+                ),
+                message,
+            )
+        text = message.reply.await_args.args[0]
+        self.assertIn("Thông tin này mới [1]", text)
+        self.assertIn("https://example.com/ev", text)
+        self.assertTrue(result.details["web_synthesized"])
+        synth.assert_awaited_once()
+        self.assertNotIn("query", result.details)
+
+    async def test_grounded_synthesis_failure_falls_back_to_source_list(self):
+        from features.assistant.providers.brave import BraveHit, BraveSearchResult
+        from features.assistant.tools import CommandToolRegistry
+
+        registry = CommandToolRegistry(SimpleNamespace())
+        message = SimpleNamespace(
+            author=SimpleNamespace(id=44),
+            reply=AsyncMock(return_value=SimpleNamespace(id=457)),
+        )
+        brave_report = BraveSearchResult(
+            status="ok",
+            hits=(BraveHit(
+                title="Official update",
+                url="https://example.com/news",
+                description="Public update",
+            ),),
+        )
+        with patch(
+            "features.assistant.tools.brave_search.search",
+            new=AsyncMock(return_value=brave_report),
+        ), patch.object(
+            registry, "_summarize_public_search",
+            new=AsyncMock(side_effect=TimeoutError()),
+        ), patch.dict(
+            "os.environ", {"ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED": "true"}
+        ):
+            result = await registry.execute(
+                await self.decision(
+                    "Tin tức mới nhất hôm nay?",
+                    "web_search", {"web.search"},
+                ),
+                message,
+            )
+        text = message.reply.await_args.args[0]
+        self.assertIn("https://example.com/news", text)
+        self.assertFalse(result.details["web_synthesized"])
+
     def test_public_safety_gate(self):
         self.assertTrue(_safe_public_web_query(
             "giá xe ô tô mới nhất hôm nay là bao nhiêu?"
