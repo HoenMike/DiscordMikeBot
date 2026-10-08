@@ -11,6 +11,7 @@ import unicodedata
 from urllib.parse import urlsplit
 
 import discord
+from core import constants as policy
 
 
 def _plain(value: str, maximum: int) -> str:
@@ -30,12 +31,14 @@ def _fuel_query(query: str) -> bool:
     return "gia xang" in folded
 
 
-def prioritize_sources(query: str, hits, maximum: int = 3):
+def prioritize_sources(query: str, hits, maximum: int | None = None):
     """Order fuel answers toward the original publisher, not aggregators.
 
     This is a presentation preference, *not* a statement that any page contains
     today's verified price. The original Brave order is preserved for ties.
     """
+    if maximum is None:
+        maximum = policy.ASUMI_WEB_SEARCH_DISPLAY_SOURCES
     options = list(hits)
     if _fuel_query(query):
         primary = ("petrolimex.com.vn", "pvoil.com.vn", "moit.gov.vn")
