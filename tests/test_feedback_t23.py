@@ -112,7 +112,7 @@ class FakeCloud:
             key = (guild_id, source_id)
             self.rows.setdefault(key, (ticket_id, "submitted", args[9], args[8], args[14], ""))
     def lookup(self, sql, args):
-        if "WHERE guild_id=?" in sql:
+        if "WHERE guild_id=?" in sql or "WHERE f.guild_id=?" in sql:
             return self.rows.get((args[0], args[1]))
         return None
 
