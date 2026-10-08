@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.7] - 2026-10-08 — *Fuel Source Failover*
+
+- At 10:46 Asumi 3.7.6 still returned Brave snippets with no numbers: PVOIL HTTP 403 can prevent live HTML parsing.
+- New source priority: PVOIL first-party → community VietFuelAPI structured JSON (strict price date/scrape date/units validation) → honest Brave fallback.
+- Clearly label community Vùng 1 prices as non-official and dated; do not pretend they were verified from PVOIL.
+- Log each PVOIL URL attempt as HTTP/parse status, show secondary status on Dashboard; never record raw bodies or Discord content.
+- Unit tests cover 403 fallback, staleness checks, provenance and avoided paid Brave calls.
+
+## [3.7.6] - 2026-10-08 — *Answer-first Fact Retrieval*
+
+- Weather answers use structured Open-Meteo measurements/forecast instead of AQI snippets.
+- Fuel facts are checked before Brave; bounded public allowlisted HTML readings augment generic search synthesis.
+
 ## [3.7.5] - 2026-10-08 — *First-party Verified Fuel Prices*
 
 ### Fixed
