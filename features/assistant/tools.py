@@ -12,7 +12,7 @@ from features.assistant.archive import archive_store
 from features.assistant.providers.brave import brave_search
 from features.assistant.providers.discord_history import DiscordHistorySearcher
 from features.assistant.providers.pvoil_prices import pvoil_reader
-from features.assistant.providers.vietfuel import vietfuel_reader
+from features.assistant.providers.webgia_prices import webgia_reader
 from features.assistant.providers.weather import weather_provider
 from features.assistant.providers.public_pages import fetch_public_page_evidence
 from features.assistant.providers.vectorize import archive_semantic
@@ -384,8 +384,8 @@ class CommandToolRegistry:
         # Never describe these as directly verified PVOIL figures.
         if _fuel_query(query):
             try:
-                backup = await vietfuel_reader.fetch()
-                source_details["aggregate_provider"] = "vietfuel"
+                backup = await webgia_reader.fetch()
+                source_details["aggregate_provider"] = "webgia"
                 source_details["aggregate_status"] = backup.status
                 source_details["aggregate_rows"] = len(backup.rows)
                 source_details["aggregate_ms"] = round(backup.elapsed_ms, 1)
@@ -402,14 +402,14 @@ class CommandToolRegistry:
                         handled=True,
                         response_message_ids=(int(sent.id),),
                         response_context=(
-                            "Community-aggregated Vietnamese retail fuel price, "
+                            "WebGia.TV aggregated Vietnamese retail fuel price, "
                             "not verified directly with PVOIL. "
                             f"Price period {backup.effective_date}.\n"
                             + values + "\nSource: " + backup.source_url
                         )[:1800],
                         details={
                             **source_details,
-                            "web_provider": "vietfuel",
+                            "web_provider": "webgia",
                             "web_search_status": "aggregate_dated",
                             "web_search_ms": 0,
                             "web_result_count": 0,
