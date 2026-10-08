@@ -182,7 +182,7 @@ class ReporterLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Lịch sử và dấu vết xử lý",html)
         self.assertIn("Xác nhận đổi ticket",html)
 
-    def test_discord_user_views_construct_with_real_discord_ui(self):
+    async def test_discord_user_views_construct_with_real_discord_ui(self):
         from features.feedback.user_views import (
             MyFeedbackView, TicketDetailView, DeleteConfirmView, ReviseModal,
         )
