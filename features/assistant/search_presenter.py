@@ -168,3 +168,39 @@ def build_weather_embed(query: str, report) -> discord.Embed:
         text=f"Thời điểm dữ liệu: {report.measured_at.replace('T', ' ')} (giờ VN) · Dự báo có thể thay đổi"
     )
     return embed
+
+
+def build_aggregated_fuel_embed(query: str, report) -> discord.Embed:
+    """Community-source facts, prominently labeled as independently unverified.
+
+    These are structured figures with an explicit price date from a third-party
+    aggregator, NOT a copy of an official PVOIL page or the live price at a pump.
+    """
+    if report.status != "ok" or not report.effective_date or not report.rows:
+        raise ValueError("Dated aggregated fuel prices required")
+    from datetime import date
+    date_label = date.fromisoformat(report.effective_date).strftime("%d/%m/%Y")
+    embed = discord.Embed(
+        title=f"⛽ {_plain(query, 105) or 'Giá xăng dầu'}",
+        description=(
+            f"**Bảng giá tham khảo (Vùng 1) · kỳ {date_label}**\n"
+            + "\n".join(
+                f"• {discord.utils.escape_markdown(label)}: "
+                f"**{value:,} đ/lít**".replace(",", ".")
+                for label, value in report.rows
+            )
+        ),
+        color=0x6985AA,
+    )
+    embed.add_field(
+        name="Nguồn dữ liệu",
+        value=f"[VietFuelAPI — dữ liệu tổng hợp cộng đồng]({report.source_url})",
+        inline=False,
+    )
+    embed.set_footer(
+        text=(
+            "Nguồn tổng hợp, chưa kiểm chứng trực tiếp với PVOIL · "
+            "Ngày kỳ giá không phải giờ cập nhật trực tiếp"
+        )
+    )
+    return embed
