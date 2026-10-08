@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligent Search (3.7.2)
+### Asumi Intelligent Search (3.7.3)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -18,11 +18,11 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - **Archive Save:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.
 - **Archive Search:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.
 - **Archive Forget:** `@Asumi quên #12`.
-- **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` → trả URL nguồn công khai từ Brave (opt-in; cần API key).
-- **Discord History Search:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → tìm tin nhắn cũ trong server, có Jump to Message (opt-in; bot token hiện tại, cần quyền xem lịch sử).
+- **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` hoặc hỏi trực tiếp `@Asumi giá xăng hôm nay như nào` → Brave tự hoạt động khi có `BRAVE_SEARCH_API_KEY` và quota Turso bền vững; **không cần bật thêm biến env**.
+- **Discord History Search:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → tìm tin nhắn cũ trong server, có Jump to Message (dùng Discord bot token hiện tại; kiểm tra quyền user/bot từng channel; cần smoke test API Discord thật).
 - **T22.4a — tìm theo thời gian:** `@Asumi tìm lại tin nhắn đầu tiên của @user trong server`, `@Asumi tìm 5 tin nhắn đầu tiên của @user`, `@Asumi tìm tin nhắn gần nhất của @user`, `@Asumi lần đầu @user nhắc tới Minecraft là khi nào?`. Không cần từ khóa khi chỉ tìm tin đầu/ cuối; có từ khóa thì lọc theo chủ đề. Phải tag chính xác **một người**. Trả tin còn được lập chỉ mục và trong kênh có quyền đọc; không khẳng định tìm được tin đầu tiên tuyệt đối.
 - **T22.4b — follow-up từ kết quả tìm kiếm:** Reply vào kết quả Brave/Discord History để hỏi về nội dung hoặc các link Asumi vừa đưa. Nếu muốn cập nhật dữ liệu web mới, hỏi rõ `@Asumi tìm tiếp trên web giá Honda SH160i hôm nay` (cần API Key Brave). Asumi không tự suy luận từ tin nhắn riêng tư để gửi truy vấn ra Brave.
-- **Clef auto-source (3.7, optional):** khi `ASUMI_AUTO_SEARCH_ENABLED=true`, Clef có thể chọn Brave / Discord History / Archive cho câu hỏi rõ ràng; Brave auto-search có Gemini tổng hợp ngắn, vẫn kèm link nguồn. Luôn kiểm tra provider đã bật và bảo vệ nội dung Discord riêng tư; History Search không ghi toàn bộ lịch sử vào Archive.
+- **Clef auto-source (3.7):** source routing bật qua `core/constants.py`; Clef chỉ chạy khi có Cloudflare credentials, Brave chỉ chạy khi có key; Gemini có thể tóm tắt nguồn công khai kèm link. Không gửi nội dung Discord riêng tư ra web; History không lưu toàn bộ server.
 - **Semantic Search (optional):** khi bật Vectorize, Archive có thể tìm theo ý nghĩa gần nhau chứ không chỉ exact keyword; nếu Cloudflare unavailable thì tự fallback lexical.
 - Archive chỉ được tạo khi user chủ động yêu cầu; bare save không reply/link/ảnh bị từ chối, không có passive full-server logging.
 - Archive search/delete luôn scope theo user đã lưu. Canonical records dùng `core.db` hiện có (Turso Cloud / SQLite fallback).
@@ -33,6 +33,16 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - 3.4 Dashboard phân biệt Archive lexical / semantic-hybrid / fallback, Vectorize latency và Clef fallback mà không lưu nguyên nội dung hội thoại.
 - 3.7.2 Dashboard hiện trạng thái Brave/History, hit count, cache/quota/API calls, nguồn follow-up (metadata only; không lưu nội dung chat).
 - Semantic requests có concurrency guard riêng (mặc định 3) để tránh burst request khi nhiều Save/Search cùng lúc.
+
+### Cấu hình Asumi (không cần bật flags trên Render)
+
+Sửa file [`core/constants.py`](core/constants.py) để thay đổi **model, nguồn tìm kiếm, thời gian chờ, quota Brave (mặc định 500/tháng), cache, cooldown, Context, Discord History, Vectorize**. `.env` và Render Environment chỉ giữ credentials + định danh kết nối (Brave key, Cloudflare token/account ID, Discord token, Turso token).
+
+- Bật Brave: lấy **Search API Key** ở https://api-dashboard.search.brave.com/ rồi nhập `BRAVE_SEARCH_API_KEY` vào Render Environment và Save/Deploy; Asumi tự nhận key.
+- Trước khi bật, thiết lập giới hạn chi tiêu phía Brave; **Brave cũng yêu cầu Turso cloud quota store đang hoạt động**. Nếu Turso không khỏe, bot từ chối chargeable requests.
+- Discord History/Search có policy bật trong code nhưng phải test bot-token endpoint/quyền channel thật; lỗi quyền/API trả thông báo rõ, không đoán kết quả.
+- Archive semantic/Vectorize vẫn **OFF trong constants** cho tới khi kiểm thử quyền Vectorize và chi phí. Không cần và không nên thêm các biến `ASUMI_*_ENABLED` vào Render.
+- Hỏi dữ liệu công khai rõ ràng như `@Asumi giá xăng hôm nay` không phụ thuộc Clef; câu hỏi mơ hồ hoặc có liên hệ chat riêng tư không tự gửi nội dung ra Brave.
 
 ### Tóm tắt cuộc trò chuyện bằng AI
 
