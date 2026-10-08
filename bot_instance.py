@@ -245,21 +245,22 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
         title=f"🤖 HƯỚNG DẪN SỬ DỤNG {BOT_BRAND_NAME.upper()} (TỔNG QUAN & TÍNH NĂNG MỚI)",
         description=(
             f"Chào mừng bạn đến với **{BOT_BRAND_NAME}**! Bot Discord đa tính năng tích hợp AI.\n\n"
-            f"💬 **Asumi 3.6:** hội thoại + Archive + Brave Search + tìm tin nhắn Discord cũ (bật riêng sau live test).\n"
+            f"💬 **Asumi 3.7:** hội thoại + Archive + Brave/Discord History Search + Clef tự chọn nguồn (bật riêng).\n"
             "⌨️ Slash Command (`/`) và Prefix Command (`.m`, `.M`) vẫn được giữ cho thao tác deterministic.\n\n"
             "💡 *Hãy sử dụng menu thả xuống bên dưới để tra cứu chi tiết từng tính năng & cơ chế QoL!*"
         ),
         color=0x7851A9
     )
     embed.add_field(
-        name="💬 ASUMI INTELLIGENCE (3.6)",
+        name="💬 ASUMI INTELLIGENCE (3.7)",
         value=(
             "• Tag bot rồi nói tự nhiên; reply message/link/ảnh để hỏi theo context hoặc follow-up response gần nhất của Asumi.\n"
             "• **Lưu:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.\n"
             "• **Tìm:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.\n"
             "• **Xóa:** `@Asumi quên #12`. Archive chỉ thuộc user đã lưu.\n"
             "• **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` (opt-in).\n"
-            "• **Tìm tin nhắn cũ:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → Jump to Message (opt-in)."
+            "• **Tìm tin nhắn cũ:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → Jump to Message (opt-in).\n"
+            "• **Auto Search:** Khi admin bật, Clef tự chọn Brave / Discord History / Archive theo nội dung hỏi; có kiểm soát quyền, nguồn và quota."
         ),
         inline=False
     )
