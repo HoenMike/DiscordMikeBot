@@ -95,7 +95,7 @@ If you start, complete, reject or materially change a T21 milestone, update `doc
 
 ## Planned next initiative — T22 Intelligent Search
 
-**Status: T22.1 BRAVE + T22.2 HISTORY + T22.3 CLEF IMPLEMENTED; T22.4a CHRONOLOGICAL HISTORY IMPLEMENTED (LIVE VERIFY PENDING); T22.4b IMPLEMENTED (LIVE VERIFY PENDING); T22.5 PLANNED. All search providers opt-in.** Before any T22 work read:
+**Status: T22.1 BRAVE + T22.2 HISTORY + T22.3 CLEF IMPLEMENTED; T22.4a CHRONOLOGICAL HISTORY IMPLEMENTED (LIVE VERIFY PENDING); T22.4b IMPLEMENTED (LIVE VERIFY PENDING); T22.5 SUPERVISED MULTI-SOURCE IMPLEMENTED (LIVE VERIFY PENDING). All search providers require their existing credentials and gates.** Before any T22 work read:
 
 1. `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md`
 2. `docs/ASUMI_T22_SEARCH_HANDOFF.md`
@@ -105,7 +105,7 @@ Owner selected Brave Search API for external web retrieval. **Separate goal:** n
 
 Non-negotiable: no passive entire-guild indexing/backfill, no personal user tokens, no leaks from channels the requester cannot read, no private Discord text sent to Brave, and no unbounded provider usage. Start with official bot-token guild search endpoint and permission validation; use optional index only if justified by real need and explicit admin consent.
 
-T22.4a supports oldest/latest messages by one @mentioned author (no topic required) with chronological search and conservative partial-result wording. T22.4b adds safe explicit web follow-up, source-grounded chat, channel metadata and privacy-safe Dashboard search tracing; T22.5 multi-source automatic chaining remains gated pending live validation. Brave adapter is implemented but requires external API key, explicit enable and live acceptance. Discord History Search and Clef auto-routing implemented but await bot-token/ACL and Brave key live validation; feature flags default OFF; code does not equal live-verified capability. Every T22 PR updates its plan/handoff, tests, and README/help only when behavior ships.
+T22.4a supports oldest/latest messages by one @mentioned author (no topic required) with chronological search and conservative partial-result wording. T22.4b adds safe explicit web follow-up, source-grounded chat, channel metadata and privacy-safe Dashboard search tracing; T22.5 now implements **at most one History search then one public lookup only if the user literally provides a standalone public web query**. Inferred/private-history-to-public-search transitions remain gated; never auto-export Discord text, and never assume matched history and public web refer to the same entity. Brave adapter is implemented but requires external API key, explicit enable and live acceptance. Discord History Search and Clef auto-routing implemented but await bot-token/ACL and Brave key live validation; feature flags default OFF; code does not equal live-verified capability. Every T22 PR updates its plan/handoff, tests, and README/help only when behavior ships.
 
 ## Feature documentation
 
