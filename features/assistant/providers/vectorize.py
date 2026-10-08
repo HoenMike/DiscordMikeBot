@@ -68,9 +68,7 @@ class ArchiveSemanticIndex:
 
     @classmethod
     def from_env(cls) -> "ArchiveSemanticIndex":
-        enabled = os.getenv("CF_ARCHIVE_SEMANTIC_ENABLED", "false").strip().lower() in {
-            "1", "true", "yes", "on"
-        }
+        from core import constants as policy
         ai_token = (
             os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
             or os.getenv("CLOUDFLARE_AUTH_TOKEN", "").strip()
@@ -79,18 +77,13 @@ class ArchiveSemanticIndex:
             account_id=os.getenv("CLOUDFLARE_ACCOUNT_ID", ""),
             ai_token=ai_token,
             vectorize_token=os.getenv("CLOUDFLARE_VECTORIZE_TOKEN", ""),
-            enabled=enabled,
-            index_name=os.getenv("CF_ARCHIVE_VECTORIZE_INDEX", "asumi-archive-v1"),
-            embedding_model=os.getenv(
-                "CF_ARCHIVE_EMBEDDING_MODEL",
-                "@cf/baai/bge-m3",
-            ),
-            dimensions=int(os.getenv("CF_ARCHIVE_VECTOR_DIMENSIONS", "1024")),
-            timeout_seconds=float(os.getenv("CF_ARCHIVE_SEMANTIC_TIMEOUT_SECONDS", "6")),
-            min_score=float(os.getenv("CF_ARCHIVE_SEMANTIC_MIN_SCORE", "0.45")),
-            max_concurrency=int(
-                os.getenv("CF_ARCHIVE_SEMANTIC_MAX_CONCURRENCY", "3")
-            ),
+            enabled=policy.ASUMI_ARCHIVE_SEMANTIC_ENABLED,
+            index_name=policy.ASUMI_ARCHIVE_VECTORIZE_INDEX,
+            embedding_model=policy.ASUMI_ARCHIVE_EMBEDDING_MODEL,
+            dimensions=policy.ASUMI_ARCHIVE_VECTOR_DIMENSIONS,
+            timeout_seconds=policy.ASUMI_ARCHIVE_SEMANTIC_TIMEOUT_SECONDS,
+            min_score=policy.ASUMI_ARCHIVE_SEMANTIC_MIN_SCORE,
+            max_concurrency=policy.ASUMI_ARCHIVE_SEMANTIC_MAX_CONCURRENCY,
         )
 
     @property
