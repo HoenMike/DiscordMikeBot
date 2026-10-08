@@ -1017,15 +1017,27 @@ def feedback_review(ticket_id: str):
 @app.route('/admin/feedback', methods=['GET'])
 @login_required
 def feedback_dashboard():
-    return render_template('feedback.html', feedback_csrf=admin_csrf_token(),
-                           page="feedback", selected_ticket="")
+    """Old bookmarks now open Feedback in the original Admin Dashboard."""
+    return redirect(url_for('admin_dashboard', tab='feedback'))
 
 
 @app.route('/admin/feedback/<ticket_id>', methods=['GET'])
 @login_required
 def feedback_ticket_page(ticket_id):
-    return render_template('feedback.html', feedback_csrf=admin_csrf_token(),
-                           page="feedback", selected_ticket=ticket_id)
+    return redirect(url_for('admin_dashboard', tab='feedback', ticket=ticket_id))
+
+
+@app.route('/admin/_feedback/embed', methods=['GET'])
+@login_required
+def feedback_embedded():
+    """Authenticated chrome-free inbox used only by the classic Feedback tab."""
+    ticket = str(request.args.get('ticket') or '')[:128]
+    response = app.make_response(render_template(
+        'feedback.html', feedback_csrf=admin_csrf_token(), embedded=True,
+        page='feedback', selected_ticket=ticket,
+    ))
+    response.headers['Cache-Control'] = 'private, no-store'
+    return response
 
 
 @app.route('/api/admin/feedback/<ticket_id>/evidence/<int:index>', methods=['GET'])
