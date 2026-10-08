@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.1] - 2026-10-08 — *T22.4a Temporal Discord History Search*
+
+### Added
+- `@Asumi tìm tin nhắn đầu tiên của @user`, `tìm 5 tin nhắn đầu tiên`, or `tìm tin nhắn gần nhất` without requiring a content keyword.
+- `@Asumi lần đầu @user nhắc tới Minecraft là khi nào?` finds chronologically earliest indexed matches for a given topic.
+- Timestamp ascending/descending Discord Search, original Jump links, author filtering, ACL checks and bounded live verification.
+- Explicit wording "earliest/latest found" rather than claiming the absolute first message in server history.
+
+### Safety / rollout
+- Requires existing `ASUMI_DISCORD_HISTORY_ENABLED=true` and real bot-token/permissions tests; disabled by default.
+- Limit five results, at most three API calls; no passive indexing.
+- T22.4b multi-source follow-up, cache/dashboard improvements remain pending.
+
 ## [3.7.0] - 2026-10-08 — *T22.3 Intelligent Source Routing*
 
 ### Added
