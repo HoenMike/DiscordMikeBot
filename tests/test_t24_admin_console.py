@@ -71,6 +71,22 @@ class ConsoleSourceTests(unittest.TestCase):
         self.assertIn("encodeURIComponent", js)
 
 
+    def test_in_place_visual_polish_preserves_guild_actions(self):
+        js = (ROOT / "web/static/admin_console.js").read_text("utf-8")
+        css = (ROOT / "web/static/admin_console.css").read_text("utf-8")
+        self.assertIn("function renderGuildRows()", js)
+        self.assertIn("async function guilds()", js)
+        self.assertIn("'/api/guilds'", js)
+        self.assertIn("guild-suspend", js)
+        self.assertIn("guild-unsuspend", js)
+        self.assertIn("guild-leave", js)
+        self.assertIn("confirmDanger(question,word)", js)
+        self.assertIn("id=\"guild-query\"", js)
+        self.assertIn("id=\"guild-filter\"", js)
+        self.assertIn(".asumi-guild-row", css)
+        self.assertIn(".asumi-more-menu", css)
+
+
 class ConsoleFlaskTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
