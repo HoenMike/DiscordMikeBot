@@ -289,13 +289,12 @@ class ContextBuilder:
 
     @classmethod
     def from_env(cls) -> "ContextBuilder":
+        from core import constants as policy
         return cls(
-            recent_limit=int(os.getenv("ASUMI_CONTEXT_RECENT_MESSAGES", "8")),
-            max_context_chars=int(os.getenv("ASUMI_CONTEXT_MAX_CHARS", "7000")),
-            max_images=int(os.getenv("ASUMI_CONTEXT_MAX_IMAGES", "2")),
-            max_image_bytes=int(
-                os.getenv("ASUMI_CONTEXT_MAX_IMAGE_BYTES", str(5 * 1024 * 1024))
-            ),
+            recent_limit=policy.ASUMI_CONTEXT_RECENT_MESSAGES,
+            max_context_chars=policy.ASUMI_CONTEXT_MAX_CHARS,
+            max_images=policy.ASUMI_CONTEXT_MAX_IMAGES,
+            max_image_bytes=policy.ASUMI_CONTEXT_MAX_IMAGE_BYTES,
         )
 
     async def build(
