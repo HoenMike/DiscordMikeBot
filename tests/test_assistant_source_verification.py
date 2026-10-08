@@ -140,7 +140,6 @@ class VerifiedFuelToolTests(unittest.IsolatedAsyncioTestCase):
             response = await registry.execute(route_locally("tìm trên web giá xăng hôm nay"), msg)
         embed = msg.reply.await_args.kwargs["embed"]
         self.assertIn("27.180 đ/lít", embed.description)
-        self.assertIn("08/10/2026", embed.description) if False else None
         self.assertIn("01/10/2026", embed.description)
         self.assertIn("pvoil.com.vn/tin-gia-xang-dau", embed.fields[0].value)
         self.assertTrue(response.handled)
