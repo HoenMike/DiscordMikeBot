@@ -1,6 +1,6 @@
 # T23 — Asumi Feedback, Review & Implementation Pipeline
 
-Status: **PROPOSAL v0.2 / AWAITING OWNER APPROVAL** (2026-10-08)
+Status: **T23.1 IMPLEMENTATION IN PROGRESS / NOT DEPLOYED** (2026-10-08). User requested to proceed. T23.2–T23.5 remain planned.
 Owner feedback v0.2: mandatory reporter notifications with reasons; actual image attachments in the MVP; design-aware clarification before submission, without blocking or auto-rejecting reports.
 Owner: Asumi Discord Bot project.
 This is a design proposal, NOT a shipped capability, deployed API, authorized auto-fix system, or a ticket created from user chat.
@@ -135,3 +135,25 @@ Classification output is **advisory**: `potential_usage_confusion`, `possibly_re
 17. Bot's design documentation/version disagrees or is unavailable: do not assert that user used it wrong, ask clarifying question and allow feedback as-is.
 
 No code was implemented in this proposal. Await explicit owner approval before T23.1.
+
+
+## T23.1 implementation handoff — first PR (2026-10-08)
+
+Branch: `feat/asumi-t23-1-feedback-mvp` (not yet in main, do not claim live). Files:
+- `features/feedback/policy.py`: explicit report intent and version-aware, overrideable troubleshooting from checked-in behavior contracts; never automatic rejection
+- `features/feedback/cog.py`: Discord member-only clarification and preview buttons; /feedback report + /feedback status; additional screenshot replies; no production source-code changes triggered by tickets
+- `features/feedback/evidence.py`: image type/actual signature validation, dimensions/size caps, EXIF-free PNG re-encoding, private R2 upload and cleanup
+- `features/feedback/store.py`: Turso-only tickets with atomic JSON evidence manifest, audit trigger and notification-outbox schema. Never acknowledge ephemeral SQLite fallback.
+- `bot_instance.py`: feedback intake precedence before the Assistant Cog; existing command precedence retained
+- `tests/test_feedback_t23.py`: report classification, design-aware clarification, image validation/R2, durable-only idempotent storage, wizard and cleanup regressions
+- CI `.github/workflows/asumi-search.yml` includes `features/feedback/**` and tests.
+- Non-secret policies in `core/constants.py`. Required **secret/deployment** values for image persistence are `ASUMI_FEEDBACK_R2_BUCKET`, `CLOUDFLARE_ACCOUNT_ID`, `ASUMI_FEEDBACK_R2_ACCESS_KEY_ID`, `ASUMI_FEEDBACK_R2_SECRET_ACCESS_KEY`; never put these credentials into source.
+
+**Release gates not yet met:**
+1. Finish CI/codereview and test Discord native button/slash command flow, especially 2h session TTL and attachment follow-ups.
+2. Confirm a **private dedicated R2 bucket**, scoped S3 API token and values in Render; R2 may have costs and must not be publicly accessible. No image ticket acceptance before upload receipt.
+3. Confirm production Turso cloud writes, deduplication and screenshot retrieval after restart. Reconcile orphaned R2 objects on partial failure.
+4. Finish T23.2 owner review, notification delivery/reasons/closed-DM fallback; it is NOT delivered in T23.1.
+5. Never mark T23 done merely because this implementation branch/CI is green; require a real Discord reporter-to-admin acceptance test.
+
+Potential follow-up: add owner-only dashboard listing and private R2 image reader, then manual approve/reject with mandatory reasons and outbox delivery; only after this can ChatGPT-side triage/agent workflow be connected.
