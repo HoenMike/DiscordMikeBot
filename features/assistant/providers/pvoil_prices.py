@@ -184,8 +184,8 @@ def parse_pvoil_prices(html: str, *, now: datetime | None = None) -> VerifiedFue
                 suffix = nearby[price_match.end(): price_match.end() + 8]
                 # Never steal a later product's price if this one is missing.
                 # Official PVOIL page formats every valid price with currency.
-                crossed_product = re.search(r"\\b(?:Xăng|Dầu|Diesel)\\b", prefix, re.I)
-                if not crossed_product and re.match(r"\\s*(?:đ|₫|VND)\\b?", suffix, re.I):
+                crossed_product = re.search(r"\b(?:Xăng|Dầu|Diesel)\b", prefix, re.I)
+                if not crossed_product and re.match(r"\s*(?:đ|₫|VND)", suffix, re.I):
                     found_value = _vnd(price_match.group(1))
                     if found_value is not None:
                         found[key] = found_value
