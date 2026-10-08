@@ -162,9 +162,10 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
                 ),
                 message,
             )
-        text = message.reply.await_args.args[0]
-        self.assertIn("Thông tin này mới [1]", text)
-        self.assertIn("https://example.com/ev", text)
+        embed = message.reply.await_args.kwargs["embed"]
+        self.assertIn("Thông tin này mới", embed.description)
+        self.assertNotIn("[1]", embed.description)
+        self.assertIn("https://example.com/ev", embed.fields[0].value)
         self.assertTrue(result.details["web_synthesized"])
         synth.assert_awaited_once()
         self.assertNotIn("query", result.details)
@@ -202,8 +203,9 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
                 ),
                 message,
             )
-        text = message.reply.await_args.args[0]
-        self.assertIn("https://example.com/news", text)
+        embed = message.reply.await_args.kwargs["embed"]
+        self.assertIn("https://example.com/news", embed.fields[0].value)
+        self.assertIn("chưa đủ", embed.description)
         self.assertFalse(result.details["web_synthesized"])
 
     def test_public_safety_gate(self):
