@@ -153,19 +153,26 @@ class ReporterLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(await self.store.own_list(reporter_id=999,guild_id=15)),0)
             self.assertEqual(len(await self.store.own_list(reporter_id=101,guild_id=99)),0)
 
-    async def test_editing_approved_report_is_disallowed(self):
+    async def test_editing_approved_report_creates_fresh_submission_and_preserves_audit(self):
         with patch("features.feedback.store.db_client",self.db):
             await self.store.init()
-            await self.create()
+            first=await self.create()
             await self.store.review(ticket_id="#1",status="approved",
                                     reason="Owner approved",actor_id="owner")
-            with self.assertRaises(FeedbackStorageError):
-                await self.store.replace_own(
-                    ticket_id="#1",reporter_id=101,guild_id=15,
-                    source_message_id=901,bot_version="3.8.4",
-                    description="Changed after owner approval must not override workflow",
-                )
-            self.assertEqual((await self.store.admin_detail("#1"))["status"],"approved")
+            fresh=await self.store.replace_own(
+                ticket_id="#1",reporter_id=101,guild_id=15,
+                source_message_id=901,bot_version="3.8.4",
+                description="Tôi bổ sung lại báo cáo đã được duyệt, cần sửa khác",
+            )
+            self.assertEqual(fresh.number,2)
+            self.assertEqual((await self.store.admin_detail("#2"))["status"],"submitted")
+            self.assertEqual((await self.store.admin_detail("#1"))["status"],"deleted")
+            events=self.db.conn.execute(
+                "SELECT old_status,new_status,reason FROM asumi_feedback_events "
+                "WHERE ticket_id=? ORDER BY event_id",(first.id,)
+            ).fetchall()
+            self.assertTrue(any(row[1]=="approved" and row[2]=="Owner approved" for row in events))
+            self.assertEqual(events[-1][0:2],("approved","deleted"))
 
     def test_admin_ui_does_not_inject_untrusted_ticket_html(self):
         from pathlib import Path
