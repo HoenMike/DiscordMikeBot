@@ -173,6 +173,31 @@ class ReporterLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(await self.store.own_list(reporter_id=999,guild_id=15)),0)
             self.assertEqual(len(await self.store.own_list(reporter_id=101,guild_id=99)),0)
 
+    async def test_cannot_mark_fixed_before_deployment_and_version(self):
+        with patch("features.feedback.store.db_client",self.db):
+            await self.store.init()
+            await self.create()
+            await self.store.review(
+                ticket_id="#1",status="approved",
+                reason="Accepted",actor_id="owner",
+            )
+            with self.assertRaises(FeedbackStorageError):
+                await self.store.review(
+                    ticket_id="#1",status="verified",
+                    reason="Fixed",actor_id="owner",verified_version="3.8.4",
+                )
+            self.assertEqual((await self.store.admin_detail("#1"))["status"],"approved")
+            await self.store.review(
+                ticket_id="#1",status="deployed",
+                reason="CI and Render deployment completed",actor_id="owner",
+            )
+            await self.store.review(
+                ticket_id="#1",status="verified",
+                reason="Reporter confirmed the defect was fixed",actor_id="owner",
+                verified_version="3.8.4",
+            )
+            self.assertEqual((await self.store.admin_detail("#1"))["status"],"verified")
+
     async def test_editing_approved_report_creates_fresh_submission_and_preserves_audit(self):
         with patch("features.feedback.store.db_client",self.db):
             await self.store.init()
