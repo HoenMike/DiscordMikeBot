@@ -477,9 +477,11 @@ class EmbedCog(commands.Cog):
         finally:
             self._in_flight_tasks.pop(message.id, None)
 
-        # Ẩn khung embed lỗi mặc định của Discord trên tin nhắn gốc của người dùng
-        # Giữ nguyên 100% tin nhắn gốc (ảnh, nội dung, danh tính) để tránh mất ảnh và hỗ trợ Reply vàng chat chuẩn Discord
-        if (any_success or any_blocked or any_action_required) and config.get("suppress_original_embed", True):
+        # Only hide native previews when Asumi actually produced media or
+        # moderation blocked it. An action-required warning is NOT a preview.
+        # For mixed-success multi-link messages, keep the original native card
+        # when any platform failed, rather than silently hiding useful media.
+        if (any_success or any_blocked) and not any_action_required and config.get("suppress_original_embed", True):
             if message.id not in self._deleted_message_ids:
                 try:
                     await message.edit(suppress=True)
@@ -560,6 +562,9 @@ class EmbedCog(commands.Cog):
         for state_key in list(self._facebook_proxy_roll_state.keys()):
             if state_key[0] == payload.message_id:
                 self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._facebook_retry_at.keys()):
+            if state_key[0] == payload.message_id:
+                self._facebook_retry_at.pop(state_key, None)
         for state_key in list(self._manual_fallback_previews.keys()):
             if state_key[0] == payload.message_id:
                 self._manual_fallback_previews.pop(state_key, None)
@@ -862,9 +867,25 @@ class EmbedCog(commands.Cog):
         if message.id in self._deleted_message_ids:
             return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
-        # Facebook không nhảy sang yt-dlp. Nếu chưa gửi được proxy nào,
-        # để người dùng chủ động thử lại/roll proxy bằng button Discord.
+        # Tier 2: bounded yt-dlp fallback for Facebook *video* URLs only.
+        # Never synthesize a playable result from a generic login thumbnail.
+        # Successful native proxy previews above NEVER invoke yt-dlp.
         if platform_key == "facebook":
+            facebook_video = bool(re.search(
+                r"/(?:share/[vr]/|reels?/|videos/|watch/?\\?|watch/)",
+                urlparse(url).path + ("?" if urlparse(url).query else ""),
+                flags=re.IGNORECASE,
+            ))
+            if facebook_video:
+                fallback_result = await self._try_ytdlp_fallback(
+                    message, platform_key, url, config,
+                    is_spoiler=is_spoiler, safety=safety,
+                )
+                if isinstance(fallback_result, PreviewResult) and (
+                    fallback_result.success or fallback_result.status in
+                    ("blocked", "cancelled", "degraded")
+                ):
+                    return replace(fallback_result, fallback_reason=proxy_result.reason)
             return await self._offer_manual_fallback(
                 message,
                 platform_key,
@@ -900,6 +921,15 @@ class EmbedCog(commands.Cog):
         try:
             post_data = await fetcher(self.session, url, match)
             if post_data is None:
+                return False
+            # yt-dlp may produce a generic title and poster on Facebook
+            # login-required pages. This is not evidence of a real video.
+            if platform_key == "facebook" and (
+                post_data.media_type != "video" or not post_data.media_urls
+                or is_generic_or_login_preview(
+                    title=post_data.text or "", platform_key="facebook"
+                )
+            ):
                 return False
 
             if safety is not None:
@@ -1099,8 +1129,16 @@ class EmbedCog(commands.Cog):
         safety: PreviewSafety | None = None,
         manual: bool = False,
     ) -> PreviewResult | bool:
-        # Chỉ kích hoạt fallback yt-dlp cho các nền tảng video được hỗ trợ
-        if platform_key not in ("twitter", "tiktok", "instagram", "reddit", "twitch"):
+        # Facebook is allowed only for actual video routes; ordinary posts
+        # must not be mistaken for playable video based on generic thumbnails.
+        supported = ("twitter", "tiktok", "instagram", "reddit", "twitch", "facebook")
+        if platform_key not in supported:
+            return False
+        if platform_key == "facebook" and not (
+            re.search(r"/(?:share/[vr]/|reels?/|videos/)", urlparse(url).path,
+                      flags=re.IGNORECASE)
+            or urlparse(url).path.startswith("/watch")
+        ):
             return False
 
         try:
@@ -1135,6 +1173,12 @@ class EmbedCog(commands.Cog):
                 file = await self._create_spoiler_file(post_data.media_urls[0], max_bytes=message.guild.filesize_limit)
             elif post_data.media_type == "video" and post_data.media_urls:
                 file = await self._download_video_file(post_data.media_urls, platform_key, max_bytes=message.guild.filesize_limit)
+
+            # Facebook video fallback must genuinely attach playable media.
+            # If Facebook blocks the CDN or the file exceeds guild limits,
+            # do not advertise a static thumbnail as a successful video.
+            if platform_key == "facebook" and file is None:
+                return False
 
             # Nếu đã đính kèm file video MP4 (Discord tự hiển thị video player native),
             # xóa ảnh thumbnail tĩnh khỏi embed để tránh bị lặp 2 lần hình ảnh trong giao diện chat
