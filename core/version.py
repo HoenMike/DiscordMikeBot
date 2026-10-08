@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.3"
+CURRENT_VERSION = "3.7.4"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.3 - Code-owned Search Policy"
+CODENAME = "Asumi 3.7.4 - Compact Search Results"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.4", "date": "2026-10-08",
+        "type": "bugfix", "title": "Brave Search Presentation & Result Quality",
+        "summary": "Trả lời trước, chỉ 3 nguồn có link rõ ràng; bỏ HTML rác và kết quả dài.",
+        "changes": [
+            {"category": "🔎 Brave Search UX", "items": [
+                "Brave trả Discord embed gọn: câu trả lời ngắn, tối đa 3 nguồn và link gốc.",
+                "Rút bớt nội dung lặp; làm sạch HTML như strong và trích dẫn [1] không có link.",
+                "Với giá xăng Việt Nam mới nhất, mở rộng keyword tìm đúng bảng giá và kỳ điều hành, không tăng request.",
+                "Ưu tiên nguồn công bố trực tiếp trong phần hiển thị, giảm trang tổng hợp hoặc biểu đồ cũ.",
+                "Không bịa giá hiện tại khi trích đoạn thiếu số liệu/ngày phù hợp.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.3", "date": "2026-10-08",
         "type": "bugfix", "title": "Code-owned Assistant Configuration",
