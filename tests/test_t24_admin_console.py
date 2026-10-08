@@ -95,11 +95,43 @@ class ConsoleFlaskTests(unittest.TestCase):
         self.assertIn(b"tab-btn-guilds", response.data)
         self.assertIn(b"tab-btn-tarot", response.data)
         self.assertIn(b"tab-btn-logs", response.data)
-        self.assertIn(b"Feedback Inbox", response.data)
+        self.assertIn(b"tab-btn-feedback", response.data)
+        self.assertIn(b"tab-content-feedback", response.data)
+        self.assertIn(b"feedback-inbox-frame", response.data)
         self.assertNotIn(b"asumi-sidebar", response.data)
-        for path in ("/admin/feedback", "/admin/feedback/FB-TEST-15"):
-            with self.subTest(path=path):
-                self.assertEqual(self.client.get(path).status_code, 200)
+        # Previous Feedback bookmarks must point inside the classic dashboard.
+        inbox = self.client.get("/admin/feedback")
+        self.assertEqual(inbox.status_code, 302)
+        self.assertTrue(inbox.headers["Location"].endswith("/admin?tab=feedback"))
+        ticket = self.client.get("/admin/feedback/FB-TEST-15")
+        self.assertEqual(ticket.status_code, 302)
+        self.assertIn("tab=feedback", ticket.headers["Location"])
+        self.assertIn("ticket=FB-TEST-15", ticket.headers["Location"])
+        # The embedded view must have no second admin shell, and stays private.
+        embedded = self.client.get("/admin/_feedback/embed?ticket=FB-TEST-15")
+        self.assertEqual(embedded.status_code, 200)
+        self.assertIn(b"Feedback Center", embedded.data)
+        self.assertIn(b"feedback-embedded", embedded.data)
+        self.assertNotIn(b"asumi-sidebar", embedded.data)
+        self.assertEqual(embedded.headers["Cache-Control"], "private, no-store")
+
+    def test_embedded_feedback_requires_admin_login(self):
+        response = self.client.get("/admin/_feedback/embed")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.headers["Location"])
+        self.assertEqual(self.client.get("/admin/feedback").status_code, 302)
+
+    def test_classic_dashboard_feedback_navigation_is_lazy_and_safe(self):
+        template = (ROOT / "web/templates/dashboard.html").read_text("utf-8")
+        self.assertIn("function openFeedbackFrame()", template)
+        self.assertIn("/admin/_feedback/embed", template)
+        self.assertIn("event.origin !== location.origin", template)
+        self.assertIn("event.source !== frame.contentWindow", template)
+        feedback = (ROOT / "web/templates/feedback.html").read_text("utf-8")
+        self.assertIn("window.parent.postMessage", feedback)
+        self.assertIn("event.source!==window.parent", feedback)
+        self.assertIn("{% if not embedded %}", feedback)
+        self.assertIn("ChatGPT", feedback)
 
     def test_newer_dashboard_bookmarks_redirect_to_old_tabs(self):
         self.login()
