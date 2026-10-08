@@ -115,6 +115,26 @@ class ReporterLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 [2,1],
             )
 
+    async def test_reporter_revision_dismisses_stale_ai_proposal(self):
+        with patch("features.feedback.store.db_client",self.db):
+            await self.store.init()
+            first=await self.create()
+            proposal_id=await self.store.propose_review(
+                ticket_id="#1",target_status="approved",
+                reason="Confirmed defect in summary routing with tag.",
+            )
+            before=await self.store.list_proposals(ticket_id="#1")
+            self.assertEqual(before[0]["state"],"pending")
+            await self.store.replace_own(
+                ticket_id="#1",reporter_id=101,guild_id=15,
+                source_message_id=901,bot_version="3.8.4",
+                description="Tôi đã sửa mô tả, hãy xem phiên bản mới",
+            )
+            after=await self.store.list_proposals(ticket_id="#1")
+            self.assertEqual(after[0]["state"],"dismissed")
+            self.assertEqual(after[0]["reviewer_id"],"101")
+            self.assertEqual((await self.store.admin_detail("#2"))["status"],"submitted")
+
     async def test_deleted_ticket_does_not_allow_replacement_or_admin_review(self):
         with patch("features.feedback.store.db_client",self.db):
             await self.store.init()
