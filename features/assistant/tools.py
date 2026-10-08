@@ -7,6 +7,7 @@ import discord
 from dataclasses import dataclass, field
 
 from features.assistant.archive import archive_store
+from features.assistant.providers.brave import brave_search
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 
@@ -268,6 +269,74 @@ class CommandToolRegistry:
 
         return ToolExecutionResult(handled=False)
 
+    async def _execute_web_search(
+        self,
+        decision: RouteDecision,
+        message,
+    ) -> ToolExecutionResult:
+        # Only the current user's explicit query reaches Brave. Never attach
+        # conversation session, replied Discord text, or Archive content.
+        query = str(decision.arguments.get("query") or "").strip()
+        report = await brave_search.search(query, user_id=int(message.author.id))
+        details = {
+            "web_provider": "brave",
+            "web_search_status": report.status,
+            "web_search_ms": round(report.elapsed_ms, 1),
+            "web_result_count": len(report.hits),
+            "web_cache_hit": report.cache_hit,
+            "web_quota_remaining": report.remaining,
+        }
+
+        notices = {
+            "disabled": "Web Search chưa bật. Cần BRAVE_SEARCH_API_KEY và ASUMI_WEB_SEARCH_ENABLED=true trên Render.",
+            "empty_query": "Bạn hãy ghi chủ đề cần tìm sau 'tìm trên web', ví dụ: @Asumi tìm trên web game mới tháng này.",
+            "cooldown": "Bạn vừa tìm kiếm; đợi một chút rồi thử lại để tránh tốn quota Brave.",
+            "quota_exhausted": "Đã đạt giới hạn Brave Search tháng này. Asumi sẽ không gửi thêm request tính phí.",
+            "quota_unavailable": "Không kiểm tra được quota bền vững, nên Asumi tạm dừng tìm kiếm để tránh chi phí.",
+            "unauthorized": "Brave API key chưa hợp lệ hoặc chưa có quyền Search.",
+            "rate_limited": "Brave đang giới hạn request/quota. Hãy thử lại sau.",
+            "provider_error": "Brave Search đang lỗi; không có kết quả nào được xác minh.",
+            "timeout": "Brave Search quá thời gian chờ, hãy thử lại sau.",
+            "no_results": "Không thấy kết quả web phù hợp. Hãy thử từ khóa khác.",
+        }
+
+        if report.status == "ok":
+            lines = ["🔎 **KẾT QUẢ TÌM KIẾM WEB · BRAVE**"]
+            for i, item in enumerate(report.hits, 1):
+                title = discord.utils.escape_markdown(
+                    discord.utils.escape_mentions(item.title)
+                )
+                snippet = discord.utils.escape_markdown(
+                    discord.utils.escape_mentions(item.description)
+                )
+                lines.append(
+                    f"**{i}. {title}**\n"
+                    + (f"> {snippet}\n" if snippet else "")
+                    + f"<{item.url}>"
+                )
+            lines.append("*Nguồn từ Brave Search. Mở link gốc để kiểm chứng thông tin.*")
+            text = "\n\n".join(lines)[:1900]
+        else:
+            text = "🔎 **Brave Search:** " + notices.get(
+                report.status, "Không thể tìm kiếm lúc này."
+            )
+
+        sent = await message.reply(
+            text,
+            mention_author=False,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return ToolExecutionResult(
+            handled=True,
+            response_message_ids=(int(sent.id),),
+            response_context=(
+                f"Web Search: {len(report.hits)} results with source URLs"
+                if report.status == "ok"
+                else f"Web Search: {report.status}"
+            ),
+            details=details,
+        )
+
     @staticmethod
     def _command_for(decision: RouteDecision) -> str | None:
         if decision.tool == "help.show":
@@ -330,6 +399,9 @@ class CommandToolRegistry:
         return message_ids[-8:], "\n\n".join(rendered)[:6000]
 
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        if decision.tool == "web.search":
+            return await self._execute_web_search(decision, message)
+
         if decision.tool and decision.tool.startswith("archive."):
             try:
                 return await self._execute_archive(decision, message)
