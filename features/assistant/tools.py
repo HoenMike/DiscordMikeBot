@@ -12,12 +12,14 @@ from features.assistant.archive import archive_store
 from features.assistant.providers.brave import brave_search
 from features.assistant.providers.discord_history import DiscordHistorySearcher
 from features.assistant.providers.pvoil_prices import pvoil_reader
+from features.assistant.providers.vietfuel import vietfuel_reader
 from features.assistant.providers.weather import weather_provider
 from features.assistant.providers.public_pages import fetch_public_page_evidence
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 from features.assistant.search_presenter import (
     build_search_embed, build_verified_fuel_embed, build_weather_embed,
+    build_aggregated_fuel_embed,
     prioritize_sources, _plain, _fuel_query,
 )
 
@@ -338,6 +340,7 @@ class CommandToolRegistry:
                     "first_party_status": source.status,
                     "first_party_ms": round(source.elapsed_ms, 1),
                     "first_party_rows": len(source.rows),
+                    "first_party_reason": ",".join(source.attempts)[:220],
                 }
                 if source.status == "ok":
                     sent = await message.reply(
@@ -375,7 +378,49 @@ class CommandToolRegistry:
                     "first_party_status": "error",
                     "first_party_rows": 0,
                 }
-        report = await brave_search.search(query, user_id=int(message.author.id))
+        # Primary publisher may return 403 from datacenter IPs. Try a
+        # separate structured community aggregator, but only use prices when
+        # it exposes a fresh scrape timestamp, dated price period and amounts.
+        # Never describe these as directly verified PVOIL figures.
+        if _fuel_query(query):
+            try:
+                backup = await vietfuel_reader.fetch()
+                source_details["aggregate_provider"] = "vietfuel"
+                source_details["aggregate_status"] = backup.status
+                source_details["aggregate_rows"] = len(backup.rows)
+                source_details["aggregate_ms"] = round(backup.elapsed_ms, 1)
+                if backup.status == "ok":
+                    sent = await message.reply(
+                        embed=build_aggregated_fuel_embed(query, backup),
+                        mention_author=False,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    values = "\n".join(
+                        f"{label}: {price} VND/lít" for label, price in backup.rows
+                    )
+                    return ToolExecutionResult(
+                        handled=True,
+                        response_message_ids=(int(sent.id),),
+                        response_context=(
+                            "Community-aggregated Vietnamese retail fuel price, "
+                            "not verified directly with PVOIL. "
+                            f"Price period {backup.effective_date}.\n"
+                            + values + "\nSource: " + backup.source_url
+                        )[:1800],
+                        details={
+                            **source_details,
+                            "web_provider": "vietfuel",
+                            "web_search_status": "aggregate_dated",
+                            "web_search_ms": 0,
+                            "web_result_count": 0,
+                            "web_cache_hit": False,
+                            "web_quota_remaining": None,
+                        },
+                    )
+            except Exception as exc:
+                print(f"⚠️ [Asumi Facts] fuel aggregate failed: {type(exc).__name__}", flush=True)
+                source_details["aggregate_status"] = "error"
+                report = await brave_search.search(query, user_id=int(message.author.id))
         details = {
             "web_provider": "brave",
             "web_search_status": report.status,
@@ -403,9 +448,18 @@ class CommandToolRegistry:
         if report.status == "ok":
             display_hits = prioritize_sources(query, report.hits)
             details["web_displayed_count"] = len(display_hits)
-            summary = ""
+            # Fuel lookup failed at both structured sources. A generic
+            # snippet does not justify claiming the next adjustment is due,
+            # and a model must not hallucinate a current pump price.
+            summary = (
+                "Mình chưa truy xuất được bảng giá có ngày hiệu lực từ nguồn "
+                "trực tiếp hoặc nguồn tổng hợp. Các trang bên dưới chỉ là "
+                "tham khảo, chưa đủ để xác nhận giá hiện hành."
+                if _fuel_query(query) else ""
+            )
             should_synthesize = (
-                decision.source in {"clef_web_search", "local_fresh_public"}
+                not _fuel_query(query)
+                and decision.source in {"clef_web_search", "local_fresh_public"}
                 and policy.ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED
             )
             if should_synthesize:
