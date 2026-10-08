@@ -171,3 +171,12 @@ T22.4a is only the chronological search slice; T22.4b remains for multi-source f
 ### Asumi 3.7.3 configuration contract — 2026-10-08
 
 Asumi runtime non-secret feature policy, models and quotas now live in `core/constants.py`, not Render env. Only external credentials and environment connection identifiers remain in env. All historical `*_ENABLED` and other operational env examples above were earlier rollout guidance and are superseded. Brave activates when `BRAVE_SEARCH_API_KEY` is present **and** a durable Turso quota store is healthy (otherwise fail closed). Automatic conservative fresh public price queries (including gasoline) can route without Clef; private references never do. Discord History code-enabled but still needs live bot-token/ACL acceptance; Archive Vectorize semantic stays code-OFF pending live test. User-facing no-key response acknowledges the integration rather than pretending it is absent. T22.5 cross-source synthesis still needs user-approved public query scope.
+
+
+### 2026-10-08 acceptance checkpoint — Asumi 3.7.7
+
+**Fuel-price answer flow: production-accepted by the user (11:10 ICT)** following a live Discord embed with WebGia.TV Vùng 1 numeric prices, dated 01/10/2026 and clearly marked as third-party aggregated figures. See `docs/ASUMI_T22_SEARCH_HANDOFF.md` for the exact evidence and values. This sign-off applies only to the fuel-price query/output, not T22 overall.
+
+**Still open:** real weather-provider acceptance; native Discord History bot-token/search and channel ACL tests; Archive Vectorize production acceptance; T22.5 privacy-safe multi-source retrieval and ranking. T22.5 must never silently transmit private Discord conversations into public web search; require a concrete public query/explicit user confirmation when deriving it from history.
+
+**Next-goal sequence:** (1) close outstanding production smoke tests, (2) implement T22.5 bounded supervised cross-source reasoning with clear citations and fallback, (3) assess relevance/answer-quality regressions using real user questions. Continue recording implementation decisions and handoffs here and in the search handoff document.
