@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.6.0"
+CURRENT_VERSION = "3.7.0"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.6 - Discord History Search"
+CODENAME = "Asumi 3.7 - Intelligent Source Routing"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.0", "date": "2026-10-08",
+        "type": "minor", "title": "Intelligent Source Routing",
+        "summary": "T22.3: Clef chọn nguồn Brave/Discord History/Archive có gate an toàn và synthesis nguồn công khai.",
+        "changes": [
+            {"category": "🧠 Source selection", "items": [
+                "Clef phân loại web_search, discord_history hoặc archive_search theo câu hỏi; không gọi API ngoài nếu chưa bật feature flag.",
+                "Web auto-search chỉ cho câu hỏi thông tin công khai có dấu hiệu cần dữ liệu mới; Discord/Archive tách biệt.",
+                "Brave tự động có thể tổng hợp ngắn từ kết quả công khai rồi đưa URL nguồn thực tế.",
+            ]},
+            {"category": "🛡️ Privacy & availability", "items": [
+                "Không chuyển Discord private references hoặc reply mơ hồ vào Brave auto-search.",
+                "Không mở tool lại khi reply follow-up trừ explicit action; lỗi synthesis fallback về kết quả nguồn thật.",
+                "Auto-search OFF theo mặc định; provider gốc cũng phải bật riêng.",
+            ]},
+        ],
+    },
     {
         "version": "3.6.0", "date": "2026-10-08",
         "type": "minor", "title": "Discord History Search",
