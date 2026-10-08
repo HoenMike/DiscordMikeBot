@@ -201,6 +201,14 @@ Implementation PR: **#31 — feat: Asumi 3.4 Intelligence Polish**.
 
 During 3.2 live testing, the Daily result exposed a presentation issue: the AI-pending state was visually hidden below a tall Reading Board. 3.2.1 moves the pending status above the board and compacts one-card final results. Re-run the Tarot live case in the acceptance matrix after deploy.
 
+## Next initiative after T21 — T22 Intelligent Search (planning only)
+
+Owner explicitly selected Brave Search API for external web lookup and requested a separate on-demand historical Discord message search. Target user story: find what a mentioned member wrote earlier in the year about buying a vehicle, even if nobody saved that message into Archive, and return an original Discord Jump to Message link.
+
+**Source of truth:** `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md` and `docs/ASUMI_T22_SEARCH_HANDOFF.md`.
+Current T22 implementation status: **NOT STARTED**. Do not imply Brave or Discord historical search already runs. T21 live regressions remain outstanding and are unchanged by this planning decision.
+
+---
 ## Exact next action
 
 Two live tasks remain before T21 can be marked fully accepted:
