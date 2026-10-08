@@ -38,3 +38,6 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_assistant_brave.py" -v
           python -m unittest discover -s tests -p "test_assistant_history.py" -v
+          python -m unittest discover -s tests -p "test_assistant_core.py" -v
+          python -m unittest discover -s tests -p "test_assistant_archive.py" -v
+          python -m unittest discover -s tests -p "test_assistant_semantic.py" -v
