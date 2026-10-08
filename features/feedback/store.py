@@ -310,7 +310,7 @@ class FeedbackStore:
         await self._require_cloud()
         limit = max(1, min(100, int(limit)))
         sql = (
-            "SELECT ticket_id, status, title, category, created_at, review_reason, "
+            "SELECT f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version, "
             "source_message_id, reported_bot_message_id, n.number "
@@ -345,7 +345,7 @@ class FeedbackStore:
         if not resolved:
             return None
         cols = (
-            "ticket_id, status, title, category, created_at, review_reason, "
+            "f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, "
             "resolved_version, source_message_id, reported_bot_message_id, n.number"
