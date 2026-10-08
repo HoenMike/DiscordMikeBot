@@ -4,6 +4,14 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ---
 
+## Asumi 3.8.1 — Review có xác nhận (T23.3–T23.5)
+
+- ChatGPT chỉ đọc ticket hoặc **gửi đề xuất** bằng private connector API; một đề xuất không tự thay đổi feedback. Chủ bot bấm **Chấp nhận / Bỏ qua** ở `/admin/feedback`, có CSRF và nhật ký ghi nhận.
+- Các quyền duyệt/đổi trạng thái trực tiếp qua connector vẫn bị khóa. Không bao giờ tự approve/reject chỉ vì AI phân loại được một ticket.
+- Admin có thể copy GitHub Issue draft từ ticket và liên kết GitHub Issue/PR/phiên bản khi đã duyệt.
+- Người báo có `/feedback reopen` kèm lý do nếu lỗi còn tái diễn; thông báo lịch sử dùng reason tại thời điểm ra quyết định, không lấy reason của quyết định mới.
+- Để dùng ngay trong ChatGPT cần kết nối plugin riêng và bearer credential ở Render; hai việc này yêu cầu hành động cấp quyền của chủ sở hữu, không tự bật khi deploy.
+
 ## Asumi 3.8 — Feedback (T23)
 
 - User: `@Asumi báo lỗi: ...`, `@Asumi góp ý: ...` hoặc slash `/feedback report`, `/feedback suggest`. Bot so sánh với thiết kế đã ghi nhận, hỏi thêm và **luôn cho phép gửi** ngay cả khi bot nghi là người dùng hiểu nhầm. Nút thao tác chỉ người báo dùng được.
