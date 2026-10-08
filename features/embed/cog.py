@@ -871,11 +871,11 @@ class EmbedCog(commands.Cog):
         # Never synthesize a playable result from a generic login thumbnail.
         # Successful native proxy previews above NEVER invoke yt-dlp.
         if platform_key == "facebook":
-            facebook_video = bool(re.search(
-                r"/(?:share/[vr]/|reels?/|videos/|watch/?\\?|watch/)",
-                urlparse(url).path + ("?" if urlparse(url).query else ""),
-                flags=re.IGNORECASE,
-            ))
+            facebook_path = urlparse(url).path.lower()
+            facebook_video = bool(
+                re.search(r"/(?:share/[vr]/|reels?/|videos/)", facebook_path)
+                or facebook_path.startswith("/watch")
+            )
             if facebook_video:
                 fallback_result = await self._try_ytdlp_fallback(
                     message, platform_key, url, config,
@@ -922,16 +922,6 @@ class EmbedCog(commands.Cog):
             post_data = await fetcher(self.session, url, match)
             if post_data is None:
                 return False
-            # yt-dlp may produce a generic title and poster on Facebook
-            # login-required pages. This is not evidence of a real video.
-            if platform_key == "facebook" and (
-                post_data.media_type != "video" or not post_data.media_urls
-                or is_generic_or_login_preview(
-                    title=post_data.text or "", platform_key="facebook"
-                )
-            ):
-                return False
-
             if safety is not None:
                 safety.is_nsfw |= post_data.is_nsfw
                 post_data.is_nsfw = safety.is_nsfw
@@ -1144,6 +1134,16 @@ class EmbedCog(commands.Cog):
         try:
             post_data = await extract_media_ytdlp(url, platform_key)
             if post_data is None:
+                return False
+
+            # A generic Facebook login page or a static preview poster
+            # is not a playable fallback.
+            if platform_key == "facebook" and (
+                post_data.media_type != "video" or not post_data.media_urls
+                or is_generic_or_login_preview(
+                    title=post_data.text or "", platform_key="facebook"
+                )
+            ):
                 return False
 
             if safety is not None:
