@@ -90,3 +90,10 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - Enabling live requires Brave token/flag for Web and explicit Discord History flag after ACL/bot-token API smoke test; then turn on auto flag.
 - New tests `tests/test_assistant_source_routing.py` under CI; verify CI green and real-provider behavior before production acceptance.
 - **Next T22.4:** richer follow-up/retrieval context, source ranking, Dashboard search-specific observability and cache improvements.
+
+## T22.3 CI verification — 2026-10-08
+
+- PR **#36** — `feat: Asumi 3.7 T22.3 gated Clef source routing`.
+- GitHub Actions `Asumi Search Regression` run 37716844816 passed **117 tests**: Brave (12), History (16), new T22.3 source routing (15), conversational core (50), Archive (12), semantic adapter (12).
+- Automatic search is default OFF; Brave and Discord History are separately default OFF. Live source selection and source-derived Gemini explanation still require provider keys, flags and real Discord smoke testing.
+- T22.4 remains planned: improved multi-source evidence follow-up and ranking/cache/observability; do not treat T22.3 as an unrestricted autonomous agent.
