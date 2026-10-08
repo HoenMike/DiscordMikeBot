@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -138,6 +139,8 @@ class BraveSearchAdapter:
             if not isinstance(raw, dict):
                 continue
             url = str(raw.get("url") or "").strip()
+            if any(ch in url for ch in "<>\r\n"):
+                continue
             parsed = urlsplit(url)
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or url in seen:
                 continue
@@ -156,6 +159,14 @@ class BraveSearchAdapter:
         clean_query = " ".join((query or "").split())[:350]
         if not clean_query:
             return BraveSearchResult(status="empty_query")
+
+        # Never forward Discord references to a public search provider.
+        if re.search(
+            r"(?:discord(?:app)?\.com/channels/|<[@#][!&]?\d+>|@everyone|@here)",
+            clean_query,
+            flags=re.IGNORECASE,
+        ):
+            return BraveSearchResult(status="private_reference")
 
         started = time.perf_counter()
         cache_key = clean_query.casefold()
