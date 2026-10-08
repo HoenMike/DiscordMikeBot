@@ -40,7 +40,9 @@ class OwnerGateTests(unittest.IsolatedAsyncioTestCase):
                     async def __aexit__(self, *e): return None
                 return Cursor()
         db = DB()
-        with patch("features.feedback.store.db_client", db):
+        with patch("features.feedback.store.db_client", db), patch.object(
+            FeedbackStore, "resolve_id", new=AsyncMock(return_value="FB-1")
+        ):
             await FeedbackStore().reopen_own(
                 ticket_id="FB-1", reporter_id=123,
                 explanation="The same bug still occurs after the shipped fix.",
@@ -48,7 +50,9 @@ class OwnerGateTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("reporter_id=?",db.sql)
         self.assertIn("status IN ('rejected','duplicate','verified','closed')", db.sql)
         self.assertEqual(db.args[-1],"123")
-        with patch("features.feedback.store.db_client", DB(rowcount=0)):
+        with patch("features.feedback.store.db_client", DB(rowcount=0)), patch.object(
+            FeedbackStore, "resolve_id", new=AsyncMock(return_value="FB-1")
+        ):
             with self.assertRaises(FeedbackStorageError):
                 await FeedbackStore().reopen_own(
                     ticket_id="FB-1", reporter_id=987,
