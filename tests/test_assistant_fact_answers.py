@@ -140,6 +140,8 @@ class FuelFactsFirstTests(unittest.IsolatedAsyncioTestCase):
         msg = SimpleNamespace(author=SimpleNamespace(id=77), reply=AsyncMock(return_value=SimpleNamespace(id=201)))
         with patch("features.assistant.tools.pvoil_reader.fetch", new=AsyncMock(
             return_value=VerifiedFuelReport(status="unavailable")
+        )), patch("features.assistant.tools.webgia_reader.fetch", new=AsyncMock(
+            return_value=SimpleNamespace(status="unavailable", rows=(), elapsed_ms=0),
         )), patch("features.assistant.tools.brave_search.search", new=AsyncMock(
             return_value=BraveSearchResult(status="ok", hits=(
                 BraveHit(title="Bảng giá", url="https://example.org/prices",
@@ -150,7 +152,7 @@ class FuelFactsFirstTests(unittest.IsolatedAsyncioTestCase):
                 await route_message("giá xăng hôm nay như nào"), msg,
             )
         self.assertEqual(result.details["first_party_status"], "unavailable")
-        self.assertIn("chưa đủ để xác minh", msg.reply.await_args.kwargs["embed"].description)
+        self.assertIn("chưa truy xuất được bảng giá", msg.reply.await_args.kwargs["embed"].description)
 
 
 if __name__ == "__main__":

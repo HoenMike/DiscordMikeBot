@@ -55,6 +55,7 @@ class VerifiedFuelReport:
     rows: tuple[VerifiedFuelPrice, ...] = ()
     source_url: str = ""
     elapsed_ms: float = 0.0
+    attempts: tuple[str, ...] = ()
 
 
 class _OfficialPage(HTMLParser):
@@ -216,10 +217,12 @@ class PVOILPriceReader:
                 return self._cached
             started = time.perf_counter()
             selected = VerifiedFuelReport(status="unavailable")
+            attempts: list[str] = []
             timeout = aiohttp.ClientTimeout(total=policy.ASUMI_FUEL_SOURCE_TIMEOUT_SECONDS)
             try:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
-                    for url in OFFICIAL_PVOIL_URLS:
+                    for index, url in enumerate(OFFICIAL_PVOIL_URLS):
+                        source_id = f"pvoil_{index + 1}"
                         try:
                             async with session.get(
                                 url,
@@ -227,15 +230,19 @@ class PVOILPriceReader:
                                 allow_redirects=False,
                             ) as response:
                                 if response.status != 200:
+                                    attempts.append(f"{source_id}:http_{response.status}")
                                     continue
                                 if "text/html" not in response.headers.get("Content-Type", ""):
+                                    attempts.append(f"{source_id}:not_html")
                                     continue
                                 body = await response.content.read(
                                     policy.ASUMI_FUEL_SOURCE_MAX_RESPONSE_BYTES + 1
                                 )
                                 if len(body) > policy.ASUMI_FUEL_SOURCE_MAX_RESPONSE_BYTES:
+                                    attempts.append(f"{source_id}:too_large")
                                     continue
                                 candidate = parse_pvoil_prices(body.decode("utf-8", "replace"))
+                                attempts.append(f"{source_id}:{candidate.status}")
                                 if candidate.status == "ok" and (
                                     selected.effective_at is None
                                     or candidate.effective_at > selected.effective_at
@@ -247,14 +254,29 @@ class PVOILPriceReader:
                                         rows=candidate.rows, source_url=url,
                                         elapsed_ms=(time.perf_counter() - started) * 1000,
                                     )
-                        except (aiohttp.ClientError, asyncio.TimeoutError, UnicodeError):
+                        except (aiohttp.ClientError, asyncio.TimeoutError, UnicodeError) as exc:
+                            attempts.append(f"{source_id}:{type(exc).__name__}")
                             continue
-            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
-                pass
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+                attempts.append(f"session:{type(exc).__name__}")
             if selected.status != "ok":
                 selected = VerifiedFuelReport(
                     status="unavailable",
                     elapsed_ms=(time.perf_counter() - started) * 1000,
+                )
+            selected = VerifiedFuelReport(
+                status=selected.status,
+                effective_at=selected.effective_at,
+                rows=selected.rows,
+                source_url=selected.source_url,
+                elapsed_ms=(time.perf_counter() - started) * 1000,
+                attempts=tuple(attempts),
+            )
+            if selected.status != "ok":
+                print(
+                    "[Asumi Fuel] PVOIL upstream unavailable: "
+                    + ",".join(selected.attempts)[:240],
+                    flush=True,
                 )
             self._cached = selected
             self._cached_until = time.monotonic() + (

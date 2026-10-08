@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.6"
+CURRENT_VERSION = "3.7.7"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.6 - Answer-first Fact Retrieval"
+CODENAME = "Asumi 3.7.7 - Fuel Source Failover"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.7", "date": "2026-10-08",
+        "type": "bugfix", "title": "Fuel Source Failover and Diagnostics",
+        "summary": "PVOIL 403 fallback sang API giá xăng có ngày hiệu lực và kiểm tra dữ liệu; trả số thực trước Brave.",
+        "changes": [
+            {"category": "⛽ Fuel facts", "items": [
+                "Fallback 3 tầng PVOIL trực tiếp → WebGia.TV có bảng giá HTML theo ngày → Brave.",
+                "Chỉ dùng trang giá tổng hợp khi kỳ giá/scrape đủ mới, đơn vị và giá hợp lệ, có ít nhất hai mặt hàng.",
+                "Ghi rõ giá tham khảo Vùng 1 từ nguồn tổng hợp; không giả làm giá đã kiểm chứng trên PVOIL.",
+                "Giảm lượt Brave nếu có bảng giá hợp lệ; giữ cảnh báo rõ khi các nguồn bị chặn.",
+                "Dashboard hiển thị HTTP/parse reason của PVOIL và trạng thái nguồn dự phòng.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.6", "date": "2026-10-08",
         "type": "bugfix", "title": "Answer-first Fact Retrieval",

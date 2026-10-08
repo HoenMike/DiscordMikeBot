@@ -1470,9 +1470,9 @@
             const d = activity.details || {};
             const parts = [];
 
-            if (d.web_provider === 'brave' || d.history_status) {
-                if (d.web_provider === 'brave') {
-                    parts.push('Brave ' + String(d.web_search_status || 'unknown'));
+            if (d.web_provider || d.history_status) {
+                if (d.web_provider) {
+                    parts.push(String(d.web_provider).toUpperCase() + ' ' + String(d.web_search_status || 'unknown'));
                     parts.push(String(Number(d.web_result_count) || 0) + ' nguồn');
                     if (d.web_cache_hit === true) parts.push('cache hit');
                     if (d.first_party_source) {
@@ -1483,6 +1483,18 @@
                         }
                         if (Number(d.first_party_ms) > 0) {
                             parts.push('Page ' + formatTimingMs(d.first_party_ms));
+                        }
+                        if (d.first_party_reason) {
+                            parts.push('PVOIL: ' + String(d.first_party_reason).slice(0,160));
+                        }
+                    }
+                    if (d.aggregate_status) {
+                        parts.push('Nguồn dự phòng: ' + String(d.aggregate_status));
+                        if (Number(d.aggregate_rows) > 0) {
+                            parts.push(String(d.aggregate_rows) + ' giá tổng hợp');
+                        }
+                        if (Number(d.aggregate_ms) > 0) {
+                            parts.push('Aggregate ' + formatTimingMs(d.aggregate_ms));
                         }
                     }
                     if (d.web_quota_remaining !== null && d.web_quota_remaining !== undefined) {
