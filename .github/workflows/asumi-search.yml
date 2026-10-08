@@ -102,6 +102,13 @@ jobs:
           python -m unittest discover -s tests -p "test_feedback_mcp.py" -v
           python -m unittest discover -s tests -p "test_feedback_oauth.py" -v
           python -m compileall -q features/feedback web/app.py
+          python - <<'PY'
+          from pathlib import Path
+          source=Path("web/templates/feedback.html").read_text(encoding="utf-8")
+          js=source.split("<script>",1)[1].split("</script>",1)[0]
+          Path("/tmp/asumi-t23-admin.js").write_text(js,encoding="utf-8")
+          PY
+          node --check /tmp/asumi-t23-admin.js
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
           python -m unittest discover -s tests -p "test_assistant_semantic.py" -v
