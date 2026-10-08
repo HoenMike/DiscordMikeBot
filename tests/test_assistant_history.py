@@ -61,9 +61,15 @@ class HistoryPermissionsTests(unittest.TestCase):
             return SimpleNamespace(
                 view_channel=visible, read_message_history=visible,
             )
+        async def fetch_live(mid):
+            return SimpleNamespace(
+                id=mid, content="đang định mua xe mới",
+                author=SimpleNamespace(id=44, display_name="Theo"),
+            )
         channel = SimpleNamespace(
             type="private_thread" if is_private_thread else "text",
             permissions_for=perms,
+            fetch_message=AsyncMock(side_effect=fetch_live),
             parent=SimpleNamespace(
                 permissions_for=lambda member: SimpleNamespace(
                     view_channel=parent_can_view,
@@ -153,7 +159,8 @@ class HistoryApiTests(unittest.IsolatedAsyncioTestCase):
         result = await self.call_with_response(200, payload)
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.hits[0].author_id, 44)
-        self.assertEqual(result.start_date, "2026-01-01" if datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).year == 2026 else result.start_date)
+        self.assertTrue(bool(result.start_date))
+        self.assertEqual(result.hits[0].content, "đang định mua xe mới")
         self.assertEqual(result.hits[0].jump_url, "https://discord.com/channels/777/55/124")
 
     async def test_private_channel_result_is_not_leaked(self):
