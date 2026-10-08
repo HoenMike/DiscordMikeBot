@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -53,25 +54,34 @@ class CloudflareDecisionRouter:
 
     @staticmethod
     def _parse_choice(answer: Any) -> ClefDecision | None:
-        if isinstance(answer, str):
-            return ClefDecision(answer, 1.0)
+        """Only calibrated, schema-valid Clef choices may drive tool routing.
+
+        Cloudflare returns a choice object with confidence/probabilities.
+        A bare string carries no confidence: never treat it as certainty 1.0.
+        """
         if not isinstance(answer, dict):
             return None
 
         choice = answer.get("choice") or answer.get("value") or answer.get("label")
-        if not choice:
+        supported = {
+            "chat", "tarot", "summarize", "help",
+            "web_search", "discord_history", "archive_search",
+        }
+        if not isinstance(choice, str) or choice not in supported:
             return None
 
         confidence = answer.get("confidence")
         if confidence is None:
             probabilities = answer.get("probabilities")
             if isinstance(probabilities, dict):
-                confidence = probabilities.get(str(choice))
+                confidence = probabilities.get(choice)
         try:
             score = float(confidence) if confidence is not None else 0.0
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             score = 0.0
-        return ClefDecision(str(choice), max(0.0, min(score, 1.0)))
+        if not math.isfinite(score):
+            score = 0.0
+        return ClefDecision(choice, max(0.0, min(score, 1.0)))
 
     async def classify(self, state: str) -> ClefDecision | None:
         if not self.enabled:
