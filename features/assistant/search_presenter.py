@@ -194,7 +194,7 @@ def build_aggregated_fuel_embed(query: str, report) -> discord.Embed:
     )
     embed.add_field(
         name="Nguồn dữ liệu",
-        value=f"[VietFuelAPI — dữ liệu tổng hợp cộng đồng]({report.source_url})",
+        value=f"[{discord.utils.escape_markdown(report.provider)} — dữ liệu tổng hợp]({report.source_url})",
         inline=False,
     )
     embed.set_footer(
