@@ -103,8 +103,8 @@ def route_locally(text: str) -> RouteDecision:
     # T22.1 is explicitly invoked only. T22.3 adds Clef source selection.
     # Keep the literal user wording for Brave (including Vietnamese accents).
     web_match = re.match(
-        r"^(?:hay\s+)?(?:tim\s+(?:tren\s+)?(?:web|mang|internet)|"
-        r"tra\s+cuu\s+(?:tren\s+)?(?:web|mang|internet)|"
+        r"^(?:hay\s+)?(?:tim\s+(?:tiep\s+)?(?:tren\s+)?(?:web|mang|internet)|"
+        r"tra\s+cuu\s+(?:tiep\s+)?(?:tren\s+)?(?:web|mang|internet)|"
         r"search\s+(?:web|online)|web\s+search)\b\s*[:,-]?\s*",
         folded,
     )
