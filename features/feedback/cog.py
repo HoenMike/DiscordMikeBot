@@ -200,7 +200,9 @@ class FeedbackCog(commands.Cog):
     async def cog_load(self):
         ready = await feedback_store.init()
         print(f"[Feedback] Turso ticket schema ready={ready}", flush=True)
-        self.notifier = FeedbackNotifier(self.bot) if ready else None
+        # Keep the retry loop active even if Turso is temporarily unavailable
+        # during startup; pending notifications are retried after recovery.
+        self.notifier = FeedbackNotifier(self.bot)
 
     async def cog_unload(self):
         if getattr(self, "notifier", None):
@@ -373,6 +375,30 @@ class FeedbackCog(commands.Cog):
             reporter_id=interaction.user.id, guild_id=interaction.guild.id,
             channel_id=interaction.channel_id, source_message_id=interaction.id,
             description=description[:3000], category="bug",
+            attachments=[(image, interaction.id)] if image is not None else [],
+            rule=clarification_text(description, CURRENT_VERSION)[1],
+        )
+        self.drafts[key] = draft
+        await interaction.response.send_message(
+            self._intro(draft), view=FeedbackView(self, draft), ephemeral=True
+        )
+
+    @feedback.command(name="suggest", description="Góp ý hoặc đề xuất tính năng mới")
+    @app_commands.describe(description="Bạn muốn Asumi cải thiện như thế nào?", image="Ảnh minh họa tùy chọn")
+    async def suggest(self, interaction: discord.Interaction, description: str, image: discord.Attachment | None = None):
+        if interaction.guild is None:
+            await interaction.response.send_message("Chỉ dùng lệnh trong server.", ephemeral=True)
+            return
+        key = self._key(interaction.guild.id, interaction.user.id)
+        if self._active(*key):
+            await interaction.response.send_message(
+                "Bạn đang có bản nháp feedback chưa hoàn tất.", ephemeral=True
+            )
+            return
+        draft = FeedbackDraft(
+            reporter_id=interaction.user.id, guild_id=interaction.guild.id,
+            channel_id=interaction.channel_id, source_message_id=interaction.id,
+            description=description[:3000], category="feature",
             attachments=[(image, interaction.id)] if image is not None else [],
             rule=clarification_text(description, CURRENT_VERSION)[1],
         )
