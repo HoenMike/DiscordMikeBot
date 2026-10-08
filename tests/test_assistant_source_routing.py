@@ -216,7 +216,7 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
 
     def test_auto_search_requires_explicit_flag_and_available_provider(self):
         bot = SimpleNamespace()
-        with patch.dict("os.environ", {"ASUMI_AUTO_SEARCH_ENABLED": "false"}):
+        with patch("core.constants.ASUMI_AUTO_SEARCH_ENABLED", False):
             cog = AssistantCog(bot)
         cog.cloudflare_router.enabled = True
         self.assertFalse(cog._allowed_auto_search_tools())

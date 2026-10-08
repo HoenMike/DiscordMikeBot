@@ -71,17 +71,15 @@ class BraveSearchAdapter:
 
     @classmethod
     def from_env(cls) -> "BraveSearchAdapter":
-        enabled = os.getenv("ASUMI_WEB_SEARCH_ENABLED", "false").strip().lower() in {
-            "1", "true", "yes", "on",
-        }
+        from core import constants as policy
         return cls(
             api_key=os.getenv("BRAVE_SEARCH_API_KEY", ""),
-            enabled=enabled,
-            monthly_cap=int(os.getenv("ASUMI_WEB_SEARCH_MONTHLY_REQUEST_CAP", "500")),
-            max_results=int(os.getenv("ASUMI_WEB_SEARCH_MAX_RESULTS", "5")),
-            timeout_seconds=float(os.getenv("ASUMI_WEB_SEARCH_TIMEOUT_SECONDS", "5")),
-            cooldown_seconds=float(os.getenv("ASUMI_WEB_SEARCH_USER_COOLDOWN_SECONDS", "15")),
-            cache_ttl_seconds=float(os.getenv("ASUMI_WEB_SEARCH_CACHE_TTL_SECONDS", "180")),
+            enabled=policy.ASUMI_WEB_SEARCH_ENABLED,
+            monthly_cap=policy.ASUMI_WEB_SEARCH_MONTHLY_REQUEST_CAP,
+            max_results=policy.ASUMI_WEB_SEARCH_MAX_RESULTS,
+            timeout_seconds=policy.ASUMI_WEB_SEARCH_TIMEOUT_SECONDS,
+            cooldown_seconds=policy.ASUMI_WEB_SEARCH_USER_COOLDOWN_SECONDS,
+            cache_ttl_seconds=policy.ASUMI_WEB_SEARCH_CACHE_TTL_SECONDS,
         )
 
     @staticmethod
@@ -91,10 +89,11 @@ class BraveSearchAdapter:
     async def _reserve_request(self) -> int | None:
         """Atomically consume one request from durable quota or reject."""
         await db_client.connect()
-        # Render's local SQLite fallback is not durable on ephemeral disks.
-        # If Turso is configured but unreachable, refuse chargeable calls.
-        if config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL and not db_client.is_cloud:
-            raise RuntimeError("Durable quota database unavailable")
+        # Never spend Brave quota using an ephemeral local database: a restart
+        # would reset the monthly counter and could incur surprise charges.
+        # Turso (or another configured persistent cloud adapter) is mandatory.
+        if not db_client.is_cloud:
+            raise RuntimeError("Durable cloud quota database required")
 
         if not self._schema_ready:
             await db_client.execute(

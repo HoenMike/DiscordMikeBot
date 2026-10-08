@@ -58,6 +58,61 @@ DEFAULT_SCAN_HOURS = 2.0
 DEFAULT_SCAN_LIMIT = 150
 
 # ---------------------------------------------------------------------------
+# Asumi 3.x: product policy (NON-SECRET). Edit here, not in Render Environment.
+# External API credentials/account-specific identifiers remain in the deployment.
+# A missing credential always disables the corresponding external provider.
+# ---------------------------------------------------------------------------
+
+ASUMI_SESSION_TTL_SECONDS = 1200
+ASUMI_SESSION_MAX_TURNS = 4
+
+ASUMI_CONTEXT_RECENT_MESSAGES = 8
+ASUMI_CONTEXT_MAX_CHARS = 7000
+ASUMI_CONTEXT_MAX_IMAGES = 2
+ASUMI_CONTEXT_MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+ASUMI_CHAT_MODEL = "gemini-3.5-flash-lite"
+ASUMI_CHAT_FALLBACK_MODELS = ("gemini-3.1-flash-lite", "gemini-3.5-flash")
+ASUMI_CHAT_MODEL_TIMEOUT_SECONDS = 4
+ASUMI_CHAT_TOTAL_BUDGET_SECONDS = 8
+ASUMI_CHAT_MAX_ATTEMPTS = 2
+
+ASUMI_CLEF_ENABLED = True
+ASUMI_CLEF_MODEL = "@cf/cloudflare/clef-flash"
+ASUMI_CLEF_TIMEOUT_SECONDS = 4
+ASUMI_CLEF_MIN_CONFIDENCE = 0.55
+
+# A clear fresh/public-information question may use Brave without waiting for
+# Clef. The API key is still mandatory, so no external request happens without it.
+ASUMI_AUTO_SEARCH_ENABLED = True
+ASUMI_WEB_SEARCH_ENABLED = True
+ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED = True
+ASUMI_WEB_SEARCH_MONTHLY_REQUEST_CAP = 500
+ASUMI_WEB_SEARCH_MAX_RESULTS = 5
+ASUMI_WEB_SEARCH_TIMEOUT_SECONDS = 5
+ASUMI_WEB_SEARCH_USER_COOLDOWN_SECONDS = 15
+ASUMI_WEB_SEARCH_CACHE_TTL_SECONDS = 180
+
+# Native Discord Search is requested on demand only, never passively indexed.
+# Bot-token support and requester-specific channel permissions are still required.
+ASUMI_DISCORD_HISTORY_ENABLED = True
+ASUMI_DISCORD_HISTORY_TIMEOUT_SECONDS = 5
+ASUMI_DISCORD_HISTORY_MAX_CALLS = 3
+ASUMI_DISCORD_HISTORY_MAX_RESULTS = 5
+ASUMI_DISCORD_HISTORY_COOLDOWN_SECONDS = 20
+
+# Keep semantic/vector usage off until its separate production permission and
+# cost validation; lexical Archive continues to work without Vectorize.
+ASUMI_ARCHIVE_SEMANTIC_ENABLED = False
+ASUMI_ARCHIVE_VECTORIZE_INDEX = "asumi-archive-v1"
+ASUMI_ARCHIVE_EMBEDDING_MODEL = "@cf/baai/bge-m3"
+ASUMI_ARCHIVE_VECTOR_DIMENSIONS = 1024
+ASUMI_ARCHIVE_SEMANTIC_TIMEOUT_SECONDS = 6
+ASUMI_ARCHIVE_SEMANTIC_MIN_SCORE = 0.45
+ASUMI_ARCHIVE_SEMANTIC_MAX_CONCURRENCY = 3
+
+
+# ---------------------------------------------------------------------------
 # Trích xuất URL từ tin nhắn Discord
 # Xử lý URL trong spoiler (||url||) và URL bị suppress (<url>).
 # ---------------------------------------------------------------------------

@@ -61,20 +61,22 @@ class AssistantCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        ttl = float(os.getenv("ASUMI_SESSION_TTL_SECONDS", "1200"))
-        turns = int(os.getenv("ASUMI_SESSION_MAX_TURNS", "4"))
-        self.sessions = SessionStore(ttl_seconds=ttl, max_turns=turns)
+        from core import constants as policy
+        self.sessions = SessionStore(
+            ttl_seconds=policy.ASUMI_SESSION_TTL_SECONDS,
+            max_turns=policy.ASUMI_SESSION_MAX_TURNS,
+        )
         self.tools = CommandToolRegistry(bot)
         self.context_builder = ContextBuilder.from_env()
         self.cloudflare_router = CloudflareDecisionRouter.from_env()
-        self.router_min_confidence = float(os.getenv("CF_ROUTER_MIN_CONFIDENCE", "0.55"))
-        self.auto_search_enabled = os.getenv(
-            "ASUMI_AUTO_SEARCH_ENABLED", "false"
-        ).strip().lower() in {"1", "true", "yes", "on"}
+        self.router_min_confidence = policy.ASUMI_CLEF_MIN_CONFIDENCE
+        self.auto_search_enabled = policy.ASUMI_AUTO_SEARCH_ENABLED
 
     def _allowed_auto_search_tools(self) -> frozenset[str]:
-        if not (self.auto_search_enabled and self.cloudflare_router.enabled):
+        if not self.auto_search_enabled:
             return frozenset()
+        # Deterministic current-public-info requests can use Brave even if
+        # Clef is unavailable. Clef-only routing still requires credentials.
         from features.assistant.providers.brave import brave_search
         allowed = set()
         if brave_search.enabled:

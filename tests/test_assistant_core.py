@@ -487,11 +487,7 @@ class AssistantChatModelTests(unittest.TestCase):
         self.assertEqual(models[0], "gemini-3.5-flash-lite")
 
     def test_chat_model_can_be_overridden(self):
-        with patch.dict(
-            "os.environ",
-            {"ASUMI_CHAT_MODEL": "gemini-custom-chat"},
-            clear=True,
-        ):
+        with patch("core.constants.ASUMI_CHAT_MODEL", "gemini-custom-chat"):
             models = _candidate_models()
         self.assertEqual(models[0], "gemini-custom-chat")
 

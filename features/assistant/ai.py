@@ -59,18 +59,9 @@ class ChatTimeoutBudgetError(TimeoutError):
 def _candidate_models() -> list[str]:
     """Conversation prefers low-latency models before heavier summary models."""
 
-    primary = (
-        os.getenv("ASUMI_CHAT_MODEL", "").strip()
-        or "gemini-3.5-flash-lite"
-    )
-    configured = [
-        model.strip()
-        for model in os.getenv(
-            "ASUMI_CHAT_FALLBACK_MODELS",
-            "gemini-3.1-flash-lite,gemini-3.5-flash",
-        ).split(",")
-        if model.strip()
-    ]
+    from core import constants as policy
+    primary = policy.ASUMI_CHAT_MODEL
+    configured = list(policy.ASUMI_CHAT_FALLBACK_MODELS)
     repository_fallbacks = list(
         getattr(config, "SUMMARY_FALLBACK_MODELS", []) or []
     )
@@ -83,18 +74,10 @@ def _candidate_models() -> list[str]:
 
 
 def _chat_limits() -> tuple[float, float, int]:
-    per_model_timeout = max(
-        1.0,
-        float(os.getenv("ASUMI_CHAT_MODEL_TIMEOUT_SECONDS", "4")),
-    )
-    total_budget = max(
-        per_model_timeout,
-        float(os.getenv("ASUMI_CHAT_TOTAL_BUDGET_SECONDS", "8")),
-    )
-    max_attempts = max(
-        1,
-        int(os.getenv("ASUMI_CHAT_MAX_ATTEMPTS", "2")),
-    )
+    from core import constants as policy
+    per_model_timeout = max(1.0, float(policy.ASUMI_CHAT_MODEL_TIMEOUT_SECONDS))
+    total_budget = max(per_model_timeout, float(policy.ASUMI_CHAT_TOTAL_BUDGET_SECONDS))
+    max_attempts = max(1, int(policy.ASUMI_CHAT_MAX_ATTEMPTS))
     return per_model_timeout, total_budget, max_attempts
 
 

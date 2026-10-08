@@ -38,9 +38,7 @@ class CloudflareDecisionRouter:
 
     @classmethod
     def from_env(cls) -> "CloudflareDecisionRouter":
-        enabled = os.getenv("CF_ASSISTANT_ENABLED", "false").strip().lower() in {
-            "1", "true", "yes", "on"
-        }
+        from core import constants as policy
         token = (
             os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
             or os.getenv("CLOUDFLARE_AUTH_TOKEN", "").strip()
@@ -48,9 +46,9 @@ class CloudflareDecisionRouter:
         return cls(
             account_id=os.getenv("CLOUDFLARE_ACCOUNT_ID", ""),
             api_token=token,
-            enabled=enabled,
-            model=os.getenv("CF_ROUTER_MODEL", "@cf/cloudflare/clef-flash"),
-            timeout_seconds=float(os.getenv("CF_ROUTER_TIMEOUT_SECONDS", "4")),
+            enabled=policy.ASUMI_CLEF_ENABLED,
+            model=policy.ASUMI_CLEF_MODEL,
+            timeout_seconds=policy.ASUMI_CLEF_TIMEOUT_SECONDS,
         )
 
     @staticmethod

@@ -28,10 +28,9 @@ class ArchiveSemanticConfigTests(unittest.TestCase):
         self.assertFalse(index.enabled)
 
     def test_separate_vectorize_token_is_supported(self):
-        with patch.dict(
+        with patch("core.constants.ASUMI_ARCHIVE_SEMANTIC_ENABLED", True), patch.dict(
             "os.environ",
             {
-                "CF_ARCHIVE_SEMANTIC_ENABLED": "true",
                 "CLOUDFLARE_ACCOUNT_ID": "account",
                 "CLOUDFLARE_API_TOKEN": "ai-token",
                 "CLOUDFLARE_VECTORIZE_TOKEN": "vec-token",

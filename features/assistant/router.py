@@ -74,6 +74,24 @@ def _safe_public_web_query(text: str) -> bool:
     return len(folded) >= 12 and any(s in folded for s in public_signals)
 
 
+def _obvious_fresh_public_search(text: str) -> bool:
+    """Conservative no-model rule for fresh public commodity prices.
+
+    This deliberately does not attempt to extract entities from private chat.
+    General external questions remain subject to Clef and source gating.
+    """
+    if not _safe_public_web_query(text):
+        return False
+    folded = _fold(text).replace("đ", "d")
+    timely = any(cue in folded for cue in (
+        "hom nay", "hien tai", "bay gio", "moi nhat", "cap nhat",
+    ))
+    topics = any(topic in folded for topic in (
+        "gia xang", "gia dau", "gia vang", "ty gia",
+    ))
+    return timely and topics
+
+
 def _safe_history_query(text: str) -> bool:
     """Only route bounded, explicitly history-related questions to guild search."""
     folded = _fold(text).replace("đ", "d")
@@ -285,6 +303,23 @@ async def route_message(
         return replace(
             local,
             source="local_tool",
+            route_ms=(time.perf_counter() - started) * 1000,
+        )
+
+    from core import constants as policy
+    # Strictly public, explicitly current price checks should never pretend the
+    # tool is unimplemented: the adapter provides a helpful missing-key status,
+    # or runs with its durable Brave quota when credentials are present.
+    if (
+        policy.ASUMI_AUTO_SEARCH_ENABLED
+        and policy.ASUMI_WEB_SEARCH_ENABLED
+        and _obvious_fresh_public_search(text)
+    ):
+        return RouteDecision(
+            intent="web_search",
+            tool="web.search",
+            arguments={"query": text.strip()},
+            source="local_fresh_public",
             route_ms=(time.perf_counter() - started) * 1000,
         )
 
