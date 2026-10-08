@@ -30,7 +30,7 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
 </style>
 <link rel="stylesheet" href="{{ url_for('static', filename='admin_console.css') }}">
 </head>
-<body class="asumi-app" data-page="feedback">
+<body class="asumi-app" data-page="feedback" data-selected-ticket="{{ selected_ticket }}">
 <div class="asumi-layout">
 {% include "partials/admin_nav.html" %}
 <div class="asumi-stage">
@@ -64,7 +64,7 @@ const LABELS={submitted:'Mới gửi',triage:'Đang phân loại',needs_info:'C�
 const PENDING=new Set(['submitted','triage','needs_info','deferred','reopened']);
 const POSITIVE=new Set(['approved','planned','in_progress','in_review','deployed','verified']);
 const DONE=new Set(['verified','closed','rejected','duplicate','deleted']);
-let records=[],selected={{ selected_ticket|tojson }}||null,filter='pending',search='',refreshSerial=0,nextOffset=0,hasMore=false;
+let records=[],selected=document.body.dataset.selectedTicket||null,filter='pending',search='',refreshSerial=0,nextOffset=0,hasMore=false;
 function n(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(cls)el.className=cls;return el}
 function append(parent,tag,text,cls){const el=n(tag,text,cls);parent.append(el);return el}
 function btn(text,fn,cls){const el=n('button',text,'btn '+(cls||''));el.type='button';el.onclick=fn;return el}
