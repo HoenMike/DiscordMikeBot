@@ -313,7 +313,15 @@ class FeedbackCog(commands.Cog):
             raise FeedbackStorageError("Bản nháp đã hết hạn. Hãy báo lỗi lại.")
         # Check Turso BEFORE uploading; no irreversible orphan file on known DB outage.
         await feedback_store._require_cloud()
-        await feedback_store.init()
+        if not await feedback_store.init():
+            raise FeedbackStorageError("Chưa thể khởi tạo Turso để ghi ticket.")
+        existing = await feedback_store.find_source(
+            guild_id=draft.guild_id,
+            source_message_id=draft.source_message_id,
+            reporter_id=draft.reporter_id,
+        )
+        if existing:
+            return existing  # Idempotent retry must not upload duplicate images.
         uploaded: list[UploadedEvidence] = []
         try:
             for attachment, message_id in draft.attachments:
@@ -334,9 +342,14 @@ class FeedbackCog(commands.Cog):
                 } for x in uploaded],
             )
             return ticket
-        except Exception:
-            for item in uploaded:
-                await evidence_store.delete(item.key)
+        except Exception as exc:
+            # The DB may have committed just before the response was lost.
+            # Never delete images that an accepted ticket could reference.
+            if isinstance(exc, FeedbackStorageError) and exc.may_have_committed:
+                print("[Feedback] Uncertain ticket commit; keep R2 evidence for reconciliation.", flush=True)
+            else:
+                for item in uploaded:
+                    await evidence_store.delete(item.key)
             raise
 
     @feedback.command(name="report", description="Gửi feedback, lỗi hoặc góp ý")
@@ -360,6 +373,34 @@ class FeedbackCog(commands.Cog):
         self.drafts[key] = draft
         await interaction.response.send_message(
             self._intro(draft), view=FeedbackView(self, draft), ephemeral=True
+        )
+
+    @feedback.command(name="add_image", description="Thêm ảnh vào bản nháp feedback đang mở")
+    @app_commands.describe(image="Ảnh PNG, JPG hoặc WebP cần bổ sung")
+    async def add_image(self, interaction: discord.Interaction, image: discord.Attachment):
+        if interaction.guild is None:
+            await interaction.response.send_message("Chỉ hỗ trợ trong server.", ephemeral=True)
+            return
+        draft = self._active(interaction.guild.id, interaction.user.id)
+        if draft is None:
+            await interaction.response.send_message(
+                "Bạn chưa có bản nháp. Dùng /feedback report trước.", ephemeral=True
+            )
+            return
+        if len(draft.attachments) >= policy.ASUMI_FEEDBACK_MAX_IMAGES:
+            await interaction.response.send_message(
+                "Đã đủ 3 ảnh. Hãy xác nhận hoặc hủy bản nháp.", ephemeral=True
+            )
+            return
+        if not (image.content_type or "").startswith("image/"):
+            await interaction.response.send_message(
+                "Chỉ nhận ảnh PNG/JPG/WebP.", ephemeral=True
+            )
+            return
+        draft.attachments.append((image, interaction.id))
+        await interaction.response.send_message(
+            f"Đã thêm ảnh. Tổng cộng {len(draft.attachments)} ảnh. "
+            "Quay lại bản nháp và xác nhận gửi ticket.", ephemeral=True
         )
 
     @feedback.command(name="status", description="Xem trạng thái ticket feedback của chính bạn")
