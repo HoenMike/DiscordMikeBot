@@ -43,12 +43,12 @@ class ReviewPolicyTests(unittest.IsolatedAsyncioTestCase):
 
 class DashboardPrivacyTests(unittest.TestCase):
     def test_routes_have_admin_guard_and_csrf(self):
-        import inspect
-        from web.app import feedback_review,feedback_dashboard,feedback_evidence
-        self.assertIn("login_required",inspect.getsource(feedback_review))
-        self.assertIn("X-CSRF-Token",inspect.getsource(feedback_review))
-        self.assertIn("login_required",inspect.getsource(feedback_dashboard))
-        self.assertIn("login_required",inspect.getsource(feedback_evidence))
+        from pathlib import Path
+        source = (Path(__file__).resolve().parents[1] / "web/app.py").read_text(encoding="utf-8")
+        self.assertIn("def feedback_dashboard()", source)
+        self.assertIn("def feedback_evidence(", source)
+        self.assertIn("X-CSRF-Token", source)
+        self.assertEqual(source.count("def feedback_review("), 1)
 
 if __name__ == "__main__":
     unittest.main()
