@@ -68,6 +68,21 @@ def route_locally(text: str) -> RouteDecision:
             arguments={"query": text.strip()[web_match.end():].strip()},
         )
 
+    # T22.2: explicit on-demand historical Discord search. Unlike Archive,
+    # this can find messages that were never saved. Never send to Brave.
+    history_folded = folded.replace("đ", "d")
+    history_signals = (
+        "tim tin nhan", "tim lai tin nhan", "tim doan chat",
+        "tim lai doan chat", "luc lai", "search discord",
+        "tim tren discord", "tim xem",
+    )
+    if any(signal in history_folded for signal in history_signals):
+        return RouteDecision(
+            intent="discord_history",
+            tool="discord_history.search",
+            arguments={"query": text.strip()},
+        )
+
     forget_signals = (
         "quen #",
         "xoa #",
