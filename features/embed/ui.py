@@ -105,8 +105,12 @@ class EmbedActionView(discord.ui.View):
             pass
 
         message = (
-            "Đã thử hết proxy khả dụng. Bạn vẫn có thể bỏ embed để quay về preview gốc của Discord."
+            "Đã thử hết các proxy còn lại. Preview hiện tại vẫn được giữ; bạn có thể mở link gốc."
             if reason == "no_more_proxy"
+            else "Proxy đang tạm không truy xuất được Facebook. Giữ nguyên preview hiện tại; thử lại sau 30 giây."
+            if reason == "proxy_temporarily_unavailable"
+            else "Vui lòng đợi khoảng 30 giây trước khi thử lại proxy Facebook."
+            if reason == "proxy_retry_cooldown"
             else f"Reload chưa thành công (`{reason}`). Preview hiện tại vẫn được giữ."
         )
         await interaction.followup.send(message, ephemeral=True)
