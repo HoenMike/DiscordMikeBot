@@ -304,7 +304,16 @@ def route_locally(text: str) -> RouteDecision:
         author_scope = any(signal in folded for signal in (
             "da nhan gi", "nhan gi", "da noi gi", "noi gi",
             "da chat gi", "da viet gi", "nhan nhung gi",
-        )) or bool(re.search(r"tin nhan\s+cua\s+<@!?\d+>", folded))
+        )) or bool(re.search(
+            # Match "tin nhắn [12h qua] của @user"; no blind bare-mention filtering.
+            r"\btin nhan\b[^\n]{0,120}?\bcua\s+(?:ban\s+|nguoi\s+)?<@!?\d{1,20}>",
+            folded,
+        )) or bool(re.search(
+            # Likewise "tóm tắt 12h qua của @user" without "tin nhắn".
+            r"\btom tat\b[^\n]{0,80}?\b\d+(?:[.,]\d+)?\s*(?:h|gio|tieng)\b"
+            r"[^\n]{0,30}?\bcua\s+(?:ban\s+|nguoi\s+)?<@!?\d{1,20}>",
+            folded,
+        ))
         if author_mention and author_scope:
             args["author_ids"] = list(dict.fromkeys(int(x) for x in author_mention))
             return RouteDecision(
