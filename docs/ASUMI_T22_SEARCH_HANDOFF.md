@@ -146,3 +146,14 @@ Implementation:
 - Preserve old permission and quota logic; no extra tokens/paid fallback. Need green CI and live Render/Discord smoke tests before declaring production UX accepted.
 
 Remaining search roadmap: T22.5 supervised cross-source retrieval; also provider data freshness and direct primary-source verification require a separate researched design, not naive AI guessing from snippets.
+
+
+## T22.4e / Asumi 3.7.5 — first-party live source extraction (2026-10-08)
+
+- Incident: Asumi 3.7.4 Brave embed was cleaner, but refused exact gasoline prices even though the [PVOIL retail price table](https://www.pvoil.com.vn/tin-gia-xang-dau) visibly showed numeric prices effective **15:00, 01/10/2026**. Root cause: Brave snippets are not the page body; prompt cannot recover a table that is absent from the evidence.
+- New `features/assistant/providers/pvoil_prices.py`: small verified-source provider, requests only two fixed official PVOIL HTTPS pages (price page and homepage), does **not** follow redirects or arbitrary provider links. Bounded 512KiB HTML/body/time budget. Parses currency amounts by product plus the **effective-from date**; rejects missing/future effective dates and ambiguous tables.
+- Even if pages contain different periods, prefer the report with the newest nonfuture effective date; show date prominently and avoid claiming prices were published specifically today. Compact Discord embed shows original numeric values and original URL, not invented figures.
+- Flow: Brave Search (existing one request/quotas) → PVOIL source read (public HTTPS, no extra Brave API quota) → deterministic validated answer if available → otherwise existing Brave answer/list with honest uncertainty. No private Discord messages or arbitrary URLs are used as fetch inputs.
+- `core/constants.py` defines enable/timeout/cache/body cap; no Render env flags. Dashboard observes `first_party_source/status/rows/ms` without raw response body or query.
+- Tests in `tests/test_assistant_source_verification.py` integrated into search CI. **Do not claim production extraction accepted until tested from the actual Render IP against PVOIL**, because bot access/HTML rendering may differ from browsers/search indexes; 403/JS-only content must fail safely.
+- T22.5 still planned: generalized safe public-source reading and multi-source result ranking/citation. Keep allowlist and SSRF mitigation for any later generalization.
