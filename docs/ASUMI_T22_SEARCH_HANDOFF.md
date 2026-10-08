@@ -191,3 +191,18 @@ Status/acceptance: CI proves the local behavior and safety fixtures, but product
 
 ### Live probing decision — 2026-10-08 10:58 VN
 GitHub Actions source probe observed PVOIL HTTP 403, unresolvable VietFuel API DNS, but **WebGia.TV Petrolimex and history pages HTTP 200**. Deprecated the unreachable VietFuel API integration before merge. Latest fallback uses only the public WebGia HTML page with per-row product/Vùng 1 price/date validation. Probe uses real external HTTP access but Render reachability still needs a guild smoke check.
+
+
+## Production acceptance — Asumi 3.7.7 fuel answers (2026-10-08, 11:10 ICT)
+
+**PASS — user explicitly approved (`duyệt`) following a real Discord screenshot.**
+
+- Real bot response to `@Asumi giá xăng hôm nay như nào` contained numeric **Vùng 1** prices in a compact, answer-first embed:
+  - E10 RON95-III: **27.180 đ/lít**
+  - E5 RON92-II: **26.560 đ/lít**
+  - Diesel 0,05S-II: **29.710 đ/lít**
+- Price period was explicitly **01/10/2026**; source identified as **WebGia.TV (aggregated/non-official)**, with no false claim of direct PVOIL verification.
+- Outcome establishes **end-to-end production acceptance for this single fuel-price query** on the deployed Asumi 3.7.7 release, not a universal guarantee of all price queries, permanent source availability, or independently verified prices.
+- Do **not** reopen this accepted UI/answer flow without a new regression report. Maintain dated/unit-bearing answers, clear provider provenance, and the PVOIL → WebGia → Brave failure hierarchy.
+- Other gates are **not implied complete**: Open-Meteo live weather acceptance, Discord History bot-token/ACL behavior, Vectorize semantic pilot and T22.5 cross-source retrieval still need their own evidence.
+- Handoff next: prioritize remaining source/permission acceptance and T22.5 plan, with user approval for any private-history → public-web transition. Avoid a new version bump for this documentation-only acceptance note.
