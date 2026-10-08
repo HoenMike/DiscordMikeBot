@@ -5,15 +5,15 @@ from features.feedback.store import feedback_store, FeedbackStorageError
 
 
 STATUS_LABELS = {
-    "needs_info": "Cần bạn bổ sung thông tin",
     "rejected": "Không được duyệt",
     "duplicate": "Đã ghi nhận trùng ticket",
-    "deferred": "Tạm hoãn xử lý",
-    "approved": "Đã duyệt để triển khai",
     "verified": "Đã sửa và xác minh",
-    "closed": "Đã đóng",
-    "reopened": "Đã mở lại",
 }
+
+
+# Only terminal outcomes produce a reporter DM. Intermediate transitions remain
+# visible in the ticket timeline and /feedback status, without push noise.
+NOTIFIABLE_ACTIONS = frozenset({"verified", "rejected", "duplicate", "cancelled"})
 
 
 def format_feedback_notification(*, number: int, status: str, reason: str) -> str:
@@ -43,8 +43,7 @@ class FeedbackNotifier:
             return
         for notice_id, ticket_id, user_id, action, reason, status, number in items:
             # PR merge / deploy isn't a verified fix; don't promise resolution.
-            if action not in ("needs_info", "rejected", "duplicate", "deferred",
-                              "approved", "verified", "closed", "reopened"):
+            if action not in NOTIFIABLE_ACTIONS:
                 try:
                     await feedback_store.mark_notification(notice_id, delivered=True)
                 except FeedbackStorageError:
