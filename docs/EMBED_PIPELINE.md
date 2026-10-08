@@ -1,6 +1,6 @@
 # Social Embed Pipeline
 
-Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v2.8.5 (2026-10-04)**.
+Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v3.10.1 (2026-10-09)**. Giữ UX owner-only của v2.8.5, khôi phục fallback video an toàn.
 
 ## Mục tiêu
 
@@ -16,18 +16,18 @@ Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl
    - Proxy được lấy từ `PROXY_DOMAINS` hoặc guild override.
    - Các candidate có thể được pre-validate bằng API/OpenGraph trước khi gửi.
    - Với Twitter/TikTok/Instagram/Reddit/... flow cũ vẫn có thể tự thử proxy tiếp theo nếu candidate gửi ra không dùng được.
-   - Với **Facebook**, sau khi tìm được một candidate và gửi thành công thì **dừng**: không tự roll sang proxy khác.
+   - Với **Facebook**, thử các provider theo thứ tự `facebed.com` → `facebed.seria.moe` → `facecot.com` → `fixacebook.com` (có thể cấu hình override theo guild). Chỉ chấp nhận video nếu metadata có video/player thật, không dùng mỗi ảnh thumbnail hay login card. Sau khi gửi thành công vẫn **dừng**, giữ quyền chọn Reload thủ công.
 
 3. **Tier 2 — yt-dlp**
    - Dùng cho Twitter/X, TikTok, Instagram, Reddit và Twitch khi các tầng trước thất bại.
-   - **Facebook không nằm trong yt-dlp fallback path từ v2.8.3.**
+   - **Facebook `/share/v/`, `/share/r/`, Reel, Watch, Video** được thử yt-dlp **cuối cùng** khi không có proxy hợp lệ hoặc chủ link bấm Reload mà các proxy còn lại thất bại. Chỉ gửi kết quả nếu tải được **file video thật** trong giới hạn Discord; không coi ảnh poster Facebook login là video. Bài Facebook dạng post thường không gọi yt-dlp.
 
 ## Facebook: compact masked proxy link
 
 Facebook preview hiện dùng masked markdown link để tránh lộ URL dài trong chat:
 
 ```text
-Trả lời @user • [facebed.seria.moe](https://facebed.seria.moe/share/r/...)
+Trả lời @user • [facebed.seria.moe](https://facebed.seria.moe/share/v/...)
 ```
 
 Điểm quan trọng là URL đích **không** được bọc bằng `<...>`. Discord dùng dạng `[label](url)` cho masked link, còn `[label](<url>)` là dạng suppress preview. Vì vậy Asumi giữ URL proxy trực tiếp trong target của masked link để Discord vẫn có thể unfurl, nhưng phần người dùng nhìn thấy chỉ còn domain proxy.
@@ -35,7 +35,7 @@ Trả lời @user • [facebed.seria.moe](https://facebed.seria.moe/share/r/...)
 Nếu nội dung cần spoiler, Asumi bọc **toàn bộ masked link** trong spoiler:
 
 ```text
-||[facebed.seria.moe](https://facebed.seria.moe/share/r/...)||
+||[facebed.seria.moe](https://facebed.seria.moe/share/v/...)||
 ```
 
 Buttons **🔄 Reload** và **🗑️ Bỏ embed** chỉ là component điều khiển; chúng không chịu trách nhiệm tạo unfurl.
@@ -45,7 +45,7 @@ Buttons **🔄 Reload** và **🗑️ Bỏ embed** chỉ là component điều k
 Mọi preview từ Tier 0, Tier 1 và Tier 2 gắn `EmbedActionView` với hai button:
 
 - **🔄 Reload**: chỉ người gửi link gốc được dùng.
-  - Facebook: thử proxy kế tiếp theo state `tried_domains`, không nhảy yt-dlp.
+  - Facebook: thử proxy tiếp theo theo state `tried_domains`; chỉ khi không còn proxy hợp lệ mới thử yt-dlp với URL video công khai.
   - Provider khác: chạy lại pipeline cho đúng URL; preview hiện tại chỉ bị xóa sau khi replacement tạo thành công.
 - **🗑️ Bỏ embed**: chỉ người gửi link gốc được dùng. Asumi unsuppress message gốc để Discord dựng native embed rồi dọn toàn bộ preview Asumi thuộc origin message.
 
@@ -71,16 +71,12 @@ Preview Facebook gắn `EmbedActionView`. Nút **🔄 Reload** gọi manual prox
    - author vẫn đúng;
    - original URL vẫn còn trong message.
 3. Ghép danh sách `tried_domains` từ payload với state server theo `(origin_message_id, URL)`.
-4. `find_valid_proxy(... excluded_domains=tried)` tìm candidate kế tiếp.
+4. `find_valid_proxy(... excluded_domains=tried)` tìm candidate kế tiếp; validation failure/timeout không khóa domain vĩnh viễn.
 5. Nếu có candidate:
    - gửi **message mới chứa masked proxy link** và một button mới mang state đã cập nhật;
    - chỉ sau khi gửi mới thành công mới xóa preview proxy cũ;
    - log `manual_proxy_roll`.
-6. Nếu không còn candidate:
-   - không gọi yt-dlp;
-   - giữ preview hiện tại;
-   - Reload đổi thành trạng thái **Hết proxy** và bị khóa;
-   - **Bỏ embed** vẫn hoạt động để user quay về native Discord embed.
+6. Nếu không còn candidate: thử yt-dlp video-only cuối cùng; nếu có file video thật, gửi preview mới rồi mới xóa preview cũ. Nếu thất bại, **giữ preview cũ**, nêu lý do tạm lỗi/hết proxy và giữ nút mở Facebook gốc. Không thử tự động vô hạn hoặc sử dụng cookies đăng nhập.
 
 ## Vì sao không server-side auto-roll Facebook
 
@@ -112,8 +108,18 @@ Các case cần giữ khi chỉnh pipeline:
 - User khác origin author không được dùng cả hai action.
 - Reload Facebook phải tìm proxy kế tiếp bằng excluded/tried state; Reload provider khác phải re-run đúng URL và giữ preview cũ nếu replacement thất bại.
 - Bỏ embed phải unsuppress origin message và cleanup preview Asumi của origin để không tạo duplicate.
-- Manual proxy roll không được gọi `_try_ytdlp_fallback`.
-- Facebook phải bị loại khỏi supported platform list của yt-dlp fallback.
+- Manual proxy roll chỉ gọi `_try_ytdlp_fallback` sau khi không còn proxy hợp lệ, cho đường dẫn video Facebook và chỉ với video thật.
+- Facebook bài viết không phải video vẫn phải bị loại khỏi yt-dlp fallback; video chỉ được coi thành công nếu file đính kèm tải được.
 - Proxy cũ chỉ bị cleanup sau khi proxy mới gửi thành công.
-- Khi hết proxy, giữ preview hiện tại.
+- Khi hết proxy và yt-dlp thất bại, giữ preview hiện tại; lỗi tạm thời có cooldown và không được xem là vĩnh viễn.
 - Twitter/X và các nền tảng ngoài Facebook vẫn giữ automatic yt-dlp fallback hiện tại.
+
+
+## v3.10.1 — Incident Facebook shared video & acceptance
+
+- **Root cause from code review:** `build_proxy_url()` rewrote a Facebook `/share/v/{token}` video share path into `/share/r/{token}` Reel path, silently changing the lookup type. Preserve the literal path and query. Numeric `/reel/{id}` paths still normalize to `/watch?v={id}` as before.
+- For Facebook **video** paths, OG validation accepts only a real video/player tag; image-only cards and generic Facebook sign-in cards are not equivalent to a playable video. Provider availability can change; a configured proxy is a candidate, not a success guarantee.
+- New bounded last resort: `yt-dlp` is permitted for Facebook video links, and ONLY a successfully downloaded attachment (within guild file limits) counts as video preview success. If video extraction requires login or exceeds limits, return a clear status rather than invent media or request cookies.
+- `action_required` (manual failure notice) never suppresses the user's native original embed by itself. The notice includes the original Facebook URL in a link button; **🔄** still retries, **❌** still reverts. Keep original preview if a reload cannot create a replacement. Multi-link messages with any action-required result keep native previews.
+- Regression workflow `.github/workflows/asumi-embed.yml` runs `test_embed_resilience.py`, historical `test_release28.py` and `test_embed_audit.py`. No external video requests in automated tests. The actual Facebook sample must be re-tested in the Discord guild after Render deployment, including fallback file-size and embed-permission behavior.
+- Status checklist: **code CI** is necessary but not proof of live Facebook permission/access. On the original screenshot's `/share/v/` link, verify provider selection, playback, preview controls, and Dashboard embed `reason/tier/proxy_domain`. If public extraction genuinely fails, original message and open-original action must remain available with honest diagnostics.
