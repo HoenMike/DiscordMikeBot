@@ -10,6 +10,7 @@ import asyncio
 import os
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -167,6 +168,17 @@ class BraveSearchAdapter:
             flags=re.IGNORECASE,
         ):
             return BraveSearchResult(status="private_reference")
+        # A follow-up may be an explicit public search command, but never
+        # transform private Discord references into an outbound web query.
+        ambiguous = unicodedata.normalize("NFD", clean_query.casefold())
+        ambiguous = "".join(
+            ch for ch in ambiguous if unicodedata.category(ch) != "Mn"
+        ).replace("đ", "d")
+        if any(signal in ambiguous for signal in (
+            "tin nhan tren", "doan chat tren", "trong server",
+            "tren discord", "cai phia tren", "cai vua noi",
+        )):
+            return BraveSearchResult(status="private_reference")
 
         started = time.perf_counter()
         cache_key = clean_query.casefold()
@@ -174,6 +186,9 @@ class BraveSearchAdapter:
 
         async with self._lock:
             entry = self._cache.get(cache_key)
+            if entry and entry[0] <= now:
+                self._cache.pop(cache_key, None)
+                entry = None
             if entry and entry[0] > now:
                 return BraveSearchResult(
                     status="ok", hits=entry[1], cache_hit=True,
