@@ -70,3 +70,13 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - Bot caches no historical message bodies and never sends them to Brave. Unknown/uncached channels, private threads and inaccessible channels are excluded.
 - Regression: `tests/test_assistant_history.py` under `.github/workflows/asumi-search.yml`; verify workflow actually completes.
 - **Next:** T22.3 Clef choice between Web / Discord History / Archive, limited evidence planning and natural Q&A; no automatic source selection shipped in T22.1/2.
+
+## T22.2 CI acceptance (2026-10-08)
+
+- PR: **#35** — `feat: Asumi 3.6.0 T22.2 Discord History Search`.
+- GitHub Actions `Asumi Search Regression` completed successfully; 102 tests passed across Brave (12), History (16), Conversational Core (50), Archive (12), Semantic (12).
+- Historical search uses a max 12-second overall deadline including live verification. No long passive crawling.
+- Added regression for ambiguous `tìm xem` phrasing and fixed existing Vietnamese `ghi chú:` Archive note parsing found in full-suite CI.
+- **Live Discord API acceptance remains pending**: needs explicit enable `ASUMI_DISCORD_HISTORY_ENABLED=true` and same-server smoke test, including a private-channel user ACL check.
+- Brave live activation also awaits `BRAVE_SEARCH_API_KEY` and `ASUMI_WEB_SEARCH_ENABLED=true`.
+- Next technical goal is **T22.3** (Clef chooses Web / History / Archive and synthesizes evidence with citations); T22.4 covers follow-up/ranking/cache/dashboard polish.
