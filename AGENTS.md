@@ -124,3 +124,7 @@ T22.4a supports oldest/latest messages by one @mentioned author (no topic requir
 ## Asumi configuration authority — 3.7.3
 
 **Never add non-secret Asumi feature flags or quota/model/timing settings to Render env.** The source of truth is `core/constants.py`. Environment is for external API keys/tokens and deployment-specific service/account IDs. Brave is credential-gated with conservative durable cloud quota (500/month); deterministic clearly-public gasoline/current-price questions may use it even if Clef is unavailable. Discord History remains user-requested, channel-ACL-safe; do not claim live success before Discord bot-token tests. Vectorize semantic remains code-OFF until accepted. Whenever policy changes, update tests and handoff.
+
+## Asumi Brave Search UX — 3.7.4
+
+A user-facing Brave result must be an **answer-first, bounded Discord embed**, not a raw wall of links/snippets. Use `features/assistant/search_presenter.py` to show at most three original clickable sources; sanitize HTML and mentions and omit unresolved numeric citation markers. For volatile prices, avoid unsupported exact values; dates/snippets are not ground truth. Cost remains one bounded Brave request per lookup, with durable quota enforcement. Preferred source domains are relevance hints, not freshness guarantees. Read `docs/ASUMI_T22_SEARCH_HANDOFF.md` before touching Search.

@@ -152,6 +152,24 @@ class BraveSearchAdapter:
                 break
         return tuple(output)
 
+    @staticmethod
+    def _public_search_query(query: str) -> str:
+        """Improve one Vietnamese gasoline lookup without an extra paid request."""
+        import unicodedata
+        from zoneinfo import ZoneInfo
+        folded = unicodedata.normalize("NFD", query.casefold())
+        folded = "".join(ch for ch in folded if unicodedata.category(ch) != "Mn")
+        folded = folded.replace("đ", "d")
+        if "gia xang" in folded and any(x in folded for x in (
+            "hom nay", "moi nhat", "hien tai", "bay gio"
+        )):
+            date = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).strftime("%d/%m/%Y")
+            return (
+                f"giá xăng dầu bán lẻ Việt Nam ngày {date} "
+                "RON95-III E10 RON95 Petrolimex PVOIL kỳ điều hành"
+            )
+        return query
+
     async def search(self, query: str, user_id: int) -> BraveSearchResult:
         if not self.enabled:
             return BraveSearchResult(status="disabled")
@@ -218,7 +236,7 @@ class BraveSearchAdapter:
                 "Accept": "application/json",
             }
             params = {
-                "q": clean_query,
+                "q": self._public_search_query(clean_query),
                 "count": self.max_results,
                 "safesearch": "moderate",
             }
