@@ -4,6 +4,17 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ---
 
+## Asumi 3.8 — Feedback (T23)
+
+- User: `@Asumi báo lỗi: ...`, `@Asumi góp ý: ...` hoặc slash `/feedback report`, `/feedback suggest`. Bot so sánh với thiết kế đã ghi nhận, hỏi thêm và **luôn cho phép gửi** ngay cả khi bot nghi là người dùng hiểu nhầm. Nút thao tác chỉ người báo dùng được.
+- Kèm tối đa ba ảnh PNG/JPG/WebP, kể cả ảnh bổ sung trong bản nháp, xác nhận trước khi lưu. Ảnh được kiểm tra và lưu trong **Cloudflare R2 private bucket**, metadata và ticket trong **Turso Cloud**; nếu Turso hoặc ảnh thất bại thì không báo lưu thành công.
+- User: `/feedback status` theo mã `FB-...` để xem quyết định và lý do (chỉ ticket của bản thân).
+- Admin: `/admin/feedback` trong Dashboard có đăng nhập để xem và duyệt ticket, xử lý kèm lý do và ảnh riêng tư. Trạng thái quan trọng tạo notification outbox cho Discord DM; nếu chặn DM vẫn có thể tra cứu bằng `/feedback status`.
+- T23.3: cổng dữ liệu riêng `/api/feedback-connector/v1` chỉ bật khi cấu hình `ASUMI_FEEDBACK_CONNECTOR_TOKEN`; **đang read-only**, chưa kết nối thành ChatGPT plugin. Quyền ghi từ connector tạm khóa đến khi có authorization cho hành động do owner duyệt.
+- T23.4: lưu link GitHub Issue/PR/phiên bản đã phát hành cho ticket được duyệt; **không có auto-fix/auto-merge** dựa trên nội dung feedback.
+- T23.5: nội bộ có thống kê trạng thái và kết quả gửi thông báo; cần smoke test thật trước khi coi T23 hoàn chỉnh.
+
+
 ## Tính năng
 
 ### Asumi Intelligent Search (3.7.8)
