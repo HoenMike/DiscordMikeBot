@@ -9,6 +9,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from typing import Any
 
 from core.db import db_client
@@ -351,9 +352,19 @@ class FeedbackStore:
         version: str = "",
     ) -> None:
         """Owner-approved refs only, never trusted from reporter ticket text."""
-        for value, required in ((issue_url, "/issues/"), (pr_url, "/pull/")):
-            if value and (not value.startswith("https://github.com/HoenMike/DiscordMikeBot")
-                          or required not in value or len(value)>200):
+        for value, segment in ((issue_url, "issues"), (pr_url, "pull")):
+            if not value:
+                continue
+            parsed = urlsplit(value)
+            parts = parsed.path.strip("/").split("/")
+            if (
+                parsed.scheme != "https" or parsed.hostname != "github.com"
+                or parsed.username or parsed.password or parsed.port
+                or parsed.query or parsed.fragment or len(value) > 200
+                or len(parts) != 4
+                or parts[:3] != ["HoenMike", "DiscordMikeBot", segment]
+                or not parts[3].isdigit()
+            ):
                 raise FeedbackStorageError("GitHub link không hợp lệ.")
         current = await self.admin_detail(ticket_id)
         if current is None:
@@ -475,8 +486,12 @@ class FeedbackStore:
         await self._require_cloud()
         async with db_client.execute(
             "SELECT n.notification_id, n.ticket_id, n.reporter_id, n.event_type, "
-            "f.review_reason, f.status FROM asumi_feedback_notifications n "
+            "COALESCE(e.reason,f.review_reason), n.event_type "
+            "FROM asumi_feedback_notifications n "
             "JOIN asumi_feedback f ON f.ticket_id=n.ticket_id "
+            "LEFT JOIN asumi_feedback_events e ON "
+            "e.ticket_id=n.ticket_id AND e.created_at=n.created_at "
+            "AND e.new_status=n.event_type AND e.action='review' "
             "WHERE n.state='pending' AND n.attempts<5 "
             "ORDER BY n.created_at ASC LIMIT ?",
             (min(50,max(1,int(limit))),),
