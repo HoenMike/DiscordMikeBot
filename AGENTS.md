@@ -147,5 +147,5 @@ If direct PVOIL HTML is inaccessible (e.g. HTTP 403), try strictly validated dat
 
 ## Proposed T24 — Unified Admin Console 2.0
 
-**Status: proposed plan only; implementation not authorized yet (2026-10-08).**
+**Status: owner approved T24 plan (2026-10-08); implementation in progress and gated by CI/live verification.**
 Read `docs/ASUMI_T24_ADMIN_CONSOLE_REDESIGN_PLAN.md` before any Admin Dashboard UI/route restructuring. T24 redesign keeps the existing Flask application, consolidates Feedback + AI proposals into the same ticket-detail workflow, and introduces five grouped navigation sections through focused goals T24.0–T24.7. Keep old /admin and /admin/feedback URLs operational; do not create a separate Request Review approval screen. Respect T23 terminal-only reporter notifications, including independent pending PR #51, before changing feedback UI. Record each goal's status/test/live-verification in repository docs so new sessions can resume.

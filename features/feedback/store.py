@@ -490,7 +490,7 @@ class FeedbackStore:
             )
         return created
 
-    async def admin_list(self, *, status: str = "", limit: int = 50) -> list[dict]:
+    async def admin_list(self, *, status: str = "", limit: int = 50, offset: int = 0, view: str = "", query: str = "") -> list[dict]:
         await self._require_cloud()
         limit = max(1, min(100, int(limit)))
         sql = (
@@ -502,12 +502,34 @@ class FeedbackStore:
             "(SELECT newer.number FROM asumi_feedback_numbers newer WHERE newer.ticket_id=f.replaced_by_ticket_id) "
             "FROM asumi_feedback f JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id"
         )
-        args = ()
+        # Bound server-side search and pagination; never interpolate user text.
+        offset = max(0, min(1000000, int(offset)))
+        rules = {
+            "pending": ("submitted", "triage", "needs_info", "deferred", "reopened"),
+            "working": ("approved", "planned", "in_progress", "in_review"),
+            "verify": ("deployed",),
+            "done": ("verified", "closed", "rejected", "duplicate"),
+            "deleted": ("deleted",),
+        }
+        conditions = []
+        args = []
         if status:
-            sql += " WHERE f.status=?"
-            args = (status[:30],)
-        sql += f" ORDER BY n.number DESC LIMIT {limit}"
-        async with db_client.execute(sql, args) as cursor:
+            conditions.append("f.status=?")
+            args.append(status[:30])
+        elif view in rules:
+            states = rules[view]
+            conditions.append("f.status IN (" + ",".join("?" for _ in states) + ")")
+            args.extend(states)
+        q = (query or "").strip().lstrip("#")[:100]
+        if q:
+            conditions.append("(f.title LIKE ? OR f.description LIKE ? OR CAST(n.number AS TEXT) LIKE ?)")
+            pattern = "%" + q + "%"
+            # User text stays a bounded bound parameter, never SQL syntax.
+            args.extend([pattern, pattern, pattern])
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += f" ORDER BY n.number DESC LIMIT {limit} OFFSET {offset}"
+        async with db_client.execute(sql, tuple(args)) as cursor:
             rows = await cursor.fetchall()
         if not db_client.is_cloud:
             raise FeedbackStorageError("Turso unavailable")

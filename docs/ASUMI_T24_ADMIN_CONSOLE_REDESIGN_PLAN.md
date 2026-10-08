@@ -1,6 +1,6 @@
 # T24 — Asumi Admin Console 2.0 / UX & Information Architecture Plan
 
-**Status:** PROPOSED, waiting for owner approval. Planning only; no runtime/dashboard code changed.
+**Status:** APPROVED 2026-10-08. T24.1–T24.6 implementation drafted on feature/t24-admin-console; T24.7 CI/live verification pending. This document is the source of truth for rollout.
 **Baseline:** main as inspected on 2026-10-08. Keep the Flask app, authentication and existing data stores.
 **Decision:** No separate Request Review approval UI. ChatGPT only creates proposals. The owner decides within the Feedback ticket detail view.
 
@@ -132,4 +132,4 @@ Each implementation goal: one manageable PR, update handoff/this plan, preserve 
 - Current feedback has its own style and CSRF token flow; reuse verified backend methods rather than create a second review API.
 - New routes are **proposals**; implement only after owner approval. Preserve code-level semantics of current feature modules.
 - To approve: five-group navigation, targeted pages above, AI & Search P2, and incremental Flask/Jinja refactor (not a full React rewrite).
-- **2026-10-08 checkpoint:** audit and documentation drafted. Runtime UI untouched. Next step is owner review → T24.0 acceptance / T24.1 shell. Maintain source of truth in repository so future sessions can resume.
+- **2026-10-08 checkpoint:** Owner approved T24 IA and staged delivery. Shared nav/layout, page-specific refresh, nine console route handlers, unified Feedback with ticket deep links/pagination, and tests are in implementation PR; CI/deploy/live Discord smoke remain gates. Keep this status accurate as PR progresses.

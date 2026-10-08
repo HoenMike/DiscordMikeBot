@@ -12,12 +12,33 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.8.4"
+CURRENT_VERSION = "3.9.0"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.8.4 - Feedback Center & My Tickets"
+CODENAME = "Asumi 3.9.0 - Admin Console 2.0"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.9.0", "date": "2026-10-08", "type": "minor",
+        "title": "T24: Admin Console 2.0",
+        "summary": "Thống nhất trang quản trị, chuyển sang điều hướng theo tác vụ và gộp duyệt Feedback vào ticket.",
+        "changes": [
+            {"category": "Admin Console", "items": [
+                "Giao diện quản trị thống nhất với sidebar responsive và các trang chuyên trách.",
+                "Tổng quan ưu tiên sức khỏe bot và feedback đang chờ; không tải lại mọi log mỗi 3 giây.",
+                "Tương tác, logs, AI/Search, Tarot, Cabin, Máy chủ, Presence và Changelog ở các trang độc lập.",
+            ]},
+            {"category": "Feedback", "items": [
+                "Review đề xuất ChatGPT ngay trong chi tiết ticket, không mở quy trình duyệt riêng.",
+                "Tìm kiếm/phân trang ticket phía server, URL chi tiết có thể chia sẻ và tải lại.",
+                "Chỉ DM kết quả cuối khi verified/done hoặc hủy/từ chối/trùng; không DM lúc approve.",
+            ]},
+            {"category": "Security", "items": [
+                "Kiểm tra session CSRF cho thao tác quản trị, xác nhận bổ sung trước hành động rủi ro.",
+                "Giữ fallback Dashboard cũ, API và dữ liệu Turso/R2 hiện tại.",
+            ]},
+        ],
+    },
     {
         "version": "3.8.4", "date": "2026-10-08", "type": "minor",
         "title": "T23: New Feedback Center and My Tickets",
