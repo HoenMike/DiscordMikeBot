@@ -140,7 +140,7 @@ class FuelFactsFirstTests(unittest.IsolatedAsyncioTestCase):
         msg = SimpleNamespace(author=SimpleNamespace(id=77), reply=AsyncMock(return_value=SimpleNamespace(id=201)))
         with patch("features.assistant.tools.pvoil_reader.fetch", new=AsyncMock(
             return_value=VerifiedFuelReport(status="unavailable")
-        )), patch("features.assistant.tools.vietfuel_reader.fetch", new=AsyncMock(
+        )), patch("features.assistant.tools.webgia_reader.fetch", new=AsyncMock(
             return_value=SimpleNamespace(status="unavailable", rows=(), elapsed_ms=0),
         )), patch("features.assistant.tools.brave_search.search", new=AsyncMock(
             return_value=BraveSearchResult(status="ok", hits=(
