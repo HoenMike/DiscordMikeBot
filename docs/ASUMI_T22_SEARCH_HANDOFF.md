@@ -206,3 +206,21 @@ GitHub Actions source probe observed PVOIL HTTP 403, unresolvable VietFuel API D
 - Do **not** reopen this accepted UI/answer flow without a new regression report. Maintain dated/unit-bearing answers, clear provider provenance, and the PVOIL → WebGia → Brave failure hierarchy.
 - Other gates are **not implied complete**: Open-Meteo live weather acceptance, Discord History bot-token/ACL behavior, Vectorize semantic pilot and T22.5 cross-source retrieval still need their own evidence.
 - Handoff next: prioritize remaining source/permission acceptance and T22.5 plan, with user approval for any private-history → public-web transition. Avoid a new version bump for this documentation-only acceptance note.
+
+
+## 3.7.8 / Member-scoped summary stress-test (2026-10-08)
+
+User test (Discord screenshot): `@Asumi tóm tắt xem qua giờ @i'm_bd đã nhắn gì` produced a 136-message channel-wide summary spanning 2h, incorrectly mentioning other members/topics. The requested target was one tagged author's messages, not "what the group discussed".
+
+**Root cause:** deterministic `route_locally()` selected `summary.catchup` and synthesized `.m tomtat <hours>h`. The command bridge lost the original author mention, so existing `SummaryCog` scanned all channel messages.
+
+**Fix (v3.7.8):**
+- Explicit member intent selects `summary.member` with stable Discord author ID(s) from literal mention(s), not the mention display name or free-form AI inference.
+- Dispatch verifies the mention against `message.mentions` (must be exactly one distinct target) and requester+bot effective channel history permissions; only scans the current channel. Multiple mentions receive a clarification instead of silently choosing one.
+- Calls the existing `SummaryCog._execute_summary_flow` directly through a real Discord context, preserving the original message and reusing its normal scanner/AI/output. Adds optional `author_filter_id` to `_fetch_messages`, applied to EVERY scan mode (hours/date/message ID) BEFORE passing text to the summarizer. Never leak other authors' messages into the model input.
+- Bare "qua giờ/nãy giờ" with no numeric duration defaults to **2h**, displayed in the Embed; an explicit "1 giờ qua" overrides. Scan remains bounded by existing message limits; cooldown/inflight guard added.
+- Embed title and scan header identify tagged author, current channel, interval and *matching* message count. No matching messages yields a clear no-hit response, NEVER a group summary. For this sensitive per-member request, summary content is not persisted into activity-logger prompt/response fields; only operational metadata.
+- `.m tomtat` without target and `/tomtat` group summary are unchanged. This is only **current-channel** recap: do not claim search across server.
+- New regression `tests/test_assistant_member_summary.py`: exact screenshot phrase, numeric hours, multi-tag rejection, validated mention, channel ACL, three scanner modes, no-match behavior, live reply override. CI includes changes in `features/summary/**`.
+
+**Acceptance:** green CI required; on Discord, ask the screenshot phrase in a busy channel with a low-activity tagged user and confirm that the count/summary are only that author's actual messages, not everyone's. Do not mark live acceptance until observed. No new API key or Render env config.
