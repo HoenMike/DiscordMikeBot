@@ -982,3 +982,39 @@ def connector_feedback_review(ticket_id):
         return jsonify({"updated": True, "ticket_id": ticket_id})
     except FeedbackStorageError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+# T23.4: attach GitHub references only after an explicitly approved ticket.
+@app.route('/api/admin/feedback/<ticket_id>/links', methods=['POST'])
+@login_required
+def feedback_implementation_links(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if request.mimetype != 'application/json':
+        return jsonify({"error":"JSON required"}), 415
+    if (request.headers.get('X-CSRF-Token') or '') != session.get('feedback_csrf'):
+        return jsonify({"error":"Invalid CSRF token"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        asyncio.run(feedback_store.link_delivery(
+            ticket_id=ticket_id,
+            issue_url=str(data.get('issue_url') or ''),
+            pr_url=str(data.get('pr_url') or ''),
+            version=str(data.get('version') or ''),
+        ))
+        return jsonify({"ok":True})
+    except FeedbackStorageError as exc:
+        return jsonify({"error":str(exc)}), 400
+
+
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>', methods=['GET'])
+@feedback_connector_required
+def connector_feedback_detail(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        data = asyncio.run(feedback_store.admin_detail(ticket_id))
+        if data is None:
+            return jsonify({"error":"Ticket not found"}), 404
+        data['evidence_count'] = len(data.pop('evidence',[]))
+        return jsonify({"ticket":data})
+    except FeedbackStorageError:
+        return jsonify({"error":"Unavailable"}), 503
