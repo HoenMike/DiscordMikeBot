@@ -27,3 +27,16 @@ This clarification supersedes the sidebar direction in T24 planning and the unme
 - User preference clarified on 2026-10-08: revert primary UI to `dashboard.html`, then improve the familiar dashboard rather than rebuilding.
 - PR #55 (3.9 sidebar polish) closed without merge.
 - Restoration PR in progress. No changes to production until merged and Render deployment confirmed.
+
+
+## T24.9 — Feedback integrated into the classic Admin tabs (2026-10-08)
+
+**Owner requirement:** Feedback must be *inside the historical main Dashboard*, not on its own Admin page. Implement it as the ninth tab next to Activity/Presence/Version/Tarot/Cabin/Guilds/Overview/Logs, retaining the native classic tab bar and top header.
+
+- The Feedback tab lazily mounts the existing authenticated Feedback Center in a chrome-free same-origin iframe, inside the old Dashboard content area. This is deliberate containment of its existing independent CSS/JS and private screenshot/AI review workflow; it is **not** the rejected T24 sidebar or an independent navigation experience. No duplicated sidebar/header in the embedded view.
+- `/admin/feedback` and `/admin/feedback/<ticket-id>` redirect to `/admin?tab=feedback[&ticket=<id>]`. Old deep links remain useful; selecting ticket inside the view updates the parent URL through checked same-origin postMessage. Back/Forward restores ticket context.
+- Private `/admin/_feedback/embed` is login-protected and no-store; ticket API, CSRF and server-side permissions remain exactly as before. Do not duplicate review permissions in frontend.
+- All other eight classic tabs remain unchanged. Do not replace historic Dashboard with newer sidebar. New feedback data loads only when Feedback is selected.
+- If later extracting Feedback as a native component, keep this same tab-only UX and feature parity; do not make a separate admin shell again.
+
+**QA gate:** Test 8 classic tab workflows + new Feedback tab, mobile nested scrolling, old redirects, image evidence from Turso/R2, proposal accept/dismiss, history and final-only DM policy. Do not change any real ticket just to test UI without the owner choosing one.
