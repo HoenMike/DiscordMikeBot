@@ -193,6 +193,7 @@ class DiscordWizardTests(unittest.IsolatedAsyncioTestCase):
                                    bytes_count=1, sha256="s",source_message_id=30)
         with patch("features.feedback.cog.feedback_store._require_cloud", new=AsyncMock()), patch(
             "features.feedback.cog.feedback_store.init", new=AsyncMock(return_value=True)
+        ), patch("features.feedback.cog.feedback_store.find_source", new=AsyncMock(return_value=None)
         ), patch("features.feedback.cog.evidence_store.put_attachment", new=AsyncMock(
             side_effect=[successful, EvidenceError("bad second")]
         )), patch("features.feedback.cog.evidence_store.delete", new=AsyncMock()) as delete:
