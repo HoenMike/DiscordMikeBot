@@ -1002,9 +1002,15 @@ def feedback_review(ticket_id: str):
 
 
 @app.route('/admin/feedback', methods=['GET'])
+@login_required
+def feedback_dashboard():
+    return render_template('feedback.html', feedback_csrf=admin_csrf_token(),
+                           page="feedback", selected_ticket="")
+
+
 @app.route('/admin/feedback/<ticket_id>', methods=['GET'])
 @login_required
-def feedback_dashboard(ticket_id=""):
+def feedback_ticket_page(ticket_id):
     return render_template('feedback.html', feedback_csrf=admin_csrf_token(),
                            page="feedback", selected_ticket=ticket_id)
 
