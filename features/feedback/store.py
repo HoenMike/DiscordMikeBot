@@ -244,6 +244,34 @@ class FeedbackStore:
             output.append(entry)
         return output
 
+    async def admin_detail(self, ticket_id: str) -> dict | None:
+        await self._require_cloud()
+        cols = (
+            "ticket_id, status, title, category, created_at, review_reason, "
+            "reporter_id, bot_version, guild_id, channel_id, description, "
+            "user_explanation, evidence_json, github_issue_url, github_pr_url, "
+            "resolved_version"
+        )
+        async with db_client.execute(
+            "SELECT " + cols + " FROM asumi_feedback WHERE ticket_id=?",
+            (ticket_id.upper(),)
+        ) as cursor:
+            row = await cursor.fetchone()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Turso unavailable")
+        if row is None:
+            return None
+        names = ("id", "status", "title", "category", "created_at", "reason",
+                 "reporter_id", "bot_version", "guild_id", "channel_id",
+                 "description", "user_explanation", "evidence",
+                 "github_issue_url", "github_pr_url", "resolved_version")
+        record = dict(zip(names, row))
+        try:
+            record["evidence"] = json.loads(record["evidence"] or "[]")
+        except (ValueError, TypeError):
+            record["evidence"] = []
+        return record
+
     async def review(
         self, *, ticket_id: str, status: str, reason: str,
         actor_id: str, verified_version: str = ""
