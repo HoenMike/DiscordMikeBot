@@ -486,7 +486,9 @@ class FeedbackStore:
             "SELECT f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version, "
-            "source_message_id, reported_bot_message_id, n.number "
+            "source_message_id, reported_bot_message_id, n.number, "
+            "f.replaces_ticket_id, f.replaced_by_ticket_id, f.deleted_at, "
+            "(SELECT newer.number FROM asumi_feedback_numbers newer WHERE newer.ticket_id=f.replaced_by_ticket_id) "
             "FROM asumi_feedback f JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id"
         )
         args = ()
@@ -501,7 +503,8 @@ class FeedbackStore:
         fields = ("id", "status", "title", "category", "created_at", "reason",
                   "reporter_id", "bot_version", "guild_id", "channel_id",
                   "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version",
-                  "source_message_id", "reported_bot_message_id", "number")
+                  "source_message_id", "reported_bot_message_id", "number",
+                  "replaces_ticket_id", "replaced_by_ticket_id", "deleted_at", "replacement_number")
         output = []
         for row in rows:
             entry = dict(zip(fields, row))
@@ -521,7 +524,9 @@ class FeedbackStore:
             "f.ticket_id, f.status, f.title, f.category, f.created_at, f.review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, "
-            "resolved_version, source_message_id, reported_bot_message_id, n.number"
+            "resolved_version, source_message_id, reported_bot_message_id, n.number, "
+            "f.replaces_ticket_id, f.replaced_by_ticket_id, f.deleted_at, "
+            "(SELECT newer.number FROM asumi_feedback_numbers newer WHERE newer.ticket_id=f.replaced_by_ticket_id)"
         )
         async with db_client.execute(
             "SELECT " + cols + " FROM asumi_feedback f "
@@ -538,7 +543,8 @@ class FeedbackStore:
                  "reporter_id", "bot_version", "guild_id", "channel_id",
                  "description", "user_explanation", "evidence",
                  "github_issue_url", "github_pr_url", "resolved_version",
-                 "source_message_id", "reported_bot_message_id", "number")
+                 "source_message_id", "reported_bot_message_id", "number",
+                 "replaces_ticket_id", "replaced_by_ticket_id", "deleted_at", "replacement_number")
         record = dict(zip(names, row))
         record["display_id"] = f"#{record['number']}"
         try:
