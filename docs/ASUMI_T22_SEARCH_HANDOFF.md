@@ -180,11 +180,14 @@ Status/acceptance: CI proves the local behavior and safety fixtures, but product
 
 10:46 production screenshot shows Asumi 3.7.6 still returned Brave links without numbers. External direct requests to PVOIL returned HTTP 403 while search-engine indexed copies showed data. Previous mocked parser tests did NOT prove Render could reach PVOIL.
 
-- Source order: **PVOIL first-party** → **VietFuelAPI dated community JSON** → **Brave**.
+- Source order: **PVOIL first-party** → **WebGia.TV dated community HTML** → **Brave**.
 - First party: report each URL status via `first_party_reason`; no raw HTML or private content logged. Reject invalid or future date.
-- Community API: one fixed HTTPS URL, no redirects, 128KiB response cap, short timeout/cache; require priceDate, fresh scrapedAt, sourceCount, plausible prices, appropriate Vùng 1 VND/lít unit and at least two fuel products. No user text is sent to API.
+- Community API: one fixed HTTPS URL, no redirects, 128KiB response cap, short timeout/cache; require Vùng 1 table header, recent effective date, plausible VND/lít prices for at least two products. No user text is sent to API.
 - If community API succeeds, present a clearly labeled **non-official, Vùng 1, dated reference price**. Never call it directly PVOIL-verified. No Brave request is needed.
 - If both fail, Brave fallback cannot hallucinate a live price or claim a new adjustment date.
 - Dashboard supports `first_party_reason`, `aggregate_status`, source count and latency even for non-Brave output; logs report bounded provider statuses.
 - No additional Render env settings: policy in `core/constants.py`. T22.5 still pending.
 - Acceptance: CI green, Render live, real Discord response with numerical values or explicit source diagnostic. The community API's live reachability has NOT yet been verified on Render.
+
+### Live probing decision — 2026-10-08 10:58 VN
+GitHub Actions source probe observed PVOIL HTTP 403, unresolvable VietFuel API DNS, but **WebGia.TV Petrolimex and history pages HTTP 200**. Deprecated the unreachable VietFuel API integration before merge. Latest fallback uses only the public WebGia HTML page with per-row product/Vùng 1 price/date validation. Probe uses real external HTTP access but Render reachability still needs a guild smoke check.
