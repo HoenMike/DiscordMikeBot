@@ -1070,3 +1070,32 @@ def admin_feedback_proposal_decision(proposal_id: str):
                         "decision": "accepted" if data['accept'] else "dismissed"})
     except FeedbackStorageError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+# MCP Streamable HTTP JSON-RPC endpoint for the private ChatGPT plugin.
+# Only read and propose tools exist; approval always requires owner Dashboard.
+@app.route('/api/feedback-connector/mcp', methods=['POST'])
+@feedback_connector_required
+def feedback_mcp_http():
+    from features.feedback.mcp_bridge import handle_mcp
+    if request.content_length is not None and request.content_length > 16384:
+        return jsonify({"error": "Payload too large"}), 413
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "JSON-RPC JSON body required"}), 415
+    payload = request.get_json(silent=True)
+    if payload is None or isinstance(payload, list):
+        return jsonify({
+            "jsonrpc": "2.0", "id": None,
+            "error": {"code": -32600, "message": "Single JSON-RPC request required"}
+        }), 400
+    try:
+        result = asyncio.run(handle_mcp(payload))
+    except Exception as exc:
+        print("[Feedback MCP] RPC error: " + type(exc).__name__, flush=True)
+        return jsonify({
+            "jsonrpc": "2.0", "id": payload.get("id"),
+            "error": {"code": -32603, "message": "Internal server error"}
+        }), 500
+    if result is None:
+        return "", 202
+    return jsonify(result), 200
