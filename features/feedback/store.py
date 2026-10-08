@@ -231,6 +231,28 @@ class FeedbackStore:
         return FeedbackTicket(*record) if record else None
 
 
+    async def reopen_own(
+        self, *, ticket_id: str, reporter_id: int, explanation: str,
+    ) -> None:
+        """Reporter may reopen their OWN reviewed issue with new evidence."""
+        reason = explanation.strip()
+        if not 10 <= len(reason) <= 1000:
+            raise FeedbackStorageError("Hãy giải thích ngắn gọn vì sao lỗi vẫn còn (10–1000 ký tự).")
+        await self._require_cloud()
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        async with db_client.execute(
+            "UPDATE asumi_feedback "
+            "SET status='reopened',review_reason=?,updated_at=?,last_reviewer_id=? "
+            "WHERE ticket_id=? AND reporter_id=? "
+            "AND status IN ('rejected','duplicate','verified','closed')",
+            (reason, now, str(reporter_id), ticket_id.upper(), str(reporter_id)),
+        ) as cursor:
+            count = cursor.rowcount
+        if not db_client.is_cloud or count != 1:
+            raise FeedbackStorageError(
+                "Chỉ có thể mở lại ticket đã được xử lý của chính bạn."
+            )
+
     async def admin_list(self, *, status: str = "", limit: int = 50) -> list[dict]:
         await self._require_cloud()
         limit = max(1, min(100, int(limit)))
