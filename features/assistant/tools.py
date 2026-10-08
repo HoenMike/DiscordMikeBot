@@ -420,7 +420,7 @@ class CommandToolRegistry:
             except Exception as exc:
                 print(f"⚠️ [Asumi Facts] fuel aggregate failed: {type(exc).__name__}", flush=True)
                 source_details["aggregate_status"] = "error"
-                report = await brave_search.search(query, user_id=int(message.author.id))
+        report = await brave_search.search(query, user_id=int(message.author.id))
         details = {
             "web_provider": "brave",
             "web_search_status": report.status,
