@@ -1,6 +1,6 @@
 # T22 — Asumi Intelligent Search / Brave + Discord History
 
-**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3–T22.4 PLANNED
+**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3 IMPLEMENTED / T22.4 PLANNED
 **Date:** 2026-10-08
 **Owner decision:** Use **Brave Search API** for external web search, and add **on-demand Discord History Search** to recover old messages that were never saved into Archive.
 **Current baseline:** Asumi 3.4.1 on main; T21 production acceptance remains pending.
@@ -97,7 +97,7 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | T22.0 | Decision, access, privacy and routing contract | DOCUMENTED |
 | T22.1 | Brave Web Search adapter, budget/keys, citation UX | IMPLEMENTED; LIVE KEY VERIFY PENDING |
 | T22.2 | Discord native History Search + author/date filters + Jump links | IMPLEMENTED; LIVE BOT API VERIFY PENDING |
-| T22.3 | Clef source selection and bounded multi-tool retrieval | NOT STARTED |
+| T22.3 | Clef source selection / controlled one-tool retrieval | IMPLEMENTED; LIVE VERIFY PENDING |
 | T22.4 | Ranking, follow-up, caching, dashboard, edge-case regression | NOT STARTED |
 
 Acceptance — live server:
@@ -136,3 +136,13 @@ Each T22 implementation PR must update this file, docs/ASUMI_T22_SEARCH_HANDOFF.
 - Supports 202 indexing, 429, permission errors, empty results, timeouts and safe non-mention output.
 - Logs only status, result/API count, latency, number of permission-filtered hits — no raw message bodies.
 - Regression tests and CI were added. Live acceptance is **NOT DONE**; actual guild search/bot token support must be verified after deploy.
+
+### T22.3 implementation note (2026-10-08)
+
+- Clef classifies chat/tarot/summarize/help and typed `web_search`, `discord_history`, `archive_search`. New feature `ASUMI_AUTO_SEARCH_ENABLED=false` by default.
+- Python maps tool only when corresponding provider is enabled, source-specific safety checks pass, and Clef confidence is adequate. No open-ended agent loop or automatic multi-tool orchestration yet (reserved for T22.4).
+- To avoid private Discord data being sent to Brave, auto web requires a clear external/current-public info cue and rejects Discord mentions, message links, private/replied context referents. Brave adapter separately rejects outbound private references.
+- If Clef chooses Brave, a bounded Gemini synthesis step uses **public Brave titles/excerpts and URLs only**, never Discord private context. Sources remain visible; synthesis error -> raw Brave sources.
+- Archive source selection remains scoped to requester-owned records; History Search enforces requester and bot effective read permissions.
+- Existing live session replies do not automatically open another tool; explicit actions override continuation.
+- CI and regression coverage extended with T22.3 safety, provider gating, public synthesis and fallback tests.
