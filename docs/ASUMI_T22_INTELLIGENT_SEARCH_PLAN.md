@@ -98,7 +98,8 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | T22.1 | Brave Web Search adapter, budget/keys, citation UX | IMPLEMENTED; LIVE KEY VERIFY PENDING |
 | T22.2 | Discord native History Search + author/date filters + Jump links | IMPLEMENTED; LIVE BOT API VERIFY PENDING |
 | T22.3 | Clef source selection / controlled one-tool retrieval | IMPLEMENTED; LIVE VERIFY PENDING |
-| T22.4a | Chronological first/last by @author, optional topic, 1–5 hits | IMPLEMENTED; LIVE API VERIFY PENDING |\n| T22.4b | Multi-source follow-up, further ranking/cache/dashboard and edge-case regression | NOT STARTED |
+| T22.4a | Chronological first/last by @author, optional topic, 1–5 hits | IMPLEMENTED; LIVE API VERIFY PENDING |
+| T22.4b | Multi-source follow-up, further ranking/cache/dashboard and edge-case regression | NOT STARTED |
 
 Acceptance — live server:
 1. Find an old 'buying a car' message by @author + early-year time hint, even though it was never saved in Archive.
