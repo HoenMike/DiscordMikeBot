@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligent Search (3.7.3)
+### Asumi Intelligent Search (3.7.4)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -18,7 +18,7 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - **Archive Save:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.
 - **Archive Search:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.
 - **Archive Forget:** `@Asumi quên #12`.
-- **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` hoặc hỏi trực tiếp `@Asumi giá xăng hôm nay như nào` → Brave tự hoạt động khi có `BRAVE_SEARCH_API_KEY` và quota Turso bền vững; **không cần bật thêm biến env**.
+- **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` hoặc hỏi trực tiếp `@Asumi giá xăng hôm nay như nào` → Brave tự hoạt động khi có `BRAVE_SEARCH_API_KEY` và quota Turso bền vững; **không cần bật thêm biến env**. Từ 3.7.4 bot trả **Discord embed gọn, câu trả lời trước + tối đa 3 nguồn có link**, lọc HTML và ưu tiên nguồn trực tiếp trong truy vấn giá xăng; thiếu dữ liệu mới thì không tự bịa mức giá.
 - **Discord History Search:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → tìm tin nhắn cũ trong server, có Jump to Message (dùng Discord bot token hiện tại; kiểm tra quyền user/bot từng channel; cần smoke test API Discord thật).
 - **T22.4a — tìm theo thời gian:** `@Asumi tìm lại tin nhắn đầu tiên của @user trong server`, `@Asumi tìm 5 tin nhắn đầu tiên của @user`, `@Asumi tìm tin nhắn gần nhất của @user`, `@Asumi lần đầu @user nhắc tới Minecraft là khi nào?`. Không cần từ khóa khi chỉ tìm tin đầu/ cuối; có từ khóa thì lọc theo chủ đề. Phải tag chính xác **một người**. Trả tin còn được lập chỉ mục và trong kênh có quyền đọc; không khẳng định tìm được tin đầu tiên tuyệt đối.
 - **T22.4b — follow-up từ kết quả tìm kiếm:** Reply vào kết quả Brave/Discord History để hỏi về nội dung hoặc các link Asumi vừa đưa. Nếu muốn cập nhật dữ liệu web mới, hỏi rõ `@Asumi tìm tiếp trên web giá Honda SH160i hôm nay` (cần API Key Brave). Asumi không tự suy luận từ tin nhắn riêng tư để gửi truy vấn ra Brave.
