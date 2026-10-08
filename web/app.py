@@ -17,6 +17,12 @@ from features.cabin.manager import cabin_manager
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 app.secret_key = config.FLASK_SECRET_KEY
+# Admin OAuth consent cookie must never travel over plaintext HTTP.
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 
 @app.context_processor
@@ -1270,3 +1276,18 @@ def asumi_mcp_oauth_token():
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+@app.route('/api/admin/feedback/oauth/revoke', methods=['POST'])
+@login_required
+def asumi_mcp_owner_revoke_tokens():
+    from features.feedback.oauth import revoke_all_owner_tokens, OAuthError
+    token = request.headers.get('X-CSRF-Token', '')
+    expected = session.get('feedback_csrf', '')
+    if not expected or not hmac.compare_digest(token, expected):
+        return jsonify({"error": "Invalid CSRF token"}), 403
+    try:
+        count = asyncio.run(revoke_all_owner_tokens())
+        return jsonify({"revoked": count, "ok": True})
+    except OAuthError as exc:
+        return jsonify({"error": exc.error}), exc.status
