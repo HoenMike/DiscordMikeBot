@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ feedback_csrf }}">
+  <title>{{ page_title }} · Asumi Console</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin_console.css') }}">
+</head>
+<body class="asumi-app" data-page="{{ page }}">
+<div class="asumi-layout">
+  {% include "partials/admin_nav.html" %}
+  <div class="asumi-stage">
+    <header class="asumi-topbar">
+      <button id="asumi-menu" class="asumi-menu" type="button" aria-label="Mở điều hướng" aria-expanded="false">☰</button>
+      <div class="asumi-heading"><span class="asumi-eyebrow">ASUMI / ADMIN</span><h1>{{ page_title }}</h1></div>
+      <div class="asumi-toolbar"><span id="top-status" class="asumi-state">Đang kiểm tra...</span><span id="top-version" class="asumi-muted">—</span><button id="refresh" class="asumi-btn asumi-btn-quiet">Làm mới</button></div>
+    </header>
+    <main class="asumi-main" id="workspace" tabindex="-1">
+      <div class="asumi-card"><div class="asumi-muted">Đang tải dữ liệu...</div></div>
+    </main>
+    <footer class="asumi-footer"><span id="last-updated">—</span><span>Asumi Admin Console</span></footer>
+  </div>
+</div>
+<div id="asumi-toast" class="asumi-toast" role="status" aria-live="polite" hidden></div>
+<script defer src="{{ url_for('static', filename='admin_console.js') }}"></script>
+</body>
+</html>
