@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import os
+import time
 
 import discord
 from dataclasses import dataclass, field
@@ -70,6 +71,8 @@ class CommandToolRegistry:
     def __init__(self, bot):
         self.bot = bot
         self.history = DiscordHistorySearcher.from_env(bot)
+        self._member_summary_cooldowns: dict[int, float] = {}
+        self._member_summary_inflight: set[int] = set()
 
     @staticmethod
     def _archive_snippet(item: dict) -> str:
@@ -638,6 +641,123 @@ class CommandToolRegistry:
             details=details,
         )
 
+    async def _execute_member_summary(
+        self, decision: RouteDecision, message
+    ) -> ToolExecutionResult:
+        """Summarize one explicitly tagged author, only in the current channel.
+
+        No synthetic prefix command: that path discards the original mention
+        and previously widened the request to all channel participants.
+        """
+        async def reply(text: str) -> ToolExecutionResult:
+            sent = await message.reply(
+                text, mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return ToolExecutionResult(
+                handled=True,
+                response_message_ids=(int(sent.id),),
+                response_context="Member summary request: " + text[:150],
+                details={"summary_scope": "member", "summary_status": "rejected"},
+            )
+
+        guild = getattr(message, "guild", None)
+        channel = getattr(message, "channel", None)
+        if guild is None or channel is None:
+            return await reply("ℹ️ Tóm tắt tin nhắn thành viên chỉ hỗ trợ trong channel của server.")
+        ids = decision.arguments.get("author_ids", [])
+        if not isinstance(ids, list) or len(ids) != 1 or not isinstance(ids[0], int):
+            return await reply(
+                "ℹ️ Hãy tag đúng một người để tóm tắt tin nhắn của người đó. "
+                "Ví dụ: @Asumi tóm tắt 1 giờ qua @user đã nhắn gì."
+            )
+        author_id = ids[0]
+        mentioned = [
+            member for member in getattr(message, "mentions", [])
+            if getattr(member, "id", None) == author_id
+        ]
+        if len(mentioned) != 1:
+            return await reply(
+                "ℹ️ Không xác nhận được người được tag trong Discord. "
+                "Hãy mention lại một thành viên thực tế."
+            )
+        bot_member = getattr(guild, "me", None)
+        try:
+            requester_perms = channel.permissions_for(message.author)
+            bot_perms = channel.permissions_for(bot_member) if bot_member else None
+        except (AttributeError, TypeError):
+            requester_perms = bot_perms = None
+        if not (
+            requester_perms
+            and bot_perms
+            and requester_perms.view_channel
+            and requester_perms.read_message_history
+            and bot_perms.view_channel
+            and bot_perms.read_message_history
+        ):
+            return await reply(
+                "🔒 Không đủ quyền xem và đọc lịch sử channel này để tóm tắt."
+            )
+        cog = self.bot.get_cog("SummaryCog")
+        if cog is None:
+            return await reply("⚠️ Module tóm tắt đang tạm thời không khả dụng.")
+
+        from core import constants as policy
+        raw_hours = decision.arguments.get("hours")
+        try:
+            hours = (
+                float(raw_hours) if raw_hours is not None
+                else policy.ASUMI_MEMBER_SUMMARY_DEFAULT_HOURS
+            )
+        except (ValueError, TypeError):
+            return await reply("ℹ️ Khoảng thời gian không hợp lệ.")
+        if not 0 < hours <= policy.ASUMI_MEMBER_SUMMARY_MAX_HOURS:
+            return await reply("ℹ️ Khoảng thời gian cần nằm trong 0–168 giờ gần nhất.")
+
+        requester_id = int(message.author.id)
+        now = time.monotonic()
+        if requester_id in self._member_summary_inflight:
+            return await reply("⏳ Bạn đang có một yêu cầu tóm tắt khác đang chạy.")
+        if now < self._member_summary_cooldowns.get(requester_id, 0):
+            return await reply("⏳ Vui lòng đợi một chút trước khi yêu cầu tóm tắt tiếp.")
+
+        # The original message stays intact; use native context for reply and
+        # reuse the standard SummaryCog AI, limits, logging, output and error UX.
+        self._member_summary_inflight.add(requester_id)
+        self._member_summary_cooldowns[requester_id] = (
+            now + policy.ASUMI_MEMBER_SUMMARY_COOLDOWN_SECONDS
+        )
+        try:
+            ctx = await self.bot.get_context(message)
+            await cog._execute_summary_flow(
+                user=message.author, target_channel=channel,
+                hours=hours, summary_type="short", ctx=ctx,
+                author_filter_id=author_id,
+                author_display_name=(
+                    getattr(mentioned[0], "display_name", None)
+                    or getattr(mentioned[0], "name", str(author_id))
+                ),
+            )
+            result_ids, result_context = await self._capture_bot_outputs(message)
+            return ToolExecutionResult(
+                handled=True, response_message_ids=result_ids,
+                response_context=result_context[:4500],
+                details={
+                    "summary_scope": "member",
+                    "summary_status": "attempted",
+                    "summary_hours": hours,
+                    "summary_channel_only": True,
+                },
+            )
+        except Exception as exc:
+            print(
+                f"❌ [Asumi Summary] {type(exc).__name__}: {str(exc)[:120]}",
+                flush=True,
+            )
+            return await reply("⚠️ Chưa thể tóm tắt tin nhắn lúc này, hãy thử lại sau.")
+        finally:
+            self._member_summary_inflight.discard(requester_id)
+
     @staticmethod
     def _command_for(decision: RouteDecision) -> str | None:
         if decision.tool == "help.show":
@@ -706,6 +826,8 @@ class CommandToolRegistry:
             return await self._execute_web_search(decision, message)
         if decision.tool == "discord_history.search":
             return await self._execute_history_search(decision, message)
+        if decision.tool == "summary.member":
+            return await self._execute_member_summary(decision, message)
 
         if decision.tool and decision.tool.startswith("archive."):
             try:
