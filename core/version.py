@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.0"
+CURRENT_VERSION = "3.7.1"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7 - Intelligent Source Routing"
+CODENAME = "Asumi 3.7.1 - Temporal Discord History Search"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.1", "date": "2026-10-08",
+        "type": "bugfix", "title": "Temporal Discord History Search (T22.4a)",
+        "summary": "Tìm tin nhắn cũ nhất/mới nhất của một người, có hoặc không có từ khóa, bằng Discord Search.",
+        "changes": [
+            {"category": "🔎 Discord History", "items": [
+                "Hỏi tin nhắn đầu tiên hoặc gần nhất của @user; mặc định trả một tin có Jump to Message.",
+                "Hỏi 5 tin nhắn đầu tiên hoặc lần đầu @user nhắc tới một chủ đề; sắp xếp theo timestamp.",
+                "Giữ giới hạn API/time/ACL và ghi rõ đây là tin sớm nhất tìm được, không bảo đảm tuyệt đối.",
+                "Cần bật ASUMI_DISCORD_HISTORY_ENABLED và nghiệm thu API bot thật mới sử dụng được.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.0", "date": "2026-10-08",
         "type": "minor", "title": "Intelligent Source Routing",
