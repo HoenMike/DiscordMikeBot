@@ -168,15 +168,14 @@ class DiscordHistorySearcher:
 
     @classmethod
     def from_env(cls, bot):
+        from core import constants as policy
         return cls(
             bot,
-            enabled=os.getenv("ASUMI_DISCORD_HISTORY_ENABLED", "false").lower() in {
-                "1", "true", "yes", "on",
-            },
-            timeout_seconds=float(os.getenv("ASUMI_DISCORD_HISTORY_TIMEOUT_SECONDS", "5")),
-            max_calls=int(os.getenv("ASUMI_DISCORD_HISTORY_MAX_CALLS", "3")),
-            max_results=int(os.getenv("ASUMI_DISCORD_HISTORY_MAX_RESULTS", "5")),
-            cooldown_seconds=float(os.getenv("ASUMI_DISCORD_HISTORY_COOLDOWN_SECONDS", "20")),
+            enabled=policy.ASUMI_DISCORD_HISTORY_ENABLED,
+            timeout_seconds=policy.ASUMI_DISCORD_HISTORY_TIMEOUT_SECONDS,
+            max_calls=policy.ASUMI_DISCORD_HISTORY_MAX_CALLS,
+            max_results=policy.ASUMI_DISCORD_HISTORY_MAX_RESULTS,
+            cooldown_seconds=policy.ASUMI_DISCORD_HISTORY_COOLDOWN_SECONDS,
         )
 
     @staticmethod
