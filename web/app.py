@@ -200,7 +200,7 @@ def admin_page(page):
 @login_required
 def admin_legacy():
     """Temporary fallback during phased migration, not part of navigation."""
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', feedback_csrf=admin_csrf_token())
 
 
 @app.route('/home')
