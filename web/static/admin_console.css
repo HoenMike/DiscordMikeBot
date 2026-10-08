@@ -13,3 +13,82 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}but
 @media(max-width:780px){.asumi-layout{display:block}.asumi-sidebar{position:fixed;transform:translateX(-110%);width:250px;max-width:85vw;transition:transform .16s ease;height:100dvh;box-shadow:18px 0 50px #0009}.asumi-nav-open .asumi-sidebar{transform:translateX(0)}.asumi-nav-open .asumi-overlay{display:block;position:fixed;inset:0;background:#0009;z-index:19}.asumi-menu{display:block}.asumi-topbar{padding:13px 16px}.asumi-toolbar{gap:7px}.asumi-toolbar .asumi-muted{display:none}.asumi-main{padding:17px 12px 40px}.asumi-grid{gap:9px}.asumi-card{padding:15px}.asumi-metric{font-size:21px}.asumi-heading h1{font-size:18px}.asumi-footer{padding:12px 16px}}
 @media(max-width:400px){.asumi-grid{grid-template-columns:1fr 1fr}.asumi-toolbar #refresh{padding:6px 8px}.asumi-state{font-size:10px}.asumi-main{padding:13px 9px 28px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* T24.8 — Progressive polish of the ORIGINAL Asumi 3.9.0 layout.
+   Navigation, routes and component hierarchy are intentionally unchanged. */
+:root{
+ --bg:#0e131e;--panel:#171f2d;--panel2:#202b3c;--line:#303e50;
+ --text:#eff3fb;--muted:#a9b7cb;--accent:#9ab6ff;
+}
+body.asumi-app{font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.asumi-sidebar{background:#121b29;padding:19px 12px 15px;gap:17px;scrollbar-width:thin;scrollbar-color:#3b4b62 transparent}
+.asumi-brand{padding:4px 10px 9px;gap:11px}
+.asumi-brand-icon{background:linear-gradient(145deg,#637dc3,#4c64a4);border-radius:11px}
+.asumi-nav{gap:11px}
+.asumi-nav-group{gap:2px}
+.asumi-nav-label{padding:5px 11px 4px;font-size:10px;letter-spacing:.085em}
+.asumi-nav-item{padding:8px 11px;border-radius:9px;transition:background-color .15s ease,color .15s ease}
+.asumi-nav-item:hover{background:#243149;color:#fff}
+.asumi-nav-item.is-active{background:#2a3d60;color:#f6f8ff;box-shadow:inset 3px 0 0 #8faefd}
+.asumi-sidebar-foot{padding:11px 10px 0}
+.asumi-topbar{background:#111926;padding-top:18px;padding-bottom:18px}
+.asumi-eyebrow{letter-spacing:.11em;font-size:10px}
+.asumi-heading h1{font-size:22px;line-height:1.25}
+.asumi-main{max-width:1390px;padding-top:26px}
+.asumi-card{background:var(--panel);border:1px solid #2e3c50;box-shadow:0 4px 20px rgba(0,0,0,.07);border-radius:14px;padding:20px}
+.asumi-card h2{font-size:16px;letter-spacing:-.015em}
+.asumi-card h3{font-size:14px}
+.asumi-section-head{margin-bottom:16px}
+.asumi-label{letter-spacing:.01em}
+.asumi-caption{line-height:1.55}
+.asumi-btn{min-height:35px;font-size:12px;border-radius:9px;background:#2a3951;border:1px solid #425470;transition:background-color .15s ease,border-color .15s ease,transform .15s ease}
+.asumi-btn:hover{background:#374c6b;border-color:#617999}
+.asumi-btn:active{transform:translateY(1px)}
+.asumi-btn-primary{background:#536ead;border-color:#6586ca}
+.asumi-btn-primary:hover{background:#617ec4}
+.asumi-btn-quiet{background:#1b2636;border-color:#334259}
+.asumi-btn-danger{background:transparent;color:#eea8b3;border-color:#6e4554}
+.asumi-btn-danger:hover{background:#492c39;border-color:#ae6579}
+.asumi-input{background:#121c2a;border-color:#42516a;border-radius:9px}
+.asumi-pill.good{background:rgba(66,133,104,.13)}
+.asumi-pill.bad{background:rgba(177,84,102,.10)}
+.asumi-table th,.asumi-table td{padding:13px 12px}
+.asumi-item{padding:14px 0}
+.asumi-help{line-height:1.6}
+.asumi-muted{color:var(--muted)}
+
+/* Guilds: existing list remains, with clearer information/action hierarchy. */
+.asumi-guild-card{max-width:1170px}
+.asumi-guild-heading{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.asumi-guild-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:1px 0 15px;border-bottom:1px solid var(--line)}
+.asumi-guild-toolbar .asumi-help{margin:0}
+.asumi-guild-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.asumi-guild-filters .asumi-input{min-height:37px}
+.asumi-guild-list{display:grid}
+.asumi-guild-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:14px;padding:17px 2px;border-bottom:1px solid var(--line);min-width:0}
+.asumi-guild-row:last-child{border-bottom:0}
+.asumi-guild-avatar{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#2d405e;color:#e3edff;font-size:16px;font-weight:700;object-fit:cover;flex:none;border:1px solid #485e7a}
+.asumi-guild-info{min-width:0}
+.asumi-guild-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.4;overflow-wrap:anywhere}
+.asumi-guild-meta{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:5px;color:var(--muted);font-size:12px}
+.asumi-guild-meta-id{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}
+.asumi-guild-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+.asumi-more{position:relative}
+.asumi-more summary{list-style:none;cursor:pointer;padding:7px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;color:var(--muted);min-width:40px;text-align:center;line-height:20px}
+.asumi-more summary::-webkit-details-marker{display:none}
+.asumi-more summary:hover,.asumi-more[open] summary{color:var(--text);background:var(--panel2)}
+.asumi-more-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:180px;padding:7px;border:1px solid var(--line);background:#212d40;box-shadow:0 15px 38px #0006;border-radius:11px;z-index:10}
+.asumi-more-menu .asumi-btn{width:100%;text-align:left;justify-content:flex-start}
+.asumi-guild-count{color:var(--muted);font-size:12px}
+@media(max-width:780px){
+ .asumi-sidebar{padding-top:18px;gap:17px}
+ .asumi-main{padding-top:18px}
+ .asumi-topbar{padding:15px 16px}
+ .asumi-card{padding:16px}
+ .asumi-guild-row{grid-template-columns:38px minmax(0,1fr);gap:11px;padding:16px 0}
+ .asumi-guild-avatar{width:38px;height:38px}
+ .asumi-guild-actions{grid-column:2;justify-content:flex-start}
+ .asumi-guild-filters,.asumi-guild-filters .asumi-input{width:100%}
+ .asumi-guild-filters .asumi-input{flex:1}
+}
+@media(prefers-reduced-motion:reduce){.asumi-nav-item,.asumi-btn{transition:none}}
