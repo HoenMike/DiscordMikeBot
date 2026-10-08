@@ -89,7 +89,7 @@ class BraveSearchUXTests(unittest.TestCase):
             url=f"https://example.org/results/{i}",
         ) for i in range(7)]
         embed = build_search_embed("test", long)
-        self.assertLessEqual(embed.length, 6000)
+        self.assertLessEqual(len(embed), 6000)
         self.assertLessEqual(len(embed.fields[0].value), 1024)
         self.assertLessEqual(embed.fields[0].value.count("https://"), 3)
 
