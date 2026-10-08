@@ -170,3 +170,34 @@ Cloudflare account now contains a new PRIVATE APAC bucket `asumi-feedback-eviden
 **Blocking owner action**: Cloudflare account token management endpoint returned 9109 Unauthorized; cannot create a secure R2 S3 key. Owner must generate a bucket-scoped R2 **Object Read & Write** API token and set secret environment variables `ASUMI_FEEDBACK_R2_ACCESS_KEY_ID` and `ASUMI_FEEDBACK_R2_SECRET_ACCESS_KEY` in Render. Never paste credentials into GitHub/chat. For T23.3, separately configure a random strong `ASUMI_FEEDBACK_CONNECTOR_TOKEN` and connect the private plugin. Avoid adding arbitrary tokens or using broad Cloudflare admin credentials.
 
 **Remaining pre-merge reviews**: enforce owner auth and actual cross-event approval (a simple request flag is not proof of owner approval); inspect any DB schema migrations for existing tables; audit private evidence serving, Slack/Discord permissions and UI rendering; review DM retries/idempotency; add end-to-end tests and live screenshot confirmation. Do not equate CI mocks with production verification. T23.4 currently supports linking approved issues/PRs, not automatic agent execution/auto-merge.
+
+
+## 2026-10-08 — T23.3–T23.5 owner-gated completion work (Asumi 3.8.1)
+
+Branch `feat/asumi-t23-review-handoff-completion`. Implementation includes:
+- Authenticated ChatGPT *proposal* endpoint `POST /api/feedback-connector/v1/tickets/{id}/proposals`. AI can draft `approved/rejected/deferred/needs_info/duplicate` recommendation and reason, but **cannot update the ticket**.
+- Turso table `asumi_feedback_review_proposals` with `pending → accepted/dismissed` audit. Owner-only admin inbox displays proposals, and an explicit CSRF-protected click decides. Dismissing a proposal does not reject the user ticket; accepting applies the proposed status and reason and triggers notification.
+- ChatGPT/OpenAPI contract exposes **read ticket, list tickets, propose only**. The existing direct connector review/link-write handlers remain hard-disabled (403). No assistant/agent can approve automatically.
+- `/feedback reopen` is reporter-only, requires explanation, and works only for previously reviewed/closed tickets.
+- Dashboard supports safe GitHub Issue draft copying and Issue/PR/release links for already approved tickets. No auto-create/merge/deploy from untrusted user feedback.
+- Durable notification outbox resolves the **historical event reason** instead of showing a later status's reason.
+- Source message jump links, exact GitHub URL validation, regression tests and version update.
+
+**Owner expressly deferred FB-01401CE0D1 after initially approving it.** It MUST remain `submitted` until owner gives a fresh explicit go-ahead **after T23 completion**. A one-off approval hook that was briefly drafted on a separate unmerged branch was removed; it is NOT in main or this branch. The member-summary bug fix is likewise postponed and unmerged.
+
+**Still external/blocking to complete fully:** ChatGPT Plugin cannot access the REST API until owner connects/authenticates an actual private integration and a scoped `ASUMI_FEEDBACK_CONNECTOR_TOKEN` is configured on Render. This workflow must never expose database credentials, allow public ticket access, or use a ticket's text as an instruction. GitHub Issue creation and code implementation remain explicit owner-approved downstream actions.
+
+**Acceptance gates:** CI + deploy only establish code availability. Do live test from ChatGPT connector → proposal → owner confirmation in Dashboard → Turso ticket status and single private DM; rejection and verified statuses must show the correct reason. No auto approval of FB-01401CE0D1.
+
+
+### Private MCP bridge details
+
+The T23.3 backend now also serves **MCP Streamable HTTP JSON** at
+`https://discordmikebot.onrender.com/api/feedback-connector/mcp`, authenticated with
+the SAME strong `ASUMI_FEEDBACK_CONNECTOR_TOKEN` Render Bearer credential as the REST connector.
+Exposed tools: `list_feedback_tickets`, `get_feedback_ticket`, `propose_feedback_review`.
+It has **no** tool for approving, rejecting, deploying, or creating GitHub issues.
+The plugin package and actual user connection need a separate confirmation and
+compatible host credential flow. Never bundle a bearer token in `mcp.json` or GitHub.
+CI verifies MCP JSON-RPC initialize/list/call, strips R2 private keys and requires
+proposal-only behavior. Live connected-plugin validation is still pending.

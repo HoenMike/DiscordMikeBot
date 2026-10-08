@@ -9,6 +9,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 from typing import Any
 
 from core.db import db_client
@@ -94,6 +95,23 @@ SCHEMA = (
       VALUES (NEW.ticket_id || ':' || NEW.status || ':' || NEW.updated_at,
               NEW.ticket_id, NEW.reporter_id, NEW.status, NEW.updated_at);
     END
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS asumi_feedback_review_proposals (
+      proposal_id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL,
+      target_status TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'chatgpt',
+      state TEXT NOT NULL DEFAULT 'pending',
+      reviewed_at TEXT,
+      reviewer_id TEXT,
+      created_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS asumi_feedback_review_proposals_ticket_idx
+    ON asumi_feedback_review_proposals (ticket_id, state, created_at)
     """,
     """
     CREATE TABLE IF NOT EXISTS asumi_feedback_notifications (
@@ -214,13 +232,36 @@ class FeedbackStore:
         return FeedbackTicket(*record) if record else None
 
 
+    async def reopen_own(
+        self, *, ticket_id: str, reporter_id: int, explanation: str,
+    ) -> None:
+        """Reporter may reopen their OWN reviewed issue with new evidence."""
+        reason = explanation.strip()
+        if not 10 <= len(reason) <= 1000:
+            raise FeedbackStorageError("Hãy giải thích ngắn gọn vì sao lỗi vẫn còn (10–1000 ký tự).")
+        await self._require_cloud()
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        async with db_client.execute(
+            "UPDATE asumi_feedback "
+            "SET status='reopened',review_reason=?,updated_at=?,last_reviewer_id=? "
+            "WHERE ticket_id=? AND reporter_id=? "
+            "AND status IN ('rejected','duplicate','verified','closed')",
+            (reason, now, str(reporter_id), ticket_id.upper(), str(reporter_id)),
+        ) as cursor:
+            count = cursor.rowcount
+        if not db_client.is_cloud or count != 1:
+            raise FeedbackStorageError(
+                "Chỉ có thể mở lại ticket đã được xử lý của chính bạn."
+            )
+
     async def admin_list(self, *, status: str = "", limit: int = 50) -> list[dict]:
         await self._require_cloud()
         limit = max(1, min(100, int(limit)))
         sql = (
             "SELECT ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
-            "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version FROM asumi_feedback"
+            "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version, "
+            "source_message_id, reported_bot_message_id FROM asumi_feedback"
         )
         args = ()
         if status:
@@ -233,7 +274,8 @@ class FeedbackStore:
             raise FeedbackStorageError("Turso unavailable")
         fields = ("id", "status", "title", "category", "created_at", "reason",
                   "reporter_id", "bot_version", "guild_id", "channel_id",
-                  "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version")
+                  "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version",
+                  "source_message_id", "reported_bot_message_id")
         output = []
         for row in rows:
             entry = dict(zip(fields, row))
@@ -250,7 +292,7 @@ class FeedbackStore:
             "ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, "
-            "resolved_version"
+            "resolved_version, source_message_id, reported_bot_message_id"
         )
         async with db_client.execute(
             "SELECT " + cols + " FROM asumi_feedback WHERE ticket_id=?",
@@ -264,7 +306,8 @@ class FeedbackStore:
         names = ("id", "status", "title", "category", "created_at", "reason",
                  "reporter_id", "bot_version", "guild_id", "channel_id",
                  "description", "user_explanation", "evidence",
-                 "github_issue_url", "github_pr_url", "resolved_version")
+                 "github_issue_url", "github_pr_url", "resolved_version",
+                 "source_message_id", "reported_bot_message_id")
         record = dict(zip(names, row))
         try:
             record["evidence"] = json.loads(record["evidence"] or "[]")
@@ -309,9 +352,18 @@ class FeedbackStore:
         version: str = "",
     ) -> None:
         """Owner-approved refs only, never trusted from reporter ticket text."""
-        for value, required in ((issue_url, "/issues/"), (pr_url, "/pull/")):
-            if value and (not value.startswith("https://github.com/HoenMike/DiscordMikeBot")
-                          or required not in value or len(value)>200):
+        for value, segment in ((issue_url, "issues"), (pr_url, "pull")):
+            if not value:
+                continue
+            parsed = urlsplit(value)
+            parts = parsed.path.strip("/").split("/")
+            if (
+                parsed.scheme != "https" or parsed.netloc != "github.com"
+                or parsed.query or parsed.fragment or len(value) > 200
+                or len(parts) != 4
+                or parts[:3] != ["HoenMike", "DiscordMikeBot", segment]
+                or not parts[3].isdigit()
+            ):
                 raise FeedbackStorageError("GitHub link không hợp lệ.")
         current = await self.admin_detail(ticket_id)
         if current is None:
@@ -353,12 +405,92 @@ class FeedbackStore:
             "notification_needs_attention": int(failed[0] if failed else 0),
         }
 
+    async def propose_review(
+        self, *, ticket_id: str, target_status: str, reason: str, source: str = "chatgpt"
+    ) -> str:
+        """Untrusted AI proposes; NEVER changes the feedback ticket status."""
+        if target_status not in {"approved", "rejected", "deferred", "needs_info", "duplicate"}:
+            raise FeedbackStorageError("Trạng thái đề xuất không hợp lệ.")
+        reason = reason.strip()
+        if not (10 <= len(reason) <= 1800):
+            raise FeedbackStorageError("Đề xuất phải có lý do rõ ràng (10–1800 ký tự).")
+        current = await self.admin_detail(ticket_id)
+        if current is None:
+            raise FeedbackStorageError("Ticket không tồn tại.")
+        if current["status"] not in {"submitted", "triage", "needs_info", "deferred", "reopened"}:
+            raise FeedbackStorageError("Ticket đã được xử lý; hãy kiểm tra lại trước khi đề xuất.")
+        await self._require_cloud()
+        proposal_id = "FP-" + uuid.uuid4().hex[:12].upper()
+        await db_client.execute(
+            "INSERT INTO asumi_feedback_review_proposals "
+            "(proposal_id,ticket_id,target_status,reason,source,created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (proposal_id, ticket_id.upper(), target_status, reason, source[:40],
+             datetime.now(timezone.utc).isoformat(timespec="microseconds")),
+        )
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không xác minh được đề xuất trên Turso.")
+        return proposal_id
+
+    async def list_proposals(self, *, ticket_id: str, limit: int = 20) -> list[dict]:
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT proposal_id,ticket_id,target_status,reason,source,state,created_at,"
+            "reviewed_at,reviewer_id FROM asumi_feedback_review_proposals "
+            "WHERE ticket_id=? ORDER BY created_at DESC LIMIT ?",
+            (ticket_id.upper(), max(1,min(50,limit))),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không đọc được đề xuất trên Turso.")
+        names = ("id","ticket_id","target_status","reason","source","state",
+                 "created_at","reviewed_at","reviewer_id")
+        return [dict(zip(names, row)) for row in rows]
+
+    async def decide_proposal(self, *, proposal_id: str, accept: bool, actor_id: str) -> str:
+        """Only callable after authenticated owner action via admin CSRF session."""
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT ticket_id,target_status,reason,state "
+            "FROM asumi_feedback_review_proposals WHERE proposal_id=?",
+            (proposal_id.upper(),),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if not db_client.is_cloud or not row:
+            raise FeedbackStorageError("Đề xuất không tồn tại.")
+        ticket_id, target_status, reason, state = row
+        if state != "pending":
+            raise FeedbackStorageError("Đề xuất đã được xử lý.")
+        # A dismissal only resolves the proposal, never rejects the reporter.
+        if accept:
+            await self.review(
+                ticket_id=ticket_id, status=target_status, reason=reason,
+                actor_id=actor_id,
+            )
+        await self._require_cloud()
+        async with db_client.execute(
+            "UPDATE asumi_feedback_review_proposals "
+            "SET state=?,reviewed_at=?,reviewer_id=? "
+            "WHERE proposal_id=? AND state='pending'",
+            ("accepted" if accept else "dismissed",
+             datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+             actor_id[:80], proposal_id.upper()),
+        ) as cursor:
+            changed = cursor.rowcount
+        if not db_client.is_cloud or changed != 1:
+            raise FeedbackStorageError("Không thể xác nhận trạng thái đề xuất.")
+        return ticket_id
+
     async def pending_notifications(self, limit: int = 20) -> list[tuple]:
         await self._require_cloud()
         async with db_client.execute(
             "SELECT n.notification_id, n.ticket_id, n.reporter_id, n.event_type, "
-            "f.review_reason, f.status FROM asumi_feedback_notifications n "
+            "COALESCE(e.reason,f.review_reason), n.event_type "
+            "FROM asumi_feedback_notifications n "
             "JOIN asumi_feedback f ON f.ticket_id=n.ticket_id "
+            "LEFT JOIN asumi_feedback_events e ON "
+            "e.ticket_id=n.ticket_id AND e.created_at=n.created_at "
+            "AND e.new_status=n.event_type AND e.action='review' "
             "WHERE n.state='pending' AND n.attempts<5 "
             "ORDER BY n.created_at ASC LIMIT ?",
             (min(50,max(1,int(limit))),),

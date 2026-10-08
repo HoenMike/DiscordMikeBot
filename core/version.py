@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.8.0"
+CURRENT_VERSION = "3.8.1"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.8.0 - Feedback Intake & Review"
+CODENAME = "Asumi 3.8.1 - Owner-Gated Feedback Review"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.8.1", "date": "2026-10-08", "type": "bugfix",
+        "title": "T23: owner-gated AI review, handoff and reporter follow-up",
+        "summary": "ChatGPT chỉ được gửi đề xuất; admin xác nhận mới thay đổi ticket. Bổ sung reopen, handoff Issue/PR và bảo mật thông báo.",
+        "changes": [
+            {"category": "🔒 Feedback moderation", "items": [
+                "Đề xuất review AI nằm trong hàng chờ riêng; chủ bot nhấn Chấp nhận/Bỏ qua trên Dashboard, không có tự duyệt.",
+                "Bổ sung xác minh CSRF và quyền admin cho thao tác áp dụng đề xuất.",
+                "Thông báo Discord lưu lý do đúng với từng lần chuyển trạng thái.",
+            ]},
+            {"category": "🛠️ Issue handoff", "items": [
+                "Copy GitHub Issue draft, liên kết Issue/PR và tin nhắn Discord gốc cho ticket đã được duyệt.",
+                "Thêm /feedback reopen để chủ ticket mở lại lỗi sau khi bị đóng hoặc sửa chưa triệt để.",
+                "Không tự khởi tạo code hoặc giải quyết feedback chưa có quyết định thủ công.",
+            ]},
+        ],
+    },
     {
         "version": "3.8.0", "date": "2026-10-08",
         "type": "minor", "title": "Feedback Intake & Review (T23)",
