@@ -1584,7 +1584,12 @@ class EmbedCog(commands.Cog):
             )
             tried = attempted
 
-            if not proxy_url:
+            if not proxy_url and (
+                re.search(
+                    r"/(?:share/[vr]/|reels?/|videos/)",
+                    urlparse(url).path, flags=re.IGNORECASE,
+                ) or urlparse(url).path.startswith("/watch")
+            ):
                 # Explicit Reload authorizes trying the last fallback; only
                 # attach an actually downloaded playable video. Preserve the
                 # current preview if yt-dlp is blocked/unavailable/oversized.
@@ -1603,6 +1608,7 @@ class EmbedCog(commands.Cog):
                     return fallback
                 if isinstance(fallback, PreviewResult) and fallback.status == "degraded":
                     return fallback
+            if not proxy_url:
                 # A failed validation/HTTP timeout does NOT mean that proxy
                 # was permanently consumed. Keep previously successful proxy
                 # rotations excluded, but allow bounded retries of failures.
