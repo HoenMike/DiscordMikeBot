@@ -52,7 +52,7 @@ WEATHER_DESCRIPTIONS = {
 
 def _fold(value: str) -> str:
     normalized = unicodedata.normalize("NFD", value.casefold())
-    return "".join(c for c in normalized if unicodedata.category(ch) != "Mn").replace("đ", "d")
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn").replace("đ", "d")
 
 
 def parse_weather_place(query: str) -> tuple[str, float, float] | str | None:
