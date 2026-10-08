@@ -96,6 +96,12 @@ async function releases(){
 const loaders={overview,activity,monitoring,assistant,tarot,cabin,guilds,presence,releases};
 async function load(){
  if(busy)return;busy=true;byId('refresh').disabled=true;
+ // All pages show the actual Discord status, even those with specialized APIs.
+ if(!['overview','monitoring','assistant'].includes(page)){
+  api('/api/stats').then(statusHeader).catch(()=>{
+    const status=byId('top-status');status.textContent='Trạng thái chưa xác định';status.className='asumi-state';
+  });
+ }
  try{await loaders[page]?.();stamp()}catch(e){root.innerHTML='<div class="asumi-alert" role="alert">Không tải được trang: '+esc(e.message)+'</div>'}finally{busy=false;byId('refresh').disabled=false}
 }
 document.addEventListener('click',async ev=>{
