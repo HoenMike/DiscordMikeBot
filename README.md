@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligent Search (3.7.5)
+### Asumi Intelligent Search (3.7.6)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
