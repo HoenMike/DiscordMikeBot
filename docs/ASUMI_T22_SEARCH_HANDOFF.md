@@ -1,6 +1,6 @@
 # T22 — Intelligent Search Handoff
 
-**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 NEXT
+**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 IMPLEMENTED / T22.4 NEXT
 **Recorded:** 2026-10-08
 **Primary spec:** docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md
 **Baseline:** Asumi 3.4.1 (`main`), T21 final production acceptance remains outstanding.
@@ -28,7 +28,7 @@
 1. Finish T21.9 production regression (including Vectorize enable test) independently; T22 plan need not wait to be documented.
 2. T22.1 implemented on a focused PR: explicit Brave Search, durable quota, original result links, cooldown/cache and dashboard tool telemetry. Await manual API key plus live verification. Never paste a key into chat.
 3. T22.2 implemented: official bot-token Discord History Search with author/time/topic, requester ACL and Jump links. Await live bot-authorization/permissions test.
-4. T22.3 add typed Clef web/history/archive source selection and bounded multi-source execution.
+4. T22.3 implemented: gated Clef web/history/archive selection, one-tool bounded retrieval and optional public Brave evidence synthesis. Full chained multi-source reasoning is deferred to T22.4.
 5. T22.4 follow-up, ranking, cache/TTL, dashboard telemetry and edge-case regression.
 
 ## Agent safety rules
@@ -80,3 +80,13 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - **Live Discord API acceptance remains pending**: needs explicit enable `ASUMI_DISCORD_HISTORY_ENABLED=true` and same-server smoke test, including a private-channel user ACL check.
 - Brave live activation also awaits `BRAVE_SEARCH_API_KEY` and `ASUMI_WEB_SEARCH_ENABLED=true`.
 - Next technical goal is **T22.3** (Clef chooses Web / History / Archive and synthesizes evidence with citations); T22.4 covers follow-up/ranking/cache/dashboard polish.
+
+## T22.3 implementation handoff — 2026-10-08
+
+- Release target: Asumi 3.7.0, feature default OFF (`ASUMI_AUTO_SEARCH_ENABLED=false`).
+- Typed choice criteria added to Cloudflare Clef for Web / Discord History / Archive; Python requires matching provider enabled + source safety + confidence before tool execution.
+- Brave public synthesis uses only fresh Brave snippets/URLs, no private server context. When Gemini fails, return raw source links without fabricated answer.
+- Same conversation follow-up does not re-run search automatically; explicit web/history/Archive requests still override session routing. No multi-tool recursive agent; T22.4 remains.
+- Enabling live requires Brave token/flag for Web and explicit Discord History flag after ACL/bot-token API smoke test; then turn on auto flag.
+- New tests `tests/test_assistant_source_routing.py` under CI; verify CI green and real-provider behavior before production acceptance.
+- **Next T22.4:** richer follow-up/retrieval context, source ranking, Dashboard search-specific observability and cache improvements.
