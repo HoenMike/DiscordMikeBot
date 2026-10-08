@@ -7,6 +7,20 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.3] - 2026-10-08 — *Code-owned Asumi Search Configuration*
+
+### Changed
+- Move **all Asumi runtime feature switches, model choices, quotas, timeouts, session/cache/context settings** into `core/constants.py`. Render Environment is reserved for external credentials and deployment identifiers.
+- Brave Search automatically becomes available when `BRAVE_SEARCH_API_KEY` is supplied. Durable Turso quota database is required before any chargeable call; monthly cap stays 500, hard ceiling 900.
+- Conservative local routing for clearly current public gas/oil/gold/FX price questions (e.g. `@Asumi giá xăng hôm nay như nào`) works even if Clef is unavailable.
+- If Brave key is absent, the bot says the key is missing rather than incorrectly claiming the search feature is not integrated.
+- Explicit/native Discord History Search is code-enabled, still constrained by bot token and requester/bot channel permissions. Vectorize semantic search remains code-disabled pending live permission/cost acceptance.
+- `.env.example` now lists only external credentials/connection identifiers. All old `ASUMI_*_ENABLED`/model/quota env values are deliberately ignored; change policy in source and redeploy.
+
+### Safety
+- No private Discord history may be forwarded to Brave, public source links preserved, and no passive guild indexing.
+- Production acceptance still requires real Discord guild Search API/ACL and Brave provider billing smoke tests.
+
 ## [3.7.2] - 2026-10-08 — *T22.4b Search Follow-up & Observability*
 
 ### Added
