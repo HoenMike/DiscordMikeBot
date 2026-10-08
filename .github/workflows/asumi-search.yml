@@ -10,6 +10,8 @@ on:
       - "tests/test_feedback_t23_review.py"
       - "tests/test_feedback_t23_db_schema.py"
       - "tests/test_feedback_ticket_numbers.py"
+      - "tests/test_feedback_user_lifecycle.py"
+      - "features/feedback/user_views.py"
       - "tests/test_feedback_evidence_reader.py"
       - "tests/test_feedback_review_proposals.py"
       - "tests/test_feedback_t23_completion.py"
@@ -42,6 +44,8 @@ on:
       - "tests/test_feedback_t23_review.py"
       - "tests/test_feedback_t23_db_schema.py"
       - "tests/test_feedback_ticket_numbers.py"
+      - "tests/test_feedback_user_lifecycle.py"
+      - "features/feedback/user_views.py"
       - "tests/test_feedback_evidence_reader.py"
       - "tests/test_feedback_review_proposals.py"
       - "tests/test_feedback_t23_completion.py"
@@ -91,6 +95,7 @@ jobs:
           python -m unittest discover -s tests -p "test_feedback_t23_review.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23_db_schema.py" -v
           python -m unittest discover -s tests -p "test_feedback_ticket_numbers.py" -v
+          python -m unittest discover -s tests -p "test_feedback_user_lifecycle.py" -v
           python -m unittest discover -s tests -p "test_feedback_evidence_reader.py" -v
           python -m unittest discover -s tests -p "test_feedback_review_proposals.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23_completion.py" -v
