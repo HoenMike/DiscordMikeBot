@@ -175,6 +175,32 @@ class ReporterLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Lịch sử và dấu vết xử lý",html)
         self.assertIn("Xác nhận đổi ticket",html)
 
+    def test_discord_user_views_construct_with_real_discord_ui(self):
+        from features.feedback.user_views import (
+            MyFeedbackView, TicketDetailView, DeleteConfirmView, ReviseModal,
+        )
+        example = {
+            "id": "FB-OLD", "number": 1, "title": "Báo lỗi tóm tắt",
+            "description": "Bot đã lấy tin nhắn cả channel",
+            "status": "submitted", "category": "bug",
+            "reason": "", "explanation": "",
+            "replacement_number": None,
+        }
+        view = MyFeedbackView(
+            owner_id=101, guild_id=15, tickets=[example],
+            offset=0, include_deleted=False,
+        )
+        self.assertTrue(any(child.__class__.__name__=="TicketSelection" for child in view.children))
+        self.assertTrue(view.prev_page.disabled)
+        detail = TicketDetailView(owner_id=101,guild_id=15,ticket=example)
+        self.assertFalse(detail.revise.disabled)
+        self.assertFalse(detail.delete.disabled)
+        self.assertIn("#1", detail.embed().title)
+        modal = ReviseModal(detail)
+        self.assertEqual(modal.description.default, example["description"])
+        confirmation = DeleteConfirmView(owner_id=101,guild_id=15,ticket=example)
+        self.assertIn("#1",confirmation.embed().title)
+
     def test_user_interface_is_ephemeral_and_owner_gated(self):
         from pathlib import Path
         text=(Path(__file__).resolve().parents[1]/"features/feedback/user_views.py").read_text("utf-8")
