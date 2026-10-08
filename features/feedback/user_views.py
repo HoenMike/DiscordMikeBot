@@ -11,7 +11,7 @@ from core.version import CURRENT_VERSION
 from features.feedback.store import FeedbackStorageError, feedback_store
 
 PAGE_SIZE = 8
-EDITABLE = {"submitted", "triage", "needs_info", "deferred", "reopened"}
+
 STATUS_VI = {
     "submitted": "Chờ xem xét", "triage": "Đang phân loại",
     "needs_info": "Cần bổ sung", "approved": "Đã duyệt",
@@ -22,6 +22,8 @@ STATUS_VI = {
     "closed": "Đã đóng", "reopened": "Mở lại", "deleted": "Đã xóa",
 }
 
+
+EDITABLE = set(STATUS_VI) - {"deleted"}
 
 def safe(value: str, limit: int = 1300) -> str:
     return discord.utils.escape_mentions(str(value or ""))[:limit]
@@ -167,7 +169,7 @@ class TicketDetailView(OwnerView):
         if t["replacement_number"]:
             e.add_field(name="Đã thay thế bằng", value=f"Ticket #{t['replacement_number']}", inline=False)
         if t["status"] in EDITABLE:
-            e.set_footer(text="Sửa sẽ tạo ticket mới và đánh dấu ticket cũ là đã xóa.")
+            e.set_footer(text="Sửa tạo ticket mới; ticket cũ và quyết định trước đây vẫn được lưu trong lịch sử audit.")
         else:
             e.set_footer(text="Ticket đã xử lý hoặc xóa: lưu lịch sử, không chỉnh sửa trực tiếp.")
         return e
