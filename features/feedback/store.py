@@ -290,7 +290,7 @@ class FeedbackStore:
         if status == "verified" and not verified_version.strip():
             raise FeedbackStorageError("Cần phiên bản đã triển khai và nghiệm thu")
         await self._require_cloud()
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
         # Single atomic guarded UPDATE, trigger writes event/outbox on success.
         async with db_client.execute(
             "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=?, last_reviewer_id=? "
