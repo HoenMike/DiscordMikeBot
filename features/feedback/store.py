@@ -450,7 +450,7 @@ class FeedbackStore:
         current = await self.admin_detail(ticket_id)
         if current is None:
             raise FeedbackStorageError("Không tìm thấy ticket")
-        if issue_url and current["status"] not in {
+        if (issue_url or pr_url or version) and current["status"] not in {
             "approved", "planned", "in_progress", "in_review", "deployed", "verified", "closed"
         }:
             raise FeedbackStorageError("Chỉ tạo GitHub Issue sau khi duyệt feedback")
