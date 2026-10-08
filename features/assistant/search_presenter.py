@@ -27,7 +27,7 @@ def _fold(value: str) -> str:
 
 def _fuel_query(query: str) -> bool:
     folded = _fold(query)
-    return any(x in folded for x in ("gia xang", "gia dau"))
+    return "gia xang" in folded
 
 
 def prioritize_sources(query: str, hits, maximum: int = 3):
