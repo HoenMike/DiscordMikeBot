@@ -12,12 +12,27 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.9.0"
+CURRENT_VERSION = "3.9.1"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.9.0 - Admin Console 2.0"
+CODENAME = "Asumi 3.9.1 - Classic Admin Dashboard"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.9.1", "date": "2026-10-08", "type": "bugfix",
+        "title": "Classic Admin Dashboard restored",
+        "summary": "Khôi phục giao diện quản trị 8 tab quen thuộc; giữ nguyên các API và Feedback Center mới.",
+        "changes": [
+            {"category": "Admin UI", "items": [
+                "Trang /admin trở lại giao diện tab trước T24, không dùng sidebar mới.",
+                "Đường dẫn quản trị 3.9.0 tự chuyển về tab tương ứng để không mất bookmark.",
+                "Giảm tải gọi dữ liệu không cần thiết khi tab trình duyệt ở nền.",
+            ]},
+            {"category": "Compatibility", "items": [
+                "Feedback Inbox, ticket #N, duyệt ChatGPT, CSRF, thông báo kết quả cuối vẫn hoạt động.",
+            ]},
+        ],
+    },
     {
         "version": "3.9.0", "date": "2026-10-08", "type": "minor",
         "title": "T24: Admin Console 2.0",
