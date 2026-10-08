@@ -149,7 +149,8 @@ async def validate_auth_request(params: dict) -> dict:
         raise OAuthError("unsupported_response_type", "Authorization code with PKCE S256 is required")
     if not PKCE_PATTERN.fullmatch(challenge):
         raise OAuthError("invalid_request", "Invalid PKCE challenge")
-    if resource != RESOURCE or scope != SCOPE:
+    requested = scope.split()
+    if resource != RESOURCE or set(requested) != set(SCOPE.split()) or len(requested) != len(SCOPE.split()):
         raise OAuthError("invalid_scope", "Resource or requested scope is not allowed")
     matches = await _query(
         "SELECT redirect_uri FROM asumi_oauth_clients WHERE client_id=?",
@@ -159,7 +160,7 @@ async def validate_auth_request(params: dict) -> dict:
         raise OAuthError("invalid_client", "Unknown OAuth client or redirect URI")
     return {
         "client_id": client_id, "redirect_uri": redirect_uri,
-        "challenge": challenge, "scope": scope,
+        "challenge": challenge, "scope": SCOPE,
         "resource": resource, "state": state,
     }
 
@@ -269,3 +270,14 @@ async def authorize_bearer(value: str) -> bool:
         return False
     resource, scope, expiry, revoked = rows[0]
     return resource == RESOURCE and scope == SCOPE and expiry > int(time.time()) and not revoked
+
+async def revoke_all_owner_tokens() -> int:
+    """Explicit admin revocation of every outstanding ChatGPT MCP token."""
+    await db_client.connect()
+    if not db_client.is_cloud:
+        raise OAuthError("temporarily_unavailable", "Turso Cloud unavailable", 503)
+    changed = await _change(
+        "UPDATE asumi_oauth_tokens SET revoked=1 WHERE revoked=0",
+        (),
+    )
+    return changed
