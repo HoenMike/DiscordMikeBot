@@ -292,7 +292,7 @@ PROXY_DOMAINS = {
     "tiktok": ["tnktok.com", "tfxktok.com"],
     "reddit": ["vxreddit.com", "fxreddit.seria.moe", "rxddit.com"],
     "instagram": ["eeinstagram.com", "vxinstagram.com", "fxig.seria.moe"],
-    "facebook": ["facebed.com", "facebed.seria.moe"],
+    "facebook": ["facebed.com", "facebed.seria.moe", "facecot.com", "fixacebook.com"],
     "bluesky": ["fxbsky.app", "bskx.app"],
     "twitch": ["fxtwitch.seria.moe"],
     "threads": ["fixthreads.seria.moe", "vxthreads.com"],
