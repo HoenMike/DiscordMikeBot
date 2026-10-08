@@ -86,6 +86,12 @@ Suggested status lifecycle: `draft` (Discord ephemeral/in-memory; includes optio
 
 
 
+## Design-awareness source of truth (do not rely on the model's memory)
+
+Implement a small, **versioned Feature Behavior Registry in the repo**, built or loaded alongside each Asumi release. Each relevant feature contract should identify command examples/aliases, intended behavior, permission requirements, user-visible limitations, release version/feature flag, and known troubleshooting steps. Keep it checked by tests when behavior changes; never rely solely on README prose or an LLM's pretraining knowledge. Examples: `/tomtat` with no author filter = channel summary; explicitly mentioning an author in natural-language requests = member-only summary (when supported by the live version); distinction between channel-scoped search and guild-wide history search. Feedback clarification can cite the matching design rule/version and compare against the source message and observed bot response.
+
+Classification output is **advisory**: `potential_usage_confusion`, `possibly_reproducible_bug`, `feature_gap`, `unknown`. If there is no verified match, explain uncertainty and ask for reproduction detail. Never pre-mark user error, reject or block the final Submit button. The full user explanation overrides any premature model interpretation and is visible to the reviewer.
+
 ## Required reporter interaction patterns — v0.2
 
 ### A. Report a genuinely broken result with a screenshot
