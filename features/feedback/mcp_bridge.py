@@ -37,7 +37,7 @@ TOOL_DEFINITIONS = [
         "description": "Read one private ticket, including description and explanation, but NOT private screenshot bytes.",
         "inputSchema": {
             "type": "object",
-            "properties": {"ticket_id": {"type": "string", "pattern": "^FB-[A-Z0-9]+$"}},
+            "properties": {"ticket_id": {"type": "string", "pattern": "^(?:FB-[A-Z0-9]+|#?[1-9][0-9]*)$"}},
             "required": ["ticket_id"],
             "additionalProperties": False,
         },
@@ -49,7 +49,7 @@ TOOL_DEFINITIONS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "ticket_id": {"type": "string", "pattern": "^FB-[A-Z0-9]+$"},
+                "ticket_id": {"type": "string", "pattern": "^(?:FB-[A-Z0-9]+|#?[1-9][0-9]*)$"},
                 "status": {"type": "string", "enum": ["approved", "rejected", "deferred", "needs_info", "duplicate"]},
                 "reason": {"type": "string", "minLength": 10, "maxLength": 1800},
             },
@@ -131,7 +131,7 @@ async def handle_mcp(payload: Any) -> dict | None:
             result = {"tickets": tickets}
         elif name == "get_feedback_ticket":
             ticket_id = str(args.get("ticket_id") or "").strip().upper()
-            if not ticket_id.startswith("FB-") or len(ticket_id) > 30:
+            if not ticket_id or len(ticket_id) > 30:
                 raise ValueError("Invalid ticket ID")
             ticket = await feedback_store.admin_detail(ticket_id)
             if ticket is None:
