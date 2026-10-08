@@ -1,0 +1,34 @@
+name: Asumi Search Regression
+
+on:
+  pull_request:
+    paths:
+      - "features/assistant/**"
+      - "tests/test_assistant_brave.py"
+      - "tests/test_assistant_history.py"
+      - ".github/workflows/asumi-search.yml"
+  push:
+    branches: [main]
+    paths:
+      - "features/assistant/**"
+      - "tests/test_assistant_brave.py"
+      - "tests/test_assistant_history.py"
+
+jobs:
+  search-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test Brave Search and Discord History
+        run: |
+          python -m unittest discover -s tests -p "test_assistant_brave.py" -v
+          python -m unittest discover -s tests -p "test_assistant_history.py" -v
