@@ -100,7 +100,7 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | T22.3 | Clef source selection / controlled one-tool retrieval | IMPLEMENTED; LIVE VERIFY PENDING |
 | T22.4a | Chronological first/last by @author, optional topic, 1–5 hits | IMPLEMENTED; LIVE API VERIFY PENDING |
 | T22.4b | Bounded source follow-up, safe explicit web lookup, source/channel UX, cache and Dashboard search tracing | IMPLEMENTED; LIVE VERIFY PENDING |
-| T22.5 | Supervised Discord History → literal public Web query, safe gates, stable local ranking, clear source provenance | IMPLEMENTED IN PR; LIVE VERIFY PENDING |
+| T22.5 | Supervised Discord History → literal public Web query, safe gates, stable local ranking, clear source provenance | MERGED #59, CI GREEN; LIVE VERIFY PENDING |
 
 Acceptance — live server:
 1. Find an old 'buying a car' message by @author + early-year time hint, even though it was never saved in Archive.
@@ -204,3 +204,8 @@ The stress-test `@Asumi tóm tắt xem qua giờ @user đã nhắn gì` incorrec
 - Implementation tests live in `tests/test_assistant_multisource.py`, run by the Asumi Search Regression workflow. Automated tests do **not** prove real bot-token search compatibility or Brave key availability.
 
 **Live acceptance still required:** Test one combined request in a permitted guild, a denied private channel, a vague product reference, no-match and unavailable Brave. Inspect only status/latency in Dashboard. Do not mark T22 end-to-end accepted until Discord bot-token and provider live checks pass. No unsolicited backfill/indexing or Vectorize enable.
+
+
+### T22.5 Dashboard observability follow-up (2026-10-08)
+
+Merged <https://github.com/HoenMike/DiscordMikeBot/pull/59> on `main` as Asumi 3.10.0 (`8a1eb48`); the supervised code and CI are complete. The historical Admin Dashboard keeps all nine tabs. Follow-up PR #60 displays combined History + public search status, bounded counts and query-validation outcomes together in Activity without displaying queries or private message bodies. No real Discord guild search or Brave provider credentials have been verified through these CI tests. Production acceptance remains **OPEN**.

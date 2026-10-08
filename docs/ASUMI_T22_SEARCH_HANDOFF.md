@@ -236,7 +236,7 @@ User test (Discord screenshot): `@Asumi tóm tắt xem qua giờ @i'm_bd đã nh
 
 ## T22.5 supervised multi-source handoff (2026-10-08)
 
-**Status: CODE IMPLEMENTED IN FEATURE PR; CI AND LIVE SEARCH ACCEPTANCE PENDING.**
+**Status: MERGED TO MAIN IN PR #59 (Asumi 3.10.0), CI GREEN; LIVE SEARCH ACCEPTANCE PENDING.**
 Primary spec: `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md`.
 
 - New `features/assistant/multisource.py` parses a two-part message and validates the **literal user-authored** public query. `router.route_locally` only accepts it when the first segment independently maps to `discord_history.search`.
@@ -246,3 +246,10 @@ Primary spec: `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md`.
 - Tests cover explicit consent, vague references, no-match/private/permission failure, stable local ranking, exact Brave query isolation, provider failure and session follow-up. CI workflow runs the regression.
 - No new environment flags, secrets, provider accounts, unbounded requests or hidden paid fallback. Source of truth for policy stays `core/constants.py`; Render env stays credential-only.
 - **Next:** CI pass → merge → confirm deploy → live Discord user/bot permission checks + Brave factual source checks; then update this status. No actual private Discord conversation may enter Brave payloads. Manual acceptance remains required; automated tests alone do not establish it.
+
+
+## T22.5 Dashboard observability follow-up — PR #60 (2026-10-08)
+
+The historical 9-tab Dashboard remains the UI baseline. The Activity timing trace previously used `if (web_provider) ... else history_status`; a combined two-source request therefore hid its Discord History permissions/results whenever public web was reached. PR #60 renders both source statuses and the number of stages, relevant API calls/permission filtering, cache/quota, valid-public-query indicator and fallback warning. It does not log source queries or private text. Tests check the original Dashboard template; live visual review is still needed.
+
+Cloudflare connector *direct API* probes on 2026-10-08 returned HTTP 200 for three synthetic, non-private classifications: `web_search` (0.9658), `discord_history` (0.7919), `archive_search` (0.9592). This demonstrates the connected Cloudflare account's Clef model works, **not** that Render's own credentials, bot routing, Discord search API or Brave Search are live-verified. Do not conflate these layers.
