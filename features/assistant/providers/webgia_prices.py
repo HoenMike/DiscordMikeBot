@@ -101,7 +101,7 @@ def parse_webgia_fuel(html: str, *, now: datetime | None = None) -> FuelAggregat
     # Require a table declaring Vùng 1; never guess column offsets from a
     # random page or price chart.
     if not any(
-        any("vung 1" in _fold(c) for c in row)
+        any(_fold(c).strip() == "vung 1" for c in row)
         and any("mat hang" in _fold(c) for c in row)
         for row in parser.rows
     ):
