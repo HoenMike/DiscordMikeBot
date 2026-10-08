@@ -168,6 +168,17 @@ LIFECYCLE_TRIGGERS = (
     END
     """,
     """
+    CREATE TRIGGER IF NOT EXISTS feedback_deleted_dismiss_proposals
+    AFTER UPDATE OF status ON asumi_feedback
+    WHEN NEW.status='deleted' AND OLD.status<>'deleted'
+    BEGIN
+      UPDATE asumi_feedback_review_proposals
+      SET state='dismissed', reviewed_at=NEW.updated_at,
+          reviewer_id=NEW.reporter_id
+      WHERE ticket_id=NEW.ticket_id AND state='pending';
+    END
+    """,
+    """
     CREATE TRIGGER IF NOT EXISTS feedback_revision_retire
     AFTER INSERT ON asumi_feedback
     WHEN NEW.replaces_ticket_id IS NOT NULL
