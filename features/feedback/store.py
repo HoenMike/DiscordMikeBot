@@ -605,10 +605,13 @@ class FeedbackStore:
         if not resolved:
             raise FeedbackStorageError("Không tìm thấy ticket.")
         now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        # Verified means AFTER a deployed release. Never let a sidebar form
+        # jump straight from submitted/approved to "fixed".
+        guard = " AND status='deployed'" if status == "verified" else ""
         # Single atomic guarded UPDATE, trigger writes event/outbox on success.
         async with db_client.execute(
             "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=?, last_reviewer_id=? "
-            "WHERE ticket_id=? AND status<>? AND status<>'deleted'",
+            "WHERE ticket_id=? AND status<>? AND status<>'deleted'" + guard,
             (status, (reason + (f" [release: {verified_version[:50]}]" if verified_version else ""))[:1800],
              now, actor_id[:80], resolved, status),
         ) as cursor:
@@ -616,7 +619,9 @@ class FeedbackStore:
         if not db_client.is_cloud:
             raise FeedbackStorageError("Không xác minh được ghi nhận trên Turso")
         if changed != 1:
-            raise FeedbackStorageError("Không thấy ticket hoặc trạng thái đã được cập nhật")
+            raise FeedbackStorageError(
+                "Không thể cập nhật: ticket đã bị xóa, không tồn tại hoặc phải được deployed trước khi verified."
+            )
 
     async def link_delivery(
         self, *, ticket_id: str, issue_url: str = "", pr_url: str = "",
