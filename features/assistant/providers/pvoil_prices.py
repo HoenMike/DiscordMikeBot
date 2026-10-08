@@ -24,6 +24,7 @@ VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 OFFICIAL_PVOIL_URLS = (
     "https://www.pvoil.com.vn/tin-gia-xang-dau",
     "https://www.pvoil.com.vn/",
+    "https://www.pvoil.com.vn/tin-tuc",
 )
 
 _PRODUCTS = (
