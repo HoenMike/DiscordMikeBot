@@ -165,6 +165,8 @@ Use a **separate Vectorize token** rather than replacing the existing Workers AI
 
 ## 3.4.1 Chat timeout hotfix
 
+Implementation PR: **#32 — fix: Asumi 3.4.1 conversational timeout budget**.
+
 Live log #1247 exposed a conversational fallback UX problem: Clef completed in ~704ms, while the chat generation path timed out and the old configuration could spend 6s on each of two models, producing ~14s total latency.
 
 3.4.1 changes:
