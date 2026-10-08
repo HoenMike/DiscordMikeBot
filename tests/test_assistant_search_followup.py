@@ -111,7 +111,8 @@ class DashboardSearchTelemetryTests(unittest.TestCase):
         for expected in (
             "d.web_search_status", "d.history_status", "d.web_cache_hit",
             "d.history_permission_filtered", "d.history_api_calls",
-            "d.followup_source_tool",
+            "d.followup_source_tool", "d.multisource_status",
+            "d.multisource_steps", "d.multisource_public_query_valid",
         ):
             self.assertIn(expected, dashboard)
 
