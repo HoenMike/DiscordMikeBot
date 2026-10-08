@@ -853,3 +853,167 @@ def api_version():
 
 
 
+
+
+# T23.2 — Authentication is inherited from the existing admin session.
+@app.route('/api/admin/feedback', methods=['GET'])
+@login_required
+def feedback_inbox():
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    status = (request.args.get("status") or "").strip()[:30]
+    try:
+        limit = int(request.args.get("limit", 50))
+    except ValueError:
+        limit = 50
+    try:
+        tickets = asyncio.run(feedback_store.admin_list(status=status, limit=limit))
+        return jsonify({"tickets": tickets, "count": len(tickets)})
+    except FeedbackStorageError:
+        return jsonify({"error": "Không thể kết nối Turso"}), 503
+
+
+@app.route('/api/admin/feedback/<ticket_id>/review', methods=['POST'])
+@login_required
+def feedback_review(ticket_id: str):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if not (ticket_id.startswith("FB-") and len(ticket_id) <= 30):
+        return jsonify({"error": "Ticket không hợp lệ"}), 400
+    if (request.headers.get('X-CSRF-Token') or '') != session.get('feedback_csrf'):
+        return jsonify({"error": "Invalid CSRF token"}), 403
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "JSON required"}), 415
+    payload = request.get_json(silent=True) or {}
+    try:
+        asyncio.run(feedback_store.review(
+            ticket_id=ticket_id, status=str(payload.get("status", "")),
+            reason=str(payload.get("reason", "")), actor_id="dashboard-admin",
+            verified_version=str(payload.get("verified_version", "")),
+        ))
+        return jsonify({"ok": True, "ticket_id": ticket_id})
+    except FeedbackStorageError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/admin/feedback', methods=['GET'])
+@login_required
+def feedback_dashboard():
+    import secrets
+    if not session.get('feedback_csrf'):
+        session['feedback_csrf'] = secrets.token_urlsafe(32)
+    return render_template('feedback.html', feedback_csrf=session['feedback_csrf'])
+
+
+@app.route('/api/admin/feedback/<ticket_id>/evidence/<int:index>', methods=['GET'])
+@login_required
+def feedback_evidence(ticket_id: str, index: int):
+    from flask import Response
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    from features.feedback.evidence import evidence_store
+    if not ticket_id.startswith('FB-') or not 0 <= index <= 2:
+        return jsonify({"error": "Not found"}), 404
+    try:
+        ticket = asyncio.run(feedback_store.admin_detail(ticket_id))
+        if ticket is None or index >= len(ticket['evidence']):
+            return jsonify({"error": "Not found"}), 404
+        key = ticket['evidence'][index].get('key', '')
+        if not key.startswith('feedback/') or '..' in key:
+            return jsonify({"error": "Invalid evidence"}), 404
+        obj = evidence_store._s3().get_object(Bucket=evidence_store.bucket, Key=key)
+        raw = obj['Body'].read(8388609)
+        if len(raw) > 8388608:
+            return jsonify({"error": "File too large"}), 413
+        return Response(raw, content_type='image/png', headers={
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "default-src 'none'; sandbox",
+        })
+    except Exception:
+        return jsonify({"error": "Private evidence currently unavailable"}), 503
+
+
+# T23.3 — Private ChatGPT/plugin bridge. Disabled until a scoped token is set.
+def feedback_connector_required(fn):
+    @wraps(fn)
+    def checked(*args, **kwargs):
+        configured = os.environ.get("ASUMI_FEEDBACK_CONNECTOR_TOKEN", "")
+        supplied = (request.headers.get("Authorization", "") or "")
+        expected = "Bearer " + configured
+        if len(configured) < 32 or not hmac.compare_digest(supplied, expected):
+            return jsonify({"error": "Unauthorized"}), 401
+        return fn(*args, **kwargs)
+    return checked
+
+
+@app.route('/api/feedback-connector/v1/tickets', methods=['GET'])
+@feedback_connector_required
+def connector_feedback_list():
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        limit = min(100, max(1, int(request.args.get('limit', '25'))))
+        records = asyncio.run(feedback_store.admin_list(
+            status=(request.args.get('status') or '')[:30], limit=limit
+        ))
+        # Send metadata and text, not raw screenshots or S3 object keys.
+        for ticket in records:
+            ticket['evidence_count'] = len(ticket.pop('evidence', []))
+        return jsonify({"tickets": records})
+    except (FeedbackStorageError, ValueError):
+        return jsonify({"error": "Unavailable"}), 503
+
+
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>/review', methods=['POST'])
+@feedback_connector_required
+def connector_feedback_review(ticket_id):
+    # Read-only until owner identity and per-decision approval are cryptographically bound.
+    return jsonify({"error":"Review writes disabled pending owner-authenticated approval"}), 403
+
+@app.route('/api/admin/feedback/<ticket_id>/links', methods=['POST'])
+@login_required
+def feedback_implementation_links(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if request.mimetype != 'application/json':
+        return jsonify({"error":"JSON required"}), 415
+    if (request.headers.get('X-CSRF-Token') or '') != session.get('feedback_csrf'):
+        return jsonify({"error":"Invalid CSRF token"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        asyncio.run(feedback_store.link_delivery(
+            ticket_id=ticket_id,
+            issue_url=str(data.get('issue_url') or ''),
+            pr_url=str(data.get('pr_url') or ''),
+            version=str(data.get('version') or ''),
+        ))
+        return jsonify({"ok":True})
+    except FeedbackStorageError as exc:
+        return jsonify({"error":str(exc)}), 400
+
+
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>', methods=['GET'])
+@feedback_connector_required
+def connector_feedback_detail(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        data = asyncio.run(feedback_store.admin_detail(ticket_id))
+        if data is None:
+            return jsonify({"error":"Ticket not found"}), 404
+        data['evidence_count'] = len(data.pop('evidence',[]))
+        return jsonify({"ticket":data})
+    except FeedbackStorageError:
+        return jsonify({"error":"Unavailable"}), 503
+
+
+@app.route('/api/admin/feedback/metrics', methods=['GET'])
+@login_required
+def feedback_metrics():
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        return jsonify(asyncio.run(feedback_store.review_metrics()))
+    except FeedbackStorageError:
+        return jsonify({"error": "Turso unavailable"}), 503
+
+
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>/links', methods=['POST'])
+@feedback_connector_required
+def connector_feedback_links(ticket_id):
+    # Read-only until owner identity and per-decision approval are cryptographically bound.
+    return jsonify({"error":"Review writes disabled pending owner-authenticated approval"}), 403

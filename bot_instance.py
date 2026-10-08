@@ -20,6 +20,7 @@ FEATURE_EXTENSIONS = [
     "features.tarot.cog",
     "features.cabin.cog",
     "features.assistant.cog",
+    "features.feedback.cog",
 ]
 
 # Danh sách các Slash Command cốt lõi bắt buộc phải có mặt trước khi được phép sync lên Discord
@@ -34,6 +35,7 @@ EXPECTED_CORE_SLASH_COMMANDS = {
     "tarot",
     "cabin",
     "cabinstop",
+    "feedback",
 }
 
 
@@ -223,6 +225,12 @@ class SummaryBot(commands.Bot):
             await send_bot_help(ctx)
             return
 
+        # Feedback requests take precedence over general AI chat/search. Only
+        # explicit reports or image replies to an active draft are intercepted.
+        feedback = self.get_cog("FeedbackCog")
+        if feedback and await feedback.handle_message(message):
+            return
+
         assistant = self.get_cog("AssistantCog")
         if assistant and assistant.should_handle(message):
             handled = await assistant.handle_conversation_message(message)
@@ -260,7 +268,9 @@ def build_overview_embed(user: Union[discord.User, discord.Member]) -> discord.E
             "• **Xóa:** `@Asumi quên #12`. Archive chỉ thuộc user đã lưu.\n"
             "• **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` (opt-in).\n"
             "• **Tìm tin nhắn cũ:** `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` → Jump to Message (opt-in).\n"
-            "• **Auto Search:** Khi admin bật, Clef tự chọn Brave / Discord History / Archive theo nội dung hỏi; có kiểm soát quyền, nguồn và quota."
+            "• **Auto Search:** Khi admin bật, Clef tự chọn Brave / Discord History / Archive theo nội dung hỏi; có kiểm soát quyền, nguồn và quota.\n"
+            "• **Feedback (3.8):** Tag Asumi báo lỗi/góp ý (có thể đính ảnh) hoặc dùng /feedback report, /feedback suggest; "
+            "Asumi sẽ hỏi lại theo thiết kế và luôn cho phép gửi ticket. Dùng /feedback status để theo dõi."
         ),
         inline=False
     )

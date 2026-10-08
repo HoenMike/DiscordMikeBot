@@ -66,6 +66,12 @@ DEFAULT_SCAN_LIMIT = 150
 ASUMI_SESSION_TTL_SECONDS = 1200
 ASUMI_SESSION_MAX_TURNS = 4
 
+# T23 feedback: configuration stored in source, not Render env.
+ASUMI_FEEDBACK_MAX_IMAGES = 3
+ASUMI_FEEDBACK_IMAGE_MAX_BYTES = 8388608
+ASUMI_FEEDBACK_IMAGE_MAX_PIXELS = 24000000
+ASUMI_FEEDBACK_DRAFT_TTL_SECONDS = 900
+
 # Summary requests naming a member must scan only that author's messages
 # in the current channel before any AI call. Bare "nãy giờ/qua giờ"
 # uses the existing two-hour lookback, explicitly displayed to the user.

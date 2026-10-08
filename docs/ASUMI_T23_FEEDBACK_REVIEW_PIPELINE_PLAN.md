@@ -1,6 +1,6 @@
 # T23 — Asumi Feedback, Review & Implementation Pipeline
 
-Status: **PROPOSAL v0.2 / AWAITING OWNER APPROVAL** (2026-10-08)
+Status: **T23.1 IMPLEMENTATION IN PROGRESS / NOT DEPLOYED** (2026-10-08). User requested to proceed. T23.2–T23.5 remain planned.
 Owner feedback v0.2: mandatory reporter notifications with reasons; actual image attachments in the MVP; design-aware clarification before submission, without blocking or auto-rejecting reports.
 Owner: Asumi Discord Bot project.
 This is a design proposal, NOT a shipped capability, deployed API, authorized auto-fix system, or a ticket created from user chat.
@@ -134,4 +134,39 @@ Classification output is **advisory**: `potential_usage_confusion`, `possibly_re
 16. R2 upload succeeds but Turso fails (or vice versa): never acknowledge a complete ticket; perform safe cleanup/retry reconciliation and avoid orphaned/leaked evidence.
 17. Bot's design documentation/version disagrees or is unavailable: do not assert that user used it wrong, ask clarifying question and allow feedback as-is.
 
-No code was implemented in this proposal. Await explicit owner approval before T23.1.
+Owner has authorized beginning T23. Code is under review in draft PR #45; deployment remains blocked on private R2 provisioning, live Turso/R2 verification and acceptance. Track milestones in GitHub issue #46.
+
+
+## T23.1 implementation handoff — first PR (2026-10-08)
+
+Branch: `feat/asumi-t23-1-feedback-mvp` (not yet in main, do not claim live). Files:
+- `features/feedback/policy.py`: explicit report intent and version-aware, overrideable troubleshooting from checked-in behavior contracts; never automatic rejection
+- `features/feedback/cog.py`: Discord member-only clarification and preview buttons; /feedback report + /feedback status; additional screenshot replies; no production source-code changes triggered by tickets
+- `features/feedback/evidence.py`: image type/actual signature validation, dimensions/size caps, EXIF-free PNG re-encoding, private R2 upload and cleanup
+- `features/feedback/store.py`: Turso-only tickets with atomic JSON evidence manifest, audit trigger and notification-outbox schema. Never acknowledge ephemeral SQLite fallback.
+- `bot_instance.py`: feedback intake precedence before the Assistant Cog; existing command precedence retained
+- `tests/test_feedback_t23.py`: report classification, design-aware clarification, image validation/R2, durable-only idempotent storage, wizard and cleanup regressions
+- CI `.github/workflows/asumi-search.yml` includes `features/feedback/**` and tests.
+- Non-secret policies in `core/constants.py`. Required **secret/deployment** values for image persistence are `ASUMI_FEEDBACK_R2_BUCKET`, `CLOUDFLARE_ACCOUNT_ID`, `ASUMI_FEEDBACK_R2_ACCESS_KEY_ID`, `ASUMI_FEEDBACK_R2_SECRET_ACCESS_KEY`; never put these credentials into source.
+
+**Release gates not yet met:**
+1. Finish CI/codereview and test Discord native button/slash command flow, especially 2h session TTL and attachment follow-ups.
+2. Confirm a **private dedicated R2 bucket**, scoped S3 API token and values in Render; R2 may have costs and must not be publicly accessible. No image ticket acceptance before upload receipt.
+3. Confirm production Turso cloud writes, deduplication and screenshot retrieval after restart. Reconcile orphaned R2 objects on partial failure.
+4. Finish T23.2 owner review, notification delivery/reasons/closed-DM fallback; it is NOT delivered in T23.1.
+5. Never mark T23 done merely because this implementation branch/CI is green; require a real Discord reporter-to-admin acceptance test.
+
+Potential follow-up: add owner-only dashboard listing and private R2 image reader, then manual approve/reject with mandatory reasons and outbox delivery; only after this can ChatGPT-side triage/agent workflow be connected.
+
+Tracking: [T23 parent issue #46](https://github.com/HoenMike/DiscordMikeBot/issues/46), [T23.1 draft PR #45](https://github.com/HoenMike/DiscordMikeBot/pull/45).
+
+
+## Engineering continuation checkpoint — 2026-10-08 ~12:15 ICT
+
+**Draft PR #45, NOT MERGED or LIVE.** Code implemented for T23.1 feedback wizard/Turso+R2, T23.2 admin UI/review+DM outbox, T23.3 bearer API/OpenAPI, T23.4 owner-approved issue/PR linkage, T23.5 delivery metrics/DB regression. CI passed on earlier changes; always re-check latest commit. Real Discord acceptance still required.
+
+Cloudflare account now contains a new PRIVATE APAC bucket `asumi-feedback-evidence` (managed r2.dev public access disabled). Non-secret Render environment `ASUMI_FEEDBACK_R2_BUCKET` and `CLOUDFLARE_ACCOUNT_ID` were set; this triggers a deployment of existing main, **not the draft PR**.
+
+**Blocking owner action**: Cloudflare account token management endpoint returned 9109 Unauthorized; cannot create a secure R2 S3 key. Owner must generate a bucket-scoped R2 **Object Read & Write** API token and set secret environment variables `ASUMI_FEEDBACK_R2_ACCESS_KEY_ID` and `ASUMI_FEEDBACK_R2_SECRET_ACCESS_KEY` in Render. Never paste credentials into GitHub/chat. For T23.3, separately configure a random strong `ASUMI_FEEDBACK_CONNECTOR_TOKEN` and connect the private plugin. Avoid adding arbitrary tokens or using broad Cloudflare admin credentials.
+
+**Remaining pre-merge reviews**: enforce owner auth and actual cross-event approval (a simple request flag is not proof of owner approval); inspect any DB schema migrations for existing tables; audit private evidence serving, Slack/Discord permissions and UI rendering; review DM retries/idempotency; add end-to-end tests and live screenshot confirmation. Do not equate CI mocks with production verification. T23.4 currently supports linking approved issues/PRs, not automatic agent execution/auto-merge.
