@@ -408,6 +408,7 @@ class CommandToolRegistry:
             "guild_only": "Chỉ hỗ trợ tìm trong server Discord hiện tại.",
             "multiple_authors": "Hãy tag một người cần tìm trong mỗi lần tìm kiếm.",
             "missing_topic": "Hãy thêm chủ đề, ví dụ: @Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?",
+            "missing_author": "Để tìm tin nhắn đầu tiên/gần nhất, hãy tag một người trong server.",
             "no_bot_token": "Bot chưa có token để truy vấn Discord History Search.",
             "cooldown": "Bạn vừa tìm tin nhắn; đợi một chút rồi thử lại.",
             "indexing": "Discord đang lập chỉ mục lịch sử. Hãy thử lại sau một chút.",
@@ -419,17 +420,29 @@ class CommandToolRegistry:
         }
         details = {
             "history_status": report.status,
+            "history_sort_mode": report.sort_mode,
             "history_api_calls": report.api_calls,
             "history_result_count": len(report.hits),
             "history_permission_filtered": report.rejected_for_permissions,
             "history_search_ms": round(report.elapsed_ms, 1),
         }
         if report.status == "ok":
-            header = "🔎 **TIN NHẮN DISCORD TÌM ĐƯỢC**"
+            mode_titles = {
+                "oldest": "TIN NHẮN SỚM NHẤT TÌM ĐƯỢC",
+                "newest": "TIN NHẮN GẦN NHẤT TÌM ĐƯỢC",
+            }
+            header = "🔎 **" + mode_titles.get(
+                report.sort_mode, "TIN NHẮN DISCORD TÌM ĐƯỢC"
+            ) + "**"
             if report.start_date:
                 header += f"\n*Khoảng tìm: {report.start_date} → {report.end_date}*"
             lines = [header]
             footer = "*Nhấn Jump to Message để xem tin gốc trong Discord.*"
+            if report.sort_mode != "relevance":
+                footer += (
+                    "\n*Chỉ tính tin còn được Discord lập chỉ mục và "
+                    "trong kênh bạn có quyền đọc; không đảm bảo tuyệt đối.*"
+                )
             for idx, hit in enumerate(report.hits, 1):
                 author = discord.utils.escape_markdown(
                     discord.utils.escape_mentions(hit.author_name)
