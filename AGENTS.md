@@ -158,3 +158,15 @@ Read `docs/ASUMI_T24_ADMIN_CONSOLE_REDESIGN_PLAN.md` before any Admin Dashboard 
 ### T24.9 Feedback in the classic Admin tab bar
 
 **Owner explicitly requires Feedback to live inside the historical Dashboard**, not open a separate admin page. The classic `web/templates/dashboard.html` has a ninth Feedback tab, with a chrome-free authenticated same-origin view of the existing T23 Feedback Center. Old `/admin/feedback[/ticket]` links redirect to `/admin?tab=feedback[&ticket=...]`; only the classic topbar/tab strip is visible. Preserve the existing CSRF, ticket data, AI proposals, private R2 access, and terminal-only notifications. See `docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md`.
+
+
+## Social Embed reliability checkpoint — Asumi 3.10.1 (2026-10-09)
+
+**Authoritative details:** `docs/EMBED_PIPELINE.md`. User reported recurring Facebook `/share/v/` login/no-preview cards in Discord mobile. Correct behavior:
+- Preserve Facebook `/share/v/{token}` verbatim; never rewrite it to `/share/r/`. Numeric reel/watch conversion remains distinct.
+- Try existing multiple proxy candidates, with Facebook four-provider order in `core/constants.py`; validators must reject thumbnail-only/log-in cards for video routes.
+- Only after no usable candidate can Facebook VIDEO links attempt yt-dlp. Require a successfully downloaded, guild-size-bounded playable video; never fabricate an embed from generic thumbnails or ask for private Facebook cookies.
+- If no media is available, retain original Discord message/native preview and present a clear, user-owned manual Reload/Remove/open-original action. Do not suppress originals for action-required warnings; failed replacement never deletes working preview.
+- All other platforms preserve existing API → proxy → yt-dlp behavior and cleanup. CI: `.github/workflows/asumi-embed.yml`, `tests/test_embed_resilience.py`, historical `test_release28.py` and `test_embed_audit.py`.
+- Production Discord/Render testing of the reported Facebook permalink is still an independent gate; don't assert guaranteed Facebook private-content retrieval from CI fixtures.
+

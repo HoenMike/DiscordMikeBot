@@ -95,6 +95,7 @@ class EmbedCog(commands.Cog):
         self._pending_sends = BoundedDict(max_size=3000)
         self._manual_fallback_previews = BoundedDict(max_size=3000)
         self._facebook_proxy_roll_state = BoundedDict(max_size=3000)
+        self._facebook_retry_at = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -185,10 +186,33 @@ class EmbedCog(commands.Cog):
                 origin_message_id=message.id,
             )
 
+        # Do not show an empty "Preview lỗi?" ghost as if a video was
+        # generated. Link buttons don't trigger another unfurl/login card.
+        if platform_key == "facebook":
+            parsed = urlparse(url)
+            hostname = (parsed.hostname or "").lower()
+            if (
+                parsed.scheme == "https"
+                and (hostname == "facebook.com" or hostname.endswith(".facebook.com")
+                     or hostname == "fb.watch")
+                and len(url) <= 512
+            ):
+                view.add_item(discord.ui.Button(
+                    label="Mở Facebook",
+                    style=discord.ButtonStyle.link,
+                    url=url,
+                ))
+            hint = (
+                "Không lấy được preview video công khai qua các proxy. "
+                "Link có thể yêu cầu đăng nhập, bị giới hạn chia sẻ "
+                "hoặc proxy đang lỗi. 🔄 để thử lại sau."
+            )
+        else:
+            hint = "Không tạo được preview; nhấn 🔄 để thử lại."
         author_name = _clean_markdown_label(message.author.display_name)
         sent_msg = await self._send_embed_preview(
             message=message,
-            content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • Preview lỗi?",
+            content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • {hint}",
             view=view,
         )
         if not sent_msg:
@@ -453,9 +477,11 @@ class EmbedCog(commands.Cog):
         finally:
             self._in_flight_tasks.pop(message.id, None)
 
-        # Ẩn khung embed lỗi mặc định của Discord trên tin nhắn gốc của người dùng
-        # Giữ nguyên 100% tin nhắn gốc (ảnh, nội dung, danh tính) để tránh mất ảnh và hỗ trợ Reply vàng chat chuẩn Discord
-        if (any_success or any_blocked or any_action_required) and config.get("suppress_original_embed", True):
+        # Only hide native previews when Asumi actually produced media or
+        # moderation blocked it. An action-required warning is NOT a preview.
+        # For mixed-success multi-link messages, keep the original native card
+        # when any platform failed, rather than silently hiding useful media.
+        if (any_success or any_blocked) and not any_action_required and config.get("suppress_original_embed", True):
             if message.id not in self._deleted_message_ids:
                 try:
                     await message.edit(suppress=True)
@@ -536,6 +562,9 @@ class EmbedCog(commands.Cog):
         for state_key in list(self._facebook_proxy_roll_state.keys()):
             if state_key[0] == payload.message_id:
                 self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._facebook_retry_at.keys()):
+            if state_key[0] == payload.message_id:
+                self._facebook_retry_at.pop(state_key, None)
         for state_key in list(self._manual_fallback_previews.keys()):
             if state_key[0] == payload.message_id:
                 self._manual_fallback_previews.pop(state_key, None)
@@ -838,9 +867,25 @@ class EmbedCog(commands.Cog):
         if message.id in self._deleted_message_ids:
             return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
-        # Facebook không nhảy sang yt-dlp. Nếu chưa gửi được proxy nào,
-        # để người dùng chủ động thử lại/roll proxy bằng button Discord.
+        # Tier 2: bounded yt-dlp fallback for Facebook *video* URLs only.
+        # Never synthesize a playable result from a generic login thumbnail.
+        # Successful native proxy previews above NEVER invoke yt-dlp.
         if platform_key == "facebook":
+            facebook_path = urlparse(url).path.lower()
+            facebook_video = bool(
+                re.search(r"/(?:share/[vr]/|reels?/|videos/)", facebook_path)
+                or facebook_path.startswith("/watch")
+            )
+            if facebook_video:
+                fallback_result = await self._try_ytdlp_fallback(
+                    message, platform_key, url, config,
+                    is_spoiler=is_spoiler, safety=safety,
+                )
+                if isinstance(fallback_result, PreviewResult) and (
+                    fallback_result.success or fallback_result.status in
+                    ("blocked", "cancelled", "degraded")
+                ):
+                    return replace(fallback_result, fallback_reason=proxy_result.reason)
             return await self._offer_manual_fallback(
                 message,
                 platform_key,
@@ -877,7 +922,6 @@ class EmbedCog(commands.Cog):
             post_data = await fetcher(self.session, url, match)
             if post_data is None:
                 return False
-
             if safety is not None:
                 safety.is_nsfw |= post_data.is_nsfw
                 post_data.is_nsfw = safety.is_nsfw
@@ -1075,13 +1119,31 @@ class EmbedCog(commands.Cog):
         safety: PreviewSafety | None = None,
         manual: bool = False,
     ) -> PreviewResult | bool:
-        # Chỉ kích hoạt fallback yt-dlp cho các nền tảng video được hỗ trợ
-        if platform_key not in ("twitter", "tiktok", "instagram", "reddit", "twitch"):
+        # Facebook is allowed only for actual video routes; ordinary posts
+        # must not be mistaken for playable video based on generic thumbnails.
+        supported = ("twitter", "tiktok", "instagram", "reddit", "twitch", "facebook")
+        if platform_key not in supported:
+            return False
+        if platform_key == "facebook" and not (
+            re.search(r"/(?:share/[vr]/|reels?/|videos/)", urlparse(url).path,
+                      flags=re.IGNORECASE)
+            or urlparse(url).path.startswith("/watch")
+        ):
             return False
 
         try:
             post_data = await extract_media_ytdlp(url, platform_key)
             if post_data is None:
+                return False
+
+            # A generic Facebook login page or a static preview poster
+            # is not a playable fallback.
+            if platform_key == "facebook" and (
+                post_data.media_type != "video" or not post_data.media_urls
+                or is_generic_or_login_preview(
+                    title=post_data.text or "", platform_key="facebook"
+                )
+            ):
                 return False
 
             if safety is not None:
@@ -1111,6 +1173,12 @@ class EmbedCog(commands.Cog):
                 file = await self._create_spoiler_file(post_data.media_urls[0], max_bytes=message.guild.filesize_limit)
             elif post_data.media_type == "video" and post_data.media_urls:
                 file = await self._download_video_file(post_data.media_urls, platform_key, max_bytes=message.guild.filesize_limit)
+
+            # Facebook video fallback must genuinely attach playable media.
+            # If Facebook blocks the CDN or the file exceeds guild limits,
+            # do not advertise a static thumbnail as a successful video.
+            if platform_key == "facebook" and file is None:
+                return False
 
             # Nếu đã đính kèm file video MP4 (Discord tự hiển thị video player native),
             # xóa ảnh thumbnail tĩnh khỏi embed để tránh bị lặp 2 lần hình ảnh trong giao diện chat
@@ -1173,8 +1241,8 @@ class EmbedCog(commands.Cog):
                 origin_message_id=origin_id or None,
             )
 
-        # Facebook keeps its v2.8.3+ behavior: Reload means roll to the next
-        # configured proxy, never silently jump to yt-dlp.
+        # Facebook reload checks remaining proxies, then a bounded video-only
+        # yt-dlp fallback if no validated proxy is available.
         if platform_key == "facebook":
             return await self.roll_facebook_proxy(
                 payload,
@@ -1362,6 +1430,9 @@ class EmbedCog(commands.Cog):
         for state_key in list(self._facebook_proxy_roll_state.keys()):
             if state_key[0] == origin_id:
                 self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._facebook_retry_at.keys()):
+            if state_key[0] == origin_id:
+                self._facebook_retry_at.pop(state_key, None)
         for state_key in list(self._manual_fallback_previews.keys()):
             if state_key[0] == origin_id:
                 self._manual_fallback_previews.pop(state_key, None)
@@ -1493,6 +1564,14 @@ class EmbedCog(commands.Cog):
             state_key = (origin_id, url)
             remembered = set(self._facebook_proxy_roll_state.get(state_key, set()))
             tried = remembered | payload_tried
+            if time.monotonic() < self._facebook_retry_at.get(state_key, 0):
+                return PreviewResult(
+                    status="action_required",
+                    tier="proxy",
+                    reason="proxy_retry_cooldown",
+                    platform=platform_key,
+                    origin_message_id=origin_id,
+                )
             attempted = set(tried)
 
             proxy_url, is_proxy_nsfw = await find_valid_proxy(
@@ -1505,16 +1584,47 @@ class EmbedCog(commands.Cog):
             )
             tried = attempted
 
+            if not proxy_url and (
+                re.search(
+                    r"/(?:share/[vr]/|reels?/|videos/)",
+                    urlparse(url).path, flags=re.IGNORECASE,
+                ) or urlparse(url).path.startswith("/watch")
+            ):
+                # Explicit Reload authorizes trying the last fallback; only
+                # attach an actually downloaded playable video. Preserve the
+                # current preview if yt-dlp is blocked/unavailable/oversized.
+                fallback = await self._try_ytdlp_fallback(
+                    origin_message, "facebook", url, config,
+                    is_spoiler=is_spoiler, manual=True,
+                )
+                if isinstance(fallback, PreviewResult) and fallback.success:
+                    if current_preview is not None and (
+                        getattr(current_preview, "id", None) != fallback.preview_message_id
+                    ):
+                        try:
+                            await self._discard_preview(origin_id, current_preview)
+                        except Exception:
+                            pass
+                    return fallback
+                if isinstance(fallback, PreviewResult) and fallback.status == "degraded":
+                    return fallback
             if not proxy_url:
-                self._set_facebook_proxy_state(origin_id, url, tried)
+                # A failed validation/HTTP timeout does NOT mean that proxy
+                # was permanently consumed. Keep previously successful proxy
+                # rotations excluded, but allow bounded retries of failures.
+                domains = guild_proxy_domains if guild_proxy_domains is not None else PROXY_DOMAINS.get(platform_key, [])
+                exhausted = bool(domains) and all(d in tried for d in domains)
+                if not exhausted:
+                    self._facebook_retry_at[state_key] = time.monotonic() + 30.0
                 return PreviewResult(
                     status="action_required",
                     tier="proxy",
-                    reason="no_more_proxy",
+                    reason="no_more_proxy" if exhausted else "proxy_temporarily_unavailable",
                     platform=platform_key,
                     origin_message_id=origin_id,
                 )
 
+            self._facebook_retry_at.pop(state_key, None)
             domain = (urlparse(proxy_url).hostname or "").lower()
             if domain:
                 tried.add(domain)

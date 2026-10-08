@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import discord
 
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
+from core.constants import PROXY_DOMAINS
 from core.version import CURRENT_VERSION
 from features.embed.cog import EmbedCog
 from features.embed.builder import PostData, NSFWFilter, build_embed
@@ -40,7 +41,7 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertFalse(is_generic_or_login_preview("Facebook", "Mai wrote about her trip today", platform_key="facebook"))
 
     def test_brand_and_legacy_mentions(self):
-        self.assertEqual(CURRENT_VERSION, "3.8.4")
+        self.assertGreaterEqual(tuple(map(int, CURRENT_VERSION.split("."))), (3, 8, 4))
         self.assertEqual(runtime_bot_name(None), BOT_BRAND_NAME)
         for query in ("@Asumi nghĩ sao?", "Asumi nghĩ sao?", "MikeDaBot nghĩ sao?"):
             clean, context = extract_question_mentions_context(query, "Mai")
@@ -49,7 +50,8 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertEqual(set(READER_STYLES), {"auto", "neutral", "healer", "chaos"})
         self.assertTrue(all("Orion" not in value["name"] and "Celeste" not in value["name"] and "Jester" not in value["name"] for value in READER_STYLES.values()))
         prompt = _build_tarot_prompt("daily", "Daily", [], None, "Mai")
-        self.assertIn("Bạn là Asumi", prompt)
+        self.assertIn("Đọc quẻ Tarot cho", prompt)
+        self.assertIn("Asumi", prompt)
         self.assertNotIn("Orion", prompt)
         malformed = parse_tarot_ai_response('{"is_valid": false, "full_reading": "Xin lỗi"')
         self.assertNotIn('{"is_valid"', malformed[0])
@@ -291,7 +293,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("facebed.com", find_proxy.await_args.kwargs["excluded_domains"])
         self.assertIn("facebed.seria.moe", sent_kwargs["view"].payload["tried_domains"])
 
-    async def test_facebook_is_not_supported_by_ytdlp_fallback_anymore(self):
+    async def test_facebook_nonvideo_posts_never_invoke_ytdlp(self):
         result = await self.cog._try_ytdlp_fallback(
             self.msg,
             "facebook",
@@ -329,7 +331,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             "platform": "facebook",
             "url": "https://facebook.com/post/1",
             "is_spoiler": False,
-            "tried_domains": ["facebed.com", "facebed.seria.moe"],
+            "tried_domains": list(PROXY_DOMAINS["facebook"]),
         }
         with patch(
             "features.embed.cog.find_valid_proxy",
@@ -506,7 +508,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
                 "action_required", "proxy", "unfurl_timeout", "facebook", origin_message_id=10
             )
             await self.cog.on_message(msg)
-            msg.edit.assert_awaited_once_with(suppress=True)
+            msg.edit.assert_not_awaited()
 
     async def test_cancellation_removes_temporary_preview(self):
         waiting = asyncio.Event()

@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.10.0"
+CURRENT_VERSION = "3.10.1"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.10.0 - Supervised Multi-source Search"
+CODENAME = "Asumi 3.10.1 - Social Embed Resilience"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.10.1", "date": "2026-10-09", "type": "bugfix",
+        "title": "More Reliable Social Embeds",
+        "summary": "Sửa Facebook share video, khôi phục chuỗi nhiều proxy và yt-dlp cuối với xác minh video, không ẩn tin gốc khi preview thất bại.",
+        "changes": [
+            {"category": "Social Embed", "items": [
+                "Giữ nguyên link Facebook /share/v/ thay vì nhầm thành /share/r/; mở rộng proxy Facebook 2 lên 4 nguồn có kiểm tra metadata.",
+                "Thử yt-dlp cuối cho video Facebook nếu không có proxy hợp lệ; chỉ công nhận thành công khi thực sự gửi được video đính kèm.",
+                "Không còn chỉ hiển thị Preview lỗi?; có thông báo cụ thể và nút mở Facebook gốc, nguyên bản tin Discord được giữ khi bot không tạo được preview.",
+                "Thử lại proxy tạm lỗi sau cooldown, giữ nguyên preview cũ cho đến khi thay thế thành công; các provider khác giữ fallback cũ.",
+            ]},
+        ],
+    },
     {
         "version": "3.10.0", "date": "2026-10-08", "type": "minor",
         "title": "T22.5: Supervised Cross-source Retrieval",

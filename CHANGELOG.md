@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.10.1] - 2026-10-09 — *Social Embed Resilience*
+
+### Fixed
+- Facebook mobile `/share/v/{token}` links keep the original **video** share path instead of silently becoming `/share/r/` Reel links.
+- Facebook has four ordered, individually metadata-validated proxy candidates: Facebed primary/mirror, Facecot and Fixacebook. For video paths, do not treat an OG thumbnail/login card as playable video.
+- Restore last-resort **yt-dlp for Facebook videos only** when proxy validation fails (also after manual Reload). Send video fallback only when an actual playable attachment is downloaded within Discord guild file limits. Normal Facebook posts never invoke yt-dlp.
+- The "Preview lỗi?" ghost becomes a clear diagnostic and **Mở Facebook** link button. A failed action-required fallback no longer suppresses the original Discord embed; current previews survive failed replacement.
+- Temporary proxy failures can be retried after a cooldown; genuinely exhausted choices keep the original preview. Owner-only Reload/Remove, cleanup on deletion and existing non-Facebook fallback behavior are preserved.
+- New regression `tests/test_embed_resilience.py`, dedicated embed workflow and refreshed older embed assertions.
+
+### Acceptance
+- Test both a public `facebook.com/share/v/` video and a sign-in-restricted video in a live Discord guild after Render deploy. Tests do not prove a third-party provider can access every post; never require personal Facebook cookies.
+
 ## [3.10.0] - 2026-10-08 — *T22.5 Supervised Multi-source Search*
 
 ### Added
