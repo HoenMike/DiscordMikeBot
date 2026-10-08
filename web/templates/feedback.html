@@ -27,10 +27,32 @@
 details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}.tech-grid .field{min-width:0}
 @media(max-width:1100px){.split{grid-template-columns:1fr}.actions{position:static}.actions .panel{display:grid;grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:740px){.shell{padding:17px 12px}.workspace{grid-template-columns:1fr}.listpanel{position:static;max-height:450px}.stats{gap:7px}.stat{padding:12px}.detail-header,.section{padding:16px}.top h1{font-size:20px}.tech-grid{grid-template-columns:1fr}}
+/* Embedded inside the historical tabbed Dashboard; no second admin shell. */
+body.feedback-embedded{background:#0f1521;color:#eaf0fb;overflow:auto;min-height:100dvh}
+.feedback-embedded .shell{max-width:none;padding:12px 14px 32px}
+.feedback-embedded .top{margin-bottom:15px}
+.feedback-embedded .stats{gap:9px;margin-bottom:14px}
+.feedback-embedded .stat{padding:12px 15px}
+.feedback-embedded .stat .num{font-size:20px}
+.feedback-embedded .workspace{grid-template-columns:290px minmax(0,1fr);gap:12px}
+.feedback-embedded .pane-head{padding:13px}
+.feedback-embedded .pane-content{padding:13px}
+.feedback-embedded .listpanel{top:0;max-height:calc(100dvh - 145px)}
+.feedback-embedded .detail-header{padding:19px 21px 15px}
+.feedback-embedded .section{padding:17px 21px}
+@media(max-width:1120px){.feedback-embedded .split{grid-template-columns:1fr}}
+@media(max-width:760px){
+ .feedback-embedded .shell{padding:12px 9px 24px}
+ .feedback-embedded .workspace{grid-template-columns:1fr}
+ .feedback-embedded .listpanel{position:static;max-height:350px}
+ .feedback-embedded .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .feedback-embedded .detail-header,.feedback-embedded .section{padding:14px}
+}
 </style>
-<link rel="stylesheet" href="{{ url_for('static', filename='admin_console.css') }}">
+{% if not embedded %}<link rel="stylesheet" href="{{ url_for('static', filename='admin_console.css') }}">{% endif %}
 </head>
-<body class="asumi-app" data-page="feedback" data-selected-ticket="{{ selected_ticket }}">
+<body class="{% if embedded %}feedback-embedded{% else %}asumi-app{% endif %}" data-page="feedback" data-selected-ticket="{{ selected_ticket }}">
+{% if not embedded %}
 <div class="asumi-layout">
 {% include "partials/admin_nav.html" %}
 <div class="asumi-stage">
@@ -39,9 +61,10 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
   <div class="asumi-heading"><span class="asumi-eyebrow">ASUMI / ADMIN</span><h1>Feedback</h1></div>
   <div class="asumi-toolbar"><span class="asumi-state">Quản lý ticket</span></div>
 </header>
+{% endif %}
 <main class="shell">
   <header class="top"><div><div class="eyebrow">Asumi / Moderation</div><h2>Feedback Center</h2><div class="muted small">Tiếp nhận · Xem bằng chứng · Quyết định · Theo dõi sửa lỗi</div></div>
-    <div class="buttons"><button class="btn" id="refresh">↻ Làm mới</button><a class="btn" href="/admin">← Dashboard</a></div>
+    <div class="buttons"><button class="btn" id="refresh">↻ Làm mới</button>{% if not embedded %}<a class="btn" href="/admin?tab=feedback">← Dashboard</a>{% endif %}</div>
   </header>
   <section class="stats" aria-label="Tổng quan feedback"><div class="stat"><div class="caption">Tất cả ticket</div><div class="num" id="statTotal">—</div></div><div class="stat"><div class="caption">Chờ xem xét</div><div class="num" id="statPending">—</div></div><div class="stat"><div class="caption">Đã duyệt</div><div class="num" id="statApproved">—</div></div><div class="stat"><div class="caption">Đã xử lý / kết thúc</div><div class="num" id="statDone">—</div></div></section>
   <div class="workspace">
@@ -55,11 +78,12 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
   </div>
   <p class="alert" id="error" role="alert"></p>
 </main>
-</div></div>
+{% if not embedded %}</div></div>{% endif %}
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
 const csrf=document.querySelector('meta[name="csrf-token"]').content;
+const embedded=document.body.classList.contains('feedback-embedded');
 const LABELS={submitted:'Mới gửi',triage:'Đang phân loại',needs_info:'Cần bổ sung',approved:'Đã duyệt',rejected:'Không duyệt',duplicate:'Trùng lặp',deferred:'Tạm hoãn',planned:'Đã lên kế hoạch',in_progress:'Đang sửa',in_review:'Đang kiểm tra',deployed:'Đã triển khai',verified:'Đã sửa xong',closed:'Đã đóng',reopened:'Mở lại',deleted:'Đã xóa'};
 const PENDING=new Set(['submitted','triage','needs_info','deferred','reopened']);
 const POSITIVE=new Set(['approved','planned','in_progress','in_review','deployed','verified']);
@@ -302,17 +326,32 @@ async function loadEvents(ticketId,host){
 }
 function selectTicket(id,push=false){
  selected=id;
- if(push && location.pathname!==('/admin/feedback/'+encodeURIComponent(id)))history.pushState({ticket:id},'', '/admin/feedback/'+encodeURIComponent(id));
+ if(push){
+  if(embedded){
+   window.parent.postMessage({type:'asumi:feedback:ticket',ticket:id},location.origin);
+  } else if(location.pathname!==('/admin/feedback/'+encodeURIComponent(id))){
+   history.pushState({ticket:id},'', '/admin/feedback/'+encodeURIComponent(id));
+  }
+ }
  renderList();const t=records.find(x=>x.id===id);if(t)renderMain(t);
 }
 window.addEventListener('popstate',()=>{
+ if(embedded)return;
  const match=decodeURIComponent(location.pathname).match(/^\/admin\/feedback\/(.+)$/);
  selected=match?match[1]:null;reload();
 });
+window.addEventListener('message',event=>{
+ if(!embedded||event.origin!==location.origin||event.source!==window.parent)return;
+ if(event.data?.type!=='asumi:feedback:open')return;
+ const id=String(event.data.ticket||'').slice(0,128);
+ if(id===String(selected||''))return;
+ selected=id||null;
+ reload();
+});
 const menu=document.getElementById('asumi-menu'), overlay=document.getElementById('asumi-overlay');
-const closeMenu=()=>{document.body.classList.remove('asumi-nav-open');menu.setAttribute('aria-expanded','false')};
-menu.addEventListener('click',()=>{const open=document.body.classList.toggle('asumi-nav-open');menu.setAttribute('aria-expanded',String(open))});
-overlay.addEventListener('click',closeMenu);
+const closeMenu=()=>{document.body.classList.remove('asumi-nav-open');menu?.setAttribute('aria-expanded','false')};
+menu?.addEventListener('click',()=>{const open=document.body.classList.toggle('asumi-nav-open');menu.setAttribute('aria-expanded',String(open))});
+overlay?.addEventListener('click',closeMenu);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
 let searchTimer;
 $('search').oninput=e=>{search=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(reload,350)};
