@@ -1,3 +1,7 @@
+## Feedback in the original Admin Dashboard
+
+Feedback is now integrated into the historical Admin Dashboard as a tab alongside Activity, Presence, Version, Tarot, Cabin, Guilds, Overview and Logs. Use `/admin?tab=feedback` and share `/admin?tab=feedback&ticket=<ticket-id>`; old Feedback links automatically redirect to the main Dashboard. This keeps private ticket review in one Admin navigation flow rather than opening a separate dashboard.
+
 ## Asumi 3.9.1 — Original Admin Dashboard restored
 
 The familiar pre-T24 eight-tab Admin Dashboard is once again the primary UI at `/admin`. The 3.9.0 sidebar design and subsequent stand-alone prototype are **not** the visual baseline. Existing Feedback Center, ticket lifecycle and Discord controls are retained. Previous /admin/* bookmarks redirect to their classic tab counterparts. See `docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md` for the authoritative future design direction.

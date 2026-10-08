@@ -154,3 +154,7 @@ Read `docs/ASUMI_T24_ADMIN_CONSOLE_REDESIGN_PLAN.md` before any Admin Dashboard 
 
 **The OWNER explicitly wants the pre-T24 eight-tab admin Dashboard that has been used historically, not Asumi 3.9.0's new sidebar nor the separate prototype.** The authoritative source is `web/templates/dashboard.html`, now served at `/admin`. Preserve current backend/features and improve that original template incrementally. Old T24 sidebar information architecture and PR #55 proposal are superseded for UI direction. Read `docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md` before touching Admin UI. Keep T23 Feedback and final-only reporter DMs.
 
+
+### T24.9 Feedback in the classic Admin tab bar
+
+**Owner explicitly requires Feedback to live inside the historical Dashboard**, not open a separate admin page. The classic `web/templates/dashboard.html` has a ninth Feedback tab, with a chrome-free authenticated same-origin view of the existing T23 Feedback Center. Old `/admin/feedback[/ticket]` links redirect to `/admin?tab=feedback[&ticket=...]`; only the classic topbar/tab strip is visible. Preserve the existing CSRF, ticket data, AI proposals, private R2 access, and terminal-only notifications. See `docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md`.

@@ -12,12 +12,24 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.9.1"
+CURRENT_VERSION = "3.9.2"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.9.1 - Classic Admin Dashboard"
+CODENAME = "Asumi 3.9.2 - Integrated Feedback Tab"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.9.2", "date": "2026-10-08", "type": "bugfix",
+        "title": "Feedback Inside Classic Dashboard",
+        "summary": "Feedback Inbox nay là tab thứ 9 trong Dashboard quen thuộc, thay vì mở một trang quản trị khác.",
+        "changes": [
+            {"category": "Dashboard", "items": [
+                "Giữ nguyên tám tab cũ và bổ sung Feedback vào thanh điều hướng chính.",
+                "Inbox, ảnh bằng chứng, duyệt AI và lịch sử ticket hiển thị trong cùng Dashboard.",
+                "Các liên kết Feedback cũ dẫn về đúng tab và ticket; vẫn dùng quyền và dữ liệu hiện có.",
+            ]},
+        ],
+    },
     {
         "version": "3.9.1", "date": "2026-10-08", "type": "bugfix",
         "title": "Classic Admin Dashboard restored",
