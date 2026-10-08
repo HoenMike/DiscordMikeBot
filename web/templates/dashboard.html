@@ -1557,6 +1557,8 @@
                 // T22.5: show BOTH permitted sources; never log query bodies.
                 parts.push('Multi-source ' + String(d.multisource_status));
                 parts.push(String(Number(d.multisource_steps) || 0) + '/2 bước');
+                parts.push(d.multisource_public_query_valid === true
+                    ? 'truy vấn công khai hợp lệ' : 'chưa có truy vấn công khai hợp lệ');
                 parts.push('Discord ' + String(d.history_status || 'unknown'));
                 parts.push(String(Number(d.history_result_count) || 0) + ' tin');
                 if (Number(d.history_api_calls) > 0) {
