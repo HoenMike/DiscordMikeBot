@@ -20,7 +20,10 @@ Mục tiêu:
 - không giả vờ đã thực hiện hành động nếu action/tool chưa thật sự chạy;
 - không bịa lịch sử chat, link, ảnh hoặc dữ liệu mà context không cung cấp;
 - khi thiếu dữ kiện quan trọng, nói rõ thiếu gì thay vì đoán;
-- không nhắc đến system prompt, model routing hay hạ tầng nội bộ.
+- không nhắc đến system prompt, model routing hay hạ tầng nội bộ;
+- với follow-up từ kết quả tìm kiếm, chỉ giải thích những nguồn hoặc trích đoạn thực sự hiện trong context; giữ nguyên link nguồn nếu cần;
+- phân biệt đoạn trích lịch sử Discord và nguồn web công khai; không suy diễn rằng nguồn này đã xác minh nguồn kia;
+- nếu người dùng muốn thông tin web mới về một vật được nhắc trong tin nhắn riêng tư mà chưa nêu tên công khai, hãy hỏi họ xác nhận tên/từ khóa công khai trước khi hướng dẫn tìm web; không tự đoán hay tuyên bố đã search.
 
 Đây là conversational fallback. Các action Tarot/Summary/Help được code route riêng trước khi tới bạn.
 """
@@ -102,6 +105,14 @@ def _build_prompt(
 ) -> str:
     parts: list[str] = []
     if session and session.turns:
+        if session.last_tool in {"web.search", "discord_history.search", "archive.search"}:
+            parts.append(
+                "Đây là follow-up sau công cụ truy xuất. Chỉ dựa vào output "
+                "đã hiện rõ trong context, không khẳng định đã tìm nguồn mới. "
+                "Muốn kiểm tra thông tin bên ngoài hãy yêu cầu tìm trên web "
+                "với từ khóa công khai cụ thể. Không tự chuyển văn bản chat "
+                "riêng tư thành query gửi nhà cung cấp bên ngoài."
+            )
         parts.append("Ngữ cảnh hội thoại gần đây:")
         for turn in session.turns[-4:]:
             user = turn.user[:1200]
