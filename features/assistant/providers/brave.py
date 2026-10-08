@@ -89,10 +89,11 @@ class BraveSearchAdapter:
     async def _reserve_request(self) -> int | None:
         """Atomically consume one request from durable quota or reject."""
         await db_client.connect()
-        # Render's local SQLite fallback is not durable on ephemeral disks.
-        # If Turso is configured but unreachable, refuse chargeable calls.
-        if config.TURSO_AUTH_TOKEN and config.TURSO_DATABASE_URL and not db_client.is_cloud:
-            raise RuntimeError("Durable quota database unavailable")
+        # Never spend Brave quota using an ephemeral local database: a restart
+        # would reset the monthly counter and could incur surprise charges.
+        # Turso (or another configured persistent cloud adapter) is mandatory.
+        if not db_client.is_cloud:
+            raise RuntimeError("Durable cloud quota database required")
 
         if not self._schema_ready:
             await db_client.execute(
