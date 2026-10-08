@@ -931,3 +931,56 @@ def feedback_evidence(ticket_id: str, index: int):
         })
     except Exception:
         return jsonify({"error": "Private evidence currently unavailable"}), 503
+
+
+# T23.3 — Private ChatGPT/plugin bridge. Disabled until a scoped token is set.
+def feedback_connector_required(fn):
+    @wraps(fn)
+    def checked(*args, **kwargs):
+        configured = os.environ.get("ASUMI_FEEDBACK_CONNECTOR_TOKEN", "")
+        supplied = (request.headers.get("Authorization", "") or "")
+        expected = "Bearer " + configured
+        if len(configured) < 32 or not hmac.compare_digest(supplied, expected):
+            return jsonify({"error": "Unauthorized"}), 401
+        return fn(*args, **kwargs)
+    return checked
+
+
+@app.route('/api/feedback-connector/v1/tickets', methods=['GET'])
+@feedback_connector_required
+def connector_feedback_list():
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        limit = min(100, max(1, int(request.args.get('limit', '25'))))
+        records = asyncio.run(feedback_store.admin_list(
+            status=(request.args.get('status') or '')[:30], limit=limit
+        ))
+        # Send metadata and text, not raw screenshots or S3 object keys.
+        for ticket in records:
+            ticket['evidence_count'] = len(ticket.pop('evidence', []))
+        return jsonify({"tickets": records})
+    except (FeedbackStorageError, ValueError):
+        return jsonify({"error": "Unavailable"}), 503
+
+
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>/review', methods=['POST'])
+@feedback_connector_required
+def connector_feedback_review(ticket_id):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if request.mimetype != "application/json":
+        return jsonify({"error": "JSON required"}), 415
+    payload = request.get_json(silent=True) or {}
+    if payload.get("owner_approved") is not True:
+        return jsonify({"error": "Explicit owner approval required"}), 403
+    if not ticket_id.startswith("FB-") or len(ticket_id)>30:
+        return jsonify({"error": "Ticket not found"}), 404
+    try:
+        asyncio.run(feedback_store.review(
+            ticket_id=ticket_id, status=str(payload.get("status") or ""),
+            reason=str(payload.get("reason") or ""),
+            actor_id="connector-owner-approved",
+            verified_version=str(payload.get("verified_version") or ""),
+        ))
+        return jsonify({"updated": True, "ticket_id": ticket_id})
+    except FeedbackStorageError as exc:
+        return jsonify({"error": str(exc)}), 400
