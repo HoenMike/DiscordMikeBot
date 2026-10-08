@@ -15,7 +15,9 @@ from core.db import db_client
 
 
 class FeedbackStorageError(Exception):
-    pass
+    def __init__(self, message: str, *, may_have_committed: bool = False):
+        super().__init__(message)
+        self.may_have_committed = may_have_committed
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,20 @@ class FeedbackStore:
             print(f"[Feedback] Durable DB unavailable at startup: {type(exc).__name__}", flush=True)
             return False
 
+    async def find_source(
+        self, *, guild_id: int, source_message_id: int, reporter_id: int
+    ) -> FeedbackTicket | None:
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT ticket_id, status, title, category, created_at, review_reason "
+            "FROM asumi_feedback WHERE guild_id=? AND source_message_id=? AND reporter_id=?",
+            (str(guild_id), str(source_message_id), str(reporter_id)),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Mất kết nối Turso khi kiểm tra ticket.")
+        return FeedbackTicket(*row) if row else None
+
     async def create(
         self, *, guild_id: int, channel_id: int, reporter_id: int,
         source_message_id: int, bot_version: str, category: str,
@@ -143,10 +159,12 @@ class FeedbackStore:
           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           ON CONFLICT(guild_id, source_message_id) DO NOTHING
         """
+        inserted = False
         try:
             await db_client.execute(sql, args)
+            inserted = True
             if not db_client.is_cloud:
-                raise FeedbackStorageError("Mất Turso; không xác nhận ticket.")
+                raise FeedbackStorageError("Mất Turso; không xác nhận ticket.", may_have_committed=True)
             async with db_client.execute(
                 "SELECT ticket_id, status, title, category, created_at, review_reason "
                 "FROM asumi_feedback WHERE guild_id=? AND source_message_id=? AND reporter_id=?",
@@ -154,12 +172,15 @@ class FeedbackStore:
             ) as cursor:
                 record = await cursor.fetchone()
             if not db_client.is_cloud or record is None:
-                raise FeedbackStorageError("Không xác minh được ticket đã lưu trên Turso.")
+                raise FeedbackStorageError("Không xác minh được ticket đã lưu trên Turso.", may_have_committed=True)
             return FeedbackTicket(*record)
         except FeedbackStorageError:
             raise
         except Exception as exc:
-            raise FeedbackStorageError("Turso không lưu được ticket. Hãy thử lại.") from exc
+            raise FeedbackStorageError(
+                "Turso không lưu được ticket. Hãy thử lại.",
+                may_have_committed=inserted,
+            ) from exc
 
     async def own_ticket(self, ticket_id: str, *, reporter_id: int) -> FeedbackTicket | None:
         await self._require_cloud()
