@@ -1241,8 +1241,8 @@ class EmbedCog(commands.Cog):
                 origin_message_id=origin_id or None,
             )
 
-        # Facebook keeps its v2.8.3+ behavior: Reload means roll to the next
-        # configured proxy, never silently jump to yt-dlp.
+        # Facebook reload checks remaining proxies, then a bounded video-only
+        # yt-dlp fallback if no validated proxy is available.
         if platform_key == "facebook":
             return await self.roll_facebook_proxy(
                 payload,
@@ -1585,6 +1585,24 @@ class EmbedCog(commands.Cog):
             tried = attempted
 
             if not proxy_url:
+                # Explicit Reload authorizes trying the last fallback; only
+                # attach an actually downloaded playable video. Preserve the
+                # current preview if yt-dlp is blocked/unavailable/oversized.
+                fallback = await self._try_ytdlp_fallback(
+                    origin_message, "facebook", url, config,
+                    is_spoiler=is_spoiler, manual=True,
+                )
+                if isinstance(fallback, PreviewResult) and fallback.success:
+                    if current_preview is not None and (
+                        getattr(current_preview, "id", None) != fallback.preview_message_id
+                    ):
+                        try:
+                            await self._discard_preview(origin_id, current_preview)
+                        except Exception:
+                            pass
+                    return fallback
+                if isinstance(fallback, PreviewResult) and fallback.status == "degraded":
+                    return fallback
                 # A failed validation/HTTP timeout does NOT mean that proxy
                 # was permanently consumed. Keep previously successful proxy
                 # rotations excluded, but allow bounded retries of failures.
