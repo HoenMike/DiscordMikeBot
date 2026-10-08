@@ -12,12 +12,27 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.5.0"
+CURRENT_VERSION = "3.6.0"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.5 - Brave Search"
+CODENAME = "Asumi 3.6 - Discord History Search"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.6.0", "date": "2026-10-08",
+        "type": "minor", "title": "Discord History Search",
+        "summary": "T22.2: tìm tin nhắn lịch sử chưa lưu Archive theo người/thời gian/chủ đề và mở tin nhắn gốc.",
+        "changes": [
+            {"category": "🔎 Discord History", "items": [
+                "Tìm xem đầu năm @user có nói gì về mua xe không: trả kết quả thật từ Discord Search.",
+                "Mỗi kết quả có tác giả, ngày và Jump to Message; không cần lưu Archive từ trước.",
+            ]},
+            {"category": "🔒 Privacy", "items": [
+                "Chỉ cho thấy message ở kênh mà người hỏi và bot cùng có quyền xem lịch sử.",
+                "Mặc định OFF để kiểm tra API bot/permission trước khi enable live; không passive index.",
+            ]},
+        ],
+    },
     {
         "version": "3.5.0", "date": "2026-10-08",
         "type": "minor", "title": "Brave Web Search",
