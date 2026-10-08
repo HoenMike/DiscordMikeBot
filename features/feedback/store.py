@@ -547,6 +547,26 @@ class FeedbackStore:
             record["evidence"] = []
         return record
 
+    async def admin_events(self, *, ticket_id: str) -> list[dict]:
+        """Owner audit timeline, including reporter deletions and replacements."""
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            return []
+        async with db_client.execute(
+            "SELECT actor_id, action, old_status, new_status, reason, created_at "
+            "FROM asumi_feedback_events WHERE ticket_id=? "
+            "ORDER BY event_id DESC LIMIT 40",
+            (resolved,),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không đọc được lịch sử review.")
+        return [
+            dict(zip(("actor_id", "action", "old_status", "new_status",
+                      "reason", "created_at"), row))
+            for row in rows
+        ]
+
     async def review(
         self, *, ticket_id: str, status: str, reason: str,
         actor_id: str, verified_version: str = ""
