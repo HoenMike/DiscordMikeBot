@@ -8,6 +8,7 @@ on:
       - "features/feedback/**"
       - "tests/test_feedback_t23.py"
       - "tests/test_feedback_t23_review.py"
+      - "tests/test_feedback_t23_db_schema.py"
       - "bot_instance.py"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
@@ -31,6 +32,7 @@ on:
       - "features/feedback/**"
       - "tests/test_feedback_t23.py"
       - "tests/test_feedback_t23_review.py"
+      - "tests/test_feedback_t23_db_schema.py"
       - "bot_instance.py"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
@@ -71,6 +73,8 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_member_summary.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23_review.py" -v
+          python -m unittest discover -s tests -p "test_feedback_t23_db_schema.py" -v
+          python -m compileall -q features/feedback web/app.py
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
           python -m unittest discover -s tests -p "test_assistant_semantic.py" -v
