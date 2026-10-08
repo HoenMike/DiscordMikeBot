@@ -1,6 +1,6 @@
 # T22 — Intelligent Search Handoff
 
-**Status:** T22.1 IMPLEMENTED / BRAVE KEY & LIVE VERIFY PENDING; T22.2 NEXT
+**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 NEXT
 **Recorded:** 2026-10-08
 **Primary spec:** docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md
 **Baseline:** Asumi 3.4.1 (`main`), T21 final production acceptance remains outstanding.
@@ -27,7 +27,7 @@
 
 1. Finish T21.9 production regression (including Vectorize enable test) independently; T22 plan need not wait to be documented.
 2. T22.1 implemented on a focused PR: explicit Brave Search, durable quota, original result links, cooldown/cache and dashboard tool telemetry. Await manual API key plus live verification. Never paste a key into chat.
-3. T22.2 implement on-demand native Discord History Search with author/time/topic filters, permission-safe Jump links, and 'not indexed yet' states.
+3. T22.2 implemented: official bot-token Discord History Search with author/time/topic, requester ACL and Jump links. Await live bot-authorization/permissions test.
 4. T22.3 add typed Clef web/history/archive source selection and bounded multi-source execution.
 5. T22.4 follow-up, ranking, cache/TTL, dashboard telemetry and edge-case regression.
 
@@ -59,3 +59,14 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - Install env in Render: `BRAVE_SEARCH_API_KEY` (secret), `ASUMI_WEB_SEARCH_ENABLED=true` only after Brave dashboard prepay/usage limits are confirmed. Default monthly cap 500; max hardcoded 900.
 - Live tests: no-key disabled, valid key search, 401/429, quota, restart persistence, cache, permission-safe no-private-Discord forwarding, Dashboard metrics.
 - Next goal: **T22.2** Discord historical search using native guild Search with requester-side ACL and original Jump links. Do not rely on Brave to search old Discord messages.
+
+## T22.2 implementation handoff — 2026-10-08
+
+- Release target: Asumi 3.6.0.
+- Added `features/assistant/providers/discord_history.py`, history intent/router bridge, permission-safe Discord Jump links, env flag, Help, tests and CI.
+- Examples: `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?`, `@Asumi tìm tin nhắn về laptop`.
+- Bot searches only current guild; uses bot token only; **no new API token required**.
+- Env `ASUMI_DISCORD_HISTORY_ENABLED=false` by default. Set true on Render for smoke test, then check Message Content intent, member channel access, 202 indexing/429 rate-limit, matching original message and Jump link.
+- Bot caches no historical message bodies and never sends them to Brave. Unknown/uncached channels, private threads and inaccessible channels are excluded.
+- Regression: `tests/test_assistant_history.py` under `.github/workflows/asumi-search.yml`; verify workflow actually completes.
+- **Next:** T22.3 Clef choice between Web / Discord History / Archive, limited evidence planning and natural Q&A; no automatic source selection shipped in T22.1/2.
