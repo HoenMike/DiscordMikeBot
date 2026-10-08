@@ -177,9 +177,18 @@ def parse_pvoil_prices(html: str, *, now: datetime | None = None) -> VerifiedFue
             continue
         match = re.search(pattern, flat, re.IGNORECASE)
         if match:
-            found_value = _vnd(flat[match.end(): match.end() + 50])
-            if found_value is not None:
-                found[key] = found_value
+            nearby = flat[match.end(): match.end() + 65]
+            price_match = _AMOUNT.search(nearby)
+            if price_match:
+                prefix = nearby[:price_match.start()]
+                suffix = nearby[price_match.end(): price_match.end() + 8]
+                # Never steal a later product's price if this one is missing.
+                # Official PVOIL page formats every valid price with currency.
+                crossed_product = re.search(r"\\b(?:Xăng|Dầu|Diesel)\\b", prefix, re.I)
+                if not crossed_product and re.match(r"\\s*(?:đ|₫|VND)\\b?", suffix, re.I):
+                    found_value = _vnd(price_match.group(1))
+                    if found_value is not None:
+                        found[key] = found_value
 
     if len(found) < 2:
         return VerifiedFuelReport(status="missing_prices")
@@ -226,13 +235,17 @@ class PVOILPriceReader:
                                 if len(body) > policy.ASUMI_FUEL_SOURCE_MAX_RESPONSE_BYTES:
                                     continue
                                 candidate = parse_pvoil_prices(body.decode("utf-8", "replace"))
-                                if candidate.status == "ok":
+                                if candidate.status == "ok" and (
+                                    selected.effective_at is None
+                                    or candidate.effective_at > selected.effective_at
+                                    or (candidate.effective_at == selected.effective_at
+                                        and len(candidate.rows) > len(selected.rows))
+                                ):
                                     selected = VerifiedFuelReport(
                                         status="ok", effective_at=candidate.effective_at,
                                         rows=candidate.rows, source_url=url,
                                         elapsed_ms=(time.perf_counter() - started) * 1000,
                                     )
-                                    break
                         except (aiohttp.ClientError, asyncio.TimeoutError, UnicodeError):
                             continue
             except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
