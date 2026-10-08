@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.8.1"
+CURRENT_VERSION = "3.8.2"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.8.1 - Owner-Gated Feedback Review"
+CODENAME = "Asumi 3.8.2 - Private ChatGPT OAuth"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.8.2", "date": "2026-10-08", "type": "bugfix",
+        "title": "T23.3: Private ChatGPT OAuth Connection",
+        "summary": "Asumi Feedback MCP hỗ trợ OAuth 2.1/PKCE để admin tự đăng nhập và cấp quyền an toàn cho ChatGPT.",
+        "changes": [
+            {"category": "🔒 ChatGPT MCP", "items": [
+                "Kết nối plugin Asumi Feedback bằng đăng nhập admin và đồng ý cấp quyền, không cần sao chép Render token.",
+                "OAuth authorization code + PKCE, giới hạn ChatGPT redirect, lưu token hashed trong Turso Cloud.",
+                "MCP chỉ đọc ticket và gửi đề xuất review; chủ bot vẫn duyệt thủ công trong Feedback Inbox.",
+                "Thêm chức năng thu hồi quyền truy cập ChatGPT khi cần.",
+            ]},
+        ],
+    },
     {
         "version": "3.8.1", "date": "2026-10-08", "type": "bugfix",
         "title": "T23: owner-gated AI review, handoff and reporter follow-up",
