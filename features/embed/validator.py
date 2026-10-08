@@ -387,6 +387,17 @@ async def validate_via_og_metadata(
                             has_video = True
 
             is_nsfw = bool(_NSFW_PATTERN.search(html_text))
+            # A thumbnail alone is not a playable video. For Facebook video
+            # share/reel/watch routes require an actual video/player meta tag;
+            # otherwise login/signup poster images can be misclassified.
+            video_path = urlparse(proxy_url).path.casefold()
+            facebook_video = platform_key == "facebook" and (
+                "/share/v/" in video_path or "/share/r/" in video_path
+                or "/reel/" in video_path or "/reels/" in video_path
+                or "/videos/" in video_path or video_path.startswith("/watch")
+            )
+            if facebook_video and not has_video:
+                return False, False
             if has_media:
                 return True, is_nsfw
 
