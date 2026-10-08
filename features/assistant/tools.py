@@ -11,9 +11,13 @@ from core import constants as policy
 from features.assistant.archive import archive_store
 from features.assistant.providers.brave import brave_search
 from features.assistant.providers.discord_history import DiscordHistorySearcher
+from features.assistant.providers.pvoil_prices import pvoil_reader
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
-from features.assistant.search_presenter import build_search_embed, prioritize_sources, _plain
+from features.assistant.search_presenter import (
+    build_search_embed, build_verified_fuel_embed,
+    prioritize_sources, _plain, _fuel_query,
+)
 
 
 @dataclass(frozen=True)
@@ -336,6 +340,36 @@ class CommandToolRegistry:
             "no_results": "Không thấy kết quả web phù hợp. Hãy thử từ khóa khác.",
         }
 
+        # Brave finds candidate pages; for fuel quotes, additionally read the
+        # source publisher's live HTML instead of trusting an excerpt. The
+        # first-party lookup is public/allowlisted and has no Brave API charge.
+        if report.status == "ok" and _fuel_query(query):
+            source = await pvoil_reader.fetch()
+            details["first_party_source"] = "pvoil"
+            details["first_party_status"] = source.status
+            details["first_party_ms"] = round(source.elapsed_ms, 1)
+            details["first_party_rows"] = len(source.rows)
+            if source.status == "ok":
+                sent = await message.reply(
+                    embed=build_verified_fuel_embed(query, source),
+                    mention_author=False,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                context_rows = "\n".join(
+                    f"{row.label}: {row.vnd_per_liter} VND/lít"
+                    for row in source.rows
+                )
+                return ToolExecutionResult(
+                    handled=True,
+                    response_message_ids=(int(sent.id),),
+                    response_context=(
+                        "PVOIL official published retail prices; effective from "
+                        + source.effective_at.isoformat()
+                        + "\n" + context_rows
+                        + "\nOriginal source: " + source.source_url
+                    )[:1800],
+                    details=details,
+                )
         if report.status == "ok":
             display_hits = prioritize_sources(query, report.hits)
             details["web_displayed_count"] = len(display_hits)

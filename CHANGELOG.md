@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.5] - 2026-10-08 — *First-party Verified Fuel Prices*
+
+### Fixed
+- Brave snippets alone can miss real tables. For public Vietnamese gasoline-price requests, Asumi additionally fetches the live **PVOIL price page and homepage** and extracts exact prices, unit and effective date.
+- Selects the newest effective date from these two first-party pages, not the top Brave title or cached search excerpt.
+- Returns a compact embed listing E10 RON95, E5 RON92 and DO prices with the **published effective-from timestamp** and a direct source link. Never claims data is accurate beyond the source's publication date.
+- If official page cannot be read, does not invent prices; falls back to the prior grounded Brave evidence/result UX.
+- Uses fixed HTTPS hosts, no redirects, HTML content-type gate, bounded body/timeout, short cache; no arbitrary URL fetching, no scraping private Discord content and no additional billable Brave calls.
+- Search Dashboard records the official source read result/status and number of verified price rows (metadata only).
+
+### Acceptance
+- Mock-based CI covers extraction from table and homepage structures, rejected future dates, transport bounds, verified embed and safe failure. Live Render IP/site permissions and actual first-party content still require a Discord smoke test.
+
 ## [3.7.4] - 2026-10-08 — *Brave Search UX Polish*
 
 ### Changed

@@ -98,3 +98,34 @@ def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
         note = "Brave Search · Trích đoạn có thể chưa cập nhật tức thời"
     embed.set_footer(text=note)
     return embed
+
+
+def build_verified_fuel_embed(query: str, report) -> discord.Embed:
+    """Show actual dated first-party prices, not search-result excerpts.
+
+    The date is an *effective-from* timestamp, not a claim that a future
+    adjustment cannot exist. Only call for parser-validated official pages.
+    """
+    if report.status != "ok" or not report.effective_at or not report.rows:
+        raise ValueError("Verified source prices required")
+    effective = report.effective_at.strftime("%H:%M ngày %d/%m/%Y")
+    heading = f"**Bảng giá PVOIL công bố — hiệu lực từ {effective}**"
+    embed = discord.Embed(
+        title=f"⛽ {_plain(query, 105) or 'Giá xăng dầu'}",
+        description=heading + "\n"
+        + "\n".join(
+            f"• {discord.utils.escape_markdown(row.label)}: "
+            f"**{row.vnd_per_liter:,} đ/lít**".replace(",", ".")
+            for row in report.rows
+        ),
+        color=0x4685A1,
+    )
+    embed.add_field(
+        name="Nguồn xác minh",
+        value=f"[PVOIL — Bảng giá xăng dầu]({report.source_url})",
+        inline=False,
+    )
+    embed.set_footer(
+        text="Đã đọc bảng giá PVOIL trực tiếp · Ngày hiệu lực không phải ngày truy vấn"
+    )
+    return embed

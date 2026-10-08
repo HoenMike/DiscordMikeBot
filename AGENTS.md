@@ -128,3 +128,8 @@ T22.4a supports oldest/latest messages by one @mentioned author (no topic requir
 ## Asumi Brave Search UX — 3.7.4
 
 A user-facing Brave result must be an **answer-first, bounded Discord embed**, not a raw wall of links/snippets. Use `features/assistant/search_presenter.py` to show at most three original clickable sources; sanitize HTML and mentions and omit unresolved numeric citation markers. For volatile prices, avoid unsupported exact values; dates/snippets are not ground truth. Cost remains one bounded Brave request per lookup, with durable quota enforcement. Preferred source domains are relevance hints, not freshness guarantees. Read `docs/ASUMI_T22_SEARCH_HANDOFF.md` before touching Search.
+
+
+## Source verification rule — Asumi 3.7.5
+
+A Brave result is only an excerpt and URL; never treat it as a verified full price table. For Vietnam public fuel prices, `features/assistant/providers/pvoil_prices.py` reads two fixed official PVOIL HTTPS pages, checks dated product-price pairs, and emits figures only when source extraction succeeds. This pilot does **not** authorize arbitrary URL fetching. Failure must preserve honest Brave fallback, no guessed prices. No extra chargeable Brave requests, no private Discord history in public searches. Test page accessibility on Render; CI fixtures alone do not establish live acceptance.

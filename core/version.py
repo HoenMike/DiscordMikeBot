@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.4"
+CURRENT_VERSION = "3.7.5"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.4 - Compact Search Results"
+CODENAME = "Asumi 3.7.5 - Verified Live Source Facts"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.5", "date": "2026-10-08",
+        "type": "bugfix", "title": "Verified First-Party Price Sources",
+        "summary": "Brave chọn nguồn, PVOIL được đọc trực tiếp để trả số liệu với ngày hiệu lực.",
+        "changes": [
+            {"category": "⛽ Search facts", "items": [
+                "Đọc bảng giá bán lẻ từ hai trang PVOIL chính thức, ưu tiên ngày hiệu lực mới hơn.",
+                "Hiển thị E10 RON95-III, E5 RON92-II và hai loại dầu DO theo VND/lít.",
+                "Nếu không xác minh được ngày/số liệu thì fallback Brave, tuyệt đối không đoán giá.",
+                "Giới hạn bytes/timeout, chặn redirect, cache, không tăng lượt Brave trả phí.",
+                "Dashboard phân biệt trang gốc đã xác minh với Brave snippets.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.4", "date": "2026-10-08",
         "type": "bugfix", "title": "Brave Search Presentation & Result Quality",

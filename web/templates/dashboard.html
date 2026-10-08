@@ -1475,6 +1475,16 @@
                     parts.push('Brave ' + String(d.web_search_status || 'unknown'));
                     parts.push(String(Number(d.web_result_count) || 0) + ' nguồn');
                     if (d.web_cache_hit === true) parts.push('cache hit');
+                    if (d.first_party_source) {
+                        parts.push('Nguồn gốc ' + String(d.first_party_source)
+                            + ': ' + String(d.first_party_status || 'unknown'));
+                        if (Number(d.first_party_rows) > 0) {
+                            parts.push(String(d.first_party_rows) + ' giá xác minh');
+                        }
+                        if (Number(d.first_party_ms) > 0) {
+                            parts.push('Page ' + formatTimingMs(d.first_party_ms));
+                        }
+                    }
                     if (d.web_quota_remaining !== null && d.web_quota_remaining !== undefined) {
                         parts.push('còn ' + String(d.web_quota_remaining) + ' request');
                     }
