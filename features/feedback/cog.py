@@ -200,15 +200,6 @@ class FeedbackCog(commands.Cog):
     async def cog_load(self):
         ready = await feedback_store.init()
         print(f"[Feedback] Turso ticket schema ready={ready}", flush=True)
-        if ready:
-            # One exact owner-approved ticket, NOT general auto-approval.
-            # Remove this migration hook after its result is confirmed live.
-            from features.feedback.one_time_approval_fb01401 import apply_approved_decision_once
-            try:
-                result = await apply_approved_decision_once()
-                print(f"[Feedback] FB-01401CE0D1 owner-approval migration: {result}", flush=True)
-            except Exception as exc:
-                print(f"[Feedback] FB-01401CE0D1 approval needs attention: {type(exc).__name__}", flush=True)
         # Keep the retry loop active even if Turso is temporarily unavailable
         # during startup; pending notifications are retried after recovery.
         self.notifier = FeedbackNotifier(self.bot)
