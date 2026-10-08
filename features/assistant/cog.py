@@ -27,11 +27,12 @@ async def choose_conversation_route(
 ) -> RouteDecision:
     """Choose routing without allowing a live reply to reopen tools."""
 
-    # Explicit Archive actions are user-requested persistence mutations and
-    # must beat continuation routing, including when the user replies directly
-    # to Asumi's latest response with "nhớ cái này" or "quên #12".
+    # Explicit Archive and Web Search requests beat live continuation.
+    # Never reopen Tarot/Summary automatically from an ordinary follow-up.
     local = route_locally(query)
-    if local.tool and local.tool.startswith("archive."):
+    if local.tool and (
+        local.tool.startswith("archive.") or local.tool == "web.search"
+    ):
         return local
 
     if is_live_continuation:
