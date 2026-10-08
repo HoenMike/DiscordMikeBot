@@ -330,6 +330,29 @@ class FeedbackStore:
         if not db_client.is_cloud:
             raise FeedbackStorageError("Không thể cập nhật Turso")
 
+    async def review_metrics(self) -> dict:
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT status, COUNT(*) FROM asumi_feedback GROUP BY status"
+        ) as cursor:
+            counts = await cursor.fetchall()
+        async with db_client.execute(
+            "SELECT state, COUNT(*) FROM asumi_feedback_notifications GROUP BY state"
+        ) as cursor:
+            delivery = await cursor.fetchall()
+        async with db_client.execute(
+            "SELECT COUNT(*) FROM asumi_feedback_notifications "
+            "WHERE state='pending' AND attempts>=5"
+        ) as cursor:
+            failed = await cursor.fetchone()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Turso unavailable")
+        return {
+            "tickets_by_status": {str(s): int(n) for s,n in counts},
+            "notification_by_state": {str(s): int(n) for s,n in delivery},
+            "notification_needs_attention": int(failed[0] if failed else 0),
+        }
+
     async def pending_notifications(self, limit: int = 20) -> list[tuple]:
         await self._require_cloud()
         async with db_client.execute(
