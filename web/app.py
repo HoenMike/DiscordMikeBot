@@ -939,8 +939,18 @@ def feedback_inbox():
     except ValueError:
         limit = 50
     try:
-        tickets = asyncio.run(feedback_store.admin_list(status=status, limit=limit))
-        return jsonify({"tickets": tickets, "count": len(tickets)})
+        offset = max(0, int(request.args.get("offset", 0)))
+    except (TypeError, ValueError):
+        offset = 0
+    limit = max(1, min(50, limit))
+    view = (request.args.get("view") or "").strip()[:20]
+    query = (request.args.get("q") or "").strip()[:100]
+    try:
+        fetched = asyncio.run(feedback_store.admin_list(
+            status=status, limit=limit + 1, offset=offset, view=view, query=query))
+        tickets = fetched[:limit]
+        return jsonify({"tickets": tickets, "count": len(tickets),
+                        "has_more": len(fetched) > limit, "offset": offset})
     except FeedbackStorageError:
         return jsonify({"error": "Không thể kết nối Turso"}), 503
 
