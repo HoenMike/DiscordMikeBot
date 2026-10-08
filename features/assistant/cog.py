@@ -24,6 +24,7 @@ async def choose_conversation_route(
     has_images: bool,
     cloudflare_router,
     min_confidence: float,
+    allowed_search_tools: frozenset[str] | None = None,
 ) -> RouteDecision:
     """Choose routing without allowing a live reply to reopen tools."""
 
@@ -47,6 +48,7 @@ async def choose_conversation_route(
         query,
         cloudflare_router=cloudflare_router,
         min_confidence=min_confidence,
+        allowed_search_tools=allowed_search_tools,
     )
 
 
@@ -66,6 +68,22 @@ class AssistantCog(commands.Cog):
         self.context_builder = ContextBuilder.from_env()
         self.cloudflare_router = CloudflareDecisionRouter.from_env()
         self.router_min_confidence = float(os.getenv("CF_ROUTER_MIN_CONFIDENCE", "0.55"))
+        self.auto_search_enabled = os.getenv(
+            "ASUMI_AUTO_SEARCH_ENABLED", "false"
+        ).strip().lower() in {"1", "true", "yes", "on"}
+
+    def _allowed_auto_search_tools(self) -> frozenset[str]:
+        if not (self.auto_search_enabled and self.cloudflare_router.enabled):
+            return frozenset()
+        from features.assistant.providers.brave import brave_search
+        allowed = set()
+        if brave_search.enabled:
+            allowed.add("web.search")
+        if self.tools.history.enabled:
+            allowed.add("discord_history.search")
+        # Archive retrieval is already owner-scoped in the canonical store.
+        allowed.add("archive.search")
+        return frozenset(allowed)
 
     async def cog_load(self):
         if not self.session_cleanup_loop.is_running():
@@ -170,6 +188,7 @@ class AssistantCog(commands.Cog):
             has_images=bool(context.images),
             cloudflare_router=self.cloudflare_router,
             min_confidence=self.router_min_confidence,
+            allowed_search_tools=self._allowed_auto_search_tools(),
         )
         route_ms = (time.perf_counter() - route_started) * 1000
 

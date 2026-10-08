@@ -46,6 +46,53 @@ def _is_obvious_chat(text: str) -> bool:
     )
 
 
+def _safe_public_web_query(text: str) -> bool:
+    """Avoid leaking Discord-private references through automatic web routing."""
+    folded = _fold(text).strip().replace("đ", "d")
+    if re.search(
+        r"(?:<[@#][!&]?\d+>|discord(?:app)?\.com/channels/|@everyone|@here)",
+        text, re.IGNORECASE,
+    ):
+        return False
+    private_signals = (
+        "tin nhan", "doan chat", "trong server", "tren discord",
+        "hoi nay", "nay gio", "phia tren", "nguoi nay",
+        "cai theo gui", "cai nay", "cai truoc", "archive",
+        "da luu", "ban vua gui", "ban vua noi",
+    )
+    if any(signal in folded for signal in private_signals):
+        return False
+    # A private question with no external/public-information cues should not
+    # send arbitrary chat text to Brave merely because Clef is uncertain.
+    public_signals = (
+        "moi nhat", "hom nay", "hien tai", "bay gio", "gia ",
+        "tin tuc", "su kien", "cap nhat", "phien ban", "patch",
+        "phat hanh", "chinh thuc", "ket qua", "thoi tiet",
+        "latest", "news", "release", "today", "bao nhieu",
+        "o dau", "gio mo cua", "thong bao moi",
+    )
+    return len(folded) >= 12 and any(s in folded for s in public_signals)
+
+
+def _safe_history_query(text: str) -> bool:
+    """Only route bounded, explicitly history-related questions to guild search."""
+    folded = _fold(text).replace("đ", "d")
+    history_signals = (
+        "tin nhan", "doan chat", "hoi dau nam", "dau nam",
+        "hoi truoc", "thang ", "trong server", "tren discord",
+        "da noi gi", "co nhan gi", "tung noi", "luc lai",
+    )
+    return any(s in folded for s in history_signals)
+
+
+def _safe_archive_query(text: str) -> bool:
+    folded = _fold(text).replace("đ", "d")
+    return any(s in folded for s in (
+        "archive", "toi da luu", "da luu", "da nho", "da save",
+        "ban ghi nho", "kho luu tru",
+    ))
+
+
 def route_locally(text: str) -> RouteDecision:
     """Cheap deterministic pass before any model router is considered."""
 
@@ -86,6 +133,22 @@ def route_locally(text: str) -> RouteDecision:
         )
     )
     if explicit_history or contextual_recall:
+        return RouteDecision(
+            intent="discord_history",
+            tool="discord_history.search",
+            arguments={"query": text.strip()},
+        )
+
+    # Distinguish "find earlier message" from finding a personally saved Archive
+    # item, even if the user says "tìm lại".
+    if (
+        "tim lai" in history_folded
+        and ("<@" in text or any(s in history_folded for s in (
+            "hoi dau nam", "dau nam", "doan chat", "tin nhan",
+            "thang ", "da noi", "tung noi",
+        )))
+        and not any(s in history_folded for s in ("archive", "da luu", "toi da luu"))
+    ):
         return RouteDecision(
             intent="discord_history",
             tool="discord_history.search",
@@ -203,6 +266,7 @@ async def route_message(
     text: str,
     cloudflare_router=None,
     min_confidence: float = 0.55,
+    allowed_search_tools: frozenset[str] | None = None,
 ) -> RouteDecision:
     """Run deterministic routing first, then Clef only when classification is useful."""
 
@@ -268,12 +332,47 @@ async def route_message(
         routed = RouteDecision(intent="summary", tool="summary.catchup", arguments=args)
     elif clef.intent == "help":
         routed = RouteDecision(intent="help", tool="help.show")
+    elif (
+        clef.intent == "web_search"
+        and "web.search" in (allowed_search_tools or ())
+        and _safe_public_web_query(text)
+    ):
+        routed = RouteDecision(
+            intent="web_search", tool="web.search",
+            arguments={"query": text.strip()},
+        )
+    elif (
+        clef.intent == "discord_history"
+        and "discord_history.search" in (allowed_search_tools or ())
+        and _safe_history_query(text)
+    ):
+        routed = RouteDecision(
+            intent="discord_history", tool="discord_history.search",
+            arguments={"query": text.strip()},
+        )
+    elif (
+        clef.intent == "archive_search"
+        and "archive.search" in (allowed_search_tools or ())
+        and _safe_archive_query(text)
+    ):
+        routed = RouteDecision(
+            intent="archive_search", tool="archive.search",
+            arguments={"query": _fold(text.strip()), "semantic_query": text.strip()},
+        )
     else:
         routed = local
 
     return replace(
         routed,
-        source=f"clef_{clef.intent}",
+        source=(
+            f"clef_{clef.intent}"
+            if routed is not local
+            else (
+                f"clef_{clef.intent}_blocked"
+                if clef.intent in {"web_search", "discord_history", "archive_search"}
+                else f"clef_{clef.intent}"
+            )
+        ),
         route_ms=(time.perf_counter() - started) * 1000,
         clef_ms=clef_ms,
     )

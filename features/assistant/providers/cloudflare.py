@@ -92,13 +92,29 @@ class CloudflareDecisionRouter:
                     "type": "choice",
                     "instructions": (
                         "Classify what the Discord user wants Asumi to do. "
-                        "Choose the closest supported intent."
+                        "Choose the closest supported intent. "
+                        "Use chat for vague follow-ups/replies, not external search. "
+                        "Do not select web_search for private Discord text."
                     ),
                     "criteria": {
                         "chat": "General conversation or a question that does not map to another tool.",
                         "tarot": "Start or discuss a Tarot reading.",
                         "summarize": "Summarize or catch up on recent Discord conversation.",
                         "help": "Explain Asumi capabilities or how to use the bot.",
+                        "web_search": (
+                            "Requires fresh PUBLIC information from the open Internet: "
+                            "current prices, announcements, news, updates or external verification. "
+                            "NOT for messages in this Discord server, Archive, screenshots or replies."
+                        ),
+                        "discord_history": (
+                            "Find a message someone previously wrote in this Discord server, "
+                            "often with author, dates or old conversations. "
+                            "NOT a public web search."
+                        ),
+                        "archive_search": (
+                            "Find a user-owned item that someone explicitly SAVED to "
+                            "Asumi Archive / saved memory. NOT all Discord message history."
+                        ),
                     },
                 }
             },
