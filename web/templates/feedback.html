@@ -84,6 +84,12 @@ function choose(id){
       area.append(a);area.append(node('span',' · '));
     }
   }
+  const suggested=document.createElement('section');
+  suggested.className='panel';
+  add(suggested,'h4','Đề xuất review từ AI (chưa có hiệu lực)');
+  add(suggested,'p','Chỉ khi bạn bấm Chấp nhận, trạng thái ticket mới thay đổi. Bỏ qua không từ chối ticket.').className='muted small';
+  area.append(suggested);
+  loadReviewProposals(id,suggested);
   add(area,'h4','Quyết định');
   const options=['triage','needs_info','approved','rejected','duplicate','deferred','planned','in_progress','in_review','deployed','verified','closed','reopened'];
   const select=document.createElement('select');for(const x of options){const option=node('option',x);option.value=x;select.append(option)}select.value=t.status;area.append(select);
@@ -103,6 +109,43 @@ function choose(id){
   };
   area.append(btn);
   document.querySelectorAll('.entry').forEach(b=>b.classList.toggle('active',b.textContent.startsWith(id+' ·')));
+}
+async function loadReviewProposals(ticketId,container){
+  try{
+    const response=await fetch('/api/admin/feedback/'+encodeURIComponent(ticketId)+'/proposals',{credentials:'same-origin'});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const data=await response.json();
+    const pending=(data.proposals||[]).filter(p=>p.state==='pending');
+    if(!pending.length){add(container,'p','Chưa có đề xuất cần duyệt.').className='muted small';return}
+    for(const p of pending){
+      const section=document.createElement('div');section.className='panel';container.append(section);
+      add(section,'p','Đề xuất '+p.id+' · '+p.target_status+' · '+p.source);
+      add(section,'p',p.reason).className='description';
+      const actions=document.createElement('div');actions.className='row';section.append(actions);
+      for(const [value,label] of [[true,'Chấp nhận đề xuất'],[false,'Bỏ qua đề xuất']]){
+        const button=node('button',label);button.className=value?'primary':'';actions.append(button);
+        button.onclick=async()=>{
+          if(!window.confirm(
+            (value?'Duyệt ticket theo đề xuất ':'Bỏ qua đề xuất ')+p.id+'?'
+          ))return;
+          button.disabled=true;
+          try{
+            const result=await fetch(
+              '/api/admin/feedback/proposals/'+encodeURIComponent(p.id)+'/decision',{
+                method:'POST',credentials:'same-origin',
+                headers:{'Content-Type':'application/json',
+                  'X-CSRF-Token':document.querySelector('meta[name=csrf-token]').content},
+                body:JSON.stringify({accept:value})
+              }
+            );
+            const body=await result.json();
+            if(!result.ok)throw Error(body.error||result.status);
+            await reload();
+          }catch(e){button.disabled=false;window.alert('Không thể xử lý đề xuất: '+e.message)}
+        };
+      }
+    }
+  }catch(e){add(container,'p','Không đọc được đề xuất: '+e.message).className='muted small'}
 }
 document.getElementById('filter').onchange=reload;reload();
 </script>
