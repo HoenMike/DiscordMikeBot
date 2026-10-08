@@ -149,3 +149,8 @@ If direct PVOIL HTML is inaccessible (e.g. HTTP 403), try strictly validated dat
 
 **Status: T24 shipped in Asumi 3.9.0 (2026-10-08), PR #53 merged, CI green, Render live, Discord connected; authenticated visual/manual UI acceptance pending.**
 Read `docs/ASUMI_T24_ADMIN_CONSOLE_REDESIGN_PLAN.md` before any Admin Dashboard UI/route restructuring. T24 redesign keeps the existing Flask application, consolidates Feedback + AI proposals into the same ticket-detail workflow, and introduces five grouped navigation sections through focused goals T24.0–T24.7. Keep old /admin and /admin/feedback URLs operational; do not create a separate Request Review approval screen. Respect T23 terminal-only reporter notifications, including independent pending PR #51, before changing feedback UI. Record each goal's status/test/live-verification in repository docs so new sessions can resume.
+
+### Historical Dashboard baseline (owner correction — 2026-10-08)
+
+**The OWNER explicitly wants the pre-T24 eight-tab admin Dashboard that has been used historically, not Asumi 3.9.0's new sidebar nor the separate prototype.** The authoritative source is `web/templates/dashboard.html`, now served at `/admin`. Preserve current backend/features and improve that original template incrementally. Old T24 sidebar information architecture and PR #55 proposal are superseded for UI direction. Read `docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md` before touching Admin UI. Keep T23 Feedback and final-only reporter DMs.
+
