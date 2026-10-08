@@ -306,6 +306,27 @@ class FeedbackStore:
                 "Chỉ có thể mở lại ticket đã được xử lý của chính bạn."
             )
 
+    async def add_info_own(self, *, ticket_id: str, reporter_id: int, explanation: str) -> None:
+        """Reporter can answer an admin clarification request, without editing decisions."""
+        explanation = explanation.strip()
+        if not 10 <= len(explanation) <= 1000:
+            raise FeedbackStorageError("Cần giải thích thêm từ 10 đến 1000 ký tự.")
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            raise FeedbackStorageError("Không tìm thấy ticket.")
+        now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        async with db_client.execute(
+            "UPDATE asumi_feedback SET "
+            "user_explanation=SUBSTR(user_explanation || CASE WHEN user_explanation='' "
+            "THEN '' ELSE CHAR(10) END || ?, 1, 1800), "
+            "status='submitted', updated_at=?, last_reviewer_id=? "
+            "WHERE ticket_id=? AND reporter_id=? AND status='needs_info'",
+            (explanation, now, str(reporter_id), resolved, str(reporter_id)),
+        ) as cursor:
+            changed = cursor.rowcount
+        if not db_client.is_cloud or changed != 1:
+            raise FeedbackStorageError("Ticket không yêu cầu bổ sung hoặc không thuộc về bạn.")
+
     async def admin_list(self, *, status: str = "", limit: int = 50) -> list[dict]:
         await self._require_cloud()
         limit = max(1, min(100, int(limit)))
