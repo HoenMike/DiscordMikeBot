@@ -225,107 +225,111 @@ class DiscordHistorySearcher:
             timeout = aiohttp.ClientTimeout(total=self.timeout_seconds * self.max_calls)
             headers = {"Authorization": f"Bot {token}"}
             url = f"https://discord.com/api/v10/guilds/{int(guild.id)}/messages/search"
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                for term in terms:
-                    if live_verifications >= max_live_verifications:
-                        break
-                    params = {"content": term, "limit": 25, "sort_by": "relevance"}
-                    if author_ids:
-                        params["author_id"] = str(author_ids[0])
-                    if start:
-                        params["min_id"] = str(max(0, _snowflake(start) - 1))
-                    if end:
-                        params["max_id"] = str(_snowflake(end))
-                    async with session.get(url, headers=headers, params=params) as response:
-                        api_calls += 1
-                        if response.status == 202:
-                            return HistorySearchResult(
-                                status="indexing", start_date=start_date,
-                                end_date=end_date, api_calls=api_calls,
-                            )
-                        if response.status in (401, 403):
-                            return HistorySearchResult(status="permission_error", api_calls=api_calls)
-                        if response.status == 429:
-                            return HistorySearchResult(status="rate_limited", api_calls=api_calls)
-                        if response.status != 200:
-                            return HistorySearchResult(status="api_error", api_calls=api_calls)
-                        data = await response.json()
-
-                    groups = data.get("messages", []) if isinstance(data, dict) else []
-                    for group in groups if isinstance(groups, list) else []:
-                        for item in group if isinstance(group, list) else []:
-                            if not isinstance(item, dict):
-                                continue
-                            try:
-                                msg_id = int(item["id"])
-                                channel_id = int(item["channel_id"])
-                                author = item["author"]
-                                user_id = int(author["id"])
-                            except (KeyError, ValueError, TypeError):
-                                continue
-                            if msg_id in seen:
-                                continue
-                            if author_ids and user_id != author_ids[0]:
-                                continue
-                            if not self._can_show(guild, requester, channel_id):
-                                rejected += 1
-                                continue
-                            # Discord search index can lag behind edits/deletes.
-                            # Re-fetch the live message (bounded by max_results)
-                            # after requester + bot ACL checks, then use its text.
-                            if live_verifications >= max_live_verifications:
-                                break
-                            live_verifications += 1
-                            channel = (
-                                guild.get_channel_or_thread(channel_id)
-                                if hasattr(guild, "get_channel_or_thread")
-                                else guild.get_channel(channel_id)
-                            )
-                            fetch_message = getattr(channel, "fetch_message", None)
-                            if fetch_message is None:
-                                continue
-                            try:
-                                live = await asyncio.wait_for(
-                                    fetch_message(msg_id), timeout=2.0,
+            # One total deadline for all search variants AND live re-fetches.
+            async with asyncio.timeout(
+                max(2.0, min(self.timeout_seconds * self.max_calls, 12.0))
+            ):
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    for term in terms:
+                        if live_verifications >= max_live_verifications:
+                            break
+                        params = {"content": term, "limit": 25, "sort_by": "relevance"}
+                        if author_ids:
+                            params["author_id"] = str(author_ids[0])
+                        if start:
+                            params["min_id"] = str(max(0, _snowflake(start) - 1))
+                        if end:
+                            params["max_id"] = str(_snowflake(end))
+                        async with session.get(url, headers=headers, params=params) as response:
+                            api_calls += 1
+                            if response.status == 202:
+                                return HistorySearchResult(
+                                    status="indexing", start_date=start_date,
+                                    end_date=end_date, api_calls=api_calls,
                                 )
-                            except Exception:
-                                continue
-                            live_author = getattr(getattr(live, "author", None), "id", None)
-                            if live_author != user_id or getattr(live, "id", None) != msg_id:
-                                continue
-                            content = (getattr(live, "content", "") or "").strip()
-                            if not content:
-                                continue
+                            if response.status in (401, 403):
+                                return HistorySearchResult(status="permission_error", api_calls=api_calls)
+                            if response.status == 429:
+                                return HistorySearchResult(status="rate_limited", api_calls=api_calls)
+                            if response.status != 200:
+                                return HistorySearchResult(status="api_error", api_calls=api_calls)
+                            data = await response.json()
 
-                            seen.add(msg_id)
-                            hits.append(HistoryHit(
-                                message_id=msg_id,
-                                channel_id=channel_id,
-                                author_id=user_id,
-                                author_name=str(
-                                    getattr(live.author, "display_name", None)
-                                    or author.get("global_name")
-                                    or author.get("username")
-                                    or "Unknown"
-                                )[:80],
-                                content=content[:600],
-                                date=str(item.get("timestamp") or "")[:10],
-                                jump_url=(
-                                    f"https://discord.com/channels/{guild.id}/{channel_id}/{msg_id}"
-                                ),
-                            ))
-                            if len(hits) >= self.max_results:
+                        groups = data.get("messages", []) if isinstance(data, dict) else []
+                        for group in groups if isinstance(groups, list) else []:
+                            for item in group if isinstance(group, list) else []:
+                                if not isinstance(item, dict):
+                                    continue
+                                try:
+                                    msg_id = int(item["id"])
+                                    channel_id = int(item["channel_id"])
+                                    author = item["author"]
+                                    user_id = int(author["id"])
+                                except (KeyError, ValueError, TypeError):
+                                    continue
+                                if msg_id in seen:
+                                    continue
+                                if author_ids and user_id != author_ids[0]:
+                                    continue
+                                if not self._can_show(guild, requester, channel_id):
+                                    rejected += 1
+                                    continue
+                                # Discord search index can lag behind edits/deletes.
+                                # Re-fetch the live message (bounded by max_results)
+                                # after requester + bot ACL checks, then use its text.
+                                if live_verifications >= max_live_verifications:
+                                    break
+                                live_verifications += 1
+                                channel = (
+                                    guild.get_channel_or_thread(channel_id)
+                                    if hasattr(guild, "get_channel_or_thread")
+                                    else guild.get_channel(channel_id)
+                                )
+                                fetch_message = getattr(channel, "fetch_message", None)
+                                if fetch_message is None:
+                                    continue
+                                try:
+                                    live = await asyncio.wait_for(
+                                        fetch_message(msg_id), timeout=2.0,
+                                    )
+                                except Exception:
+                                    continue
+                                live_author = getattr(getattr(live, "author", None), "id", None)
+                                if live_author != user_id or getattr(live, "id", None) != msg_id:
+                                    continue
+                                content = (getattr(live, "content", "") or "").strip()
+                                if not content:
+                                    continue
+
+                                seen.add(msg_id)
+                                hits.append(HistoryHit(
+                                    message_id=msg_id,
+                                    channel_id=channel_id,
+                                    author_id=user_id,
+                                    author_name=str(
+                                        getattr(live.author, "display_name", None)
+                                        or author.get("global_name")
+                                        or author.get("username")
+                                        or "Unknown"
+                                    )[:80],
+                                    content=content[:600],
+                                    date=str(item.get("timestamp") or "")[:10],
+                                    jump_url=(
+                                        f"https://discord.com/channels/{guild.id}/{channel_id}/{msg_id}"
+                                    ),
+                                ))
+                                if len(hits) >= self.max_results:
+                                    break
+                            if (
+                                len(hits) >= self.max_results
+                                or live_verifications >= max_live_verifications
+                            ):
                                 break
                         if (
                             len(hits) >= self.max_results
                             or live_verifications >= max_live_verifications
                         ):
                             break
-                    if (
-                        len(hits) >= self.max_results
-                        or live_verifications >= max_live_verifications
-                    ):
-                        break
 
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as exc:
             print(
