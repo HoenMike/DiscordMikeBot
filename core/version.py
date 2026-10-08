@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.7"
+CURRENT_VERSION = "3.7.8"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.7 - Fuel Source Failover"
+CODENAME = "Asumi 3.7.8 - Member-scoped Conversation Summary"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.8", "date": "2026-10-08",
+        "type": "bugfix", "title": "Tóm tắt đúng tin nhắn của thành viên",
+        "summary": "Câu hỏi tóm tắt @user đã nhắn gì lọc tác giả trước khi AI phân tích, không còn nhầm thành tóm tắt cả channel.",
+        "changes": [
+            {"category": "📝 Summary scope", "items": [
+                "Câu 'tóm tắt xem qua giờ @user đã nhắn gì' chỉ tóm tắt tin của người đó ở channel hiện tại.",
+                "Dùng Discord User ID từ mention thật và lọc trước khi gửi vào AI; các tác giả khác không được đưa vào tóm tắt.",
+                "Nhãn kết quả có tác giả, channel, khoảng thời gian và số tin đã lọc.",
+                "Mặc định 2 giờ nếu người dùng không nêu thời gian; hỗ trợ '1 giờ qua', từ chối nhiều người mơ hồ.",
+                "Quyền channel, giới hạn giờ, cooldown và thông báo không có tin phù hợp được kiểm tra.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.7", "date": "2026-10-08",
         "type": "bugfix", "title": "Fuel Source Failover and Diagnostics",

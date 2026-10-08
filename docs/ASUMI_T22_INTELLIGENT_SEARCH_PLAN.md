@@ -180,3 +180,8 @@ Asumi runtime non-secret feature policy, models and quotas now live in `core/con
 **Still open:** real weather-provider acceptance; native Discord History bot-token/search and channel ACL tests; Archive Vectorize production acceptance; T22.5 privacy-safe multi-source retrieval and ranking. T22.5 must never silently transmit private Discord conversations into public web search; require a concrete public query/explicit user confirmation when deriving it from history.
 
 **Next-goal sequence:** (1) close outstanding production smoke tests, (2) implement T22.5 bounded supervised cross-source reasoning with clear citations and fallback, (3) assess relevance/answer-quality regressions using real user questions. Continue recording implementation decisions and handoffs here and in the search handoff document.
+
+
+### T22 UX regression — member-only recap (2026-10-08)
+
+The stress-test `@Asumi tóm tắt xem qua giờ @user đã nhắn gì` incorrectly summarized all recent channel authors because the natural-language summary route discarded the mentioned author. Asumi 3.7.8 separates `summary.member` from `summary.catchup`, validates the member and channel ACL, and filters by author ID before AI. The default unqualified lookback is 2 hours in the current channel, clearly labeled. Production test with mismatched message counts required before marking the fix accepted. This scoped-summary bugfix is independent of unfinished T22.5 cross-source search and T21 Vectorize work.

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "features/assistant/**"
+      - "features/summary/**"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
       - "tests/test_assistant_temporal_history.py"
@@ -16,11 +17,13 @@ on:
       - "tests/test_assistant_fuel_aggregate.py"
       - "tests/test_assistant_fact_answers.py"
       - "tests/test_assistant_source_routing.py"
+      - "tests/test_assistant_member_summary.py"
       - ".github/workflows/asumi-search.yml"
   push:
     branches: [main]
     paths:
       - "features/assistant/**"
+      - "features/summary/**"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
 
@@ -57,6 +60,7 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_public_pages.py" -v
           python -m unittest discover -s tests -p "test_assistant_fuel_aggregate.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_routing.py" -v
+          python -m unittest discover -s tests -p "test_assistant_member_summary.py" -v
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
           python -m unittest discover -s tests -p "test_assistant_semantic.py" -v

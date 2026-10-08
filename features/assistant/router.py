@@ -296,6 +296,23 @@ def route_locally(text: str) -> RouteDecision:
         args: Dict[str, Any] = {}
         if hours is not None:
             args["hours"] = hours
+
+        # Explicit author-scope ≠ ordinary channel recap. Keep stable mention
+        # IDs and validate the actual Discord mentions before fetching.
+        # "tóm tắt @X và @Y đã nói gì" is ambiguous: the tool asks for one.
+        author_mention = re.findall(r"<@!?(\d{1,20})>", text)
+        author_scope = any(signal in folded for signal in (
+            "da nhan gi", "nhan gi", "da noi gi", "noi gi",
+            "da chat gi", "da viet gi", "nhan nhung gi",
+        )) or bool(re.search(r"tin nhan\s+cua\s+<@!?\d+>", folded))
+        if author_mention and author_scope:
+            args["author_ids"] = list(dict.fromkeys(int(x) for x in author_mention))
+            return RouteDecision(
+                intent="summary_member",
+                tool="summary.member",
+                arguments=args,
+            )
+
         return RouteDecision(intent="summary", tool="summary.catchup", arguments=args)
 
     return RouteDecision(intent="chat")

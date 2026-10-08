@@ -276,7 +276,8 @@ class SummaryCog(commands.Cog):
         limit: Optional[int] = None,
         start_time_utc: Optional[datetime] = None,
         end_time_utc: Optional[datetime] = None,
-        after_message_id: Optional[int] = None
+        after_message_id: Optional[int] = None,
+        author_filter_id: Optional[int] = None
     ) -> tuple[list[str], str]:
         """
         Thu thập tin nhắn từ kênh Discord:
@@ -294,7 +295,9 @@ class SummaryCog(commands.Cog):
             fetch_after = start_time_utc - timedelta(seconds=1) if start_time_utc else None
             fetch_before = end_time_utc + timedelta(seconds=1) if end_time_utc else None
             async for msg in target_channel.history(limit=limit, after=fetch_after, before=fetch_before, oldest_first=True):
-                if msg.author.bot:
+                if msg.author.bot or (
+                    author_filter_id is not None and msg.author.id != author_filter_id
+                ):
                     continue
                 local_dt = msg.created_at.astimezone(vn_tz)
                 weekday_str = weekday_map[local_dt.weekday()]
@@ -305,7 +308,9 @@ class SummaryCog(commands.Cog):
         elif after_message_id is not None:
             fetch_after = discord.Object(id=after_message_id - 1)
             async for msg in target_channel.history(limit=limit, after=fetch_after, oldest_first=True):
-                if msg.author.bot:
+                if msg.author.bot or (
+                    author_filter_id is not None and msg.author.id != author_filter_id
+                ):
                     continue
                 local_dt = msg.created_at.astimezone(vn_tz)
                 weekday_str = weekday_map[local_dt.weekday()]
@@ -322,7 +327,9 @@ class SummaryCog(commands.Cog):
             async for msg in target_channel.history(limit=limit):
                 if cutoff_time_utc and msg.created_at < cutoff_time_utc:
                     break
-                if msg.author.bot:
+                if msg.author.bot or (
+                    author_filter_id is not None and msg.author.id != author_filter_id
+                ):
                     continue
                 local_dt = msg.created_at.astimezone(vn_tz)
                 weekday_str = weekday_map[local_dt.weekday()]
@@ -356,7 +363,9 @@ class SummaryCog(commands.Cog):
         focus: Optional[str] = None,
         send_to_dm: bool = False,
         interaction: Optional[discord.Interaction] = None,
-        ctx: Optional[commands.Context] = None
+        ctx: Optional[commands.Context] = None,
+        author_filter_id: Optional[int] = None,
+        author_display_name: Optional[str] = None
     ):
         """Quy trình thực thi tóm tắt tin nhắn bằng AI dùng chung cho Slash và Prefix Command."""
         is_valid, start_utc, end_utc, time_scan_info, after_message_id = await self._validate_inputs(
@@ -390,6 +399,14 @@ class SummaryCog(commands.Cog):
         if focus and focus.strip() and focus.strip().lower() not in ["none", "null", "undefined"]:
             clean_focus = focus.strip()
 
+        author_label = ""
+        if author_filter_id is not None:
+            safe_name = discord.utils.escape_markdown(
+                discord.utils.escape_mentions(author_display_name or str(author_filter_id))
+            )[:75]
+            author_label = f"Tin của {safe_name}"
+            scan_info = f"{scan_info} | chỉ tin của {safe_name} trong #{target_channel.name}"
+
         print(f"📥 [Lệnh nhận] tomtat được gọi bởi @{user.display_name} tại kênh #{target_channel.name}", flush=True)
         print(f"   ↳ Tham số quét: scan_info='{scan_info}', limit={resolved_limit}, kiểu='{summary_type}', focus='{clean_focus}', send_to_dm={send_to_dm}", flush=True)
 
@@ -411,7 +428,8 @@ class SummaryCog(commands.Cog):
                 limit=resolved_limit,
                 start_time_utc=start_utc,
                 end_time_utc=end_utc,
-                after_message_id=after_message_id
+                after_message_id=after_message_id,
+                author_filter_id=author_filter_id
             )
         except Exception as fetch_error:
             print(f"❌ Lỗi khi tải lịch sử chat: {fetch_error}", flush=True)
@@ -428,7 +446,12 @@ class SummaryCog(commands.Cog):
 
         if not raw_messages:
             print(f"⚠️ Hủy bỏ: Không tìm thấy tin nhắn nào trong kênh #{target_channel.name} để tóm tắt.", flush=True)
-            err_msg = f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}."
+            err_msg = (
+                f"ℹ️ Không tìm thấy tin nhắn nào của {author_label} trong khoảng "
+                f"thời gian đã chọn tại {target_channel.mention}."
+                if author_filter_id is not None
+                else f"❌ Không tìm thấy tin nhắn nào thỏa mãn điều kiện quét ({scan_info}) tại kênh {target_channel.mention}."
+            )
             if interaction:
                 await interaction.followup.send(err_msg, ephemeral=send_to_dm)
                 config.active_interactions.discard(interaction)
@@ -439,7 +462,11 @@ class SummaryCog(commands.Cog):
         try:
             summary_result = await ai_summary.generate_summary(raw_messages, summary_type, clean_focus, scan_info)
 
-            title_str = "📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN"
+            title_str = (
+                f"📝 TÓM TẮT {author_label}"
+                if author_filter_id is not None
+                else ("📝 TÓM TẮT CHI TIẾT & TIMELINE" if summary_type == "long" else "📝 TÓM TẮT CUỘC TRÒ CHUYỆN")
+            )
             embed_color = discord.Color.blue() if summary_type == "long" else discord.Color.green()
 
             chunks = split_text(summary_result, limit=config.DISCORD_EMBED_CHAR_LIMIT)
@@ -537,8 +564,11 @@ class SummaryCog(commands.Cog):
                     guild_id=guild_id_val,
                     channel_name=getattr(target_channel, 'name', 'Unknown'),
                     channel_id=target_channel.id,
-                    prompt=f"Phạm vi: {scan_info} | Focus: {clean_focus or '(Không)'} | Chế độ: {summary_type}",
-                    response=summary_result,
+                    prompt=(
+                        "" if author_filter_id is not None
+                        else f"Phạm vi: {scan_info} | Focus: {clean_focus or '(Không)'} | Chế độ: {summary_type}"
+                    ),
+                    response="" if author_filter_id is not None else summary_result,
                     status="success",
                     duration_ms=elapsed_ms,
                     details={

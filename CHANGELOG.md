@@ -7,6 +7,15 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.7.8] - 2026-10-08 — *Author-scoped Chat Summary*
+
+- Fix user stress test: `@Asumi tóm tắt xem qua giờ @user đã nhắn gì` must summarize **the user's own messages** in the current channel, not the entire group.
+- Route to a new `summary.member` tool, validating actual Discord mention, one author only and effective requester/bot channel permissions.
+- Filter by author ID in the scanner across time-window/date/message-anchor modes **before** the AI sees any chat content; zero-match never falls back to a whole-channel summary.
+- Default ambiguous lookback to 2h, support explicitly stated hours. Embed identifies the author, channel, time range and matching count.
+- Reuse established summary AI; add cooldown, inflight guard, privacy-safe metadata and automated regressions.
+- Existing group-wide slash/prefix summary unchanged. Live Discord smoke test still pending.
+
 ## [3.7.7] - 2026-10-08 — *Fuel Source Failover*
 
 - At 10:46 Asumi 3.7.6 still returned Brave snippets with no numbers: PVOIL HTTP 403 can prevent live HTML parsing.
