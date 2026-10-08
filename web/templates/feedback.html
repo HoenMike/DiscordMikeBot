@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="csrf-token" content="{{ feedback_csrf }}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Asumi · Feedback Center</title>
+<title>Feedback · Asumi Console</title>
 <style>
 :root{color-scheme:dark;font:14px/1.55 Inter,ui-sans-serif,system-ui,Segoe UI,sans-serif;--bg:#0d111b;--surface:#151c29;--raised:#1c2636;--stroke:#2e3b4f;--txt:#eaf0fb;--muted:#9cacc0;--accent:#87afff;--good:#73d6af;--warn:#ffd083}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt)}button,input,select,textarea{font:inherit}button{cursor:pointer}a{color:#a9c8ff;text-decoration:none}a:hover{text-decoration:underline}h1,h2,h3,h4,p{margin-top:0}h1{font-size:23px;letter-spacing:-.6px;margin-bottom:2px}h2{font-size:17px;margin:0}h3{font-size:15px}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.shell{max-width:1540px;margin:0 auto;padding:28px 30px 60px}
+.shell{max-width:1460px;width:100%;margin:0 auto;padding:25px 26px 60px;min-width:0}
 .top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:24px}
 .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);font-weight:750}
 .muted{color:var(--muted)}.small{font-size:12px}
@@ -28,10 +28,19 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
 @media(max-width:1100px){.split{grid-template-columns:1fr}.actions{position:static}.actions .panel{display:grid;grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:740px){.shell{padding:17px 12px}.workspace{grid-template-columns:1fr}.listpanel{position:static;max-height:450px}.stats{gap:7px}.stat{padding:12px}.detail-header,.section{padding:16px}.top h1{font-size:20px}.tech-grid{grid-template-columns:1fr}}
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='admin_console.css') }}">
 </head>
-<body>
+<body class="asumi-app" data-page="feedback">
+<div class="asumi-layout">
+{% include "partials/admin_nav.html" %}
+<div class="asumi-stage">
+<header class="asumi-topbar">
+  <button id="asumi-menu" class="asumi-menu" type="button" aria-label="Mở điều hướng" aria-expanded="false">☰</button>
+  <div class="asumi-heading"><span class="asumi-eyebrow">ASUMI / ADMIN</span><h1>Feedback</h1></div>
+  <div class="asumi-toolbar"><span class="asumi-state">Quản lý ticket</span></div>
+</header>
 <main class="shell">
-  <header class="top"><div><div class="eyebrow">Asumi / Moderation</div><h1>Feedback Center</h1><div class="muted small">Tiếp nhận · Xem bằng chứng · Quyết định · Theo dõi sửa lỗi</div></div>
+  <header class="top"><div><div class="eyebrow">Asumi / Moderation</div><h2>Feedback Inbox</h2><div class="muted small">Tiếp nhận · Xem bằng chứng · Quyết định · Theo dõi sửa lỗi</div></div>
     <div class="buttons"><button class="btn" id="refresh">↻ Làm mới</button><a class="btn" href="/admin">← Dashboard</a></div>
   </header>
   <section class="stats" aria-label="Tổng quan feedback"><div class="stat"><div class="caption">Tất cả ticket</div><div class="num" id="statTotal">—</div></div><div class="stat"><div class="caption">Chờ xem xét</div><div class="num" id="statPending">—</div></div><div class="stat"><div class="caption">Đã duyệt</div><div class="num" id="statApproved">—</div></div><div class="stat"><div class="caption">Đã xử lý / kết thúc</div><div class="num" id="statDone">—</div></div></section>
@@ -46,6 +55,7 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
   </div>
   <p class="alert" id="error" role="alert"></p>
 </main>
+</div></div>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -54,7 +64,7 @@ const LABELS={submitted:'Mới gửi',triage:'Đang phân loại',needs_info:'C�
 const PENDING=new Set(['submitted','triage','needs_info','deferred','reopened']);
 const POSITIVE=new Set(['approved','planned','in_progress','in_review','deployed','verified']);
 const DONE=new Set(['verified','closed','rejected','duplicate','deleted']);
-let records=[],selected=null,filter='pending',search='',refreshSerial=0;
+let records=[],selected={{ selected_ticket|tojson }}||null,filter='pending',search='',refreshSerial=0;
 function n(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(cls)el.className=cls;return el}
 function append(parent,tag,text,cls){const el=n(tag,text,cls);parent.append(el);return el}
 function btn(text,fn,cls){const el=n('button',text,'btn '+(cls||''));el.type='button';el.onclick=fn;return el}
@@ -64,13 +74,14 @@ function prettyDate(s){try{return new Date(s).toLocaleString('vi-VN',{dateStyle:
 function setError(e){$('error').textContent=e?String(e):''}
 async function req(url,opts){const response=await fetch(url,{credentials:'same-origin',...opts});const obj=await response.json();if(!response.ok)throw Error(obj.error||'HTTP '+response.status);return obj}
 async function post(url,payload){return req(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(payload)})}
-const FILTERS=[['pending','Cần xử lý'],['all','Tất cả'],['approved','Đã duyệt'],['done','Đã kết thúc'],['deleted','Đã xóa']];
+const FILTERS=[['pending','Cần xử lý'],['working','Đang triển khai'],['verify','Chờ xác minh'],['done','Hoàn tất'],['all','Tất cả'],['deleted','Đã xóa']];
 function matches(t){
  const q=search.trim().toLowerCase();
  if(q && ![t.display_id,t.id,t.title,t.description,t.reporter_id].some(v=>String(v||'').toLowerCase().includes(q)))return false;
  if(filter==='pending')return PENDING.has(t.status);
  if(filter==='all')return true;
- if(filter==='approved')return POSITIVE.has(t.status);
+ if(filter==='working')return ['approved','planned','in_progress','in_review'].includes(t.status);
+ if(filter==='verify')return t.status==='deployed';
  if(filter==='done')return DONE.has(t.status)&&t.status!=='deleted';
  if(filter==='deleted')return t.status==='deleted';
  return true;
@@ -92,7 +103,7 @@ function renderList(){
  const found=records.filter(matches);$('ticketList').replaceChildren();$('count').textContent=found.length+' ticket';
  if(!found.length){append($('ticketList'),'p','Không có ticket phù hợp.','muted');return}
  for(const t of found){
-   const item=btn('',()=>selectTicket(t.id),'ticket'+(selected===t.id?' active':''));
+   const item=btn('',()=>selectTicket(t.id,true),'ticket'+(selected===t.id?' active':''));
    const top=append(item,'div',undefined,'ticket-top');
    append(top,'strong',t.display_id||t.id);
    append(top,'span',statusName(t.status),statusClass(t.status));
@@ -107,9 +118,13 @@ async function reload(){
  try{
    const data=await req('/api/admin/feedback?limit=100');
    if(sequence!==refreshSerial)return;
-   records=data.tickets||[];renderStats();renderList();
-   if(selected && records.some(t=>t.id===selected))selectTicket(selected);
-   else if(!selected && records.length){const first=records.find(matches)||records[0];selectTicket(first.id)}
+   records=data.tickets||[];
+    if(selected && !records.some(t=>t.id===selected)){
+      try{const detail=await req('/api/admin/feedback/'+encodeURIComponent(selected));if(detail.ticket)records.unshift(detail.ticket)}catch(_){/* show inbox if unavailable */}
+    }
+    renderStats();renderList();
+   if(selected && records.some(t=>t.id===selected))selectTicket(selected,false);
+   else if(!selected && records.length){const first=records.find(matches)||records[0];selectTicket(first.id,false)}
    else if(selected&&!records.some(t=>t.id===selected)){selected=null;$('ticketArea').replaceChildren(n('p','Không còn ticket trong danh sách.','muted'))}
  }catch(e){setError('Không tải được Feedback Inbox: '+e.message)}
  finally{$('refresh').disabled=false}
@@ -226,7 +241,8 @@ function showDecision(t,value){
    if(sel.value===t.status){setError('Hãy chọn trạng thái mới.');return}
    if(!reason.value.trim()){setError('Cần điền lý do rõ ràng cho quyết định.');return}
    if(sel.value==='verified'&&!version.value.trim()){setError('Cần phiên bản được triển khai và xác minh.');return}
-   if(!confirm('Xác nhận đổi ticket '+(t.display_id||t.id)+' sang "'+statusName(sel.value)+'"? Người báo có thể nhận DM.'))return;
+   const notify=['verified','rejected','duplicate'].includes(sel.value)?' Người báo sẽ nhận DM kết quả cuối.':' Không gửi DM ở bước trung gian.';
+    if(!confirm('Xác nhận đổi ticket '+(t.display_id||t.id)+' sang "'+statusName(sel.value)+'"?'+notify))return;
    try{await post('/api/admin/feedback/'+encodeURIComponent(t.id)+'/review',{status:sel.value,reason:reason.value,verified_version:version.value});setError('Đã cập nhật quyết định.');await reload()}
    catch(e){setError('Lỗi cập nhật: '+e.message)}
  },'primary'));
@@ -269,7 +285,20 @@ async function loadEvents(ticketId,host){
    }
  }catch(e){host.textContent='Không tải được lịch sử: '+e.message}
 }
-function selectTicket(id){selected=id;renderList();const t=records.find(x=>x.id===id);if(t)renderMain(t)}
+function selectTicket(id,push=false){
+ selected=id;
+ if(push && location.pathname!==('/admin/feedback/'+encodeURIComponent(id)))history.pushState({ticket:id},'', '/admin/feedback/'+encodeURIComponent(id));
+ renderList();const t=records.find(x=>x.id===id);if(t)renderMain(t);
+}
+window.addEventListener('popstate',()=>{
+ const match=decodeURIComponent(location.pathname).match(/^\/admin\/feedback\/(.+)$/);
+ selected=match?match[1]:null;reload();
+});
+const menu=document.getElementById('asumi-menu'), overlay=document.getElementById('asumi-overlay');
+const closeMenu=()=>{document.body.classList.remove('asumi-nav-open');menu.setAttribute('aria-expanded','false')};
+menu.addEventListener('click',()=>{const open=document.body.classList.toggle('asumi-nav-open');menu.setAttribute('aria-expanded',String(open))});
+overlay.addEventListener('click',closeMenu);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
 $('search').oninput=e=>{search=e.target.value;renderList()};
 $('refresh').onclick=reload;renderFilters();reload();
 </script>
