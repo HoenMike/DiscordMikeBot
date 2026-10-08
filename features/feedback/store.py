@@ -313,13 +313,14 @@ class FeedbackStore:
             "SELECT ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version, "
-            "source_message_id, reported_bot_message_id FROM asumi_feedback"
+            "source_message_id, reported_bot_message_id, n.number "
+            "FROM asumi_feedback f JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id"
         )
         args = ()
         if status:
-            sql += " WHERE status=?"
+            sql += " WHERE f.status=?"
             args = (status[:30],)
-        sql += f" ORDER BY created_at DESC LIMIT {limit}"
+        sql += f" ORDER BY n.number DESC LIMIT {limit}"
         async with db_client.execute(sql, args) as cursor:
             rows = await cursor.fetchall()
         if not db_client.is_cloud:
@@ -327,10 +328,11 @@ class FeedbackStore:
         fields = ("id", "status", "title", "category", "created_at", "reason",
                   "reporter_id", "bot_version", "guild_id", "channel_id",
                   "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version",
-                  "source_message_id", "reported_bot_message_id")
+                  "source_message_id", "reported_bot_message_id", "number")
         output = []
         for row in rows:
             entry = dict(zip(fields, row))
+            entry["display_id"] = f"#{entry['number']}"
             try:
                 entry["evidence"] = json.loads(entry["evidence"] or "[]")
             except ValueError:
@@ -339,16 +341,20 @@ class FeedbackStore:
         return output
 
     async def admin_detail(self, ticket_id: str) -> dict | None:
-        await self._require_cloud()
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            return None
         cols = (
             "ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, "
-            "resolved_version, source_message_id, reported_bot_message_id"
+            "resolved_version, source_message_id, reported_bot_message_id, n.number"
         )
         async with db_client.execute(
-            "SELECT " + cols + " FROM asumi_feedback WHERE ticket_id=?",
-            (ticket_id.upper(),)
+            "SELECT " + cols + " FROM asumi_feedback f "
+            "JOIN asumi_feedback_numbers n ON n.ticket_id=f.ticket_id "
+            "WHERE f.ticket_id=?",
+            (resolved,)
         ) as cursor:
             row = await cursor.fetchone()
         if not db_client.is_cloud:
@@ -359,8 +365,9 @@ class FeedbackStore:
                  "reporter_id", "bot_version", "guild_id", "channel_id",
                  "description", "user_explanation", "evidence",
                  "github_issue_url", "github_pr_url", "resolved_version",
-                 "source_message_id", "reported_bot_message_id")
+                 "source_message_id", "reported_bot_message_id", "number")
         record = dict(zip(names, row))
+        record["display_id"] = f"#{record['number']}"
         try:
             record["evidence"] = json.loads(record["evidence"] or "[]")
         except (ValueError, TypeError):
@@ -384,14 +391,16 @@ class FeedbackStore:
             raise FeedbackStorageError("Cần ghi lý do quyết định")
         if status == "verified" and not verified_version.strip():
             raise FeedbackStorageError("Cần phiên bản đã triển khai và nghiệm thu")
-        await self._require_cloud()
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            raise FeedbackStorageError("Không tìm thấy ticket.")
         now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
         # Single atomic guarded UPDATE, trigger writes event/outbox on success.
         async with db_client.execute(
             "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=?, last_reviewer_id=? "
             "WHERE ticket_id=? AND status<>?",
             (status, (reason + (f" [release: {verified_version[:50]}]" if verified_version else ""))[:1800],
-             now, actor_id[:80], ticket_id.upper(), status),
+             now, actor_id[:80], resolved, status),
         ) as cursor:
             changed = cursor.rowcount
         if not db_client.is_cloud:
@@ -429,7 +438,7 @@ class FeedbackStore:
             "UPDATE asumi_feedback SET github_issue_url=?, github_pr_url=?, "
             "resolved_version=?, updated_at=? WHERE ticket_id=?",
             (issue_url, pr_url, version[:50],
-             datetime.now(timezone.utc).isoformat(timespec="seconds"), ticket_id.upper()),
+             datetime.now(timezone.utc).isoformat(timespec="seconds"), current["id"]),
         )
         if not db_client.is_cloud:
             raise FeedbackStorageError("Không thể cập nhật Turso")
@@ -477,7 +486,7 @@ class FeedbackStore:
             "INSERT INTO asumi_feedback_review_proposals "
             "(proposal_id,ticket_id,target_status,reason,source,created_at) "
             "VALUES (?,?,?,?,?,?)",
-            (proposal_id, ticket_id.upper(), target_status, reason, source[:40],
+            (proposal_id, current["id"], target_status, reason, source[:40],
              datetime.now(timezone.utc).isoformat(timespec="microseconds")),
         )
         if not db_client.is_cloud:
@@ -485,12 +494,14 @@ class FeedbackStore:
         return proposal_id
 
     async def list_proposals(self, *, ticket_id: str, limit: int = 20) -> list[dict]:
-        await self._require_cloud()
+        resolved = await self.resolve_id(ticket_id)
+        if not resolved:
+            return []
         async with db_client.execute(
             "SELECT proposal_id,ticket_id,target_status,reason,source,state,created_at,"
             "reviewed_at,reviewer_id FROM asumi_feedback_review_proposals "
             "WHERE ticket_id=? ORDER BY created_at DESC LIMIT ?",
-            (ticket_id.upper(), max(1,min(50,limit))),
+            (resolved, max(1,min(50,limit))),
         ) as cursor:
             rows = await cursor.fetchall()
         if not db_client.is_cloud:
@@ -537,9 +548,10 @@ class FeedbackStore:
         await self._require_cloud()
         async with db_client.execute(
             "SELECT n.notification_id, n.ticket_id, n.reporter_id, n.event_type, "
-            "COALESCE(e.reason,f.review_reason), n.event_type "
+            "COALESCE(e.reason,f.review_reason), n.event_type, nums.number "
             "FROM asumi_feedback_notifications n "
             "JOIN asumi_feedback f ON f.ticket_id=n.ticket_id "
+            "JOIN asumi_feedback_numbers nums ON nums.ticket_id=n.ticket_id "
             "LEFT JOIN asumi_feedback_events e ON "
             "e.ticket_id=n.ticket_id AND e.created_at=n.created_at "
             "AND e.new_status=n.event_type AND e.action='review' "
