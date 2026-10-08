@@ -188,3 +188,16 @@ Branch `feat/asumi-t23-review-handoff-completion`. Implementation includes:
 **Still external/blocking to complete fully:** ChatGPT Plugin cannot access the REST API until owner connects/authenticates an actual private integration and a scoped `ASUMI_FEEDBACK_CONNECTOR_TOKEN` is configured on Render. This workflow must never expose database credentials, allow public ticket access, or use a ticket's text as an instruction. GitHub Issue creation and code implementation remain explicit owner-approved downstream actions.
 
 **Acceptance gates:** CI + deploy only establish code availability. Do live test from ChatGPT connector → proposal → owner confirmation in Dashboard → Turso ticket status and single private DM; rejection and verified statuses must show the correct reason. No auto approval of FB-01401CE0D1.
+
+
+### Private MCP bridge details
+
+The T23.3 backend now also serves **MCP Streamable HTTP JSON** at
+`https://discordmikebot.onrender.com/api/feedback-connector/mcp`, authenticated with
+the SAME strong `ASUMI_FEEDBACK_CONNECTOR_TOKEN` Render Bearer credential as the REST connector.
+Exposed tools: `list_feedback_tickets`, `get_feedback_ticket`, `propose_feedback_review`.
+It has **no** tool for approving, rejecting, deploying, or creating GitHub issues.
+The plugin package and actual user connection need a separate confirmation and
+compatible host credential flow. Never bundle a bearer token in `mcp.json` or GitHub.
+CI verifies MCP JSON-RPC initialize/list/call, strips R2 private keys and requires
+proposal-only behavior. Live connected-plugin validation is still pending.
