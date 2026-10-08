@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import discord
 
 from core.branding import BOT_BRAND_NAME, runtime_bot_name
+from core.constants import PROXY_DOMAINS
 from core.version import CURRENT_VERSION
 from features.embed.cog import EmbedCog
 from features.embed.builder import PostData, NSFWFilter, build_embed
@@ -329,7 +330,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             "platform": "facebook",
             "url": "https://facebook.com/post/1",
             "is_spoiler": False,
-            "tried_domains": ["facebed.com", "facebed.seria.moe"],
+            "tried_domains": list(PROXY_DOMAINS["facebook"]),
         }
         with patch(
             "features.embed.cog.find_valid_proxy",
