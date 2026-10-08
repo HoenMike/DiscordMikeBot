@@ -198,8 +198,11 @@ def build_proxy_url(original_url: str, platform_key: str, proxy_domain: str) -> 
                 elif re.search(r"[?&]v=(\d+)", res_url):
                     v_id = re.search(r"[?&]v=(\d+)", res_url).group(1)
                     res_url = f"https://{proxy_domain}/watch?v={v_id}"
-                elif "/share/v/" in res_url:
-                    res_url = re.sub(r"/share/v/", "/share/r/", res_url)
+                # Facebook /share/v/{token} is a *video* share route.
+                # /share/r/{token} is a Reel route with different lookup
+                # semantics. Facebed supports /share/v/ directly; rewriting it
+                # to /share/r/ made ordinary shared videos look unavailable.
+                # Keep the original share route and token/query untouched.
             return res_url
 
     return None
