@@ -912,9 +912,7 @@ def feedback_evidence(ticket_id: str, index: int):
     if not ticket_id.startswith('FB-') or not 0 <= index <= 2:
         return jsonify({"error": "Not found"}), 404
     try:
-        # Bound by inbox result; T23.2 review UI limits to newest 100 tickets.
-        records = asyncio.run(feedback_store.admin_list(limit=100))
-        ticket = next((x for x in records if x['id'] == ticket_id), None)
+        ticket = asyncio.run(feedback_store.admin_detail(ticket_id))
         if ticket is None or index >= len(ticket['evidence']):
             return jsonify({"error": "Not found"}), 404
         key = ticket['evidence'][index].get('key', '')
