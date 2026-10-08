@@ -1017,3 +1017,56 @@ def feedback_metrics():
 def connector_feedback_links(ticket_id):
     # Read-only until owner identity and per-decision approval are cryptographically bound.
     return jsonify({"error":"Review writes disabled pending owner-authenticated approval"}), 403
+
+
+# T23.3 — AI can PROPOSE, but only a logged-in owner can APPLY the decision.
+@app.route('/api/feedback-connector/v1/tickets/<ticket_id>/proposals', methods=['POST'])
+@feedback_connector_required
+def connector_propose_feedback_review(ticket_id: str):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "JSON required"}), 415
+    data = request.get_json(silent=True) or {}
+    try:
+        proposal_id = asyncio.run(feedback_store.propose_review(
+            ticket_id=ticket_id, target_status=str(data.get('status') or ''),
+            reason=str(data.get('reason') or ''), source='chatgpt',
+        ))
+        return jsonify({"proposal_id": proposal_id, "ticket_id": ticket_id,
+                        "state": "pending_owner_review"}), 202
+    except FeedbackStorageError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/api/admin/feedback/<ticket_id>/proposals', methods=['GET'])
+@login_required
+def admin_feedback_proposals(ticket_id: str):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    try:
+        items = asyncio.run(feedback_store.list_proposals(ticket_id=ticket_id))
+        return jsonify({"proposals": items})
+    except FeedbackStorageError:
+        return jsonify({"error": "Turso unavailable"}), 503
+
+
+@app.route('/api/admin/feedback/proposals/<proposal_id>/decision', methods=['POST'])
+@login_required
+def admin_feedback_proposal_decision(proposal_id: str):
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "JSON required"}), 415
+    if not session.get('feedback_csrf') or not hmac.compare_digest(
+        request.headers.get('X-CSRF-Token', ''), session['feedback_csrf']
+    ):
+        return jsonify({"error": "CSRF invalid"}), 403
+    data = request.get_json(silent=True) or {}
+    if type(data.get('accept')) is not bool:
+        return jsonify({"error": "Boolean accept required"}), 400
+    try:
+        ticket_id = asyncio.run(feedback_store.decide_proposal(
+            proposal_id=proposal_id, accept=data['accept'], actor_id='owner-dashboard',
+        ))
+        return jsonify({"ok": True, "ticket_id": ticket_id,
+                        "decision": "accepted" if data['accept'] else "dismissed"})
+    except FeedbackStorageError as exc:
+        return jsonify({"error": str(exc)}), 400
