@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.8"
+CURRENT_VERSION = "3.8.0"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.8 - Member-scoped Conversation Summary"
+CODENAME = "Asumi 3.8.0 - Feedback Intake & Review"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.8.0", "date": "2026-10-08",
+        "type": "minor", "title": "Feedback Intake & Review (T23)",
+        "summary": "Báo lỗi/góp ý trong Discord kèm ảnh; admin review, theo dõi trạng thái và thông báo lý do qua DM.",
+        "changes": [
+            {"category": "📝 Feedback", "items": [
+                "Tag Asumi báo lỗi/góp ý hoặc dùng /feedback report, /feedback suggest; bot hỏi lại theo thiết kế, nhưng không chặn gửi ticket.",
+                "Cho phép bổ sung ảnh, xem bản nháp rồi xác nhận; lưu ảnh riêng tư ở R2 và ticket trong Turso Cloud.",
+                "/feedback status cho người gửi tự xem trạng thái và lý do.",
+            ]},
+            {"category": "🛡️ Admin review", "items": [
+                "Feedback Inbox riêng có kiểm soát đăng nhập/CSRF và truy cập ảnh riêng tư.",
+                "Quyết định duyệt/từ chối với lý do, lịch sử xử lý và hàng chờ thông báo Discord DM.",
+                "Cổng tích hợp đọc feedback riêng tư; quyền ghi qua connector tạm khóa cho tới khi xác thực phê duyệt của chủ bot.",
+                "Hỗ trợ lưu liên kết GitHub Issue/PR cho ticket được duyệt; chưa tự động triển khai code từ feedback.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.8", "date": "2026-10-08",
         "type": "bugfix", "title": "Tóm tắt đúng tin nhắn của thành viên",
