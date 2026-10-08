@@ -523,9 +523,8 @@ class FeedbackStore:
         q = (query or "").strip().lstrip("#")[:100]
         if q:
             conditions.append("(f.title LIKE ? OR f.description LIKE ? OR CAST(n.number AS TEXT) LIKE ?)")
-            pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-            # ESCAPE expressions are not portable across all libSQL versions;
-            # bounded query parameters remain safe from SQL injection.
+            pattern = "%" + q + "%"
+            # User text stays a bounded bound parameter, never SQL syntax.
             args.extend([pattern, pattern, pattern])
         if conditions:
             sql += " WHERE " + " AND ".join(conditions)
