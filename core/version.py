@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.7.2"
+CURRENT_VERSION = "3.7.3"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.7.2 - Search Follow-up and Observability"
+CODENAME = "Asumi 3.7.3 - Code-owned Search Policy"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.7.3", "date": "2026-10-08",
+        "type": "bugfix", "title": "Code-owned Assistant Configuration",
+        "summary": "Chỉ giữ secrets/kết nối trong Environment; search/model/limits bật và cấu hình bằng core/constants.py.",
+        "changes": [
+            {"category": "⚙️ Configuration", "items": [
+                "Asumi models, cooldown, caching, quotas, feature policy moved to core/constants.py.",
+                "Brave activates with BRAVE_SEARCH_API_KEY when durable Turso quota is ready; no extra feature flag.",
+                "Discord History / Clef select feature policy in code, still gated by bot token or Cloudflare credentials.",
+                "Semantic Archive remains off by policy until live Vectorize verification.",
+            ]},
+            {"category": "🔎 Search UX", "items": [
+                "Giá xăng hôm nay và một số giá công khai có tín hiệu thời gian rõ ràng route Brave trực tiếp.",
+                "Thiếu Brave key: giải thích cần thêm key, không tuyên bố rằng Search chưa được tích hợp.",
+                "Giữ bảo vệ tin nhắn Discord, hạn mức 500 request/tháng, cache và không request tính phí khi DB quota không bền vững.",
+            ]},
+        ],
+    },
     {
         "version": "3.7.2", "date": "2026-10-08",
         "type": "bugfix", "title": "Search Follow-up and Dashboard (T22.4b)",
