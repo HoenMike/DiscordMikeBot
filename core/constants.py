@@ -97,6 +97,15 @@ ASUMI_FUEL_SOURCE_TIMEOUT_SECONDS = 3.5
 ASUMI_FUEL_SOURCE_CACHE_SECONDS = 300
 ASUMI_FUEL_SOURCE_MAX_RESPONSE_BYTES = 512 * 1024
 
+# Community fallback when the official website blocks datacenter requests.
+# Values are allowed only if the structured API provides fresh dated prices.
+# Always label this data as non-official and Vùng 1.
+ASUMI_FUEL_AGGREGATE_ENABLED = True
+ASUMI_FUEL_AGGREGATE_TIMEOUT_SECONDS = 4
+ASUMI_FUEL_AGGREGATE_CACHE_SECONDS = 300
+ASUMI_FUEL_AGGREGATE_MAX_SCRAPE_AGE_HOURS = 48
+ASUMI_FUEL_AGGREGATE_MAX_PRICE_AGE_DAYS = 14
+
 # Public weather facts: Open-Meteo has no secret required for eligible use.
 # Never use AQI or a generic search snippet as a weather forecast substitute.
 ASUMI_WEATHER_ENABLED = True
