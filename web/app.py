@@ -49,7 +49,11 @@ def guard_admin_mutations():
     token = session.get('feedback_csrf')
     if not token or not hmac.compare_digest(request.headers.get('X-CSRF-Token', ''), token):
         return jsonify({"error": "Invalid CSRF token"}), 403
-    if request.mimetype != 'application/json':
+    # Legacy clear/reset-all actions intentionally have no JSON body.
+    # Preserve their behavior while requiring the same session CSRF token.
+    no_body = {'/api/activities/clear', '/api/logs/clear',
+               '/api/tarot/reset-all-cooldowns'}
+    if request.path not in no_body and request.mimetype != 'application/json':
         return jsonify({"error": "JSON required"}), 415
     return None
 
