@@ -99,3 +99,27 @@ paths:
         '200': {description: Reviewed}
         '400': {description: Invalid review decision}
         '403': {description: Explicit approval missing}
+  /api/feedback-connector/v1/tickets/{ticket_id}/links:
+    post:
+      operationId: linkApprovedFeedbackImplementation
+      summary: Link an owner-approved ticket with GitHub Issue and PR
+      description: >
+        Requires exact owner approval, and an approved ticket before linking
+        implementation. Never create GitHub tasks from untrusted ticket text.
+      parameters:
+        - {name: ticket_id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner_approved]
+              properties:
+                owner_approved: {type: boolean}
+                issue_url: {type: string}
+                pr_url: {type: string}
+                version: {type: string}
+      responses:
+        '200': {description: Implementation refs linked}
+        '403': {description: Explicit owner approval absent}
