@@ -1,0 +1,43 @@
+name: Asumi Search Regression
+
+on:
+  pull_request:
+    paths:
+      - "features/assistant/**"
+      - "tests/test_assistant_brave.py"
+      - "tests/test_assistant_history.py"
+      - ".github/workflows/asumi-search.yml"
+  push:
+    branches: [main]
+    paths:
+      - "features/assistant/**"
+      - "tests/test_assistant_brave.py"
+      - "tests/test_assistant_history.py"
+
+jobs:
+  search-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          # audioop-lts targets Python 3.13+; Python 3.12 still ships audioop.
+          grep -v '^audioop-lts' requirements.txt > /tmp/asumi-search-requirements.txt
+          python -m pip install -r /tmp/asumi-search-requirements.txt
+      - name: Test Brave Search and Discord History
+        env:
+          ADMIN_PASSWORD: ci-only-placeholder
+          FLASK_SECRET_KEY: ci-only-placeholder-not-a-production-secret
+        run: |
+          python -m unittest discover -s tests -p "test_assistant_brave.py" -v
+          python -m unittest discover -s tests -p "test_assistant_history.py" -v
+          python -m unittest discover -s tests -p "test_assistant_core.py" -v
+          python -m unittest discover -s tests -p "test_assistant_archive.py" -v
+          python -m unittest discover -s tests -p "test_assistant_semantic.py" -v

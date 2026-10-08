@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from features.assistant.archive import archive_store
 from features.assistant.providers.brave import brave_search
+from features.assistant.providers.discord_history import DiscordHistorySearcher
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 
@@ -57,6 +58,7 @@ class CommandToolRegistry:
 
     def __init__(self, bot):
         self.bot = bot
+        self.history = DiscordHistorySearcher.from_env(bot)
 
     @staticmethod
     def _archive_snippet(item: dict) -> str:
@@ -342,6 +344,72 @@ class CommandToolRegistry:
             details=details,
         )
 
+    async def _execute_history_search(
+        self, decision: RouteDecision, message
+    ) -> ToolExecutionResult:
+        report = await self.history.search(
+            message, str(decision.arguments.get("query") or "")
+        )
+        status_text = {
+            "disabled": "Tìm tin nhắn cũ chưa bật. Admin cần đặt ASUMI_DISCORD_HISTORY_ENABLED=true.",
+            "guild_only": "Chỉ hỗ trợ tìm trong server Discord hiện tại.",
+            "multiple_authors": "Hãy tag một người cần tìm trong mỗi lần tìm kiếm.",
+            "missing_topic": "Hãy thêm chủ đề, ví dụ: @Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?",
+            "no_bot_token": "Bot chưa có token để truy vấn Discord History Search.",
+            "cooldown": "Bạn vừa tìm tin nhắn; đợi một chút rồi thử lại.",
+            "indexing": "Discord đang lập chỉ mục lịch sử. Hãy thử lại sau một chút.",
+            "permission_error": "Discord chưa cho phép bot tìm lịch sử này. Kiểm tra quyền Read Message History và Message Content Intent.",
+            "rate_limited": "Discord đang giới hạn số lượt tìm. Hãy thử lại sau.",
+            "api_error": "Không truy vấn được Discord Search lúc này.",
+            "timeout": "Tìm kiếm quá thời gian chờ. Hãy thử lại sau.",
+            "no_results": "Chưa tìm được tin nhắn phù hợp trong các kênh bạn có quyền đọc. Hãy thử mốc thời gian hoặc từ khóa khác.",
+        }
+        details = {
+            "history_status": report.status,
+            "history_api_calls": report.api_calls,
+            "history_result_count": len(report.hits),
+            "history_permission_filtered": report.rejected_for_permissions,
+            "history_search_ms": round(report.elapsed_ms, 1),
+        }
+        if report.status == "ok":
+            header = "🔎 **TIN NHẮN DISCORD TÌM ĐƯỢC**"
+            if report.start_date:
+                header += f"\n*Khoảng tìm: {report.start_date} → {report.end_date}*"
+            lines = [header]
+            footer = "*Nhấn Jump to Message để xem tin gốc trong Discord.*"
+            for idx, hit in enumerate(report.hits, 1):
+                author = discord.utils.escape_markdown(
+                    discord.utils.escape_mentions(hit.author_name)
+                )
+                body = discord.utils.escape_markdown(
+                    discord.utils.escape_mentions(" ".join(hit.content.split())[:250])
+                )
+                entry = (
+                    f"**{idx}. {author} · {hit.date}**\n"
+                    f"> {body}\n"
+                    f"[Jump to Message]({hit.jump_url})"
+                )
+                if len("\n\n".join([*lines, entry, footer])) > 1900:
+                    break
+                lines.append(entry)
+            lines.append(footer)
+            text = "\n\n".join(lines)
+        else:
+            text = "🔎 **Discord History:** " + status_text.get(
+                report.status, "Chưa tìm được tin nhắn phù hợp."
+            )
+
+        sent = await message.reply(
+            text, mention_author=False,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return ToolExecutionResult(
+            handled=True,
+            response_message_ids=(int(sent.id),),
+            response_context=f"Discord History: {len(report.hits)} results; status={report.status}",
+            details=details,
+        )
+
     @staticmethod
     def _command_for(decision: RouteDecision) -> str | None:
         if decision.tool == "help.show":
@@ -406,6 +474,8 @@ class CommandToolRegistry:
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
         if decision.tool == "web.search":
             return await self._execute_web_search(decision, message)
+        if decision.tool == "discord_history.search":
+            return await self._execute_history_search(decision, message)
 
         if decision.tool and decision.tool.startswith("archive."):
             try:

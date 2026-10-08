@@ -1,6 +1,6 @@
 # T22 — Asumi Intelligent Search / Brave + Discord History
 
-**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2–T22.4 PLANNED
+**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3–T22.4 PLANNED
 **Date:** 2026-10-08
 **Owner decision:** Use **Brave Search API** for external web search, and add **on-demand Discord History Search** to recover old messages that were never saved into Archive.
 **Current baseline:** Asumi 3.4.1 on main; T21 production acceptance remains pending.
@@ -96,7 +96,7 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | --- | --- | --- |
 | T22.0 | Decision, access, privacy and routing contract | DOCUMENTED |
 | T22.1 | Brave Web Search adapter, budget/keys, citation UX | IMPLEMENTED; LIVE KEY VERIFY PENDING |
-| T22.2 | Discord native History Search + author/date filters + Jump links | NOT STARTED |
+| T22.2 | Discord native History Search + author/date filters + Jump links | IMPLEMENTED; LIVE BOT API VERIFY PENDING |
 | T22.3 | Clef source selection and bounded multi-tool retrieval | NOT STARTED |
 | T22.4 | Ranking, follow-up, caching, dashboard, edge-case regression | NOT STARTED |
 
@@ -125,3 +125,14 @@ Each T22 implementation PR must update this file, docs/ASUMI_T22_SEARCH_HANDOFF.
 - Dashboard assistant metadata records web provider/status/latency/cache/remaining count, **not private search terms or result bodies**.
 - User must later configure `BRAVE_SEARCH_API_KEY` and `ASUMI_WEB_SEARCH_ENABLED=true`; configure Brave dashboard spend cap/prepay and disable auto reload too.
 - Unit tests added in `tests/test_assistant_brave.py`; live acceptance and provider key validation still pending.
+
+### T22.2 implementation note (2026-10-08)
+
+- On-demand `discord_history.search` deterministic route for phrases such as `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` or `@Asumi tìm tin nhắn về laptop`.
+- Uses official bot-token REST GET /guilds/{id}/messages/search (no user token/self-bot); **disabled by default pending production Discord permission validation**.
+- Filters @mentioned author by stable ID (one user at a time), early-year Jan–Mar, specific numeric month/year, plus bounded topic synonyms. Up to three API requests and five results; per-user cooldown 20s.
+- Returns verbatim excerpts, original author/date and actual Discord Jump to Message deep links. Never invents hits or archives message content.
+- On each candidate, verify requester and bot `VIEW_CHANNEL` + `READ_MESSAGE_HISTORY` and parent visibility. Unknown/uncached channels and private threads fail closed.
+- Supports 202 indexing, 429, permission errors, empty results, timeouts and safe non-mention output.
+- Logs only status, result/API count, latency, number of permission-filtered hits — no raw message bodies.
+- Regression tests and CI were added. Live acceptance is **NOT DONE**; actual guild search/bot token support must be verified after deploy.

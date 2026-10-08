@@ -31,7 +31,8 @@ async def choose_conversation_route(
     # Never reopen Tarot/Summary automatically from an ordinary follow-up.
     local = route_locally(query)
     if local.tool and (
-        local.tool.startswith("archive.") or local.tool == "web.search"
+        local.tool.startswith("archive.")
+        or local.tool in {"web.search", "discord_history.search"}
     ):
         return local
 

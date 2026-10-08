@@ -7,6 +7,19 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.6.0] - 2026-10-08 — *T22.2 Discord History Search*
+
+### Added
+- Explicit historical Discord search: `@Asumi tìm xem đầu năm @Theo có nhắn gì về mua xe không?` (no prior Archive save required).
+- Native guild Search API through bot token, bounded synonyms, author ID/time window, up to 5 original results with Discord Jump links.
+- Requester-and-bot channel permission checks, private thread/unknown channel fail closed; no passive indexing.
+- 202 indexing / 429 / timeout handling, 20s user cooldown, request caps and privacy-safe Dashboard metadata.
+- Search regression GitHub Actions CI added for Brave + History adapters.
+
+### Activation
+- `ASUMI_DISCORD_HISTORY_ENABLED=false` by default pending real-server permission and bot-token API validation.
+- Clef automatic source selection still belongs to T22.3.
+
 ## [3.5.0] - 2026-10-08 — *T22.1 Brave Web Search*
 
 ### Added
