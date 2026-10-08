@@ -24,8 +24,8 @@ CHANGELOG: List[Dict[str, Any]] = [
         "summary": "PVOIL 403 fallback sang API giá xăng có ngày hiệu lực và kiểm tra dữ liệu; trả số thực trước Brave.",
         "changes": [
             {"category": "⛽ Fuel facts", "items": [
-                "Fallback 3 tầng PVOIL trực tiếp → VietFuelAPI có dữ liệu cấu trúc theo ngày → Brave.",
-                "Chỉ dùng API cộng đồng khi kỳ giá/scrape đủ mới, đơn vị và giá hợp lệ, có ít nhất hai mặt hàng.",
+                "Fallback 3 tầng PVOIL trực tiếp → WebGia.TV có bảng giá HTML theo ngày → Brave.",
+                "Chỉ dùng trang giá tổng hợp khi kỳ giá/scrape đủ mới, đơn vị và giá hợp lệ, có ít nhất hai mặt hàng.",
                 "Ghi rõ giá tham khảo Vùng 1 từ nguồn tổng hợp; không giả làm giá đã kiểm chứng trên PVOIL.",
                 "Giảm lượt Brave nếu có bảng giá hợp lệ; giữ cảnh báo rõ khi các nguồn bị chặn.",
                 "Dashboard hiển thị HTTP/parse reason của PVOIL và trạng thái nguồn dự phòng.",
