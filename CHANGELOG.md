@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.5.0] - 2026-10-08 — *T22.1 Brave Web Search*
+
+### Added
+- Explicit `@Asumi tìm trên web ...` through Brave Search API (no Clef auto-search yet).
+- Real source URLs and snippets, safe mention escaping, disabled without admin-provided key + flag.
+- Durable monthly Brave request reservations in existing Turso/SQLite, default max 500 and absolute app cap 900; fail closed when quota DB is unavailable.
+- Per-user cooldown, bounded result count/timeout, short-lived cache, no API retry or paid provider fallback.
+- Privacy: reject Discord mention/message URLs in outbound queries; do not send replied/private context or Archive to Brave.
+- Dashboard metadata captures status/provider/latency/cache/quota without storing search content.
+
 ## [3.4.1] - 2026-10-08 — *Conversational Timeout Budget*
 
 ### Fixed

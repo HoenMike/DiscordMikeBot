@@ -12,12 +12,27 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.4.1"
+CURRENT_VERSION = "3.5.0"
 RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.4 - Chat Timeout Hotfix"
+CODENAME = "Asumi 3.5 - Brave Search"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.5.0", "date": "2026-10-08",
+        "type": "minor", "title": "Brave Web Search",
+        "summary": "T22.1: tìm web thủ công qua Brave, trả URL nguồn thật và kiểm soát quota bền vững.",
+        "changes": [
+            {"category": "🔎 Web", "items": [
+                "@Asumi tìm trên web ... lấy kết quả từ Brave, không tự gọi search cho chat thường.",
+                "Kết quả có tiêu đề, đoạn trích và URL nguồn.",
+            ]},
+            {"category": "🛡️ Safety", "items": [
+                "Brave mặc định OFF, cần API key + flag; monthly DB quota tối đa 900, mặc định 500.",
+                "Không gửi nội dung riêng tư Discord/Archive sang Brave, có cooldown + cache + fail-closed.",
+            ]},
+        ],
+    },
     {
         "version": "3.4.1",
         "date": "2026-10-08",

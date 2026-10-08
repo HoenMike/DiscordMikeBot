@@ -1,6 +1,6 @@
 # T22 — Asumi Intelligent Search / Brave + Discord History
 
-**Status:** APPROVED IDEA / DOCUMENTED / NOT IMPLEMENTED
+**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2–T22.4 PLANNED
 **Date:** 2026-10-08
 **Owner decision:** Use **Brave Search API** for external web search, and add **on-demand Discord History Search** to recover old messages that were never saved into Archive.
 **Current baseline:** Asumi 3.4.1 on main; T21 production acceptance remains pending.
@@ -95,7 +95,7 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | Goal | Deliverable | Status |
 | --- | --- | --- |
 | T22.0 | Decision, access, privacy and routing contract | DOCUMENTED |
-| T22.1 | Brave Web Search adapter, budget/keys, citation UX | NOT STARTED |
+| T22.1 | Brave Web Search adapter, budget/keys, citation UX | IMPLEMENTED; LIVE KEY VERIFY PENDING |
 | T22.2 | Discord native History Search + author/date filters + Jump links | NOT STARTED |
 | T22.3 | Clef source selection and bounded multi-tool retrieval | NOT STARTED |
 | T22.4 | Ranking, follow-up, caching, dashboard, edge-case regression | NOT STARTED |
@@ -112,3 +112,16 @@ Acceptance — live server:
 ## 7. Handoff / changes rule
 
 Each T22 implementation PR must update this file, docs/ASUMI_T22_SEARCH_HANDOFF.md, regression tests, and release README/help when user-facing behavior ships. Planning-only PR must not bump version or claim live functionality.
+
+### T22.1 implementation note (2026-10-08)
+
+- Endpoint uses Brave Search API GET /res/v1/web/search, **not** Brave Answers.
+- Deterministic explicit trigger only (`@Asumi tìm trên web ...`); Clef auto-search remains T22.3.
+- Provider key/feature flag off by default. The web query is strictly the user's explicit search phrase; no reply, private Discord channel history, Archive or image context is sent to Brave.
+- Reject Discord message URLs, @user/#channel mentions and @everyone/@here in the outbound query.
+- Durable UTC calendar-month quota through `asumi_brave_usage` in existing Turso/SQLite adapter; cap default 500, hard maximum 900. Reserve quota before HTTP, including failure. Fail closed when durable Turso is configured but unavailable.
+- Cache for 180s in RAM (public search only), 15s per-user cooldown, 5s HTTP timeout, <=5 hits default, no auto retries/paid fallback.
+- Discord result includes real Brave source URL and snippets, no AI-generated unsupported assertions; full synthesized cited replies are a future goal.
+- Dashboard assistant metadata records web provider/status/latency/cache/remaining count, **not private search terms or result bodies**.
+- User must later configure `BRAVE_SEARCH_API_KEY` and `ASUMI_WEB_SEARCH_ENABLED=true`; configure Brave dashboard spend cap/prepay and disable auto reload too.
+- Unit tests added in `tests/test_assistant_brave.py`; live acceptance and provider key validation still pending.

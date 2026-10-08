@@ -53,6 +53,21 @@ def route_locally(text: str) -> RouteDecision:
     if not folded:
         return RouteDecision(intent="help", tool="help.show")
 
+    # T22.1 is explicitly invoked only. T22.3 adds Clef source selection.
+    # Keep the literal user wording for Brave (including Vietnamese accents).
+    web_match = re.match(
+        r"^(?:hay\s+)?(?:tim\s+(?:tren\s+)?(?:web|mang|internet)|"
+        r"tra\s+cuu\s+(?:tren\s+)?(?:web|mang|internet)|"
+        r"search\s+(?:web|online)|web\s+search)\b\s*[:,-]?\s*",
+        folded,
+    )
+    if web_match:
+        return RouteDecision(
+            intent="web_search",
+            tool="web.search",
+            arguments={"query": text.strip()[web_match.end():].strip()},
+        )
+
     forget_signals = (
         "quen #",
         "xoa #",

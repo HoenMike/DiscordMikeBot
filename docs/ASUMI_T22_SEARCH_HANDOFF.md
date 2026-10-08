@@ -1,6 +1,6 @@
 # T22 — Intelligent Search Handoff
 
-**Status:** PLANNED / DESIGN RECORDED / NO RUNTIME FEATURE SHIPPED
+**Status:** T22.1 IMPLEMENTED / BRAVE KEY & LIVE VERIFY PENDING; T22.2 NEXT
 **Recorded:** 2026-10-08
 **Primary spec:** docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md
 **Baseline:** Asumi 3.4.1 (`main`), T21 final production acceptance remains outstanding.
@@ -26,7 +26,7 @@
 ## Plan / next actions
 
 1. Finish T21.9 production regression (including Vectorize enable test) independently; T22 plan need not wait to be documented.
-2. T22.1 implement bounded Brave Search adapter + citation UX + quota guard. **Manual API key required later**, never paste key into chat.
+2. T22.1 implemented on a focused PR: explicit Brave Search, durable quota, original result links, cooldown/cache and dashboard tool telemetry. Await manual API key plus live verification. Never paste a key into chat.
 3. T22.2 implement on-demand native Discord History Search with author/time/topic filters, permission-safe Jump links, and 'not indexed yet' states.
 4. T22.3 add typed Clef web/history/archive source selection and bounded multi-source execution.
 5. T22.4 follow-up, ranking, cache/TTL, dashboard telemetry and edge-case regression.
@@ -50,3 +50,12 @@
 ## Update protocol
 
 Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, tests executed and exact continuation step. Keep this handoff as the resumption point.
+
+## T22.1 implementation handoff — 2026-10-08
+
+- Release target: Asumi 3.5.0 (feature flag OFF by default).
+- Files: `features/assistant/providers/brave.py`, `features/assistant/router.py`, `features/assistant/tools.py`, `features/assistant/cog.py`, `.env.example`, `tests/test_assistant_brave.py`.
+- Explicit UX: `@Asumi tìm trên web <public query>`; displays real URLs/snippets from Brave. Auto source routing is **not implemented yet**.
+- Install env in Render: `BRAVE_SEARCH_API_KEY` (secret), `ASUMI_WEB_SEARCH_ENABLED=true` only after Brave dashboard prepay/usage limits are confirmed. Default monthly cap 500; max hardcoded 900.
+- Live tests: no-key disabled, valid key search, 401/429, quota, restart persistence, cache, permission-safe no-private-Discord forwarding, Dashboard metrics.
+- Next goal: **T22.2** Discord historical search using native guild Search with requester-side ACL and original Jump links. Do not rely on Brave to search old Discord messages.
