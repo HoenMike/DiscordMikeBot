@@ -69,7 +69,7 @@ class MCPBridgeTests(unittest.IsolatedAsyncioTestCase):
         from pathlib import Path
         src=(Path(__file__).resolve().parents[1] / "web/app.py").read_text("utf-8")
         self.assertIn("def feedback_mcp_http(",src)
-        self.assertIn("@feedback_connector_required\ndef feedback_mcp_http()",src)
+        self.assertIn("@feedback_mcp_oauth_required\ndef feedback_mcp_http()",src)
         self.assertIn("request.content_length > 16384",src)
 
 

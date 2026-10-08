@@ -4,6 +4,15 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ---
 
+## Asumi 3.8.2 — Đăng nhập ChatGPT Feedback qua OAuth
+
+- ChatGPT plugin sử dụng MCP `https://discordmikebot.onrender.com/api/feedback-connector/mcp`, xác thực OAuth 2.1 Authorization Code + PKCE S256.
+- Khi kết nối từ ChatGPT, admin đăng nhập Asumi Dashboard, xem màn hình cho phép và nhấn **Cho phép kết nối**. OAuth tự chuyển người dùng trở lại ChatGPT.
+- Không cần sao chép bất kỳ secret nào từ Render vào ChatGPT. `ASUMI_FEEDBACK_CONNECTOR_TOKEN` vẫn được giữ cho REST connector nội bộ/legacy, không phải thông tin đăng nhập cho plugin.
+- Token MCP được băm (SHA-256) và lưu trong Turso, access token hết hạn sau 1 giờ, refresh token 30 ngày và được xoay vòng. Dùng endpoint admin `POST /api/admin/feedback/oauth/revoke` (với CSRF) để thu hồi token khi cần.
+- Phạm vi cấp quyền được giới hạn `feedback:read feedback:propose`. **AI không tự duyệt hay từ chối feedback**. Chỉ admin đăng nhập mới chấp nhận đề xuất trong Feedback Inbox.
+- OAuth chỉ chấp nhận redirect URL chính thức `https://chatgpt.com/connector/oauth/{callback_id}`, theo kết nối ChatGPT; toàn bộ flow cần CI, deploy và xác minh người dùng thật trước khi đánh dấu hoàn tất.
+
 ## Asumi 3.8.1 — Review có xác nhận (T23.3–T23.5)
 
 - ChatGPT chỉ đọc ticket hoặc **gửi đề xuất** bằng private connector API; một đề xuất không tự thay đổi feedback. Chủ bot bấm **Chấp nhận / Bỏ qua** ở `/admin/feedback`, có CSRF và nhật ký ghi nhận.

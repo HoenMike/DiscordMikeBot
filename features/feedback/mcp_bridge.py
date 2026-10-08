@@ -99,7 +99,18 @@ async def handle_mcp(payload: Any) -> dict | None:
     if method == "ping":
         return _answer(request_id, {})
     if method == "tools/list":
-        return _answer(request_id, {"tools": TOOL_DEFINITIONS})
+        # Signal the OAuth scopes to ChatGPT for linking/reauthorization.
+        tools = [
+            {**tool, "securitySchemes": [
+                {"type": "oauth2", "scopes": ["feedback:read", "feedback:propose"]}
+            ], "annotations": {
+                "readOnlyHint": tool["name"] != "propose_feedback_review",
+                "destructiveHint": False,
+                "openWorldHint": False,
+            }}
+            for tool in TOOL_DEFINITIONS
+        ]
+        return _answer(request_id, {"tools": tools})
     if method != "tools/call":
         return _error(request_id, -32601, "Method not found")
     name, args = params.get("name"), params.get("arguments") or {}

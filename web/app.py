@@ -17,6 +17,12 @@ from features.cabin.manager import cabin_manager
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 app.secret_key = config.FLASK_SECRET_KEY
+# Admin OAuth consent cookie must never travel over plaintext HTTP.
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 
 @app.context_processor
@@ -1072,12 +1078,39 @@ def admin_feedback_proposal_decision(proposal_id: str):
         return jsonify({"error": str(exc)}), 400
 
 
+# The ChatGPT MCP host cannot read server-side Render env values. OAuth
+# binds a short-lived access token to the admin who explicitly consented.
+def feedback_mcp_oauth_required(fn):
+    @wraps(fn)
+    def checked(*args, **kwargs):
+        from features.feedback.oauth import authorize_bearer, CHALLENGE_METADATA, OAuthError
+        try:
+            authorized = asyncio.run(authorize_bearer(
+                request.headers.get('Authorization', '')
+            ))
+        except (OAuthError, Exception):
+            authorized = False
+        if not authorized:
+            response = jsonify({"error": "OAuth authorization required"})
+            response.status_code = 401
+            response.headers['WWW-Authenticate'] = (
+                'Bearer resource_metadata="' + CHALLENGE_METADATA
+                + '", scope="feedback:read feedback:propose"'
+            )
+            response.headers['Cache-Control'] = 'no-store'
+            return response
+        return fn(*args, **kwargs)
+    return checked
+
+
 # MCP Streamable HTTP JSON-RPC endpoint for the private ChatGPT plugin.
 # Only read and propose tools exist; approval always requires owner Dashboard.
-@app.route('/api/feedback-connector/mcp', methods=['POST'])
-@feedback_connector_required
+@app.route('/api/feedback-connector/mcp', methods=['GET', 'POST'])
+@feedback_mcp_oauth_required
 def feedback_mcp_http():
     from features.feedback.mcp_bridge import handle_mcp
+    if request.method == 'GET':
+        return jsonify({"error": "SSE not supported; use Streamable HTTP POST"}), 405
     if request.content_length is not None and request.content_length > 16384:
         return jsonify({"error": "Payload too large"}), 413
     if request.mimetype != 'application/json':
@@ -1099,3 +1132,162 @@ def feedback_mcp_http():
     if result is None:
         return "", 202
     return jsonify(result), 200
+
+
+# T23 OAuth 2.1 authorization server for owner-only ChatGPT MCP access.
+# Separate from the legacy static REST connector token used for internal callers.
+@app.route('/.well-known/oauth-protected-resource', methods=['GET'])
+@app.route('/.well-known/oauth-protected-resource/api/feedback-connector/mcp', methods=['GET'])
+def asumi_mcp_protected_resource_metadata():
+    from features.feedback.oauth import ISSUER, RESOURCE, SCOPE
+    return jsonify({
+        "resource": RESOURCE, "authorization_servers": [ISSUER],
+        "scopes_supported": SCOPE.split(),
+        "resource_documentation": ISSUER + "/admin/feedback",
+    })
+
+
+@app.route('/.well-known/oauth-authorization-server', methods=['GET'])
+def asumi_mcp_authorization_server_metadata():
+    from features.feedback.oauth import ISSUER, SCOPE
+    return jsonify({
+        "issuer": ISSUER,
+        "authorization_endpoint": ISSUER + "/oauth/authorize",
+        "token_endpoint": ISSUER + "/oauth/token",
+        "registration_endpoint": ISSUER + "/oauth/register",
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "token_endpoint_auth_methods_supported": ["none"],
+        "code_challenge_methods_supported": ["S256"],
+        "scopes_supported": SCOPE.split(),
+    })
+
+
+@app.route('/oauth/register', methods=['POST'])
+def asumi_mcp_oauth_register():
+    from features.feedback.oauth import register_chatgpt_client, OAuthError
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "invalid_client_metadata"}), 415
+    if request.content_length is not None and request.content_length > 4096:
+        return jsonify({"error": "invalid_client_metadata"}), 413
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid_client_metadata"}), 400
+    # Reject clients that can bypass public-client PKCE or redirect outside ChatGPT.
+    if data.get("token_endpoint_auth_method", "none") != "none":
+        return jsonify({"error": "invalid_client_metadata"}), 400
+    grants = data.get("grant_types", ["authorization_code"])
+    if not isinstance(grants, list) or "authorization_code" not in grants:
+        return jsonify({"error": "invalid_client_metadata"}), 400
+    try:
+        record = asyncio.run(register_chatgpt_client(data.get("redirect_uris")))
+        response = jsonify(record)
+        response.status_code = 201
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except OAuthError as exc:
+        return jsonify({"error": exc.error, "error_description": exc.description}), exc.status
+
+
+@app.route('/oauth/authorize', methods=['GET', 'POST'])
+def asumi_mcp_oauth_authorize():
+    from features.feedback.oauth import (
+        validate_auth_request, issue_code, OAuthError, ISSUER
+    )
+    from flask import render_template_string
+    from urllib.parse import urlencode
+
+    # No consent through ChatGPT tool calls: user must sign in and click approve.
+    if not session.get("logged_in"):
+        return redirect(url_for("login_page", next=request.full_path if request.method == "GET" else "/admin"))
+
+    if request.method == "GET":
+        try:
+            pending = asyncio.run(validate_auth_request(dict(request.args)))
+        except OAuthError as exc:
+            return jsonify({"error": exc.error, "error_description": exc.description}), exc.status
+        import secrets
+        session["asumi_mcp_oauth_pending"] = pending
+        session["asumi_mcp_oauth_csrf"] = secrets.token_urlsafe(32)
+        session.modified = True
+        return render_template_string(
+            """<!doctype html><html lang="vi"><head><meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>Asumi Feedback — ChatGPT access</title>
+            <style>body{max-width:510px;margin:8vh auto;font:16px/1.6 system-ui;padding:20px}
+            main{border:1px solid #bbb;border-radius:14px;padding:25px}
+            button{padding:12px 20px;margin-right:12px;cursor:pointer}</style></head>
+            <body><main><h2>Cho phép ChatGPT truy cập Asumi Feedback?</h2>
+            <p>Bạn đang đăng nhập với quyền quản trị Asumi.</p>
+            <p>ChatGPT được <strong>đọc ticket</strong> và <strong>đề xuất review</strong>.
+            ChatGPT <strong>không được tự duyệt/từ chối</strong>.
+            Quyết định vẫn cần bạn bấm xác nhận trong Feedback Inbox.</p>
+            <form method="POST" action="/oauth/authorize">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button name="decision" value="allow">Cho phép kết nối</button>
+            <button name="decision" value="deny">Từ chối</button>
+            </form></main></body></html>""",
+            csrf=session["asumi_mcp_oauth_csrf"],
+        )
+
+    pending = session.get("asumi_mcp_oauth_pending")
+    secret = session.get("asumi_mcp_oauth_csrf", "")
+    session.pop("asumi_mcp_oauth_pending", None)
+    session.pop("asumi_mcp_oauth_csrf", None)
+    if not isinstance(pending, dict) or not secret or not hmac.compare_digest(
+        str(request.form.get("csrf", "")), secret
+    ):
+        return jsonify({"error": "access_denied", "error_description": "Invalid consent session"}), 403
+    if request.form.get("decision") != "allow":
+        return redirect(pending["redirect_uri"] + "?" + urlencode({
+            "error": "access_denied", "state": pending["state"]
+        }), code=302)
+    try:
+        code = asyncio.run(issue_code(pending))
+    except OAuthError as exc:
+        return jsonify({"error": exc.error, "error_description": exc.description}), exc.status
+    return redirect(pending["redirect_uri"] + "?" + urlencode({
+        "code": code, "state": pending["state"], "iss": ISSUER,
+    }), code=302)
+
+
+@app.route('/oauth/token', methods=['POST'])
+def asumi_mcp_oauth_token():
+    from features.feedback.oauth import (
+        exchange_code, refresh_access_token, OAuthError
+    )
+    if request.mimetype != "application/x-www-form-urlencoded":
+        return jsonify({"error": "invalid_request"}), 415
+    grant = request.form.get("grant_type")
+    params = dict(request.form)
+    try:
+        if grant == "authorization_code":
+            result = asyncio.run(exchange_code(params))
+        elif grant == "refresh_token":
+            result = asyncio.run(refresh_access_token(params))
+        else:
+            return jsonify({"error": "unsupported_grant_type"}), 400
+    except OAuthError as exc:
+        result = jsonify({"error": exc.error, "error_description": exc.description})
+        result.status_code = exc.status
+        result.headers["Cache-Control"] = "no-store"
+        return result
+    response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.route('/api/admin/feedback/oauth/revoke', methods=['POST'])
+@login_required
+def asumi_mcp_owner_revoke_tokens():
+    from features.feedback.oauth import revoke_all_owner_tokens, OAuthError
+    token = request.headers.get('X-CSRF-Token', '')
+    expected = session.get('feedback_csrf', '')
+    if not expected or not hmac.compare_digest(token, expected):
+        return jsonify({"error": "Invalid CSRF token"}), 403
+    try:
+        count = asyncio.run(revoke_all_owner_tokens())
+        return jsonify({"revoked": count, "ok": True})
+    except OAuthError as exc:
+        return jsonify({"error": exc.error}), exc.status

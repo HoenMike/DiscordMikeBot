@@ -200,6 +200,13 @@ class FeedbackCog(commands.Cog):
     async def cog_load(self):
         ready = await feedback_store.init()
         print(f"[Feedback] Turso ticket schema ready={ready}", flush=True)
+        if ready:
+            from features.feedback.oauth import init_oauth_tables
+            try:
+                await init_oauth_tables()
+                print("[Feedback] Private MCP OAuth tables ready=True", flush=True)
+            except Exception as exc:
+                print(f"[Feedback] MCP OAuth initialization unavailable: {type(exc).__name__}", flush=True)
         # Keep the retry loop active even if Turso is temporarily unavailable
         # during startup; pending notifications are retried after recovery.
         self.notifier = FeedbackNotifier(self.bot)
