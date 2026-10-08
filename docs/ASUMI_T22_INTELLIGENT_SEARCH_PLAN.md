@@ -166,3 +166,8 @@ T22.4a is only the chronological search slice; T22.4b remains for multi-source f
 - Discord history snippets include the verified source channel (only after effective requester+bot ACL). Brave cache discards expired entries; private Discord-relative web phrases fail before quota reservation.
 - Dashboard search metadata now visibly shows provider/status, source count, cache hit, remaining quota, API call count, permission filtered count and follow-up source, but never stores private query or message text.
 - T22.5 is a separate explicit future milestone for sequential multi-source plans/ranking after live API/provider permission checks. Do not authorize automatic history -> Brave extraction by model guesswork.
+
+
+### Asumi 3.7.3 configuration contract — 2026-10-08
+
+Asumi runtime non-secret feature policy, models and quotas now live in `core/constants.py`, not Render env. Only external credentials and environment connection identifiers remain in env. All historical `*_ENABLED` and other operational env examples above were earlier rollout guidance and are superseded. Brave activates when `BRAVE_SEARCH_API_KEY` is present **and** a durable Turso quota store is healthy (otherwise fail closed). Automatic conservative fresh public price queries (including gasoline) can route without Clef; private references never do. Discord History code-enabled but still needs live bot-token/ACL acceptance; Archive Vectorize semantic stays code-OFF pending live test. User-facing no-key response acknowledges the integration rather than pretending it is absent. T22.5 cross-source synthesis still needs user-approved public query scope.
