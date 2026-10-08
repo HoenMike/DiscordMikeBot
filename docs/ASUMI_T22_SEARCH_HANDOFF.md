@@ -1,6 +1,6 @@
 # T22 — Intelligent Search Handoff
 
-**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 IMPLEMENTED / T22.4 NEXT
+**Status:** T22.1 + T22.2 IMPLEMENTED (BOTH DISABLED BY DEFAULT / LIVE VERIFY PENDING); T22.3 IMPLEMENTED / T22.4a TEMPORAL HISTORY STAGED / T22.4b NEXT
 **Recorded:** 2026-10-08
 **Primary spec:** docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md
 **Baseline:** Asumi 3.4.1 (`main`), T21 final production acceptance remains outstanding.
@@ -97,3 +97,14 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - GitHub Actions `Asumi Search Regression` run 37716844816 passed **117 tests**: Brave (12), History (16), new T22.3 source routing (15), conversational core (50), Archive (12), semantic adapter (12).
 - Automatic search is default OFF; Brave and Discord History are separately default OFF. Live source selection and source-derived Gemini explanation still require provider keys, flags and real Discord smoke testing.
 - T22.4 remains planned: improved multi-source evidence follow-up and ranking/cache/observability; do not treat T22.3 as an unrestricted autonomous agent.
+
+
+## T22.4a implementation handoff — 2026-10-08
+
+- Requirement: find earliest/latest indexed messages by a specific @mentioned user in current guild **without a topic**; find first time that author mentioned an explicit topic.
+- Branch `feat/asumi-t22-4a-temporal-history`; target version 3.7.1. Guild search `author_id` + `sort_by=timestamp` + `sort_order=asc|desc`, omit `content` for author-only. One result by default, up to five if requested.
+- For a subject like Minecraft, filter by subject; for known car-buying variants, merge chronologically under a maximum three search calls.
+- Preserve requester+bot channel ACL, verify live message, no passive index or unbounded crawling, exact Discord Jump links; explicitly say results are the oldest/latest **found**, not guaranteed absolute.
+- Tests in `tests/test_assistant_temporal_history.py` wired into CI; previous History/Brave/Router/Core/Archive/Semantic suites continue running.
+- **Next acceptance:** require green CI and real-server bot-token test for oldest/newest/5-oldest/topic/hidden channel/removed messages/index-lag. Feature remains opt-in behind `ASUMI_DISCORD_HISTORY_ENABLED`. Do not mark T22 fully accepted yet.
+- Remaining T22.4b: richer multi-source follow-up, ranking/cache/dashboard search tracing. T21 Vectorize acceptance also outstanding.
