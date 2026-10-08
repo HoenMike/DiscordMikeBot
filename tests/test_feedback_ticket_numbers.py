@@ -110,6 +110,41 @@ class TicketSequenceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(notifications[0][6],1)
             self.assertEqual(notifications[0][4],"Current command behaviour was expected")
 
+    async def test_needs_info_reply_is_owner_only_and_requeues_for_review(self):
+        with patch("features.feedback.store.db_client",self.db):
+            await self.store.init()
+            ticket=await self.create(source=86)
+            await self.store.review(ticket_id="#1",status="needs_info",
+                                    reason="Cho thêm kết quả mong muốn",
+                                    actor_id="owner-dashboard")
+            await self.store.add_info_own(
+                ticket_id="#1",reporter_id=3,
+                explanation="Tôi đã tag người dùng nhưng bot lấy tin cả channel.",
+            )
+            updated=await self.store.admin_detail("#1")
+            self.assertEqual(updated["status"],"submitted")
+            self.assertIn("bot lấy tin cả channel",updated["user_explanation"])
+            with self.assertRaises(Exception):
+                await self.store.add_info_own(
+                    ticket_id="#1",reporter_id=999,
+                    explanation="Tôi không phải chủ của ticket này.",
+                )
+
+    def test_feedback_dm_labels_human_readable(self):
+        from features.feedback.notifications import format_feedback_notification
+        fixed=format_feedback_notification(
+            number=15,status="verified",
+            reason="Đã sửa trong Asumi 3.8.3 [release: 3.8.3]",
+        )
+        self.assertIn("Feedback #15",fixed)
+        self.assertIn("Đã sửa và xác minh",fixed)
+        self.assertIn("3.8.3",fixed)
+        rejected=format_feedback_notification(
+            number=16,status="rejected",reason="Không tái hiện được lỗi đã nêu",
+        )
+        self.assertIn("Không được duyệt",rejected)
+        self.assertIn("Không tái hiện được lỗi",rejected)
+
     async def test_invalid_or_missing_public_numbers_never_target_another_ticket(self):
         with patch("features.feedback.store.db_client",self.db):
             await self.store.init()
