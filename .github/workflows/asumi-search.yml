@@ -9,6 +9,7 @@ on:
       - "tests/test_feedback_t23.py"
       - "tests/test_feedback_t23_review.py"
       - "tests/test_feedback_t23_db_schema.py"
+      - "tests/test_feedback_owner_approval_01401.py"
       - "bot_instance.py"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
@@ -33,6 +34,7 @@ on:
       - "tests/test_feedback_t23.py"
       - "tests/test_feedback_t23_review.py"
       - "tests/test_feedback_t23_db_schema.py"
+      - "tests/test_feedback_owner_approval_01401.py"
       - "bot_instance.py"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
@@ -71,6 +73,7 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_fuel_aggregate.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_routing.py" -v
           python -m unittest discover -s tests -p "test_assistant_member_summary.py" -v
+          python -m unittest discover -s tests -p "test_feedback_owner_approval_01401.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23_review.py" -v
           python -m unittest discover -s tests -p "test_feedback_t23_db_schema.py" -v
