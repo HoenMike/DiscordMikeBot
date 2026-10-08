@@ -93,10 +93,26 @@ Before any T21 work, read:
 If you start, complete, reject or materially change a T21 milestone, update `docs/ASUMI_INTELLIGENCE_HANDOFF.md` in the same PR. Update the master plan when the product/architecture contract changes.
 
 
+## Planned next initiative — T22 Intelligent Search
+
+**Status: PLAN APPROVED / NO SEARCH CODE SHIPPED.** Before any T22 work read:
+
+1. `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md`
+2. `docs/ASUMI_T22_SEARCH_HANDOFF.md`
+3. `docs/ASUMI_INTELLIGENCE_HANDOFF.md` for unfinished T21 live tests.
+
+Owner selected Brave Search API for external web retrieval. **Separate goal:** native on-demand Discord guild history search to find actual old messages by author/time/topic, even if they were never explicitly saved in Archive. Return original Discord Jump to Message URLs.
+
+Non-negotiable: no passive entire-guild indexing/backfill, no personal user tokens, no leaks from channels the requester cannot read, no private Discord text sent to Brave, and no unbounded provider usage. Start with official bot-token guild search endpoint and permission validation; use optional index only if justified by real need and explicit admin consent.
+
+Planning does not equal shipped capability. Every T22 PR updates its plan/handoff, tests, and README/help only when behavior ships.
+
 ## Feature documentation
 
 - Asumi Intelligence master plan: `docs/ASUMI_INTELLIGENCE_MASTER_PLAN.md`
 - Asumi Intelligence handoff: `docs/ASUMI_INTELLIGENCE_HANDOFF.md`
+- T22 Intelligent Search plan (Brave + Discord history): `docs/ASUMI_T22_INTELLIGENT_SEARCH_PLAN.md`
+- T22 Search handoff: `docs/ASUMI_T22_SEARCH_HANDOFF.md`
 - Social embed pipeline: `docs/EMBED_PIPELINE.md`
 - Current Tarot system: `docs/TAROT_SYSTEM.md`
 - Tarot 2.0 master plan: `docs/TAROT_V2_MASTER_PLAN.md`
