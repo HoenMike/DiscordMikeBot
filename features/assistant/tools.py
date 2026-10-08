@@ -13,6 +13,7 @@ from features.assistant.providers.brave import brave_search
 from features.assistant.providers.discord_history import DiscordHistorySearcher
 from features.assistant.providers.pvoil_prices import pvoil_reader
 from features.assistant.providers.weather import weather_provider
+from features.assistant.providers.public_pages import fetch_public_page_evidence
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 from features.assistant.search_presenter import (
@@ -283,13 +284,19 @@ class CommandToolRegistry:
         """Synthesize public Brave snippets only; never Discord private context."""
         from features.assistant.ai import generate_chat_reply
 
+        page_evidence = await fetch_public_page_evidence(query, hits[:3])
+        full_text_by_url = {item.url: item.text for item in page_evidence}
         evidence = []
         for index, item in enumerate(hits[:3], start=1):
-            evidence.append(
+            section = (
                 f"[{index}] {item.title[:130]}\n"
                 f"URL: {item.url[:450]}\n"
                 f"Excerpt: {item.description[:300]}"
             )
+            page_text = full_text_by_url.get(item.url)
+            if page_text:
+                section += f"\nPublic page body (có thể cũ): {page_text[:1400]}"
+            evidence.append(section)
         prompt = (
             "Chỉ dùng 1-2 câu tiếng Việt (tối đa 400 ký tự) trả lời TRỰC TIẾP "
             "câu hỏi dựa trên trích đoạn các nguồn công khai dưới đây. "
@@ -298,6 +305,9 @@ class CommandToolRegistry:
             "Nếu hỏi mức giá hôm nay: CHỈ nêu con số khi nguồn có rõ giá, "
             "đơn vị và thời điểm phù hợp; nếu không đủ bằng chứng, nói ngắn "
             "gọn là chưa xác minh được giá chính xác. "
+            "Ưu tiên trả lời rõ kết quả người dùng hỏi, không biến câu "
+            "trả lời thành danh sách nguồn. Không đánh đồng thông tin "
+            "AQI với nhiệt độ/dự báo thời tiết. "
             "Không tự bịa số liệu, ngày tháng, nguồn, URL. "
             "KHÔNG dùng ký hiệu [1], [2], [3], không liệt kê lại nguồn "
             "vì Discord sẽ hiển thị nguồn riêng ở dưới.\n\n"
