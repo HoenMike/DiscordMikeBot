@@ -131,3 +131,18 @@ Record each T22 sub-goal as NOT STARTED / IMPLEMENTED / LIVE VERIFIED with PR, t
 - `.env.example` trimmed to credentials. User only needs `BRAVE_SEARCH_API_KEY` in Render (and existing Turso credentials): no `ASUMI_WEB_SEARCH_ENABLED` etc. After changing `core/constants.py`, redeploy from main.
 - New regression `tests/test_assistant_policy_config.py`; other existing Asumi tests updated for source configuration and included in CI. Before accepting: green CI, real Brave query + quota, Discord bot-token Search/ACL, negative private-source test. If native bot-token Search is unauthorized, do not claim production History is usable.
 - Next: T22.5 multi-source confirm-before-public-search. T21 Vectorize permission/live acceptance remains independent.
+
+
+## T22.4d / Asumi 3.7.4 — Brave Search UX polish (2026-10-08)
+
+Motivation: a real `@Asumi giá xăng hôm nay như nào` returned a long plain text list with raw HTML tags (`<strong>`), repeated unrelated/old source snippets and bracket citations, without a useful first-line answer. The bot had successfully called Brave but the output was too bulky.
+
+Implementation:
+- `features/assistant/search_presenter.py`: a compact Discord Embed with answer first, up to `ASUMI_WEB_SEARCH_DISPLAY_SOURCES=3` clean linked results, no raw HTML or unlinked [n] references, and visible caveat for freshness-sensitive questions.
+- `features/assistant/providers/brave.py`: improve *one* Vietnamese gasoline-price query with local calendar date and petrol product/source terms, without additional billable calls.
+- `features/assistant/tools.py`: short source-only grounded summary (only numbers supported by dated excerpts), same selected sources for model and embed, no fake current price when unsupported, Discord reply Embed with original links; graceful fallback to the source list on LLM failure.
+- Fuel-specific domain prioritization places original publishers before aggregators; not a claim of freshness or full-page verification.
+- All non-secret style policy remains in `core/constants.py`. New `tests/test_assistant_search_ux.py` verifies HTML sanitization, compactness, clickable links, no fabricated prices, source ordering and fuel-query behavior.
+- Preserve old permission and quota logic; no extra tokens/paid fallback. Need green CI and live Render/Discord smoke tests before declaring production UX accepted.
+
+Remaining search roadmap: T22.5 supervised cross-source retrieval; also provider data freshness and direct primary-source verification require a separate researched design, not naive AI guessing from snippets.
