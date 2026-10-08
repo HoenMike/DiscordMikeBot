@@ -218,6 +218,8 @@ class DiscordHistorySearcher:
         seen: set[int] = set()
         rejected = 0
         api_calls = 0
+        live_verifications = 0
+        max_live_verifications = min(12, self.max_results * 2)
 
         try:
             timeout = aiohttp.ClientTimeout(total=self.timeout_seconds * self.max_calls)
@@ -225,6 +227,8 @@ class DiscordHistorySearcher:
             url = f"https://discord.com/api/v10/guilds/{int(guild.id)}/messages/search"
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 for term in terms:
+                    if live_verifications >= max_live_verifications:
+                        break
                     params = {"content": term, "limit": 25, "sort_by": "relevance"}
                     if author_ids:
                         params["author_id"] = str(author_ids[0])
@@ -269,6 +273,9 @@ class DiscordHistorySearcher:
                             # Discord search index can lag behind edits/deletes.
                             # Re-fetch the live message (bounded by max_results)
                             # after requester + bot ACL checks, then use its text.
+                            if live_verifications >= max_live_verifications:
+                                break
+                            live_verifications += 1
                             channel = (
                                 guild.get_channel_or_thread(channel_id)
                                 if hasattr(guild, "get_channel_or_thread")
@@ -309,9 +316,15 @@ class DiscordHistorySearcher:
                             ))
                             if len(hits) >= self.max_results:
                                 break
-                        if len(hits) >= self.max_results:
+                        if (
+                            len(hits) >= self.max_results
+                            or live_verifications >= max_live_verifications
+                        ):
                             break
-                    if len(hits) >= self.max_results:
+                    if (
+                        len(hits) >= self.max_results
+                        or live_verifications >= max_live_verifications
+                    ):
                         break
 
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as exc:
