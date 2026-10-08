@@ -6,7 +6,7 @@ Asumi là bot Discord hỗ trợ tóm tắt hội thoại bằng AI, tạo bản
 
 ## Tính năng
 
-### Asumi Intelligence (3.4)
+### Asumi Intelligence + Brave Search (3.5)
 
 Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 
@@ -18,6 +18,7 @@ Có thể tag **@Asumi** rồi nói tự nhiên thay vì phải nhớ command:
 - **Archive Save:** reply đúng message/link/ảnh → `@Asumi nhớ cái này`.
 - **Archive Search:** `@Asumi tìm lại meme mèo Khai` hoặc `@Asumi archive của tôi`.
 - **Archive Forget:** `@Asumi quên #12`.
+- **Brave Web Search:** `@Asumi tìm trên web giá xe hôm nay` → trả các nguồn công khai từ Brave Search (opt-in; cần API key). Chưa tự search bằng Clef hoặc đọc Discord lịch sử trong goal T22.1.
 - **Semantic Search (optional):** khi bật Vectorize, Archive có thể tìm theo ý nghĩa gần nhau chứ không chỉ exact keyword; nếu Cloudflare unavailable thì tự fallback lexical.
 - Archive chỉ được tạo khi user chủ động yêu cầu; bare save không reply/link/ảnh bị từ chối, không có passive full-server logging.
 - Archive search/delete luôn scope theo user đã lưu. Canonical records dùng `core.db` hiện có (Turso Cloud / SQLite fallback).
