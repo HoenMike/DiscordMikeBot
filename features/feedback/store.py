@@ -358,8 +358,7 @@ class FeedbackStore:
             parsed = urlsplit(value)
             parts = parsed.path.strip("/").split("/")
             if (
-                parsed.scheme != "https" or parsed.hostname != "github.com"
-                or parsed.username or parsed.password or parsed.port
+                parsed.scheme != "https" or parsed.netloc != "github.com"
                 or parsed.query or parsed.fragment or len(value) > 200
                 or len(parts) != 4
                 or parts[:3] != ["HoenMike", "DiscordMikeBot", segment]
