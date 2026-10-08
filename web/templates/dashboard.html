@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asumi - Admin & Activity Console</title>
+    <title>Asumi · Legacy Admin Console</title>
+    <meta name="csrf-token" content="{{ feedback_csrf }}">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -1097,6 +1098,22 @@
         // ==========================================
         // TOAST / SNACKBAR NOTIFICATION SYSTEM
         // ==========================================
+        // T24 compatibility: legacy writes carry the same session CSRF token.
+        // New console uses explicit headers; remove this shim with legacy page.
+        const legacyFetch = window.fetch.bind(window);
+        window.fetch = function(resource, init) {
+            const opts = init ? {...init} : {};
+            try {
+                const url = new URL(resource, location.href);
+                if (url.origin === location.origin && (opts.method || '').toUpperCase() === 'POST' && url.pathname.startsWith('/api/')) {
+                    const headers = new Headers(opts.headers || {});
+                    headers.set('X-CSRF-Token', document.querySelector('meta[name="csrf-token"]').content);
+                    opts.headers = headers;
+                }
+            } catch (_) {}
+            return legacyFetch(resource, opts);
+        };
+
         function showToast(message, type = 'success', duration = 3000) {
             const container = document.getElementById('toast-container');
             if (!container) return;
