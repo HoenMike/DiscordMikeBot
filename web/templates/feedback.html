@@ -49,7 +49,7 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
       <div class="pane-head"><div class="toolbar"><h2>Inbox</h2><span class="small muted" id="count"></span></div>
         <input id="search" class="search" aria-label="Tìm feedback" placeholder="Tìm số ticket, nội dung, tên..." />
         <div id="filters" class="tabs" role="group" aria-label="Bộ lọc ticket"></div>
-      </div><div class="pane-content" id="ticketList"><div class="muted">Đang tải...</div></div>
+      </div><div class="pane-content" id="ticketList"><div class="muted">Đang tải...</div></div><div class="pane-head"><button class="btn" id="loadMore" type="button" hidden>Tải thêm ticket</button></div>
     </aside>
     <section id="ticketArea" class="split"><div class="panel"><div class="empty"><strong>Chọn một ticket</strong><p>Chọn từ Inbox để xem nội dung, ảnh và lịch sử xử lý.</p></div></div></section>
   </div>
@@ -64,7 +64,7 @@ const LABELS={submitted:'Mới gửi',triage:'Đang phân loại',needs_info:'C�
 const PENDING=new Set(['submitted','triage','needs_info','deferred','reopened']);
 const POSITIVE=new Set(['approved','planned','in_progress','in_review','deployed','verified']);
 const DONE=new Set(['verified','closed','rejected','duplicate','deleted']);
-let records=[],selected={{ selected_ticket|tojson }}||null,filter='pending',search='',refreshSerial=0;
+let records=[],selected={{ selected_ticket|tojson }}||null,filter='pending',search='',refreshSerial=0,nextOffset=0,hasMore=false;
 function n(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(cls)el.className=cls;return el}
 function append(parent,tag,text,cls){const el=n(tag,text,cls);parent.append(el);return el}
 function btn(text,fn,cls){const el=n('button',text,'btn '+(cls||''));el.type='button';el.onclick=fn;return el}
@@ -89,7 +89,7 @@ function matches(t){
 function renderFilters(){
  $('filters').replaceChildren();
  for(const [id,label] of FILTERS){
-   const el=btn(label,()=>{filter=id;renderFilters();renderList()},'tab'+(filter===id?' selected':''));
+   const el=btn(label,()=>{filter=id;renderFilters();reload()},'tab'+(filter===id?' selected':''));
    el.setAttribute('aria-pressed',filter===id?'true':'false');$('filters').append(el)
  }
 }
@@ -100,7 +100,7 @@ function renderStats(){
  $('statDone').textContent=records.filter(t=>DONE.has(t.status)).length;
 }
 function renderList(){
- const found=records.filter(matches);$('ticketList').replaceChildren();$('count').textContent=found.length+' ticket';
+ const found=records.filter(matches);$('ticketList').replaceChildren();$('count').textContent=found.length+' ticket đã tải';$('loadMore').hidden=!hasMore;
  if(!found.length){append($('ticketList'),'p','Không có ticket phù hợp.','muted');return}
  for(const t of found){
    const item=btn('',()=>selectTicket(t.id,true),'ticket'+(selected===t.id?' active':''));
@@ -112,13 +112,25 @@ function renderList(){
    $('ticketList').append(item)
  }
 }
+async function loadMore(){
+ if(!hasMore)return;
+ $('loadMore').disabled=true;
+ const sequence=refreshSerial;
+ try{
+  const data=await req('/api/admin/feedback?limit=50&offset='+nextOffset+'&view='+encodeURIComponent(filter==='all'?'':filter)+'&q='+encodeURIComponent(search));
+  if(sequence!==refreshSerial)return;
+  records.push(...(data.tickets||[]).filter(t=>!records.some(prev=>prev.id===t.id)));
+  nextOffset+=(data.tickets||[]).length;hasMore=Boolean(data.has_more);renderStats();renderList();
+ }catch(e){setError('Không tải thêm được ticket: '+e.message)}finally{$('loadMore').disabled=false}
+}
 async function reload(){
  const sequence=++refreshSerial;
  $('refresh').disabled=true;setError('');
  try{
-   const data=await req('/api/admin/feedback?limit=100');
+   nextOffset=0;
+    const data=await req('/api/admin/feedback?limit=50&offset=0&view='+encodeURIComponent(filter==='all'?'':filter)+'&q='+encodeURIComponent(search));
    if(sequence!==refreshSerial)return;
-   records=data.tickets||[];
+   records=data.tickets||[];nextOffset=records.length;hasMore=Boolean(data.has_more);
     if(selected && !records.some(t=>t.id===selected)){
       try{const detail=await req('/api/admin/feedback/'+encodeURIComponent(selected));if(detail.ticket)records.unshift(detail.ticket)}catch(_){/* show inbox if unavailable */}
     }
@@ -132,6 +144,7 @@ async function reload(){
 function sourceLink(t){if(!t.guild_id||!t.channel_id||!t.source_message_id)return null;return 'https://discord.com/channels/'+t.guild_id+'/'+t.channel_id+'/'+t.source_message_id}
 function external(parent,url,text){
  if(!url)return;
+ try{if(!['https:','http:'].includes(new URL(url,location.origin).protocol))return}catch(_){return}
  const a=append(parent,'a',text);
  a.href=url;a.target='_blank';a.rel='noopener noreferrer';return a
 }
@@ -299,7 +312,9 @@ const closeMenu=()=>{document.body.classList.remove('asumi-nav-open');menu.setAt
 menu.addEventListener('click',()=>{const open=document.body.classList.toggle('asumi-nav-open');menu.setAttribute('aria-expanded',String(open))});
 overlay.addEventListener('click',closeMenu);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
-$('search').oninput=e=>{search=e.target.value;renderList()};
+let searchTimer;
+$('search').oninput=e=>{search=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(reload,350)};
+$('loadMore').onclick=loadMore;
 $('refresh').onclick=reload;renderFilters();reload();
 </script>
 </body></html>
