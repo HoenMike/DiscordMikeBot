@@ -96,6 +96,23 @@ SCHEMA = (
     END
     """,
     """
+    CREATE TABLE IF NOT EXISTS asumi_feedback_review_proposals (
+      proposal_id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL,
+      target_status TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'chatgpt',
+      state TEXT NOT NULL DEFAULT 'pending',
+      reviewed_at TEXT,
+      reviewer_id TEXT,
+      created_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS asumi_feedback_review_proposals_ticket_idx
+    ON asumi_feedback_review_proposals (ticket_id, state, created_at)
+    """,
+    """
     CREATE TABLE IF NOT EXISTS asumi_feedback_notifications (
       notification_id TEXT PRIMARY KEY,
       ticket_id TEXT NOT NULL,
@@ -352,6 +369,82 @@ class FeedbackStore:
             "notification_by_state": {str(s): int(n) for s,n in delivery},
             "notification_needs_attention": int(failed[0] if failed else 0),
         }
+
+    async def propose_review(
+        self, *, ticket_id: str, target_status: str, reason: str, source: str = "chatgpt"
+    ) -> str:
+        """Untrusted AI proposes; NEVER changes the feedback ticket status."""
+        if target_status not in {"approved", "rejected", "deferred", "needs_info", "duplicate"}:
+            raise FeedbackStorageError("Trạng thái đề xuất không hợp lệ.")
+        reason = reason.strip()
+        if not (10 <= len(reason) <= 1800):
+            raise FeedbackStorageError("Đề xuất phải có lý do rõ ràng (10–1800 ký tự).")
+        current = await self.admin_detail(ticket_id)
+        if current is None:
+            raise FeedbackStorageError("Ticket không tồn tại.")
+        if current["status"] not in {"submitted", "triage", "needs_info", "deferred", "reopened"}:
+            raise FeedbackStorageError("Ticket đã được xử lý; hãy kiểm tra lại trước khi đề xuất.")
+        await self._require_cloud()
+        proposal_id = "FP-" + uuid.uuid4().hex[:12].upper()
+        await db_client.execute(
+            "INSERT INTO asumi_feedback_review_proposals "
+            "(proposal_id,ticket_id,target_status,reason,source,created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (proposal_id, ticket_id.upper(), target_status, reason, source[:40],
+             datetime.now(timezone.utc).isoformat(timespec="microseconds")),
+        )
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không xác minh được đề xuất trên Turso.")
+        return proposal_id
+
+    async def list_proposals(self, *, ticket_id: str, limit: int = 20) -> list[dict]:
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT proposal_id,ticket_id,target_status,reason,source,state,created_at,"
+            "reviewed_at,reviewer_id FROM asumi_feedback_review_proposals "
+            "WHERE ticket_id=? ORDER BY created_at DESC LIMIT ?",
+            (ticket_id.upper(), max(1,min(50,limit))),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        if not db_client.is_cloud:
+            raise FeedbackStorageError("Không đọc được đề xuất trên Turso.")
+        names = ("id","ticket_id","target_status","reason","source","state",
+                 "created_at","reviewed_at","reviewer_id")
+        return [dict(zip(names, row)) for row in rows]
+
+    async def decide_proposal(self, *, proposal_id: str, accept: bool, actor_id: str) -> str:
+        """Only callable after authenticated owner action via admin CSRF session."""
+        await self._require_cloud()
+        async with db_client.execute(
+            "SELECT ticket_id,target_status,reason,state "
+            "FROM asumi_feedback_review_proposals WHERE proposal_id=?",
+            (proposal_id.upper(),),
+        ) as cursor:
+            row = await cursor.fetchone()
+        if not db_client.is_cloud or not row:
+            raise FeedbackStorageError("Đề xuất không tồn tại.")
+        ticket_id, target_status, reason, state = row
+        if state != "pending":
+            raise FeedbackStorageError("Đề xuất đã được xử lý.")
+        # A dismissal only resolves the proposal, never rejects the reporter.
+        if accept:
+            await self.review(
+                ticket_id=ticket_id, status=target_status, reason=reason,
+                actor_id=actor_id,
+            )
+        await self._require_cloud()
+        async with db_client.execute(
+            "UPDATE asumi_feedback_review_proposals "
+            "SET state=?,reviewed_at=?,reviewer_id=? "
+            "WHERE proposal_id=? AND state='pending'",
+            ("accepted" if accept else "dismissed",
+             datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+             actor_id[:80], proposal_id.upper()),
+        ) as cursor:
+            changed = cursor.rowcount
+        if not db_client.is_cloud or changed != 1:
+            raise FeedbackStorageError("Không thể xác nhận trạng thái đề xuất.")
+        return ticket_id
 
     async def pending_notifications(self, limit: int = 20) -> list[tuple]:
         await self._require_cloud()
