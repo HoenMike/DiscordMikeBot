@@ -20,6 +20,7 @@ FEATURE_EXTENSIONS = [
     "features.tarot.cog",
     "features.cabin.cog",
     "features.assistant.cog",
+    "features.feedback.cog",
 ]
 
 # Danh sách các Slash Command cốt lõi bắt buộc phải có mặt trước khi được phép sync lên Discord
@@ -34,6 +35,7 @@ EXPECTED_CORE_SLASH_COMMANDS = {
     "tarot",
     "cabin",
     "cabinstop",
+    "feedback",
 }
 
 
@@ -221,6 +223,12 @@ class SummaryBot(commands.Bot):
         content_clean = message.content.strip().lower()
         if content_clean == ".m":
             await send_bot_help(ctx)
+            return
+
+        # Feedback requests take precedence over general AI chat/search. Only
+        # explicit reports or image replies to an active draft are intercepted.
+        feedback = self.get_cog("FeedbackCog")
+        if feedback and await feedback.handle_message(message):
             return
 
         assistant = self.get_cog("AssistantCog")
