@@ -855,46 +855,6 @@ def api_version():
 
 
 
-# ==========================================
-# T23.2 Feedback triage — protected dashboard only
-# ==========================================
-@app.route('/api/admin/feedback', methods=['GET'])
-@login_required
-def feedback_inbox():
-    from features.feedback.store import feedback_store, FeedbackStorageError
-    status = (request.args.get("status") or "").strip()[:30]
-    try:
-        limit = int(request.args.get("limit", 50))
-    except ValueError:
-        limit = 50
-    try:
-        results = asyncio.run(feedback_store.admin_list(status=status, limit=limit))
-        # Object keys are internal storage identifiers, NOT public links.
-        return jsonify({"tickets": results, "count": len(results)})
-    except FeedbackStorageError:
-        return jsonify({"error": "Không thể kết nối kho feedback Turso"}), 503
-
-
-@app.route('/api/admin/feedback/<ticket_id>/review', methods=['POST'])
-@login_required
-def feedback_review(ticket_id: str):
-    from features.feedback.store import feedback_store, FeedbackStorageError
-    if not (ticket_id.startswith("FB-") and len(ticket_id) <= 30):
-        return jsonify({"error": "Ticket không hợp lệ"}), 400
-    payload = request.get_json(silent=True) or {}
-    try:
-        asyncio.run(feedback_store.review(
-            ticket_id=ticket_id,
-            status=str(payload.get("status", "")),
-            reason=str(payload.get("reason", "")),
-            actor_id="dashboard-admin",
-            verified_version=str(payload.get("verified_version", "")),
-        ))
-        return jsonify({"ok": True, "ticket_id": ticket_id, "status": payload.get("status")})
-    except FeedbackStorageError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-
 # T23.2 — Authentication is inherited from the existing admin session.
 @app.route('/api/admin/feedback', methods=['GET'])
 @login_required
@@ -918,6 +878,10 @@ def feedback_review(ticket_id: str):
     from features.feedback.store import feedback_store, FeedbackStorageError
     if not (ticket_id.startswith("FB-") and len(ticket_id) <= 30):
         return jsonify({"error": "Ticket không hợp lệ"}), 400
+    if (request.headers.get('X-CSRF-Token') or '') != session.get('feedback_csrf'):
+        return jsonify({"error": "Invalid CSRF token"}), 403
+    if request.mimetype != 'application/json':
+        return jsonify({"error": "JSON required"}), 415
     payload = request.get_json(silent=True) or {}
     try:
         asyncio.run(feedback_store.review(
@@ -928,3 +892,42 @@ def feedback_review(ticket_id: str):
         return jsonify({"ok": True, "ticket_id": ticket_id})
     except FeedbackStorageError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@app.route('/admin/feedback', methods=['GET'])
+@login_required
+def feedback_dashboard():
+    import secrets
+    if not session.get('feedback_csrf'):
+        session['feedback_csrf'] = secrets.token_urlsafe(32)
+    return render_template('feedback.html', feedback_csrf=session['feedback_csrf'])
+
+
+@app.route('/api/admin/feedback/<ticket_id>/evidence/<int:index>', methods=['GET'])
+@login_required
+def feedback_evidence(ticket_id: str, index: int):
+    from flask import Response
+    from features.feedback.store import feedback_store, FeedbackStorageError
+    from features.feedback.evidence import evidence_store
+    if not ticket_id.startswith('FB-') or not 0 <= index <= 2:
+        return jsonify({"error": "Not found"}), 404
+    try:
+        # Bound by inbox result; T23.2 review UI limits to newest 100 tickets.
+        records = asyncio.run(feedback_store.admin_list(limit=100))
+        ticket = next((x for x in records if x['id'] == ticket_id), None)
+        if ticket is None or index >= len(ticket['evidence']):
+            return jsonify({"error": "Not found"}), 404
+        key = ticket['evidence'][index].get('key', '')
+        if not key.startswith('feedback/') or '..' in key:
+            return jsonify({"error": "Invalid evidence"}), 404
+        obj = evidence_store._s3().get_object(Bucket=evidence_store.bucket, Key=key)
+        raw = obj['Body'].read(8388609)
+        if len(raw) > 8388608:
+            return jsonify({"error": "File too large"}), 413
+        return Response(raw, content_type='image/png', headers={
+            'Cache-Control': 'private, no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "default-src 'none'; sandbox",
+        })
+    except Exception:
+        return jsonify({"error": "Private evidence currently unavailable"}), 503
