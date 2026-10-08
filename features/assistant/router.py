@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 import time
 import unicodedata
@@ -397,10 +398,29 @@ async def route_message(
         )
 
     clef_ms = (time.perf_counter() - clef_started) * 1000
-    if clef is None or clef.confidence < min_confidence:
+    # The provider normally validates confidence, but also enforce it here
+    # because the router accepts injected adapters in tests and deployments.
+    confidence = getattr(clef, "confidence", None)
+    if (
+        confidence is None
+        or not isinstance(confidence, (int, float))
+        or not math.isfinite(confidence)
+        or not 0.0 <= confidence <= 1.0
+        or confidence < min_confidence
+    ):
         return replace(
             local,
             source="local_low_confidence",
+            route_ms=(time.perf_counter() - started) * 1000,
+            clef_ms=clef_ms,
+        )
+    if getattr(clef, "intent", None) not in {
+        "chat", "tarot", "summarize", "help",
+        "web_search", "discord_history", "archive_search",
+    }:
+        return replace(
+            local,
+            source="local_clef_unknown",
             route_ms=(time.perf_counter() - started) * 1000,
             clef_ms=clef_ms,
         )
