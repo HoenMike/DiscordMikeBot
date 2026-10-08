@@ -95,6 +95,7 @@ class EmbedCog(commands.Cog):
         self._pending_sends = BoundedDict(max_size=3000)
         self._manual_fallback_previews = BoundedDict(max_size=3000)
         self._facebook_proxy_roll_state = BoundedDict(max_size=3000)
+        self._facebook_retry_at = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -185,10 +186,33 @@ class EmbedCog(commands.Cog):
                 origin_message_id=message.id,
             )
 
+        # Do not show an empty "Preview lỗi?" ghost as if a video was
+        # generated. Link buttons don't trigger another unfurl/login card.
+        if platform_key == "facebook":
+            parsed = urlparse(url)
+            hostname = (parsed.hostname or "").lower()
+            if (
+                parsed.scheme == "https"
+                and (hostname == "facebook.com" or hostname.endswith(".facebook.com")
+                     or hostname == "fb.watch")
+                and len(url) <= 512
+            ):
+                view.add_item(discord.ui.Button(
+                    label="Mở Facebook",
+                    style=discord.ButtonStyle.link,
+                    url=url,
+                ))
+            hint = (
+                "Không lấy được preview video công khai qua các proxy. "
+                "Link có thể yêu cầu đăng nhập, bị giới hạn chia sẻ "
+                "hoặc proxy đang lỗi. 🔄 để thử lại sau."
+            )
+        else:
+            hint = "Không tạo được preview; nhấn 🔄 để thử lại."
         author_name = _clean_markdown_label(message.author.display_name)
         sent_msg = await self._send_embed_preview(
             message=message,
-            content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • Preview lỗi?",
+            content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • {hint}",
             view=view,
         )
         if not sent_msg:
@@ -1362,6 +1386,9 @@ class EmbedCog(commands.Cog):
         for state_key in list(self._facebook_proxy_roll_state.keys()):
             if state_key[0] == origin_id:
                 self._facebook_proxy_roll_state.pop(state_key, None)
+        for state_key in list(self._facebook_retry_at.keys()):
+            if state_key[0] == origin_id:
+                self._facebook_retry_at.pop(state_key, None)
         for state_key in list(self._manual_fallback_previews.keys()):
             if state_key[0] == origin_id:
                 self._manual_fallback_previews.pop(state_key, None)
@@ -1493,6 +1520,14 @@ class EmbedCog(commands.Cog):
             state_key = (origin_id, url)
             remembered = set(self._facebook_proxy_roll_state.get(state_key, set()))
             tried = remembered | payload_tried
+            if time.monotonic() < self._facebook_retry_at.get(state_key, 0):
+                return PreviewResult(
+                    status="action_required",
+                    tier="proxy",
+                    reason="proxy_retry_cooldown",
+                    platform=platform_key,
+                    origin_message_id=origin_id,
+                )
             attempted = set(tried)
 
             proxy_url, is_proxy_nsfw = await find_valid_proxy(
@@ -1506,15 +1541,22 @@ class EmbedCog(commands.Cog):
             tried = attempted
 
             if not proxy_url:
-                self._set_facebook_proxy_state(origin_id, url, tried)
+                # A failed validation/HTTP timeout does NOT mean that proxy
+                # was permanently consumed. Keep previously successful proxy
+                # rotations excluded, but allow bounded retries of failures.
+                domains = guild_proxy_domains if guild_proxy_domains is not None else PROXY_DOMAINS.get(platform_key, [])
+                exhausted = bool(domains) and all(d in tried for d in domains)
+                if not exhausted:
+                    self._facebook_retry_at[state_key] = time.monotonic() + 30.0
                 return PreviewResult(
                     status="action_required",
                     tier="proxy",
-                    reason="no_more_proxy",
+                    reason="no_more_proxy" if exhausted else "proxy_temporarily_unavailable",
                     platform=platform_key,
                     origin_message_id=origin_id,
                 )
 
+            self._facebook_retry_at.pop(state_key, None)
             domain = (urlparse(proxy_url).hostname or "").lower()
             if domain:
                 tried.add(domain)
