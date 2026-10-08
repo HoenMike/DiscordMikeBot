@@ -142,4 +142,4 @@ When the user asks for a value (price, weather, date, count), prioritize **struc
 
 ## Fuel source fallback — Asumi 3.7.7
 
-If direct PVOIL HTML is inaccessible (e.g. HTTP 403), try strictly validated fresh VietFuelAPI *community aggregated* data, then Brave. Never present community prices as first-party official PVOIL data or hardcode a pump price. Preserve true dates and Vùng 1 pricing; reject stale, missing or implausible data. Keep diagnostics of HTTP/parse failures in Dashboard, not raw payloads, and do not equate CI mocks with Render network access.
+If direct PVOIL HTML is inaccessible (e.g. HTTP 403), try strictly validated fresh WebGia.TV *community aggregated* data, then Brave. Never present community prices as first-party official PVOIL data or hardcode a pump price. Preserve true dates and Vùng 1 pricing; reject stale, missing or implausible data. Keep diagnostics of HTTP/parse failures in Dashboard, not raw payloads, and do not equate CI mocks with Render network access.
