@@ -104,7 +104,7 @@ class ConfirmView(discord.ui.View):
         self.owner.discard(self.draft)
         self.stop()
         try:
-            await interaction.message.edit(content=f"✅ Đã tiếp nhận feedback **{ticket.id}**. Trạng thái: **{ticket.status}**.", view=None)
+            await interaction.message.edit(content=f"✅ Đã tiếp nhận feedback **{ticket.id}**. Trạng thái: **{ticket.status}**.", embed=None, view=None)
         except (discord.HTTPException, AttributeError):
             pass
         await interaction.followup.send(
