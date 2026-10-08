@@ -119,3 +119,8 @@ T22.4a supports oldest/latest messages by one @mentioned author (no topic requir
 - Tarot 2.0 handoff: `docs/TAROT_V2_HANDOFF.md`
 - Tarot 2.0 prompt spec: `docs/TAROT_V2_PROMPT_SPEC.md`
 - Tarot 2.0 renderer spec: `docs/TAROT_V2_RENDERER_SPEC.md`
+
+
+## Asumi configuration authority — 3.7.3
+
+**Never add non-secret Asumi feature flags or quota/model/timing settings to Render env.** The source of truth is `core/constants.py`. Environment is for external API keys/tokens and deployment-specific service/account IDs. Brave is credential-gated with conservative durable cloud quota (500/month); deterministic clearly-public gasoline/current-price questions may use it even if Clef is unavailable. Discord History remains user-requested, channel-ACL-safe; do not claim live success before Discord bot-token tests. Vectorize semantic remains code-OFF until accepted. Whenever policy changes, update tests and handoff.
