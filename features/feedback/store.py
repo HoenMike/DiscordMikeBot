@@ -162,7 +162,7 @@ LIFECYCLE_TRIGGERS = (
         WHERE original.ticket_id=NEW.replaces_ticket_id
           AND original.reporter_id=NEW.reporter_id
           AND original.guild_id=NEW.guild_id
-          AND original.status IN ('submitted','triage','needs_info','deferred','reopened')
+          AND original.status<>'deleted'
           AND original.replaced_by_ticket_id IS NULL
       ) THEN RAISE(ABORT,'Feedback revision not permitted') END;
     END
@@ -462,7 +462,7 @@ class FeedbackStore:
             "FROM asumi_feedback f "
             "WHERE f.ticket_id=? AND f.reporter_id=? AND f.guild_id=? "
             "AND f.replaced_by_ticket_id IS NULL "
-            "AND f.status IN ('submitted','triage','needs_info','deferred','reopened')",
+            "AND f.status<>'deleted'",
             (new_id, str(source_message_id), bot_version, title, description,
              explanation[:1800], now, now, resolved, str(reporter_id), str(guild_id)),
         ) as cursor:
