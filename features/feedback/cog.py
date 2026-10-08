@@ -19,6 +19,7 @@ from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 from features.feedback.policy import clarification_text, detect_feedback, FeedbackIntent
 from features.feedback.evidence import EvidenceError, evidence_store, UploadedEvidence
 from features.feedback.store import FeedbackStorageError, feedback_store
+from features.feedback.notifications import FeedbackNotifier
 
 
 @dataclass
@@ -199,6 +200,11 @@ class FeedbackCog(commands.Cog):
     async def cog_load(self):
         ready = await feedback_store.init()
         print(f"[Feedback] Turso ticket schema ready={ready}", flush=True)
+        self.notifier = FeedbackNotifier(self.bot) if ready else None
+
+    async def cog_unload(self):
+        if getattr(self, "notifier", None):
+            self.notifier.stop()
 
     def _key(self, guild_id: int, user_id: int) -> tuple[int, int]:
         return (int(guild_id), int(user_id))
