@@ -236,3 +236,16 @@ After CI/deploy, owner completes a single *ChatGPT plugin connection* and Asumi 
 6. Real acceptance still pending until owner has exercised owner-confirmed decision + DM in Discord. Do not auto-approve FB-01401CE0D1.
 
 **Live limitations:** GitHub Issue drafting/linking is supported, but unattended Codex task creation/automatic deployment is deliberately NOT enabled, for code/reporter privacy and approval safety.
+
+
+## T23.6 — Feedback Center & My Tickets (owner-requested UX, v3.8.4)
+
+Owner reported the original admin page was crowded, difficult to moderate, had a persistent generic review form, and no user-facing feedback history or ticket lifecycle.
+
+- **Admin Dashboard:** Rebuild as responsive review inbox with status totals, search/filter, concise ticket cards, actual protected R2 image thumbnails, decision rail with contextual quick actions, AI proposal accept/dismiss, history timeline and GitHub handoff behind expandable details. User-submitted text rendered via DOM `textContent`, never unsafe HTML injection. All actions require login/CSRF and explicit click; report contents do not grant approval.
+- **Discord user:** `/feedback mine` is ephemeral and scoped to the requesting Discord account AND guild. Page through tickets, see statuses/reasons, and optionally show previously deleted reports. User can delete with explicit confirmation: DB status `deleted`, `deleted_at`, history and evidence remain durable for admin audit and privacy investigations.
+- **Edit/supersede:** User may revise any non-deleted ticket explicitly via modal; never mutate old report text. Atomic `INSERT INTO asumi_feedback ... SELECT original...` writes a fresh `FB-` ID and next `#N`, clones old evidence metadata, and an AFTER INSERT trigger marks original ticket `deleted` with `replaced_by_ticket_id`; new ticket links back via `replaces_ticket_id`. Owner review decisions on the old ticket remain in append-only audit but **are not inherited** by the new ticket. The original owner-approved ticket can thus be superseded only by the reporter's explicit edit action, never AI or automatic migration.
+- **Proposal hygiene:** Any pending AI review proposal on deleted/replaced ticket is atomically dismissed, to avoid accidentally approving stale content; user deletion/replacement does not create an approved ticket.
+- **Migration:** Existing Turso rows get nullable lifecycle fields via PRAGMA + ALTER TABLE, no data loss, no renumbering, no R2 deletion. Re-running initialization should be idempotent.
+- **Quality gates:** CI migration on legacy 3.8.3 SQLite, owner/guild ACL, real Discord View/Select/Modal instantiation, evidence reuse, original-state/audit preservation, old proposal dismissal, review guard and JS syntax. Then Render deploy + production no-mutation smoke; opt-in user acceptance for revised/delete UI.
+- **Ticket #1:** Its current status must not be changed merely by this release. No test should approve, delete or replace the real production feedback.
