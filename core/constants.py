@@ -66,6 +66,13 @@ DEFAULT_SCAN_LIMIT = 150
 ASUMI_SESSION_TTL_SECONDS = 1200
 ASUMI_SESSION_MAX_TURNS = 4
 
+# Summary requests naming a member must scan only that author's messages
+# in the current channel before any AI call. Bare "nãy giờ/qua giờ"
+# uses the existing two-hour lookback, explicitly displayed to the user.
+ASUMI_MEMBER_SUMMARY_DEFAULT_HOURS = 2.0
+ASUMI_MEMBER_SUMMARY_MAX_HOURS = 168.0
+ASUMI_MEMBER_SUMMARY_COOLDOWN_SECONDS = 30
+
 ASUMI_CONTEXT_RECENT_MESSAGES = 8
 ASUMI_CONTEXT_MAX_CHARS = 7000
 ASUMI_CONTEXT_MAX_IMAGES = 2
