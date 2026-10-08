@@ -1,9 +1,9 @@
 # T22 — Asumi Intelligent Search / Brave + Discord History
 
-**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3 IMPLEMENTED / T22.4 PLANNED
+**Status:** T22.1 BRAVE WEB SEARCH IMPLEMENTED (OFF BY DEFAULT; LIVE KEY PENDING) / T22.2 IMPLEMENTED / T22.3 IMPLEMENTED / T22.4a TEMPORAL HISTORY IMPLEMENTED (LIVE VERIFY PENDING); T22.4b REMAINS
 **Date:** 2026-10-08
 **Owner decision:** Use **Brave Search API** for external web search, and add **on-demand Discord History Search** to recover old messages that were never saved into Archive.
-**Current baseline:** Asumi 3.4.1 on main; T21 production acceptance remains pending.
+**Current implementation:** Asumi 3.7.1 T22.4a staged; T21 production acceptance remains pending.
 **Cost contract:** free-credit / no unexpected charge; no paid fallback, explicit circuit-breaker and request caps.
 
 ## 1. Desired user experience
@@ -98,7 +98,8 @@ Do not web-search every chat greeting or use Brave for questions answerable usin
 | T22.1 | Brave Web Search adapter, budget/keys, citation UX | IMPLEMENTED; LIVE KEY VERIFY PENDING |
 | T22.2 | Discord native History Search + author/date filters + Jump links | IMPLEMENTED; LIVE BOT API VERIFY PENDING |
 | T22.3 | Clef source selection / controlled one-tool retrieval | IMPLEMENTED; LIVE VERIFY PENDING |
-| T22.4 | Ranking, follow-up, caching, dashboard, edge-case regression | NOT STARTED |
+| T22.4a | Chronological first/last by @author, optional topic, 1–5 hits | IMPLEMENTED; LIVE API VERIFY PENDING |
+| T22.4b | Multi-source follow-up, further ranking/cache/dashboard and edge-case regression | NOT STARTED |
 
 Acceptance — live server:
 1. Find an old 'buying a car' message by @author + early-year time hint, even though it was never saved in Archive.
@@ -146,3 +147,12 @@ Each T22 implementation PR must update this file, docs/ASUMI_T22_SEARCH_HANDOFF.
 - Archive source selection remains scoped to requester-owned records; History Search enforces requester and bot effective read permissions.
 - Existing live session replies do not automatically open another tool; explicit actions override continuation.
 - CI and regression coverage extended with T22.3 safety, provider gating, public synthesis and fallback tests.
+
+
+### T22.4a implementation note — 2026-10-08
+
+User-requested case: `@Asumi tìm lại tin nhắn đầu tiên của @user trong server`. Require an explicitly mentioned author; issue native Discord guild Search with `author_id`, no `content` when no topic, `sort_by=timestamp`, `sort_order=asc`; `desc` for newest. Default count 1, optional 1–5. An explicit topic (`lần đầu @user nhắc tới Minecraft`) narrows matching results. Bounded variants are merged chronologically, not reported in keyword order.
+
+Requester AND bot must be authorized for the source channel. Re-fetch live content before returning a Jump link; enforce the current three-call/time/verification budgets. The result is **earliest/latest found**, not a claim to have located the absolute first ever message: deletions, partial Discord indexing, unavailable channels and budgets limit coverage.
+
+T22.4a is only the chronological search slice; T22.4b remains for multi-source follow-ups, further ranking/cache improvements and Dashboard search tracing. Live bot-token authorization/permissions checks must precede production activation.

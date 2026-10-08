@@ -32,6 +32,7 @@ class HistoryHit:
 class HistorySearchResult:
     status: str
     hits: tuple[HistoryHit, ...] = ()
+    sort_mode: str = "relevance"
     start_date: str = ""
     end_date: str = ""
     elapsed_ms: float = 0.0
@@ -100,6 +101,47 @@ def _terms(query: str) -> tuple[str, ...]:
         if token not in stops and not token.isdigit() and len(token) >= 3
     ]
     return (" ".join(tokens[-3:])[:100],) if tokens else ()
+
+
+def _temporal_request(query: str) -> tuple[str, int] | None:
+    """Recognize author-first chronological requests, never approximate 'đầu năm'."""
+    folded = _fold(query)
+    oldest = (
+        r"\b(?:tin nhan|doan chat)(?:\s+\w+){0,2}\s+(?:dau tien|cu nhat|som nhat)\b",
+        r"\blan dau(?: tien)?\b",
+    )
+    newest = (
+        r"\b(?:tin nhan|doan chat)(?:\s+\w+){0,2}\s+(?:gan nhat|moi nhat|cuoi cung)\b",
+        r"\blan cuoi(?: cung)?\b",
+    )
+    mode = (
+        "oldest" if any(re.search(p, folded) for p in oldest)
+        else "newest" if any(re.search(p, folded) for p in newest)
+        else ""
+    )
+    if not mode:
+        return None
+    count = re.search(r"\b([1-5])\s+(?:tin nhan|doan chat|message)\b", folded)
+    return mode, int(count.group(1)) if count else 1
+
+
+def _temporal_terms(query: str) -> tuple[str, ...]:
+    """An author-only first/last request must not search the words 'đầu tiên'."""
+    if any(s in _fold(query) for s in ("mua xe", "doi xe", "tau xe", "xe moi")):
+        return _terms(query)
+    folded = _fold(re.sub(r"<@!?\d+>", " ", query))
+    topic = re.search(
+        r"\b(?:nhac (?:toi|den)|noi ve|de cap (?:toi|den)|ve)\s+(.+)$",
+        folded,
+    )
+    if not topic:
+        return ("",)
+    value = re.split(
+        r"\b(?:trong server|tren discord|trong discord|la khi nao|luc nao|khong)\b",
+        topic.group(1),
+        maxsplit=1,
+    )[0].strip(" ?.,!").strip()
+    return (value[:100],) if value else ("",)
 
 
 class DiscordHistorySearcher:
@@ -189,9 +231,16 @@ class DiscordHistorySearcher:
         author_ids = self._author_ids(message)
         if len(author_ids) > 1:
             return HistorySearchResult(status="multiple_authors")
-        terms = _terms(query)[: self.max_calls]
+        temporal = _temporal_request(query)
+        sort_mode, requested_count = temporal if temporal else ("relevance", self.max_results)
+        if temporal and not author_ids:
+            return HistorySearchResult(status="missing_author", sort_mode=sort_mode)
+        terms = (
+            _temporal_terms(query) if temporal else _terms(query)
+        )[: self.max_calls]
         if not terms:
             return HistorySearchResult(status="missing_topic")
+        result_limit = min(self.max_results, requested_count)
 
         token = (
             getattr(getattr(self.bot, "http", None), "token", None)
@@ -219,7 +268,10 @@ class DiscordHistorySearcher:
         rejected = 0
         api_calls = 0
         live_verifications = 0
-        max_live_verifications = min(12, self.max_results * 2)
+        max_live_verifications = min(12, max(2, self.max_results * 2))
+        per_term_verifications = (
+            max(1, max_live_verifications // len(terms)) if temporal else max_live_verifications
+        )
 
         try:
             timeout = aiohttp.ClientTimeout(total=self.timeout_seconds * self.max_calls)
@@ -233,7 +285,15 @@ class DiscordHistorySearcher:
                     for term in terms:
                         if live_verifications >= max_live_verifications:
                             break
-                        params = {"content": term, "limit": 25, "sort_by": "relevance"}
+                        checked_this_term = 0
+                        params = {
+                            "limit": 25,
+                            "sort_by": "timestamp" if temporal else "relevance",
+                        }
+                        if temporal:
+                            params["sort_order"] = "asc" if sort_mode == "oldest" else "desc"
+                        if term:
+                            params["content"] = term
                         if author_ids:
                             params["author_id"] = str(author_ids[0])
                         if start:
@@ -277,9 +337,13 @@ class DiscordHistorySearcher:
                                 # Discord search index can lag behind edits/deletes.
                                 # Re-fetch the live message (bounded by max_results)
                                 # after requester + bot ACL checks, then use its text.
-                                if live_verifications >= max_live_verifications:
+                                if (
+                                    live_verifications >= max_live_verifications
+                                    or (temporal and checked_this_term >= per_term_verifications)
+                                ):
                                     break
                                 live_verifications += 1
+                                checked_this_term += 1
                                 channel = (
                                     guild.get_channel_or_thread(channel_id)
                                     if hasattr(guild, "get_channel_or_thread")
@@ -318,15 +382,16 @@ class DiscordHistorySearcher:
                                         f"https://discord.com/channels/{guild.id}/{channel_id}/{msg_id}"
                                     ),
                                 ))
-                                if len(hits) >= self.max_results:
+                                if len(hits) >= result_limit and not temporal:
                                     break
                             if (
-                                len(hits) >= self.max_results
+                                (len(hits) >= result_limit and not temporal)
                                 or live_verifications >= max_live_verifications
+                                or (temporal and checked_this_term >= per_term_verifications)
                             ):
                                 break
                         if (
-                            len(hits) >= self.max_results
+                            (len(hits) >= result_limit and not temporal)
                             or live_verifications >= max_live_verifications
                         ):
                             break
@@ -341,9 +406,12 @@ class DiscordHistorySearcher:
                 start_date=start_date, end_date=end_date, api_calls=api_calls,
             )
 
+        if temporal:
+            hits.sort(key=lambda hit: hit.message_id, reverse=(sort_mode == "newest"))
         return HistorySearchResult(
             status="ok" if hits else "no_results",
-            hits=tuple(hits),
+            hits=tuple(hits[:result_limit]),
+            sort_mode=sort_mode,
             start_date=start_date,
             end_date=end_date,
             elapsed_ms=(time.perf_counter() - started) * 1000,

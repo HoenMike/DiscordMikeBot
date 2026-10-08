@@ -132,7 +132,15 @@ def route_locally(text: str) -> RouteDecision:
             or any(s in history_folded for s in ("co nhan", "da noi", "noi gi", "tin nhan"))
         )
     )
-    if explicit_history or contextual_recall:
+    temporal_author_recall = (
+        "<@" in text
+        and any(s in history_folded for s in (
+            "lan dau", "lan cuoi", "tin nhan dau tien",
+            "tin nhan cu nhat", "tin nhan som nhat",
+            "tin nhan gan nhat", "tin nhan moi nhat",
+        ))
+    )
+    if explicit_history or contextual_recall or temporal_author_recall:
         return RouteDecision(
             intent="discord_history",
             tool="discord_history.search",
