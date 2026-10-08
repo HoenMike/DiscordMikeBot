@@ -8,6 +8,7 @@ on:
       - "tests/test_assistant_history.py"
       - "tests/test_assistant_temporal_history.py"
       - "tests/test_assistant_search_followup.py"
+      - "tests/test_assistant_policy_config.py"
       - "tests/test_assistant_source_routing.py"
       - ".github/workflows/asumi-search.yml"
   push:
@@ -43,6 +44,7 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_history.py" -v
           python -m unittest discover -s tests -p "test_assistant_temporal_history.py" -v
           python -m unittest discover -s tests -p "test_assistant_search_followup.py" -v
+          python -m unittest discover -s tests -p "test_assistant_policy_config.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_routing.py" -v
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
