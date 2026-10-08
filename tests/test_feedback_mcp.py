@@ -20,7 +20,7 @@ class MCPBridgeTests(unittest.IsolatedAsyncioTestCase):
         result = await handle_mcp(rpc("tools/list"))
         names={t["name"] for t in result["result"]["tools"]}
         self.assertEqual(names, {
-            "list_feedback_tickets", "get_feedback_ticket", "propose_feedback_review",
+            "list_feedback_tickets", "get_feedback_ticket", "get_feedback_evidence", "propose_feedback_review",
         })
         self.assertFalse(any("approve" in name or "reject" in name for name in names))
 
