@@ -259,7 +259,8 @@ class FeedbackStore:
         sql = (
             "SELECT ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
-            "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version FROM asumi_feedback"
+            "user_explanation, evidence_json, github_issue_url, github_pr_url, resolved_version, "
+            "source_message_id, reported_bot_message_id FROM asumi_feedback"
         )
         args = ()
         if status:
@@ -272,7 +273,8 @@ class FeedbackStore:
             raise FeedbackStorageError("Turso unavailable")
         fields = ("id", "status", "title", "category", "created_at", "reason",
                   "reporter_id", "bot_version", "guild_id", "channel_id",
-                  "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version")
+                  "description", "user_explanation", "evidence", "github_issue_url", "github_pr_url", "resolved_version",
+                  "source_message_id", "reported_bot_message_id")
         output = []
         for row in rows:
             entry = dict(zip(fields, row))
@@ -289,7 +291,7 @@ class FeedbackStore:
             "ticket_id, status, title, category, created_at, review_reason, "
             "reporter_id, bot_version, guild_id, channel_id, description, "
             "user_explanation, evidence_json, github_issue_url, github_pr_url, "
-            "resolved_version"
+            "resolved_version, source_message_id, reported_bot_message_id"
         )
         async with db_client.execute(
             "SELECT " + cols + " FROM asumi_feedback WHERE ticket_id=?",
@@ -303,7 +305,8 @@ class FeedbackStore:
         names = ("id", "status", "title", "category", "created_at", "reason",
                  "reporter_id", "bot_version", "guild_id", "channel_id",
                  "description", "user_explanation", "evidence",
-                 "github_issue_url", "github_pr_url", "resolved_version")
+                 "github_issue_url", "github_pr_url", "resolved_version",
+                 "source_message_id", "reported_bot_message_id")
         record = dict(zip(names, row))
         try:
             record["evidence"] = json.loads(record["evidence"] or "[]")
