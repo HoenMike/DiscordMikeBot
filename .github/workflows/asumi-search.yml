@@ -70,6 +70,9 @@ jobs:
           urls = [
               ("official", "https://www.pvoil.com.vn/tin-gia-xang-dau"),
               ("community", "https://vietfuel-api.tranqui.workers.dev/api/fuel-prices"),
+              ("webgia", "https://webgia.tv/xang-dau/petrolimex"),
+              ("webgia_history", "https://webgia.tv/xang-dau/lich-su"),
+              ("petrolimex", "https://www.petrolimex.com.vn/ndi/gia-ban-le.html"),
           ]
           for label, url in urls:
               try:
