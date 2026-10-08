@@ -303,6 +303,7 @@ class CommandToolRegistry:
 
         if report.status == "ok":
             lines = ["🔎 **KẾT QUẢ TÌM KIẾM WEB · BRAVE**"]
+            footer = "*Nguồn từ Brave Search. Mở link gốc để kiểm chứng thông tin.*"
             for i, item in enumerate(report.hits, 1):
                 title = discord.utils.escape_markdown(
                     discord.utils.escape_mentions(item.title)
@@ -310,13 +311,16 @@ class CommandToolRegistry:
                 snippet = discord.utils.escape_markdown(
                     discord.utils.escape_mentions(item.description)
                 )
-                lines.append(
+                entry = (
                     f"**{i}. {title}**\n"
                     + (f"> {snippet}\n" if snippet else "")
                     + f"<{item.url}>"
                 )
-            lines.append("*Nguồn từ Brave Search. Mở link gốc để kiểm chứng thông tin.*")
-            text = "\n\n".join(lines)[:1900]
+                if len("\n\n".join([*lines, entry, footer])) > 1900:
+                    break
+                lines.append(entry)
+            lines.append(footer)
+            text = "\n\n".join(lines)
         else:
             text = "🔎 **Brave Search:** " + notices.get(
                 report.status, "Không thể tìm kiếm lúc này."
