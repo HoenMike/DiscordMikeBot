@@ -161,7 +161,7 @@ class VerifiedFuelToolTests(unittest.IsolatedAsyncioTestCase):
             "features.assistant.tools.pvoil_reader.fetch",
             new=AsyncMock(return_value=VerifiedFuelReport(status="unavailable")),
         ), patch(
-            "features.assistant.tools.vietfuel_reader.fetch",
+            "features.assistant.tools.webgia_reader.fetch",
             new=AsyncMock(return_value=SimpleNamespace(status="unavailable", rows=(), elapsed_ms=0)),
         ), patch.object(registry, "_summarize_public_search",
                         new=AsyncMock(return_value="Chưa xác minh được giá.")):
