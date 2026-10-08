@@ -47,7 +47,7 @@ details summary{cursor:pointer;color:#cfddf3;font-weight:700}.tech-grid{display:
   <div class="workspace">
     <aside class="panel listpanel" aria-label="Danh sách ticket">
       <div class="pane-head"><div class="toolbar"><h2>Inbox</h2><span class="small muted" id="count"></span></div>
-        <input id="search" class="search" aria-label="Tìm feedback" placeholder="Tìm số ticket, nội dung, tên..." />
+        <input id="search" class="search" aria-label="Tìm feedback" placeholder="Tìm #ticket, tiêu đề, nội dung..." />
         <div id="filters" class="tabs" role="group" aria-label="Bộ lọc ticket"></div>
       </div><div class="pane-content" id="ticketList"><div class="muted">Đang tải...</div></div><div class="pane-head"><button class="btn" id="loadMore" type="button" hidden>Tải thêm ticket</button></div>
     </aside>
@@ -64,7 +64,7 @@ const LABELS={submitted:'Mới gửi',triage:'Đang phân loại',needs_info:'C�
 const PENDING=new Set(['submitted','triage','needs_info','deferred','reopened']);
 const POSITIVE=new Set(['approved','planned','in_progress','in_review','deployed','verified']);
 const DONE=new Set(['verified','closed','rejected','duplicate','deleted']);
-let records=[],selected=document.body.dataset.selectedTicket||null,filter='pending',search='',refreshSerial=0,nextOffset=0,hasMore=false;
+let records=[],selected=document.body.dataset.selectedTicket||null,filter='pending',search='',refreshSerial=0,nextOffset=0,hasMore=false,globalMetrics=null;
 function n(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(cls)el.className=cls;return el}
 function append(parent,tag,text,cls){const el=n(tag,text,cls);parent.append(el);return el}
 function btn(text,fn,cls){const el=n('button',text,'btn '+(cls||''));el.type='button';el.onclick=fn;return el}
@@ -94,10 +94,12 @@ function renderFilters(){
  }
 }
 function renderStats(){
- $('statTotal').textContent=records.length;
- $('statPending').textContent=records.filter(t=>PENDING.has(t.status)).length;
- $('statApproved').textContent=records.filter(t=>POSITIVE.has(t.status)).length;
- $('statDone').textContent=records.filter(t=>DONE.has(t.status)).length;
+ const counts=globalMetrics?.tickets_by_status;
+ const sum=pred=>Object.entries(counts||{}).filter(([k])=>pred(k)).reduce((n,[,v])=>n+Number(v||0),0);
+ $('statTotal').textContent=counts?sum(()=>true):records.length+'+';
+ $('statPending').textContent=counts?sum(k=>PENDING.has(k)):records.filter(t=>PENDING.has(t.status)).length+'+';
+ $('statApproved').textContent=counts?sum(k=>POSITIVE.has(k)):records.filter(t=>POSITIVE.has(t.status)).length+'+';
+ $('statDone').textContent=counts?sum(k=>DONE.has(k)&&k!=='deleted'):records.filter(t=>DONE.has(t.status)&&t.status!=='deleted').length+'+';
 }
 function renderList(){
  const found=records.filter(matches);$('ticketList').replaceChildren();$('count').textContent=found.length+' ticket đã tải';$('loadMore').hidden=!hasMore;
