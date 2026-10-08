@@ -49,6 +49,7 @@ SCHEMA = (
       evidence_json TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'submitted',
       review_reason TEXT NOT NULL DEFAULT '',
+      last_reviewer_id TEXT NOT NULL DEFAULT '',
       github_issue_url TEXT NOT NULL DEFAULT '',
       github_pr_url TEXT NOT NULL DEFAULT '',
       resolved_version TEXT NOT NULL DEFAULT '',
@@ -86,7 +87,7 @@ SCHEMA = (
     BEGIN
       INSERT INTO asumi_feedback_events
       (ticket_id, actor_id, action, old_status, new_status, reason, created_at)
-      VALUES (NEW.ticket_id, 'dashboard-admin', 'review', OLD.status, NEW.status,
+      VALUES (NEW.ticket_id, NEW.last_reviewer_id, 'review', OLD.status, NEW.status,
               NEW.review_reason, NEW.updated_at);
       INSERT INTO asumi_feedback_notifications
       (notification_id, ticket_id, reporter_id, event_type, created_at)
@@ -264,10 +265,10 @@ class FeedbackStore:
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         # Single atomic guarded UPDATE, trigger writes event/outbox on success.
         async with db_client.execute(
-            "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=? "
+            "UPDATE asumi_feedback SET status=?, review_reason=?, updated_at=?, last_reviewer_id=? "
             "WHERE ticket_id=? AND status<>?",
             (status, (reason + (f" [release: {verified_version[:50]}]" if verified_version else ""))[:1800],
-             now, ticket_id.upper(), status),
+             now, actor_id[:80], ticket_id.upper(), status),
         ) as cursor:
             changed = cursor.rowcount
         if not db_client.is_cloud:
