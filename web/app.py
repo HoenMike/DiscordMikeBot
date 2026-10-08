@@ -964,27 +964,9 @@ def connector_feedback_list():
 @app.route('/api/feedback-connector/v1/tickets/<ticket_id>/review', methods=['POST'])
 @feedback_connector_required
 def connector_feedback_review(ticket_id):
-    from features.feedback.store import feedback_store, FeedbackStorageError
-    if request.mimetype != "application/json":
-        return jsonify({"error": "JSON required"}), 415
-    payload = request.get_json(silent=True) or {}
-    if payload.get("owner_approved") is not True:
-        return jsonify({"error": "Explicit owner approval required"}), 403
-    if not ticket_id.startswith("FB-") or len(ticket_id)>30:
-        return jsonify({"error": "Ticket not found"}), 404
-    try:
-        asyncio.run(feedback_store.review(
-            ticket_id=ticket_id, status=str(payload.get("status") or ""),
-            reason=str(payload.get("reason") or ""),
-            actor_id="connector-owner-approved",
-            verified_version=str(payload.get("verified_version") or ""),
-        ))
-        return jsonify({"updated": True, "ticket_id": ticket_id})
-    except FeedbackStorageError as exc:
-        return jsonify({"error": str(exc)}), 400
+    # Read-only until owner identity and per-decision approval are cryptographically bound.
+    return jsonify({"error":"Review writes disabled pending owner-authenticated approval"}), 403
 
-
-# T23.4: attach GitHub references only after an explicitly approved ticket.
 @app.route('/api/admin/feedback/<ticket_id>/links', methods=['POST'])
 @login_required
 def feedback_implementation_links(ticket_id):
@@ -1033,19 +1015,5 @@ def feedback_metrics():
 @app.route('/api/feedback-connector/v1/tickets/<ticket_id>/links', methods=['POST'])
 @feedback_connector_required
 def connector_feedback_links(ticket_id):
-    from features.feedback.store import feedback_store, FeedbackStorageError
-    if request.mimetype != "application/json":
-        return jsonify({"error":"JSON required"}), 415
-    data = request.get_json(silent=True) or {}
-    if data.get("owner_approved") is not True:
-        return jsonify({"error":"Explicit owner approval required"}), 403
-    try:
-        asyncio.run(feedback_store.link_delivery(
-            ticket_id=ticket_id,
-            issue_url=str(data.get("issue_url") or ""),
-            pr_url=str(data.get("pr_url") or ""),
-            version=str(data.get("version") or ""),
-        ))
-        return jsonify({"ok":True})
-    except FeedbackStorageError as exc:
-        return jsonify({"error":str(exc)}), 400
+    # Read-only until owner identity and per-decision approval are cryptographically bound.
+    return jsonify({"error":"Review writes disabled pending owner-authenticated approval"}), 403
