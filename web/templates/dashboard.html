@@ -92,7 +92,6 @@
                 </div>
             </div>
 
-            <a href="/admin/feedback" class="text-xs px-3 py-2 border border-violet-500/40 text-violet-200 rounded-lg hover:bg-violet-500/20">Feedback Inbox</a>
             <!-- Middle: Quick Metric Badges (Desktop) -->
             <div class="hidden md:flex items-center gap-3 text-xs text-slate-300">
                 <div class="flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-dark-surface border border-dark-border">
@@ -141,6 +140,10 @@
                     <span>Log Tương Tác</span>
                     <span id="badge-total-activities" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">0</span>
                 </button>
+                <button onclick="switchTab('feedback')" id="tab-btn-feedback" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all" aria-controls="tab-content-feedback">
+                    <i data-lucide="message-square-heart" class="w-3.5 h-3.5 text-violet-400"></i>
+                    <span>Feedback</span>
+                </button>
                 <button onclick="switchTab('presence')" id="tab-btn-presence" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-400"></i>
                     <span>Trạng Thái Bot</span>
@@ -184,6 +187,14 @@
                 <span>Live Realtime • 3s</span>
             </div>
         </div>
+
+        <!-- Feedback Inbox is an authenticated, same-origin view within the
+             historical Admin tab shell. The inner view has no extra sidebar. -->
+        <section id="tab-content-feedback" class="tab-content hidden flex-1 min-h-0 flex flex-col overflow-hidden" aria-label="Feedback Inbox">
+            <iframe id="feedback-inbox-frame" title="Feedback Inbox — duyệt ticket"
+                    class="w-full flex-1 min-h-0 rounded-xl border border-dark-border bg-dark-card"
+                    referrerpolicy="same-origin" loading="lazy"></iframe>
+        </section>
 
         <!-- ========================================== -->
         <!-- TAB 1: USER INTERACTION & ACTIVITY LOGS -->
@@ -1279,7 +1290,58 @@
             });
         }
 
-        function switchTab(tab) {
+        // The classic navigation remains authoritative. Feedback loads only when
+        // its tab is selected, preserving all existing eight-tab workflows.
+        function feedbackFrame() { return document.getElementById('feedback-inbox-frame'); }
+        function feedbackTicketFromURL() {
+            return new URLSearchParams(location.search).get('ticket') || '';
+        }
+        function openFeedbackFrame() {
+            const frame = feedbackFrame();
+            if (!frame || frame.dataset.ready === 'true') return;
+            const url = new URL('/admin/_feedback/embed', location.origin);
+            const ticket = feedbackTicketFromURL();
+            if (ticket) url.searchParams.set('ticket', ticket);
+            frame.src = url.pathname + url.search;
+            frame.dataset.ready = 'true';
+        }
+        function syncAdminTabURL(tab) {
+            const url = new URL(location.href);
+            if (tab === 'feedback') url.searchParams.set('tab', 'feedback');
+            else {
+                url.searchParams.set('tab', tab);
+                url.searchParams.delete('ticket');
+            }
+            if (url.pathname + url.search !== location.pathname + location.search) {
+                history.replaceState({adminTab:tab}, '', url.pathname + url.search);
+            }
+        }
+        window.addEventListener('message', event => {
+            const frame = feedbackFrame();
+            if (event.origin !== location.origin || !frame || event.source !== frame.contentWindow) return;
+            if (event.data?.type !== 'asumi:feedback:ticket') return;
+            const ticket = String(event.data.ticket || '');
+            if (!ticket || ticket.length > 128) return;
+            const url = new URL(location.href);
+            url.searchParams.set('tab', 'feedback');
+            url.searchParams.set('ticket', ticket);
+            if (url.pathname + url.search !== location.pathname + location.search) {
+                history.pushState({adminTab:'feedback'}, '', url.pathname + url.search);
+            }
+        });
+        window.addEventListener('popstate', () => {
+            const params = new URLSearchParams(location.search);
+            const tab = params.get('tab') || 'activity';
+            if (['activity','feedback','presence','version','tarot','cabin','guilds','overview','logs'].includes(tab)) {
+                switchTab(tab, false);
+                if (tab === 'feedback') feedbackFrame()?.contentWindow?.postMessage(
+                    {type:'asumi:feedback:open', ticket:params.get('ticket')||''},
+                    location.origin
+                );
+            }
+        });
+
+        function switchTab(tab, updateURL = true) {
             currentTab = tab;
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => {
@@ -1292,7 +1354,10 @@
                 activeBtn.className = "tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-brand-600 text-white shadow-md shadow-brand-600/30";
             }
             
-            if (tab === 'overview' && !latencyChart) {
+            if (updateURL) syncAdminTabURL(tab);
+            if (tab === 'feedback') {
+                openFeedbackFrame();
+            } else if (tab === 'overview' && !latencyChart) {
                 initLatencyChart();
             } else if (tab === 'presence') {
                 fetchPresenceData();
@@ -3021,8 +3086,8 @@
             // Preserve bookmarked T24 links by selecting the corresponding old tab.
             // Direct /admin visits retain the original Activity landing tab.
             const requestedTab = new URLSearchParams(location.search).get('tab');
-            if (requestedTab && ['activity','presence','version','tarot','cabin','guilds','overview','logs'].includes(requestedTab)) {
-                switchTab(requestedTab);
+            if (requestedTab && ['activity','feedback','presence','version','tarot','cabin','guilds','overview','logs'].includes(requestedTab)) {
+                switchTab(requestedTab, false);
             }
             setInterval(() => {
                 if (!document.hidden) fetchDashboardData();
