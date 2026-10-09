@@ -50,45 +50,55 @@ class BraveSearchUXTests(unittest.TestCase):
         ranked = prioritize_sources("tình hình game hôm nay", self.sample())
         self.assertEqual(ranked[0], self.sample()[0])
 
-    def test_compact_embed_sources_and_unlinked_citations(self):
+    def test_compact_sources_and_answer_bolding(self):
         embed = build_search_embed(
             "giá xăng hôm nay như nào",
             self.sample(),
-            "Chưa xác minh giá chính xác [1], [2] tại thời điểm này.",
+            "Chưa xác minh giá chính xác [1], [2] tại thời điểm này. "
+            "Nguồn công khai chưa cung cấp bảng giá hợp lệ.",
         )
         self.assertIn("🔎", embed.title)
-        self.assertIn("Chưa xác minh", embed.description)
-        self.assertNotIn("[1]", embed.description)
-        self.assertEqual(len(embed.fields), 1)
-        sources = embed.fields[0].value
-        self.assertIn("https://pvoil.com.vn/gia-ban-le", sources)
-        self.assertIn("https://petrolimex.com.vn/gia-xang-dau", sources)
-        self.assertNotIn("<strong>", sources)
-        self.assertLessEqual(len(sources), 1024)
-        self.assertIn("Tổng hợp từ web", embed.footer.text)
+        self.assertTrue(embed.description.startswith(
+            "**Chưa xác minh giá chính xác"
+        ))
+        lead, detail = embed.description.split("\n\n", 1)
+        self.assertNotIn("[1]", lead)
+        self.assertIn("Nguồn công khai", detail)
+        self.assertIn("[1](https://pvoil.com.vn/gia-ban-le)", detail)
+        self.assertIn("[2](https://petrolimex.com.vn/gia-xang-dau)", detail)
+        self.assertEqual(embed.fields, [])
+        self.assertFalse(embed.footer.text)
+        self.assertNotIn("pricedancing.com", embed.description)
 
-    def test_answer_first_does_not_dump_snippets(self):
+    def test_cktg_response_highlights_takeaway_with_minimal_citations(self):
         hits = [
             BraveHit(
                 title="Lịch thi đấu giải đấu chính thức",
-                description="Một đoạn trích rất dài không nên hiển thị như câu trả lời.",
+                description="Một đoạn trích dài không nên xuất hiện trong lời đáp.",
                 url="https://example.org/worlds",
             )
         ]
         embed = build_search_embed(
             "Khi nào CKTG bắt đầu?", hits,
-            "CKTG bắt đầu ngày 15/10/2026 theo lịch công bố.",
+            "CKTG LMHT 2026 bắt đầu ngày 15/10/2026. "
+            "Giải đấu dự kiến kéo dài đến 14/11.",
         )
-        self.assertTrue(embed.description.startswith("CKTG bắt đầu"))
-        self.assertNotIn("Một đoạn trích rất dài", str(embed.to_dict()))
-        self.assertEqual(len(embed.fields), 1)
-        self.assertIn("Kiểm chứng", embed.fields[0].name)
-        self.assertIn("https://example.org/worlds", embed.fields[0].value)
+        self.assertTrue(embed.description.startswith(
+            "**CKTG LMHT 2026 bắt đầu ngày 15/10/2026.**"
+        ))
+        self.assertIn("\n\nGiải đấu dự kiến", embed.description)
+        self.assertTrue(embed.description.endswith(
+            "[1](https://example.org/worlds)"
+        ))
+        self.assertNotIn("Kiểm chứng", str(embed.to_dict()))
+        self.assertNotIn("Một đoạn trích dài", str(embed.to_dict()))
+        self.assertEqual(embed.fields, [])
 
     def test_no_summary_does_not_invent_price(self):
         embed = build_search_embed("giá xăng hôm nay", self.sample())
         self.assertIn("chưa thể xác minh", embed.description)
         self.assertNotIn("đ/lít", embed.description)
+        self.assertEqual(embed.description.count("https://"), 2)
 
     def test_mass_mentions_are_escaped(self):
         bad = BraveHit(
@@ -96,20 +106,42 @@ class BraveSearchUXTests(unittest.TestCase):
             description="<strong>@here</strong> giá xăng",
             url="https://example.org/price",
         )
-        embed = build_search_embed("giá xăng hôm nay", [bad], "Đừng tag @everyone")
+        embed = build_search_embed(
+            "giá xăng hôm nay", [bad],
+            "Đừng tag @everyone. Không nhắc @here trong kênh.",
+        )
         self.assertNotIn("@everyone", embed.description)
-        self.assertNotIn("@here", embed.fields[0].value)
+        self.assertNotIn("@here", embed.description)
+        self.assertNotIn("Thông báo", embed.description)
 
-    def test_source_count_and_message_bounds(self):
-        long = [BraveHit(
-            title="X" * 500,
-            description="<b>Y</b>" * 400,
-            url=f"https://example.org/results/{i}",
-        ) for i in range(7)]
-        embed = build_search_embed("test", long)
+    def test_source_count_link_bounds_and_unsafe_urls(self):
+        hits = [
+            BraveHit(title="X" * 500, description="<b>Y</b>" * 400,
+                     url=f"https://example.org/results/{i}")
+            for i in range(7)
+        ]
+        hits.insert(0, BraveHit("Bad", "javascript:alert(1)", "unsafe"))
+        embed = build_search_embed("test", hits)
         self.assertLessEqual(len(embed), 6000)
-        self.assertLessEqual(len(embed.fields[0].value), 1024)
-        self.assertLessEqual(embed.fields[0].value.count("https://"), 3)
+        self.assertEqual(embed.description.count("https://"), 1)
+        self.assertNotIn("javascript:", embed.description)
+        self.assertEqual(len(embed.fields), 0)
+
+    def test_source_link_parentheses_are_safe(self):
+        embed = build_search_embed(
+            "câu hỏi", [BraveHit("news", "https://example.org/news_(2026)", "")],
+            "Kết quả đúng theo trang vừa tìm.",
+        )
+        self.assertIn("[1](https://example.org/news_%282026%29)", embed.description)
+
+    def test_empty_and_long_answers_have_bounded_emphasis(self):
+        embed = build_search_embed("hỏi", [], "")
+        self.assertIn("**Mình chưa thể xác minh", embed.description)
+        long = "Thông tin " + ("rất dài " * 70) + ". Nội dung sau."
+        embed = build_search_embed("hỏi", [], long)
+        self.assertTrue(embed.description.startswith("**"))
+        self.assertLess(embed.description.index("**", 2), 220)
+        self.assertIn("Nội dung sau.", embed.description)
 
 
 class BraveSearchQueryTests(unittest.TestCase):
