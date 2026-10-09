@@ -25,6 +25,9 @@ on:
       - "web/**"
       - "docs/T23_FEEDBACK_CONNECTOR_OPENAPI.yaml"
       - "bot_instance.py"
+      - "core/deploy_recovery.py"
+      - "core/constants.py"
+      - "tests/test_deploy_recovery.py"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
       - "tests/test_assistant_temporal_history.py"
@@ -65,6 +68,9 @@ on:
       - "web/**"
       - "docs/T23_FEEDBACK_CONNECTOR_OPENAPI.yaml"
       - "bot_instance.py"
+      - "core/deploy_recovery.py"
+      - "core/constants.py"
+      - "tests/test_deploy_recovery.py"
       - "tests/test_assistant_brave.py"
       - "tests/test_assistant_history.py"
 
@@ -90,6 +96,7 @@ jobs:
           ADMIN_PASSWORD: ci-only-placeholder
           FLASK_SECRET_KEY: ci-only-placeholder-not-a-production-secret
         run: |
+          python -m unittest discover -s tests -p "test_deploy_recovery.py" -v
           python -m unittest discover -s tests -p "test_tarot_inline_ui.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_session.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_renderer.py" -v
@@ -118,7 +125,7 @@ jobs:
           python -m unittest discover -s tests -p "test_feedback_mcp.py" -v
           python -m unittest discover -s tests -p "test_feedback_oauth.py" -v
           python -m unittest discover -s tests -p "test_t24_admin_console.py" -v
-          python -m compileall -q features/tarot features/assistant features/feedback web/app.py
+          python -m compileall -q core/deploy_recovery.py bot_instance.py features/tarot features/assistant features/feedback web/app.py
           python - <<'PY'
           from pathlib import Path
           source=Path("web/templates/feedback.html").read_text(encoding="utf-8")
