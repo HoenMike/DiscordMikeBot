@@ -328,8 +328,8 @@ class TarotMultiTurnStateTests(unittest.TestCase):
         self.assertEqual(state.last_activity_at, 250.0)
 
 
-class TarotResultSessionControlTests(unittest.TestCase):
-    def test_result_view_exposes_three_turn_followup_and_why(self):
+class TarotResultSessionControlTests(unittest.IsolatedAsyncioTestCase):
+    async def test_result_view_exposes_three_turn_followup_and_why(self):
         view = TarotResultActionView(
             author_id=1,
             author_name="Mai",
