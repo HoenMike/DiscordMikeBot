@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.11.1"
+CURRENT_VERSION = "3.12.0"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.11.1 - Compact Search Citations"
+CODENAME = "Asumi 3.12.0 - Deploy Recovery Queue"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.12.0", "date": "2026-10-09", "type": "minor",
+        "title": "Deploy Recovery Queue",
+        "summary": "Tìm và xử lý bù lời gọi @Asumi bị lỡ khi Render deploy; nhận lại request chat dở với Turso và không tự chạy lệnh thay đổi dữ liệu.",
+        "changes": [
+            {"category": "Reliability", "items": [
+                "Nhắc Asumi giữa downtime được tìm lại bằng Discord channel history khi bot kết nối lại, trong cửa sổ 15 phút.",
+                "Đánh dấu pending/processing/done qua Turso bằng message ID; tránh chạy trùng, thử lại khi request dở bị ngắt.",
+                "Gửi thông báo nhận lại, trả lời đúng tin nhắn gốc; chỉ tự chạy chat hoặc công cụ đọc dữ liệu an toàn.",
+                "Không khôi phục tự động Slash/Prefix/Tarot/Feedback/quản trị và không lưu nội dung hội thoại vào Turso.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.11.1", "date": "2026-10-09", "type": "bugfix",
         "title": "Search Reply Readability",
