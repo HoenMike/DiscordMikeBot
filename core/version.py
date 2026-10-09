@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.13.2"
+CURRENT_VERSION = "3.13.3"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.13.2 - Conversational Tarot Intent Fix"
+CODENAME = "Asumi 3.13.3 - Original Tarot Reading UI"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.13.3", "date": "2026-10-09", "type": "bugfix",
+        "title": "Original Tarot Reading UI",
+        "summary": "Trở về ảnh trải bài và luận giải trong Discord, bỏ file TXT gây preview khó đọc.",
+        "changes": [
+            {"category": "Tarot UI", "items": [
+                "Giữ ảnh board trải bài gốc cho mọi spread và hiển thị giải bài bằng embed bên dưới.",
+                "Loại bỏ tarot_reading.txt khỏi kết quả và khỏi nút Đọc đầy đủ.",
+                "Luận giải dài đọc bằng các trang Discord, không tải tệp, không rút hay gọi AI thêm.",
+                "Không thay cơ chế bốc/lật bài, cooldown, câu hỏi, Daily, Yes/No, Followup, Why hoặc Clarifier.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.13.2", "date": "2026-10-09", "type": "bugfix",
         "title": "Conversational Tarot Questions",
