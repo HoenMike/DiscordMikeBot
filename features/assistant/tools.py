@@ -15,6 +15,8 @@ from features.assistant.providers.discord_history import DiscordHistorySearcher
 from features.assistant.providers.pvoil_prices import pvoil_reader
 from features.assistant.providers.webgia_prices import webgia_reader
 from features.assistant.providers.weather import weather_provider
+from features.assistant.providers.air_quality import aqi_provider, aqi_label
+from features.assistant.air_quality_renderer import render_air_quality_png
 from features.assistant.providers.public_pages import fetch_public_page_evidence
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
@@ -547,6 +549,59 @@ class CommandToolRegistry:
             details=details,
         )
 
+    async def _execute_air_quality(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        """Answer AQI from typed Open-Meteo model, with optional PNG visual."""
+        facts = await aqi_provider.fetch()
+        details = {
+            "aqi_provider": "open_meteo_model",
+            "aqi_status": facts.status,
+            "aqi_ms": round(facts.elapsed_ms, 1),
+        }
+        if facts.status == "ok" and facts.aqi is not None and facts.pm25 is not None:
+            text = (
+                f"🌫️ **Biên Hòa · US AQI mô hình: {facts.aqi} — {aqi_label(facts.aqi)}**\\n"
+                f"PM2.5 mô hình: **{facts.pm25:g} µg/m³** · "
+                f"Cập nhật: **{facts.model_time}**\\n"
+                "⚠️ *Ước tính theo mô hình, không phải số đo trực tiếp tại trạm.*\\n"
+                "[1](https://open-meteo.com/en/docs/air-quality-api)"
+            )
+            file = None
+            try:
+                image = await asyncio.to_thread(render_air_quality_png, facts)
+                file = discord.File(fp=image, filename="aqi_bien_hoa.png")
+                details["aqi_visual"] = "png"
+            except Exception as exc:
+                print(f"[Asumi AQI] rendering failed: {type(exc).__name__}", flush=True)
+                text += "\\n*Chưa thể tạo biểu đồ; các chỉ số phía trên vẫn là dữ liệu mô hình.*"
+                details["aqi_visual"] = "text_fallback"
+            kwargs = {
+                "mention_author": False,
+                "allowed_mentions": discord.AllowedMentions.none(),
+            }
+            if file is not None:
+                kwargs["file"] = file
+            sent = await message.reply(text, **kwargs)
+            response_context = (
+                f"Open-Meteo modeled US AQI {facts.aqi}, PM2.5 {facts.pm25} µg/m3"
+                f" for Biên Hòa at {facts.model_time}. Not a station reading."
+            )
+        else:
+            reason = (
+                "Dữ liệu AQI mô hình đã quá cũ, mình sẽ không trình bày như chỉ số hiện tại."
+                if facts.status == "stale"
+                else "Mình chưa lấy được số liệu AQI mô hình cập nhật cho Biên Hòa."
+            )
+            sent = await message.reply(
+                "🌫️ **AQI Biên Hòa:** " + reason,
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            response_context = f"Modeled AQI status: {facts.status}"
+        return ToolExecutionResult(
+            handled=True, response_message_ids=(int(sent.id),),
+            response_context=response_context[:1600], details=details,
+        )
+
     async def _execute_weather(self, decision: RouteDecision, message) -> ToolExecutionResult:
         query = str(decision.arguments.get("query") or "").strip()
         facts = await weather_provider.fetch(query)
@@ -976,6 +1031,8 @@ class CommandToolRegistry:
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
         if decision.tool == "multi_source.search":
             return await self._execute_multi_source(decision, message)
+        if decision.tool == "air_quality.report":
+            return await self._execute_air_quality(decision, message)
         if decision.tool == "weather.forecast":
             return await self._execute_weather(decision, message)
         if decision.tool == "web.search":
