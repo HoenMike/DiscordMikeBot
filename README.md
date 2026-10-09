@@ -1,3 +1,9 @@
+## Asumi 3.13.0 — Discord Components V2 Search Pilot
+
+- Upgraded to `discord.py==2.7.1`. Generic public Search answers now render **directly in ordinary Discord chat** using native Components V2 Container/TextDisplay with bold headline and small clickable numeric citations.
+- Explicitly scoped pilot: Tarot, Feedback, source-verified fuel/weather, social embed and the classic Dashboard retain their existing interfaces. Unsupported V2 payloads (HTTP 400) fall back to legacy Search embeds.
+- This is native Discord UI, **not OpenUI/React execution**. T25.1 follow-ups: Tarot/ticket read-only panel, interactive native controls and mobile visual checks. See docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md.
+
 ## Asumi 3.12.0 — Deploy Recovery Queue
 
 - If Render restarts while someone is tagging Asumi in a normal Discord chat, once the Gateway reconnects the bot will try to find that original message within a bounded recent window and answer it automatically.
