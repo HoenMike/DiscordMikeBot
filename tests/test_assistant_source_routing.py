@@ -184,11 +184,12 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
                 ),
                 message,
             )
-        embed = message.reply.await_args.kwargs["embed"]
-        self.assertIn("Thông tin này mới", embed.description)
-        self.assertTrue(embed.description.startswith("**Thông tin này mới"))
-        self.assertIn("[1](https://example.com/ev)", embed.description)
-        self.assertEqual(embed.fields, [])
+        kwargs = message.reply.await_args.kwargs
+        self.assertNotIn("embed", kwargs)
+        view = kwargs["view"]
+        content = view.children[0].children[-1].content
+        self.assertTrue(content.startswith("**Thông tin này mới"))
+        self.assertIn("[1](https://example.com/ev)", content)
         self.assertTrue(result.details["web_synthesized"])
         synth.assert_awaited_once()
         self.assertNotIn("query", result.details)
@@ -226,9 +227,11 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
                 ),
                 message,
             )
-        embed = message.reply.await_args.kwargs["embed"]
-        self.assertIn("[1](https://example.com/news)", embed.description)
-        self.assertIn("chưa thể xác minh", embed.description)
+        kwargs = message.reply.await_args.kwargs
+        self.assertNotIn("embed", kwargs)
+        content = kwargs["view"].children[0].children[-1].content
+        self.assertIn("[1](https://example.com/news)", content)
+        self.assertIn("chưa thể xác minh", content)
         self.assertFalse(result.details["web_synthesized"])
 
     async def test_cktg_route_now_synthesizes_answer_first(self):
@@ -264,9 +267,11 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
         ):
             result = await registry.execute(decision, message)
         synth.assert_awaited_once()
-        embed = message.reply.await_args.kwargs["embed"]
-        self.assertTrue(embed.description.startswith("**CKTG bắt đầu"))
-        self.assertIn("[1](https://example.com/official-worlds-2026)", embed.description)
+        kwargs = message.reply.await_args.kwargs
+        self.assertNotIn("embed", kwargs)
+        content = kwargs["view"].children[0].children[-1].content
+        self.assertTrue(content.startswith("**CKTG bắt đầu"))
+        self.assertIn("[1](https://example.com/official-worlds-2026)", content)
         self.assertTrue(result.details["web_synthesized"])
 
     def test_public_safety_gate(self):
