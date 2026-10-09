@@ -10,7 +10,7 @@ import discord
 MAX_VISIBLE_READING = 3700
 
 
-def build_full_reading_layout(reading: str) -> discord.ui.LayoutView:
+def build_full_reading_layout(reading: str, *, with_attachment: bool = False) -> discord.ui.LayoutView:
     safe = discord.utils.escape_mentions(reading or "Chưa có luận giải.")
     visible = safe[:MAX_VISIBLE_READING].rstrip()
     if len(safe) > MAX_VISIBLE_READING:
@@ -25,4 +25,7 @@ def build_full_reading_layout(reading: str) -> discord.ui.LayoutView:
         ),
         accent_colour=discord.Colour(0x6D5D8F),
     ))
+    if with_attachment:
+        # V2 attachments must be explicitly surfaced by a File component.
+        view.add_item(discord.ui.File("attachment://tarot_reading.txt"))
     return view
