@@ -2,9 +2,17 @@
 
 > **Purpose:** This file is the short operational handoff for future ChatGPT/Codex/agent sessions.  
 > **Status:** T20.1–T20.9 remain complete; current bot release is **Asumi 3.0.0** with a post-roadmap Tarot launcher UX refresh.  
-> **Last updated:** 2026-10-05.
+> **Last updated:** 2026-10-09 (Tarot mention routing hotfix).
 
 The user explicitly requested that a future session should be able to point at the repository and continue without needing the original planning conversation.
+
+### 2026-10-09 — Asumi 3.13.2 conversational Tarot routing
+
+- Reproduction: @Asumi bốc cho quẻ tarot xem mai nên mặc áo màu gì đi nhậu. Root cause: route_locally detected Tarot, but CommandToolRegistry always converted this to a bare ".m tarot", discarding the original question.
+- New features/tarot/reading/request.py parses literal questions without an AI call. Explicit bốc/rút/bói + meaningful question uses tarot.draw and the existing ".m tarot <recommended-spread> <question>" flow; bare requests do not auto-draw. General Tarot questions open the launcher with a prefilled question via ".m tarot ui <question>".
+- Outfit/color guidance recommends single; the explicit Daily route remains direct, but a sentence containing "hôm nay" with a real question is not Daily by itself.
+- QA: tests/test_assistant_core.py and tests/test_tarot_v2_launcher.py. Validate CI and live Discord/Render separately. Do not describe production as live before deployment is verified.
+
 
 ---
 
