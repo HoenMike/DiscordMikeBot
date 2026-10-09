@@ -188,11 +188,15 @@ class BraveProviderTests(unittest.IsolatedAsyncioTestCase):
             result = await registry.execute(
                 route_locally("tìm trên web tin mới"), message,
             )
-        embed = message.reply.await_args.kwargs["embed"]
-        self.assertIn("[1](https://example.org/news)", embed.description)
-        self.assertNotIn("@everyone", embed.description)
-        self.assertEqual(embed.fields, [])
-        self.assertEqual(embed.title.startswith("🔎 "), True)
+        kwargs = message.reply.await_args.kwargs
+        self.assertNotIn("embed", kwargs)
+        view = kwargs["view"]
+        self.assertIsInstance(view, discord.ui.LayoutView)
+        parts = [x.content for x in view.children[0].children
+                 if isinstance(x, discord.ui.TextDisplay)]
+        self.assertTrue(parts[0].startswith("###"))
+        self.assertIn("[1](https://example.org/news)", parts[-1])
+        self.assertNotIn("@everyone", "\n".join(parts))
         self.assertEqual(result.details["web_provider"], "brave")
         self.assertNotIn("query", result.details)
         self.assertNotIn("source_content", result.details)
