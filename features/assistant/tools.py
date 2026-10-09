@@ -326,7 +326,9 @@ class CommandToolRegistry:
             "gì, KHÔNG làm như đã xác nhận. "
             "Không tự bịa số liệu, ngày tháng, nguồn, URL. "
             "KHÔNG dùng ký hiệu [1], [2], [3], không liệt kê lại nguồn "
-            "vì Discord sẽ có link dẫn chứng ngắn bên dưới.\n\n"
+            "vì Discord sẽ có link dẫn chứng ngắn bên dưới. "
+            "Không tự chèn link, không tự in đậm: renderer sẽ nhấn mạnh "
+            "kết luận và tự thêm link [1], [2] ở cuối.\n\n"
             f"Câu hỏi công khai: {query[:300]}\n\n"
             + "\n\n".join(evidence)
         )
