@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import aiosqlite
+import discord
 
 from core.db import AsyncQueryContext, CursorWrapper
 from features.assistant.cog import choose_conversation_route
