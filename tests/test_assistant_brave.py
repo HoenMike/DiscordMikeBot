@@ -189,8 +189,9 @@ class BraveProviderTests(unittest.IsolatedAsyncioTestCase):
                 route_locally("tìm trên web tin mới"), message,
             )
         embed = message.reply.await_args.kwargs["embed"]
-        self.assertIn("https://example.org/news", embed.fields[0].value)
-        self.assertNotIn("@everyone", embed.fields[0].value)
+        self.assertIn("[1](https://example.org/news)", embed.description)
+        self.assertNotIn("@everyone", embed.description)
+        self.assertEqual(embed.fields, [])
         self.assertEqual(embed.title.startswith("🔎 "), True)
         self.assertEqual(result.details["web_provider"], "brave")
         self.assertNotIn("query", result.details)
