@@ -1323,6 +1323,37 @@ class TarotResultActionView(discord.ui.View):
 
         if not clarifier_allowed or not drawn_cards:
             self.clarifier_button.disabled = True
+        if len(drawn_cards) != 1:
+            # Multi-card spreads already show the full reading inline.
+            self.remove_item(self.full_reading_button)
+
+    @discord.ui.button(label="📖 Đọc đầy đủ", style=discord.ButtonStyle.secondary, custom_id="tarot_read_full", row=2)
+    async def full_reading_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "Chỉ người bốc quẻ mới xem phần luận giải riêng của mình.", ephemeral=True,
+            )
+            return
+        description = discord.utils.escape_mentions(self.ai_reading or "Chưa có luận giải.")
+        attachment = None
+        if len(description) > 3900:
+            attachment = discord.File(
+                io.BytesIO(description.encode("utf-8")),
+                filename="tarot_reading.txt",
+            )
+            description = description[:3750].rstrip() + "\n\n*Có bản đầy đủ trong tarot_reading.txt*"
+        embed = discord.Embed(
+            title="📖 Luận giải Tarot đầy đủ",
+            description=description,
+            color=0x6D5D8F,
+        )
+        embed.set_footer(text="Nội dung thuộc quẻ hiện tại · Không rút lại lá bài")
+        if attachment is not None:
+            await interaction.response.send_message(
+                embed=embed, file=attachment, ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="❓ Hỏi thêm (0/3)", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
