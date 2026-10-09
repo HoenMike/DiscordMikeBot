@@ -111,6 +111,9 @@ ASUMI_CLEF_MIN_CONFIDENCE = 0.55
 ASUMI_AUTO_SEARCH_ENABLED = True
 ASUMI_WEB_SEARCH_ENABLED = True
 ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED = True
+# Read-only Search answers pilot native Discord Components V2.
+# Does not change Tarot/Feedback/social embeds; legacy embed fallback remains.
+ASUMI_SEARCH_NATIVE_V2_ENABLED = True
 ASUMI_WEB_SEARCH_MONTHLY_REQUEST_CAP = 500
 ASUMI_WEB_SEARCH_MAX_RESULTS = 5
 ASUMI_WEB_SEARCH_DISPLAY_SOURCES = 3  # One short embed, up to 3 source links
