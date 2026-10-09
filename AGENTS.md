@@ -13,6 +13,14 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## T25.1b — Tarot read-only Components V2 (2026-10-09)
+
+- Scoped to the one-card `📖 Đọc đầy đủ` callback; only its *ephemeral reply* uses LayoutView, never mutate the original Tarot V1 reveal/edit message into V2.
+- For text longer than 3900 characters, send the complete `tarot_reading.txt` plus a native File component; ensure source reading is not redrawn or regenerated.
+- Only retry with a legacy embed on an explicit Discord HTTP 400 rejection; never duplicate an uncertain 5xx or timeout.
+- Source toggle: `ASUMI_TAROT_READING_NATIVE_V2_ENABLED` in core/constants.py. Owner permission policy remains the same: full reading readable by channel viewers, followup/why/clarifier author-only.
+- T25.1c interactive pagination and live mobile/desktop screenshots are still outstanding.
+
 ## T25.1a — Native Components V2 Pilot (2026-10-09)
 
 - Discord library upgraded to discord.py 2.7.1. Native V2 messages use `discord.ui.LayoutView` and **cannot include content or embed fields alongside the view**.

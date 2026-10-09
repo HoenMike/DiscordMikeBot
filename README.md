@@ -1,3 +1,7 @@
+## Asumi 3.13.1 — T25.1b Native Tarot Detail
+
+Tarot's **📖 Đọc đầy đủ** button now displays read-only Components V2 for one-card readings, with a File component for long text and safe fallback to the legacy embed. No additional draw or model call; the original message retains the durable full reading. See `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
+
 ## Asumi 3.13.0 — Discord Components V2 Search Pilot
 
 - Upgraded to `discord.py==2.7.1`. Generic public Search answers now render **directly in ordinary Discord chat** using native Components V2 Container/TextDisplay with bold headline and small clickable numeric citations.
