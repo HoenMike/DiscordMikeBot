@@ -559,10 +559,10 @@ class CommandToolRegistry:
         }
         if facts.status == "ok" and facts.aqi is not None and facts.pm25 is not None:
             text = (
-                f"🌫️ **Biên Hòa · US AQI mô hình: {facts.aqi} — {aqi_label(facts.aqi)}**\\n"
+                f"🌫️ **Biên Hòa · US AQI mô hình: {facts.aqi} — {aqi_label(facts.aqi)}**\n"
                 f"PM2.5 mô hình: **{facts.pm25:g} µg/m³** · "
-                f"Cập nhật: **{facts.model_time}**\\n"
-                "⚠️ *Ước tính theo mô hình, không phải số đo trực tiếp tại trạm.*\\n"
+                f"Cập nhật: **{facts.model_time}**\n"
+                "⚠️ *Ước tính theo mô hình, không phải số đo trực tiếp tại trạm.*\n"
                 "[1](https://open-meteo.com/en/docs/air-quality-api)"
             )
             file = None
@@ -572,7 +572,7 @@ class CommandToolRegistry:
                 details["aqi_visual"] = "png"
             except Exception as exc:
                 print(f"[Asumi AQI] rendering failed: {type(exc).__name__}", flush=True)
-                text += "\\n*Chưa thể tạo biểu đồ; các chỉ số phía trên vẫn là dữ liệu mô hình.*"
+                text += "\n*Chưa thể tạo biểu đồ; các chỉ số phía trên vẫn là dữ liệu mô hình.*"
                 details["aqi_visual"] = "text_fallback"
             kwargs = {
                 "mention_author": False,
