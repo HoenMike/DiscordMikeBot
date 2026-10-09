@@ -12,12 +12,28 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.10.1"
-RELEASE_DATE = "2026-10-08"
-CODENAME = "Asumi 3.10.1 - Social Embed Resilience"
+CURRENT_VERSION = "3.10.2"
+RELEASE_DATE = "2026-10-09"
+CODENAME = "Asumi 3.10.2 - Search and Feedback UX"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.10.2", "date": "2026-10-09", "type": "bugfix",
+        "title": "History Self Search, CKTG Web Routing & Feedback Draft",
+        "summary": "Tìm tin nhắn đầu/cuối của chính mình không cần tag, lịch CKTG tự tra Brave; feedback mới không bị kẹt bản nháp cũ.",
+        "changes": [
+            {"category": "Search & Clef", "items": [
+                "Các cách nói 'của t/tôi/mình' nhận diện đúng người hỏi; người được tag rõ ràng vẫn có ưu tiên.",
+                "Câu hỏi lịch CKTG/Worlds năm nay tự gọi Brave nếu tính năng web bật; vẫn giữ lọc nội dung riêng tư và quota.",
+            ]},
+            {"category": "Feedback", "items": [
+                "Có các nút dùng báo cáo mới, giữ bản cũ hoặc hủy bản cũ khi còn draft; không âm thầm xóa dữ liệu.",
+                "Nút trên draft hết hạn/đã thay thế không thể gửi ticket cũ nhầm lẫn.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.10.1", "date": "2026-10-09", "type": "bugfix",
         "title": "More Reliable Social Embeds",
