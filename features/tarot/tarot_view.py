@@ -6,7 +6,7 @@ import discord
 
 import config
 from core import constants as policy
-from features.tarot.native_layout import build_full_reading_layout
+from features.tarot.reading.pagination import TarotReadingPagesView
 from features.tarot.deck import (
     DrawnCard,
     get_yes_no_verdict,
@@ -22,7 +22,6 @@ from features.tarot.reading.clarifier import resolve_clarifier_suggestions, targ
 from features.tarot.reading.custom_spread import CustomSpreadSchema
 from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.reading.recap import build_recap_state
-from features.tarot.inline_ui import render_inline_tarot_to_bytes
 from features.tarot.reading.schema import TarotReadingResult
 from features.tarot.rendering.state import ClarifierBoardState
 from features.tarot.reading.followup import TarotSessionState
@@ -65,25 +64,27 @@ def _unpack_tarot_result(ai_res):
 
 
 def build_reading_payload(embed_cards, ai_reading, title, footer, avatar_url=None):
-    card_text = embed_cards.description or ""
+    """Keep the familiar board + reading embeds. Never attach a TXT preview.
+
+    Discord permits 4096 chars per embed description and 6000 total embed
+    chars per message. The existing read-more action handles the rest.
+    """
     embed_cards.title = (embed_cards.title or "")[:256]
-    embed_cards.description = card_text[:3500]
+    embed_cards.description = (embed_cards.description or "")[:1900]
     title = title[:256]
     footer = footer[:256]
-    budget = min(4096, 6000 - len(embed_cards) - len(title) - len(footer))
-    notice = "\n\nFull reading: tarot_reading.txt"
-    attachment = None
-    if len(ai_reading) > budget or len(card_text) > 3500:
-        description = ai_reading[:max(0, budget - len(notice))] + notice
-        attachment = discord.File(
-            io.BytesIO((card_text + "\n\n" + ai_reading).encode("utf-8")),
-            filename="tarot_reading.txt"
-        )
+    reading = discord.utils.escape_mentions(ai_reading or "Chưa có luận giải.")
+    # Leave headroom for Discord's aggregate 6000-character embed limit.
+    budget = min(3900, max(0, 5850 - len(embed_cards) - len(title) - len(footer) - 150))
+    if len(reading) > budget:
+        notice = "\n\n*Luận giải còn tiếp · bấm **📖 Đọc đầy đủ** để xem trọn.*"
+        description = reading[:max(0, budget - len(notice))].rstrip() + notice
     else:
-        description = ai_reading
-    reading = discord.Embed(title=title, description=description, color=embed_cards.color)
-    reading.set_footer(text=footer, icon_url=avatar_url)
-    return [embed_cards, reading], attachment
+        description = reading
+    detail = discord.Embed(title=title, description=description, color=embed_cards.color)
+    detail.set_footer(text=footer, icon_url=avatar_url)
+    return [embed_cards, detail], None
+
 
 SPREAD_SELECT_OPTIONS = [
     discord.SelectOption(
@@ -1325,61 +1326,20 @@ class TarotResultActionView(discord.ui.View):
 
         if not clarifier_allowed or not drawn_cards:
             self.clarifier_button.disabled = True
-        if len(drawn_cards) != 1:
-            # Multi-card spreads already show the full reading inline.
-            self.remove_item(self.full_reading_button)
-
     @discord.ui.button(label="📖 Đọc đầy đủ", style=discord.ButtonStyle.secondary, custom_id="tarot_read_full", row=2)
     async def full_reading_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Before this UI pilot, the full reading was public in the channel.
-        # Allow any viewer of this message to open the same text privately,
-        # while owner-only Followup / Why / Clarifier remain restricted.
-        reading = self.ai_reading or "Chưa có luận giải."
-        description = discord.utils.escape_mentions(reading)
-        needs_attachment = len(description) > 3900
-
-        def full_file():
-            return discord.File(
-                io.BytesIO(description.encode("utf-8")),
-                filename="tarot_reading.txt",
-            )
-
-        # Native V2 is limited to this read-only detail reply, not the
-        # interaction lifecycle for Tarot draw/flip/followup/clarifier.
-        if policy.ASUMI_TAROT_READING_NATIVE_V2_ENABLED:
-            try:
-                kwargs = {
-                    "view": build_full_reading_layout(reading, with_attachment=needs_attachment),
-                    "ephemeral": True,
-                    "allowed_mentions": discord.AllowedMentions.none(),
-                }
-                if needs_attachment:
-                    kwargs["file"] = full_file()
-                await interaction.response.send_message(**kwargs)
-                return
-            except discord.HTTPException as exc:
-                if exc.status != 400:
-                    raise
-                # Discord definitively rejected this payload. Only this
-                # failure class is safe to retry as an old-style embed.
-                # Make a fresh file object since failed sends may close it.
-        if needs_attachment:
-            visible = description[:3750].rstrip()
-            description = visible + "\n\n*Có bản đầy đủ trong tarot_reading.txt*"
-        embed = discord.Embed(
-            title="📖 Luận giải Tarot đầy đủ",
-            description=description[:4096],
-            color=0x6D5D8F,
+        # Read-only: original card, stored reading, and cooldowns stay untouched.
+        # Paginate inside Discord to avoid its TXT preview and font rendering.
+        pages = TarotReadingPagesView(
+            self.ai_reading or "Chưa có luận giải.",
+            viewer_id=interaction.user.id,
         )
-        embed.set_footer(text="Nội dung thuộc quẻ hiện tại · Không rút lại lá bài")
-        kwargs = {
-            "embed": embed,
-            "ephemeral": True,
-            "allowed_mentions": discord.AllowedMentions.none(),
-        }
-        if needs_attachment:
-            kwargs["file"] = full_file()
-        await interaction.response.send_message(**kwargs)
+        await interaction.response.send_message(
+            embed=pages.build_embed(),
+            view=pages if len(pages.pages) > 1 else None,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @discord.ui.button(label="❓ Hỏi thêm (0/3)", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1977,83 +1937,22 @@ class TarotFlipView(discord.ui.View):
         *,
         image_filename: str = "tarot_spread.png",
     ):
-        """One-card rich UI pilot: answer first, image alongside native actions.
+        """Restore the original spread board and inline reading for every spread.
 
-        The full AI reading remains available via the owner's button. Large
-        spreads keep their established image and two-embed reading workflow.
+        This only changes presentation: the real drawn cards, revealed states,
+        AI reading, Yes/No verdict and action controls remain exactly as before.
         """
-        if len(self.drawn_cards) != 1:
-            return build_reading_payload(
-                embed_cards,
-                ai_reading,
-                self.style_info.get("embed_title", "Tarot"),
-                f"Quẻ bài của {self.author_name}",
-                self.author_avatar_url,
-            )
+        if len(self.drawn_cards) == 1:
+            original = embed_cards.description or ""
+            embed_cards.description = "✅ **HOÀN TẤT**\n\n" + original
 
-        drawn = self.drawn_cards[0]
-        orientation = "NGƯỢC" if drawn.is_reversed else "XUÔI"
-        position_label = drawn.position_title
-        if position_label.upper().startswith("LÁ ") and ":" in position_label:
-            position_label = position_label.split(":", 1)[1].strip()
-
-        safe = discord.utils.escape_mentions
-        lines = ["✅ **HOÀN TẤT**"]
-        if self.question:
-            lines.append(f"**Bạn hỏi:** {safe(self.question[:220])}")
-        lines.append(
-            f"**Lá bài:** {safe(drawn.card.name_vi)} "
-            f"(*{safe(drawn.card.name_en)}*) · {orientation}"
+        return build_reading_payload(
+            embed_cards,
+            ai_reading,
+            self.style_info.get("embed_title", "🔮 THÔNG ĐIỆP TỪ ASUMI"),
+            f"Quẻ bài của {self.author_name} · HOÀN TẤT",
+            self.author_avatar_url,
         )
-
-        is_valid = reading_result is None or reading_result.is_valid
-        if self.spread_key == "yes_no" and is_valid:
-            badge, verdict_desc, _ = get_yes_no_verdict(
-                drawn.card, drawn.is_reversed
-            )
-            lines.append(f"**Phán quyết:** {badge}")
-            lines.append(f"*{safe(verdict_desc[:220])}*")
-
-        if reading_result and not reading_result.is_valid:
-            insight = reading_result.refusal_message or ai_reading
-            takeaway = ""
-        elif reading_result:
-            insight = (
-                reading_result.core_message
-                or reading_result.dominant_theme
-                or ai_reading
-            )
-            takeaway = (
-                reading_result.practical_takeaway[0]
-                if reading_result.practical_takeaway else ""
-            )
-        else:
-            insight = ai_reading
-            takeaway = ""
-
-        lines.append(f"\n**Thông điệp chính**\n{safe(insight[:800])}")
-        if takeaway:
-            lines.append(f"\n**Bạn có thể thử**\n{safe(takeaway[:330])}")
-        lines.append("\n*Bấm **📖 Đọc đầy đủ** hoặc mở tệp `tarot_reading.txt` bất cứ lúc nào.*")
-
-        reading = discord.Embed(
-            title=self.style_info.get("embed_title", "Asumi Tarot")[:256],
-            description="\n".join(lines)[:4096],
-            color=self.embed_color,
-        )
-        reading.set_image(url=f"attachment://{image_filename}")
-        reading.set_footer(
-            text=f"Quẻ bài của {self.author_name} · HOÀN TẤT · UI thử nghiệm",
-            icon_url=self.author_avatar_url,
-        )
-        # Keep the full interpretation durable for anyone with access to the
-        # original message, even after the Discord View's 10-minute timeout.
-        # It was previously public in the old multi-paragraph embed.
-        full_reading_file = discord.File(
-            io.BytesIO((ai_reading or "").encode("utf-8")),
-            filename="tarot_reading.txt",
-        )
-        return [reading], full_reading_file
 
     def build_session_embed(self, last_revealed_indices: Optional[Set[int]] = None) -> discord.Embed:
         """Build the FACE_DOWN/REVEALING session state for the single live message."""
@@ -2399,38 +2298,12 @@ class TarotFlipView(discord.ui.View):
                 mood_tag=mood_tag
             )
 
-            # The one-card pilot replaces the tall spread image with a compact
-            # visual reading. Multi-card boards retain their original layout.
-            image_filename = "tarot_spread.png"
-            if len(self.drawn_cards) == 1 and is_valid_question:
-                try:
-                    glance_state = build_recap_state(
-                        spread_title=self.spread_title,
-                        user_name=self.author_name,
-                        drawn_cards=self.drawn_cards,
-                        reading_result=reading_result,
-                        ai_reading=ai_reading,
-                    )
-                    glance_buffer = await asyncio.to_thread(
-                        render_inline_tarot_to_bytes, glance_state,
-                    )
-                    old_file = file
-                    file = discord.File(
-                        fp=glance_buffer, filename="tarot_inline.png"
-                    )
-                    image_filename = "tarot_inline.png"
-                    old_file.close()
-                except Exception as exc:
-                    print(
-                        f"[Tarot Inline UI] Falling back to original board: "
-                        f"{type(exc).__name__}", flush=True,
-                    )
-
-            final_embeds, reading_file = self.build_final_payload(
+            # Preserve the original rendered board even for single-card
+            # spreads. The reading stays inside Discord embeds, not TXT.
+            final_embeds, _ = self.build_final_payload(
                 embed_cards,
                 ai_reading,
                 reading_result=reading_result,
-                image_filename=image_filename,
             )
 
             # View tương tác sau khi hoàn tất quẻ bài (Hỏi thêm AI & Đánh giá)
@@ -2454,17 +2327,15 @@ class TarotFlipView(discord.ui.View):
 
             action_view.message = self.message or interaction.message
             file.reset()
-            attachments = [file] + ([reading_file] if reading_file else [])
             try:
                 await interaction.edit_original_response(
-                    embeds=final_embeds, attachments=attachments, view=action_view
+                    embeds=final_embeds, attachments=[file], view=action_view
                 )
             except Exception:
                 if self.message:
-                    for attachment in attachments:
-                        attachment.reset()
+                    file.reset()
                     await self.message.edit(
-                        embeds=final_embeds, attachments=attachments, view=action_view
+                        embeds=final_embeds, attachments=[file], view=action_view
                     )
             self.stop()
 

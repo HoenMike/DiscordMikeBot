@@ -13,6 +13,13 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## Asumi 3.13.3 — Restore Tarot legacy presentation (2026-10-09)
+
+- Owner explicitly wants the **original Tarot spread board and flip flow**, just cleaner formatting. Do not substitute the rich Insight PNG, attach a long TXT, or change draws/AI/card selection.
+- The final message uses the existing image `tarot_spread.png` plus a second readable Discord embed. The full-reading button uses Discord-only pagination for unusually long text, with no AI rerun or new draw.
+- User-visible `tarot_reading.txt` is retired. Preserve the generated reading in manager/history and test Discord length limits, no extra attachments, multi-card/Yes-No, and permission boundaries.
+- Search's Components V2 experiment remains independent. Prior T25.1b native Tarot detail panel is superseded **in live Tarot UI only**; legacy helper can remain for compatibility.
+
 ## Asumi 3.13.2 — Tarot mention question preservation (2026-10-09)
 
 - A mention such as @Asumi bốc cho quẻ tarot xem mai nên mặc áo màu gì đi nhậu must preserve the actual question through router → tool bridge → TarotCog.

@@ -149,43 +149,30 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.image.url, "attachment://tarot_spread.png")
         self.assertIn("TỰ CẬP NHẬT", embed.footer.text)
 
-    async def test_one_card_final_payload_prioritizes_reading_in_single_embed(self):
+    async def test_one_card_restores_original_board_and_reading_without_txt(self):
         one_card_task = asyncio.create_task(asyncio.sleep(60))
         card = drawn("major_02", 0, "LÁ 1: NĂNG LƯỢNG NGÀY")
         view = TarotFlipView(
-            author_id=1,
-            author_name="Mai",
-            author_avatar_url=None,
-            spread_key="daily",
-            spread_info=SPREAD_DEFINITIONS["daily"],
-            drawn_cards=[card],
-            question=None,
-            context=None,
-            reader_style="auto",
-            ai_task=one_card_task,
-            tarot_manager=FakeManager(),
+            author_id=1, author_name="Mai", author_avatar_url=None,
+            spread_key="daily", spread_info=SPREAD_DEFINITIONS["daily"],
+            drawn_cards=[card], question=None, context=None, reader_style="auto",
+            ai_task=one_card_task, tarot_manager=FakeManager(),
         )
         source_embed = discord.Embed(
-            title="Cards",
-            description="legacy card block",
+            title="Cards", description=f"**{card.card.name_vi}** (XUÔI)",
             color=0x7851A9,
         )
-
+        source_embed.set_image(url="attachment://tarot_spread.png")
         embeds, attachment = view.build_final_payload(
-            source_embed,
-            "Thông điệp quan trọng nhất nằm ở đây.",
+            source_embed, "Thông điệp quan trọng nhất nằm ở đây."
         )
-
-        self.assertEqual(len(embeds), 1)
-        self.assertEqual(attachment.filename, "tarot_reading.txt")
-        self.assertIn("Thông điệp quan trọng nhất", attachment.fp.getvalue().decode("utf-8"))
-        attachment.close()
+        self.assertEqual(len(embeds), 2)
+        self.assertIsNone(attachment)
         self.assertIn("HOÀN TẤT", embeds[0].description)
         self.assertIn(card.card.name_vi, embeds[0].description)
-        self.assertIn("Thông điệp quan trọng nhất", embeds[0].description)
         self.assertEqual(embeds[0].image.url, "attachment://tarot_spread.png")
-        self.assertIn("HOÀN TẤT", embeds[0].footer.text)
-
+        self.assertIn("Thông điệp quan trọng nhất", embeds[1].description)
+        self.assertNotIn("tarot_reading.txt", str(embeds[1].description))
         one_card_task.cancel()
         try:
             await one_card_task
@@ -193,9 +180,8 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
             pass
         view.stop()
 
-    async def test_single_card_rich_preview_uses_ai_fields_not_full_dump(self):
+    async def test_single_card_long_reading_is_inline_preview_then_pages(self):
         card = drawn("major_02", 0, "LÁ 1: NĂNG LƯỢNG NGÀY")
-        from unittest.mock import MagicMock
         task = asyncio.create_task(asyncio.sleep(60))
         view = TarotFlipView(
             author_id=1, author_name="Tester", author_avatar_url=None,
@@ -204,24 +190,20 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
             ai_task=task, tarot_manager=FakeManager(),
         )
         reading = TarotReadingResult(
-            full_reading="Luận giải chi tiết rất dài" * 200,
-            headline="Quan sát kỹ",
+            full_reading="Luận giải chi tiết rất dài" * 500,
             core_message="Thông điệp chính có cấu trúc.",
-            practical_takeaway=["Đặt một câu hỏi nhỏ để chiêm nghiệm."],
         )
         embeds, attachment = view.build_final_payload(
             discord.Embed(title="Cards"),
             reading.full_reading, reading_result=reading,
-            image_filename="tarot_inline.png",
         )
-        self.assertEqual(embeds[0].image.url, "attachment://tarot_inline.png")
-        self.assertIn(reading.core_message, embeds[0].description)
-        self.assertIn(reading.practical_takeaway[0], embeds[0].description)
-        self.assertNotIn(reading.full_reading[:100], embeds[0].description)
-        self.assertIn("Đọc đầy đủ", embeds[0].description)
-        self.assertEqual(attachment.filename, "tarot_reading.txt")
-        self.assertEqual(attachment.fp.getvalue().decode("utf-8"), reading.full_reading)
-        attachment.close()
+        self.assertIsNone(attachment)
+        self.assertEqual(len(embeds), 2)
+        self.assertIn("Luận giải chi tiết rất dài", embeds[1].description)
+        self.assertIn("Đọc đầy đủ", embeds[1].description)
+        self.assertLessEqual(len(embeds[1].description), 4096)
+        self.assertLessEqual(sum(len(embed) for embed in embeds), 6000)
+        self.assertNotIn("tarot_reading.txt", embeds[1].description)
         task.cancel()
         try:
             await task
@@ -246,12 +228,14 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
             tarot_manager=FakeManager(),
         )
 
-        embeds, _ = view.build_final_payload(
-            discord.Embed(title="Cards", color=0x7851A9),
-            "Giải thích.",
+        source = discord.Embed(
+            title="Cards",
+            description="**⚡ Phán quyết Yes / No:** ✅ Có điều kiện",
+            color=0x7851A9,
         )
+        embeds, _ = view.build_final_payload(source, "Giải thích.")
 
-        self.assertEqual(len(embeds), 1)
+        self.assertEqual(len(embeds), 2)
         self.assertIn("Phán quyết", embeds[0].description)
 
         one_card_task.cancel()

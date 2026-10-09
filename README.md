@@ -1,3 +1,9 @@
+## Asumi 3.13.3 — Original Tarot UI, no TXT
+
+- Tarot uses the **existing card board and flip/draw flow** for all spreads. After the last flip, the AI reading appears **directly in Discord under the board**, not as a `tarot_reading.txt` preview.
+- For long readings, **📖 Đọc đầy đủ** opens previous/next pages without new cards, new AI requests, or downloads. Existing Tarot interaction controls are unchanged.
+- The T25 PNG single-card insight image and native TXT File display were not adopted as the default presentation; the original board remains the visual baseline.
+
 ## Asumi 3.13.1 — T25.1b Native Tarot Detail
 
 Tarot's **📖 Đọc đầy đủ** button now displays read-only Components V2 for one-card readings, with a File component for long text and safe fallback to the legacy embed. No additional draw or model call; the original message retains the durable full reading. See `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.

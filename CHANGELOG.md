@@ -7,6 +7,14 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.13.3] - 2026-10-09 — *Original Tarot UI, no TXT attachments*
+
+### Changed
+- Restored the original spread board rendering after the last card is flipped, including single-card draws. This restores the familiar card art and exact layout instead of replacing it with the T25 inline Insight image.
+- Display the existing AI reading as a second, readable Discord embed below the board. No `tarot_reading.txt` upload, preview, or Discord native File component.
+- For exceptionally long text, the existing **📖 Đọc đầy đủ** button displays the **same** AI reading over multiple ephemeral Discord embed pages, with Prev/Next; never redraws a card or makes another AI call.
+- The old native V2 Tarot read-only panel is retired from the live callback. Search Components V2 and all Tarot mechanics—draw/reveal, Daily, Yes/No, cooldowns, followups, clarifier, recap—remain unchanged.
+
 ## [3.13.2] - 2026-10-09 — *Tarot mention question hotfix*
 
 ### Fixed

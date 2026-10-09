@@ -1,31 +1,28 @@
-"""Read-only Discord Components V2 for the one-card Tarot detail action.
+"""Historical read-only native Tarot V2 view.
 
-The actual Tarot draw, AI reading and ownership rules remain in the existing
-Tarot Views. Never combine LayoutView with content/embed on one message.
+The legacy Discord embed is again the public reading UI. This helper is kept
+for compatibility only and must never upload or reference a TXT attachment.
+Long readings now use features.tarot.reading.pagination in the live callback.
 """
 from __future__ import annotations
 
 import discord
 
-MAX_VISIBLE_READING = 3700
+MAX_VISIBLE_READING = 3500
 
 
 def build_full_reading_layout(reading: str, *, with_attachment: bool = False) -> discord.ui.LayoutView:
+    """Short read-only compatibility view; the attachment flag is ignored."""
     safe = discord.utils.escape_mentions(reading or "Chưa có luận giải.")
     visible = safe[:MAX_VISIBLE_READING].rstrip()
     if len(safe) > MAX_VISIBLE_READING:
-        visible += "\n\n*Bản luận giải đầy đủ nằm trong tệp `tarot_reading.txt` đính kèm.*"
+        visible += "\n\n*Để xem trọn nội dung, dùng tính năng đọc nhiều trang trong Discord.*"
     view = discord.ui.LayoutView(timeout=None)
     view.add_item(discord.ui.Container(
-        discord.ui.TextDisplay("### 📖 Luận giải Tarot đầy đủ"),
+        discord.ui.TextDisplay("### 📖 Luận giải Tarot"),
         discord.ui.Separator(visible=True),
         discord.ui.TextDisplay(visible),
-        discord.ui.TextDisplay(
-            "-# Asumi Tarot · Quẻ đã rút · Không rút lại lá bài"
-        ),
+        discord.ui.TextDisplay("-# Asumi Tarot · Không rút lại lá bài"),
         accent_colour=discord.Colour(0x6D5D8F),
     ))
-    if with_attachment:
-        # V2 attachments must be explicitly surfaced by a File component.
-        view.add_item(discord.ui.File("attachment://tarot_reading.txt"))
     return view

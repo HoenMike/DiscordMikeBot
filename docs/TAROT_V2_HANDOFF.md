@@ -16,6 +16,14 @@ The user explicitly requested that a future session should be able to point at t
 
 ---
 
+### 2026-10-09 — Asumi 3.13.3 owner-approved Tarot UI decision
+
+- After screenshot feedback showing an unreadable `tarot_reading.txt` Discord preview, the owner requested **remove TXT entirely and keep the original Tarot UI/mechanics**, focusing only on appearance.
+- Reuse the final `render_spread_to_bytes` board for all spreads (including one-card), and show a companion AI-reading embed below it. Eliminate TXT uploads from final results and read-more interactions.
+- For lengthy generated readings exceeding Discord's embed budget, keep a short in-message portion and use the existing `📖 Đọc đầy đủ` action to open the **same reading** in ephemeral Prev/Next pages. No additional model/draw.
+- Don't change the 3.13.2 natural-language question preservation, existing cooldown, Daily, card-flipping, followups, clarifier, Why, Recap, or Search UI.
+- Code: `features/tarot/tarot_view.py`, `features/tarot/reading/pagination.py`. Tests: `tests/test_tarot_v2_session.py` and `tests/test_tarot_native_layout.py`. CI and real Discord mobile/desktop verification are distinct acceptance gates.
+
 ## 1. Read these files first
 
 In a fresh session, read in this order:
