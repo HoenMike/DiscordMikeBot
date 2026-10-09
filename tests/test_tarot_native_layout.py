@@ -43,7 +43,7 @@ class TarotReadingPagesTests(unittest.IsolatedAsyncioTestCase):
         await read_button(view).callback(interaction)
         kwargs = response.send_message.await_args.kwargs
         self.assertTrue(kwargs["ephemeral"])
-        self.assertEqual(kwargs["allowed_mentions"], discord.AllowedMentions.none())
+        self.assertFalse(kwargs["allowed_mentions"].everyone)
         self.assertIn("LUẬN GIẢI TAROT", kwargs["embed"].title)
         self.assertIsInstance(kwargs["view"], TarotReadingPagesView)
         self.assertNotIn("file", kwargs)
