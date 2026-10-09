@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.13.0"
+CURRENT_VERSION = "3.13.1"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.13.0 - Native Discord Components V2 Pilot"
+CODENAME = "Asumi 3.13.1 - Native Tarot Reading Panel"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.13.1", "date": "2026-10-09", "type": "bugfix",
+        "title": "Native Tarot Reading Panel",
+        "summary": "Nút Đọc đầy đủ Tarot một lá mở giao diện Components V2, có tệp luận giải dài và fallback embed.",
+        "changes": [
+            {"category": "Tarot UX", "items": [
+                "Dùng native Container và TextDisplay cho luận giải một lá, không đổi rút/lật bài hoặc luồng hỏi thêm.",
+                "Nội dung dài có File component trỏ tới tệp tarot_reading.txt; kết quả đầy đủ vẫn được lưu trong tin nhắn gốc.",
+                "Nếu Discord từ chối V2 bằng HTTP 400 thì thử embed cũ; không retry lỗi mơ hồ.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.13.0", "date": "2026-10-09", "type": "minor",
         "title": "Discord Components V2 Native Search Pilot",
