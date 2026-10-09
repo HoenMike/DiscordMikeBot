@@ -245,26 +245,29 @@ class SummaryBot(commands.Bot):
         assistant = self.get_cog("AssistantCog")
         if assistant and assistant.should_handle(message):
             from core.deploy_recovery import deploy_recovery, eligible_replay
-            tracked = False
+            claim_token = None
             if eligible_replay(message, getattr(getattr(self, "user", None), "id", None)):
                 tracked = await deploy_recovery.register(message)
                 if tracked:
                     try:
-                        if not await deploy_recovery.claim(message.id):
-                            return  # Already handled or claimed by recovery/another process.
+                        claim_token = await deploy_recovery.claim(message.id)
+                        if not claim_token:
+                            return  # Already handled or claimed by another worker.
                     except Exception as exc:
                         print(
                             f"[Asumi Recovery] live claim unavailable: {type(exc).__name__}",
                             flush=True,
                         )
-                        tracked = False  # Fail open: answer live messages normally.
+                        claim_token = None  # Fail open for newly received messages.
             handled = False
             try:
                 handled = await assistant.handle_conversation_message(message)
             finally:
-                if tracked:
+                if claim_token:
                     try:
-                        await deploy_recovery.finish(message.id, done=handled)
+                        await deploy_recovery.finish(
+                            message.id, done=handled, claim_token=claim_token,
+                        )
                     except Exception as exc:
                         print(
                             f"[Asumi Recovery] live finish failed: {type(exc).__name__}",
