@@ -331,9 +331,22 @@ def route_locally(text: str) -> RouteDecision:
 
     tarot_signal = any(signal in folded for signal in ("tarot", "boc bai", "boi bai"))
     if tarot_signal:
-        if any(signal in folded for signal in ("daily", "hom nay", "ngay hom nay")):
-            return RouteDecision(intent="tarot_daily", tool="tarot.daily")
-        return RouteDecision(intent="tarot", tool="tarot.launch")
+        from features.tarot.reading.request import parse_tarot_request
+
+        request = parse_tarot_request(text)
+        args = {"question": request.question} if request.question else {}
+        if request.daily:
+            return RouteDecision(intent="tarot_daily", tool="tarot.daily", arguments=args)
+        if request.draw_now:
+            # An explicit "bốc/rút/bói ... [question]" is already consent to
+            # draw. Reuse the existing Tarot command/cooldown and its AI reading.
+            from features.tarot.reading.recommendation import recommend_spread
+            spread_key = recommend_spread(request.question).spread_key
+            return RouteDecision(
+                intent="tarot_draw", tool="tarot.draw",
+                arguments={**args, "spread_key": spread_key},
+            )
+        return RouteDecision(intent="tarot", tool="tarot.launch", arguments=args)
 
     summary_signals = (
         "tom tat",
