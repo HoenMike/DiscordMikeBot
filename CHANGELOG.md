@@ -7,6 +7,13 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.13.1] - 2026-10-09 — *Native Tarot Reading Panel*
+
+### Improved
+- `📖 Đọc đầy đủ` on one-card Tarot opens a read-only native Components V2 container: title, divider, full interpretation preview and discreet footer.
+- Long readings show a native File component and fresh `tarot_reading.txt` attachment; public original complete reading remains in the first Tarot result.
+- Discord HTTP 400 rejection falls back to the legacy ephemeral embed, controlled by `ASUMI_TAROT_READING_NATIVE_V2_ENABLED`. No Tarot draw, reveal, cooldown, AI, follow-up or permission changes.
+
 ## [3.13.0] - 2026-10-09 — *Native Search Components V2*
 
 ### Added
