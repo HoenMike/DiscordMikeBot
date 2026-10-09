@@ -2017,7 +2017,7 @@ class TarotFlipView(discord.ui.View):
         )
         reading.set_image(url=f"attachment://{image_filename}")
         reading.set_footer(
-            text=f"Quẻ bài của {self.author_name} · Giao diện Tarot thử nghiệm",
+            text=f"Quẻ bài của {self.author_name} · HOÀN TẤT · UI thử nghiệm",
             icon_url=self.author_avatar_url,
         )
         return [reading], None
