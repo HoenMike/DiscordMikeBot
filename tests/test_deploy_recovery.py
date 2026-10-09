@@ -53,15 +53,25 @@ class RecoveryStore(unittest.IsolatedAsyncioTestCase):
     async def test_claim_is_compare_and_swap_with_retry_cap(self):
         store = NS(commit=AsyncMock(), execute=AsyncMock(return_value=NS(rowcount=1)))
         recovery = DeployRecovery(store=store)
-        self.assertTrue(await recovery.claim(42))
+        token = await recovery.claim(42)
+        self.assertIsInstance(token, str)
+        self.assertEqual(len(token), 32)
         query, args = store.execute.await_args.args
         self.assertIn("attempts<?", query)
         self.assertIn("status='processing'", query)
-        self.assertEqual(args[1], "42")
-        self.assertEqual(args[2], 2)
+        self.assertIn("claim_token=?", query)
+        self.assertEqual(args[0], token)
+        self.assertEqual(args[2], "42")
+        self.assertEqual(args[3], 2)
+
+        await recovery.finish(42, done=True, claim_token=token)
+        finish_query, finish_args = store.execute.await_args.args
+        self.assertIn("claim_token=?", finish_query)
+        self.assertIn("status='processing'", finish_query)
+        self.assertEqual(finish_args[-1], token)
 
         store.execute.return_value = NS(rowcount=0)
-        self.assertFalse(await recovery.claim(42))
+        self.assertIsNone(await recovery.claim(42))
 
     async def test_local_sqlite_cannot_claim_durable_guarantee(self):
         store = NS(is_cloud=False, connect=AsyncMock(), execute=AsyncMock())
