@@ -50,7 +50,7 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result.tool, "web.search")
         self.assertEqual(result.source, "local_public_event_schedule")
-        self.assertRegex(result.arguments["query"], r"20\\d{2}$")
+        self.assertRegex(result.arguments["query"], r"20\d{2}$")
         clef.classify.assert_not_awaited()
 
         for unsafe in (
