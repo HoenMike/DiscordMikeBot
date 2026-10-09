@@ -228,10 +228,12 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
             tarot_manager=FakeManager(),
         )
 
-        embeds, _ = view.build_final_payload(
-            discord.Embed(title="Cards", color=0x7851A9),
-            "Giải thích.",
+        source = discord.Embed(
+            title="Cards",
+            description="**⚡ Phán quyết Yes / No:** ✅ Có điều kiện",
+            color=0x7851A9,
         )
+        embeds, _ = view.build_final_payload(source, "Giải thích.")
 
         self.assertEqual(len(embeds), 2)
         self.assertIn("Phán quyết", embeds[0].description)
