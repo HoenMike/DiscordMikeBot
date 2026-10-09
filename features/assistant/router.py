@@ -74,6 +74,7 @@ def _safe_public_web_query(text: str) -> bool:
         "latest", "news", "release", "today", "bao nhieu",
         "o dau", "gio mo cua", "thong bao moi",
         "cktg", "worlds", "chung ket the gioi", "lich thi dau",
+        "aqi", "pm2.5", "chat luong khong khi", "bui min",
     )
     return len(folded) >= 12 and any(s in folded for s in public_signals)
 
@@ -122,6 +123,19 @@ def _public_event_query(text: str) -> str:
         return original
     year = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).year
     return f"{original} {year}"
+
+
+def _current_aqi_bien_hoa_query(text: str) -> bool:
+    """Only public fixed-place modeled AQI; never derive place from chat."""
+    if not _safe_public_web_query(text):
+        return False
+    folded = _fold(text).replace("đ", "d")
+    return (
+        "bien hoa" in folded
+        and any(s in folded for s in (
+            "aqi", "pm2.5", "chat luong khong khi", "bui min",
+        ))
+    )
 
 
 def _current_weather_query(text: str) -> bool:
@@ -419,6 +433,16 @@ async def route_message(
             tool="web.search",
             arguments={"query": _public_event_query(text)},
             source="local_public_event_schedule",
+            route_ms=(time.perf_counter() - started) * 1000,
+        )
+
+    # T25.2 fixed-city AQI is typed public model data, not station observation
+    # or a Brave snippet synthesis. Do not infer location from private context.
+    if _current_aqi_bien_hoa_query(text):
+        return RouteDecision(
+            intent="air_quality", tool="air_quality.report",
+            arguments={"query": text.strip()},
+            source="local_aqi_model",
             route_ms=(time.perf_counter() - started) * 1000,
         )
 
