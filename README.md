@@ -1,3 +1,7 @@
+## Asumi 3.11.1 — Readable answer-first Search
+
+Web answers now start with a **bold conclusion**, supporting detail follows in a short paragraph, and sources appear as compact clickable **[1] · [2]** links below. No source-title list, domain badge or long verification section; searching remains an internal tool. Missing evidence still produces an explicit uncertainty statement.
+
 ## Asumi 3.11.0 — Tarot Rich Reply + Answer-First Web Search
 
 - For ordinary public web questions, Asumi automatically searches and **answers the question first** from the available public evidence; Brave snippets are internal, and the reply keeps only up to two short verification links. If the answer cannot be verified, Asumi says so; it will not invent a start date.
