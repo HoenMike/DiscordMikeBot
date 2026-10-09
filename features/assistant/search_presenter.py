@@ -60,45 +60,43 @@ def prioritize_sources(query: str, hits, maximum: int | None = None):
 
 
 def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
-    """One short answer followed by a maximum of three clearly linked sources."""
-    title = _plain(query, 115) or "Tra cứu web"
-    # Model citation indices are not Discord links. Sources are clickable below;
-    # never leave unlinked [1]/[2]/[3] references in the answer.
-    answer = re.sub(r"\[(?:[1-9]|10)\]", "", _plain(summary, 620))
+    """Answer-first Discord response; Brave is an invisible retrieval layer.
+
+    The model produces only the answer. Link citations remain user-clickable,
+    but raw search snippets and keyword-result dumps are not the product.
+    """
+    title = _plain(query, 105) or "Câu hỏi của bạn"
+    answer = re.sub(r"\\[(?:[1-9]|10)\\]", "", _plain(summary, 700))
     answer = " ".join(answer.split())
     if not answer:
         answer = (
-            "Mình tìm được các nguồn tham khảo bên dưới, nhưng trích đoạn "
-            "chưa đủ để xác minh một câu trả lời chính xác."
+            "Mình chưa thể xác minh câu trả lời chính xác từ dữ liệu công khai "
+            "vừa tìm được. Bạn có thể đối chiếu các nguồn gốc bên dưới."
         )
     embed = discord.Embed(
         title=f"🔎 {title}",
-        description=discord.utils.escape_mentions(answer)[:700],
+        description=discord.utils.escape_mentions(answer)[:800],
         color=0x5888A8,
     )
-    lines: list[str] = []
-    for i, item in enumerate(prioritize_sources(query, hits), 1):
+    # A handful of links is enough for provenance, not a substitute for an
+    # answer. Snippets can be stale, contradictory or malicious: don't
+    # display them as if they were Asumi's own explanation.
+    lines = []
+    for item in prioritize_sources(query, hits, maximum=2):
+        host = (urlsplit(item.url).hostname or "").lower().removeprefix("www.")
+        if not host or not item.url.startswith(("https://", "http://")):
+            continue
         label = discord.utils.escape_markdown(
-            discord.utils.escape_mentions(_plain(item.title, 96))
+            discord.utils.escape_mentions(_plain(item.title, 70))
         )
-        domain = (urlsplit(item.url).hostname or "Nguồn web").removeprefix("www.")
-        excerpt = discord.utils.escape_markdown(
-            discord.utils.escape_mentions(_plain(item.description, 135))
-        )
-        entry = f"**{i}. [{label}]({item.url})** · `{domain}`"
-        if excerpt:
-            entry += f"\n{excerpt}"
-        if len("\n\n".join([*lines, entry])) > 1010:
+        entry = f"[{label}]({item.url}) · `{host[:55]}`"
+        if len("\\n".join([*lines, entry])) > 900:
             break
         lines.append(entry)
     if lines:
-        embed.add_field(name="Nguồn tham khảo", value="\n\n".join(lines), inline=False)
-    note = "Brave Search · Mở link để xác minh nội dung gốc"
-    if any(x in _fold(query) for x in ("hom nay", "moi nhat", "hien tai", "bay gio")):
-        note = "Brave Search · Trích đoạn có thể chưa cập nhật tức thời"
-    embed.set_footer(text=note)
+        embed.add_field(name="Kiểm chứng thông tin", value="\\n".join(lines), inline=False)
+    embed.set_footer(text="Asumi · Tổng hợp từ web công khai · Kiểm tra ngày và nguồn gốc")
     return embed
-
 
 def build_verified_fuel_embed(query: str, report) -> discord.Embed:
     """Show actual dated first-party prices, not search-result excerpts.
