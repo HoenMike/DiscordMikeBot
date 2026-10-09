@@ -1329,11 +1329,9 @@ class TarotResultActionView(discord.ui.View):
 
     @discord.ui.button(label="📖 Đọc đầy đủ", style=discord.ButtonStyle.secondary, custom_id="tarot_read_full", row=2)
     async def full_reading_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "Chỉ người bốc quẻ mới xem phần luận giải riêng của mình.", ephemeral=True,
-            )
-            return
+        # Before this UI pilot, the full reading was public in the channel.
+        # Allow any viewer of this message to open the same text privately,
+        # while owner-only Followup / Why / Clarifier remain restricted.
         description = discord.utils.escape_mentions(self.ai_reading or "Chưa có luận giải.")
         attachment = None
         if len(description) > 3900:
@@ -2008,7 +2006,7 @@ class TarotFlipView(discord.ui.View):
         lines.append(f"\n**Thông điệp chính**\n{safe(insight[:800])}")
         if takeaway:
             lines.append(f"\n**Bạn có thể thử**\n{safe(takeaway[:330])}")
-        lines.append("\n*Bấm **📖 Đọc đầy đủ** để xem toàn bộ luận giải.*")
+        lines.append("\n*Bấm **📖 Đọc đầy đủ** hoặc mở tệp `tarot_reading.txt` bất cứ lúc nào.*")
 
         reading = discord.Embed(
             title=self.style_info.get("embed_title", "Asumi Tarot")[:256],
@@ -2020,7 +2018,14 @@ class TarotFlipView(discord.ui.View):
             text=f"Quẻ bài của {self.author_name} · HOÀN TẤT · UI thử nghiệm",
             icon_url=self.author_avatar_url,
         )
-        return [reading], None
+        # Keep the full interpretation durable for anyone with access to the
+        # original message, even after the Discord View's 10-minute timeout.
+        # It was previously public in the old multi-paragraph embed.
+        full_reading_file = discord.File(
+            io.BytesIO((ai_reading or "").encode("utf-8")),
+            filename="tarot_reading.txt",
+        )
+        return [reading], full_reading_file
 
     def build_session_embed(self, last_revealed_indices: Optional[Set[int]] = None) -> discord.Embed:
         """Build the FACE_DOWN/REVEALING session state for the single live message."""
