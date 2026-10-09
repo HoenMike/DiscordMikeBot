@@ -166,7 +166,7 @@ class AssistantCog(commands.Cog):
                 flush=True,
             )
 
-    async def handle_conversation_message(self, message) -> bool:
+    async def handle_conversation_message(self, message, *, recovery_mode: bool = False) -> bool:
         if not self.should_handle(message):
             return False
 
@@ -196,6 +196,18 @@ class AssistantCog(commands.Cog):
             allowed_search_tools=self._allowed_auto_search_tools(),
         )
         route_ms = (time.perf_counter() - route_started) * 1000
+
+        if recovery_mode and decision.tool and decision.tool not in {
+            "web.search", "weather.forecast", "discord_history.search",
+        }:
+            # We don't replay commands that could charge game quotas, submit
+            # feedback, run Tarot draws or mutate Archive after a restart.
+            await message.reply(
+                "🔄 Mình đã tìm lại lời nhắn gửi lúc cập nhật, nhưng đây là "
+                "thao tác cần bạn xác nhận lại. Hãy gửi lại yêu cầu nếu vẫn muốn thực hiện.",
+                mention_author=False,
+            )
+            return True
 
         if decision.tool:
             tool_started = time.perf_counter()
