@@ -14,17 +14,17 @@ from datetime import datetime, timezone
 import discord
 
 from core.db import db_client
+from core import constants as policy
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 
-# Keep all non-secret knobs in source, not Render Environment.
-LOOKBACK_SECONDS = 15 * 60
-FIRST_BOOT_LOOKBACK_SECONDS = 2 * 60
-HEARTBEAT_SECONDS = 60
-CLAIM_LEASE_SECONDS = 90
-MAX_RETRIES = 2
-MAX_CHANNELS = 80
-MAX_MESSAGES_PER_CHANNEL = 100
-MAX_PENDING = 60
+LOOKBACK_SECONDS = policy.ASUMI_RECOVERY_LOOKBACK_SECONDS
+FIRST_BOOT_LOOKBACK_SECONDS = policy.ASUMI_RECOVERY_FIRST_BOOT_SECONDS
+HEARTBEAT_SECONDS = policy.ASUMI_RECOVERY_HEARTBEAT_SECONDS
+CLAIM_LEASE_SECONDS = policy.ASUMI_RECOVERY_CLAIM_LEASE_SECONDS
+MAX_RETRIES = policy.ASUMI_RECOVERY_MAX_RETRIES
+MAX_CHANNELS = policy.ASUMI_RECOVERY_MAX_CHANNELS
+MAX_MESSAGES_PER_CHANNEL = policy.ASUMI_RECOVERY_MAX_MESSAGES_PER_CHANNEL
+MAX_PENDING = policy.ASUMI_RECOVERY_MAX_MESSAGES_PER_PASS
 
 RECOVERY_ACK = "⏳ **Asumi vừa kết nối lại** — mình đã tìm được lời nhắn lúc cập nhật và đang xử lý."
 
@@ -62,6 +62,7 @@ class DeployRecovery:
         self._schema_ready = False
         self._recovery_lock = asyncio.Lock()
         self._heartbeat_task: asyncio.Task | None = None
+        self._lease_retry_task: asyncio.Task | None = None
 
     async def _ready_store(self) -> bool:
         await self.store.connect()
@@ -178,8 +179,31 @@ class DeployRecovery:
                 await self.heartbeat()
                 if self._heartbeat_task is None or self._heartbeat_task.done():
                     self._heartbeat_task = asyncio.create_task(self._heartbeat_loop(bot))
+                # An in-flight request from the old process may retain its
+                # lease for 90s. Reconcile once more after lease expiry, or
+                # it would remain unhandled until the NEXT redeploy.
+                if self._lease_retry_task is None or self._lease_retry_task.done():
+                    self._lease_retry_task = asyncio.create_task(
+                        self._retry_expired_claims(bot, cutoff),
+                        name="asumi-recovery-lease-retry",
+                    )
             except Exception as exc:
                 print(f"[Asumi Recovery] startup recovery error: {type(exc).__name__}: {exc}", flush=True)
+
+    async def _retry_expired_claims(self, bot, cutoff: float) -> None:
+        await asyncio.sleep(CLAIM_LEASE_SECONDS + 5)
+        if bot.is_ready() and not bot.is_closed():
+            async with self._recovery_lock:
+                try:
+                    await self.recover(
+                        bot,
+                        cutoff=max(cutoff, time.time() - LOOKBACK_SECONDS),
+                    )
+                except Exception as exc:
+                    print(
+                        f"[Asumi Recovery] lease retry failed: {type(exc).__name__}",
+                        flush=True,
+                    )
 
     @staticmethod
     def _can_read(bot, channel) -> bool:
@@ -189,7 +213,12 @@ class DeployRecovery:
             return False
         try:
             p = channel.permissions_for(me)
-            return bool(p.view_channel and p.read_message_history and p.send_messages)
+            can_send = (
+                getattr(p, "send_messages_in_threads", False)
+                if isinstance(channel, discord.Thread)
+                else getattr(p, "send_messages", False)
+            )
+            return bool(p.view_channel and p.read_message_history and can_send)
         except Exception:
             return False
 
@@ -199,10 +228,14 @@ class DeployRecovery:
             return
         if not self._can_read(bot, message.channel):
             return
-        if not isinstance(message.author, discord.Member):
-            # A departed user must not have private requests retried.
-            return
-        if not message.channel.permissions_for(message.author).view_channel:
+        member = message.author
+        if not isinstance(member, discord.Member):
+            # Discord may not have this member in its cache after a reboot.
+            try:
+                member = await message.guild.fetch_member(message.author.id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return
+        if not message.channel.permissions_for(member).view_channel:
             return
         if already_answered(message, known_messages, bot_id):
             await self.register(message)
