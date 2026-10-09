@@ -23,7 +23,9 @@
 
 **T25.1a — Asumi 3.13.0, native Search pilot:** upgrade discord.py 2.4.0 → 2.7.1 and render read-only, non-fuel Brave answers as native `LayoutView → Container → TextDisplay/Separator/TextDisplay`. Keep answer-first bold takeaway and numbered [1] [2] citations. No `content` or `embed` alongside a V2 view. Existing specialised factual sources (fuel/weather), Tarot, Feedback, social embed and other commands retain V1 behavior. On Discord HTTP 400 explicitly rejecting V2, use a single legacy embed fallback; do not retry ambiguous network failures to avoid duplicate answers. Controlled rollback is `ASUMI_SEARCH_NATIVE_V2_ENABLED=False` in `core/constants.py` and redeploy.
 
-**T25.1b — Still pending:** move an individually selected, read-only Tarot or ticket-status view to V2 with permission checks, timeout and existing UI fallback. **T25.1c — Still pending:** native pagination/interactive Search actions where genuinely useful, full mobile/desktop visual acceptance, and follow-up regression for interactions. Do not claim that T25.1 is complete merely because the foundation and Search pilot shipped.
+**T25.1b — Asumi 3.13.1 (code in PR):** one-card Tarot **📖 Đọc đầy đủ** opens a read-only V2 `LayoutView` as a new ephemeral response; it never converts the existing V1 Tarot draw/flip message. Long readings show a native File component referencing `tarot_reading.txt`; the complete reading remains in the original public Tarot message. Explicit HTTP 400 → old embed fallback. The author-only follow-up, why and clarifier restrictions remain unchanged.
+
+**T25.1c — Still pending:** native Search pagination/interactive read-only actions where useful, full mobile/desktop visual acceptance, and regression for interactions. Do not claim that T25.1 is complete merely because the foundation and Search pilot shipped.
 
 - Never allow AI to emit arbitrary component definitions. Continue using a code-owned allowlist of approved UI builders.
 - Legacy embed/button views remain fully supported; do not convert existing interaction messages in place because the V2 flag is irreversible.
