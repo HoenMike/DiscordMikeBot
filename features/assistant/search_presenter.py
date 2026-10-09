@@ -123,6 +123,29 @@ def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
     )
 
 
+def build_search_layout(query: str, hits, summary: str = "") -> discord.ui.LayoutView:
+    """Read-only native Components V2 result, preserving answer-first citations.
+
+    Unlike an embed, LayoutView owns the *entire* message content: never pass
+    content= or embed= alongside this view. Sources remain clickable numeric
+    Markdown links, not extra buttons or visible Brave snippets.
+    """
+    legacy = build_search_embed(query, hits, summary=summary)
+    title = discord.utils.escape_markdown(
+        discord.utils.escape_mentions(legacy.title or "Asumi Search")
+    )
+    # All content must live in V2 TextDisplay; the legacy embed is a safe
+    # fallback and makes the text contract identical across both renderers.
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(discord.ui.Container(
+        discord.ui.TextDisplay(f"### {title[:150]}"),
+        discord.ui.Separator(visible=True),
+        discord.ui.TextDisplay((legacy.description or "")[:3900]),
+        accent_colour=discord.Colour(0x5888A8),
+    ))
+    return view
+
+
 def build_verified_fuel_embed(query: str, report) -> discord.Embed:
     """Show actual dated first-party prices, not search-result excerpts.
 
