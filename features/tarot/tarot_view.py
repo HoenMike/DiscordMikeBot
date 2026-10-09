@@ -1349,7 +1349,7 @@ class TarotResultActionView(discord.ui.View):
         if policy.ASUMI_TAROT_READING_NATIVE_V2_ENABLED:
             try:
                 kwargs = {
-                    "view": build_full_reading_layout(reading),
+                    "view": build_full_reading_layout(reading, with_attachment=needs_attachment),
                     "ephemeral": True,
                     "allowed_mentions": discord.AllowedMentions.none(),
                 }
