@@ -294,9 +294,11 @@ class DeployRecovery:
                 messages = [
                     m async for m in channel.history(
                         limit=MAX_MESSAGES_PER_CHANNEL,
-                        after=cutoff_dt, oldest_first=True,
+                        after=cutoff_dt, oldest_first=False,
                     )
                 ]
+                # Take the newest bounded window, then replay oldest first.
+                messages.reverse()
             except (discord.Forbidden, discord.HTTPException):
                 continue
             except Exception as exc:
