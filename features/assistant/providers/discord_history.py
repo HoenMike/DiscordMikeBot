@@ -179,14 +179,33 @@ class DiscordHistorySearcher:
         )
 
     @staticmethod
-    def _author_ids(message) -> list[int]:
+    def _author_ids(message, query: str = "") -> list[int]:
         bot_id = getattr(getattr(message, "guild", None), "me", None)
         bot_id = getattr(bot_id, "id", None)
-        return list(dict.fromkeys(
+        authors = list(dict.fromkeys(
             int(user.id)
             for user in (getattr(message, "mentions", None) or [])
             if getattr(user, "id", None) is not None and user.id != bot_id
         ))
+        # Explicit people always win. In Discord a mention of Asumi itself is
+        # NOT the person being searched. Vietnamese self-references such as
+        # "của t", "của tôi" and "mình đã nhắn" resolve to the requester.
+        if authors:
+            return authors
+        folded = _fold(query).replace("đ", "d")
+        own_message = (
+            re.search(r"\bcua\s+(?:t|toi|tui|minh|em|tao|ban than)\b", folded)
+            or re.search(
+                r"\b(?:t|toi|tui|minh|em|tao)\s+(?:da\s+)?(?:nhan|gui|viet|noi)\b",
+                folded,
+            )
+            or re.search(r"\b(?:my messages|my first message|my last message)\b", folded)
+        )
+        if own_message:
+            requester_id = getattr(getattr(message, "author", None), "id", None)
+            if requester_id is not None:
+                return [int(requester_id)]
+        return []
 
     @staticmethod
     def _can_show(guild, requester, channel_id: int) -> bool:
@@ -228,7 +247,7 @@ class DiscordHistorySearcher:
         guild = getattr(message, "guild", None)
         if guild is None:
             return HistorySearchResult(status="guild_only")
-        author_ids = self._author_ids(message)
+        author_ids = self._author_ids(message, query)
         if len(author_ids) > 1:
             return HistorySearchResult(status="multiple_authors")
         temporal = _temporal_request(query)

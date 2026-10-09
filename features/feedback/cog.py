@@ -60,6 +60,9 @@ class ExplanationModal(discord.ui.Modal, title="Bổ sung thông tin feedback"):
 
     async def on_submit(self, interaction: discord.Interaction):
         draft = self.parent_view.draft
+        if self.parent_view.owner._active(draft.guild_id, draft.reporter_id) is not draft:
+            await interaction.response.send_message("Bản nháp này không còn hiệu lực.", ephemeral=True)
+            return
         draft.explanation = str(self.explanation.value).strip()
         await interaction.response.send_message(
             "Đã thêm lời giải thích. Bạn có thể gửi ticket dù đây có thể là "
@@ -78,6 +81,11 @@ class ConfirmView(discord.ui.View):
         if interaction.user.id != self.draft.reporter_id:
             await interaction.response.send_message(
                 "Chỉ người gửi mới được xác nhận ticket này.", ephemeral=True
+            )
+            return False
+        if self.owner._active(self.draft.guild_id, self.draft.reporter_id) is not self.draft:
+            await interaction.response.send_message(
+                "Bản nháp cũ đã hết hạn hoặc được thay bằng báo cáo mới.", ephemeral=True
             )
             return False
         return True
@@ -138,6 +146,9 @@ class ExplanationModalForPreview(discord.ui.Modal, title="Chỉnh sửa mô tả
         self.description.default = view.draft.explanation or view.draft.description[:1700]
 
     async def on_submit(self, interaction: discord.Interaction):
+        if self.view.owner._active(self.view.draft.guild_id, self.view.draft.reporter_id) is not self.view.draft:
+            await interaction.response.send_message("Bản nháp này không còn hiệu lực.", ephemeral=True)
+            return
         self.view.draft.explanation = str(self.description.value).strip()
         await interaction.response.send_message(
             "Đã cập nhật lời giải thích. Quay lại thẻ xác nhận để gửi ticket.", ephemeral=True
@@ -153,6 +164,11 @@ class FeedbackView(discord.ui.View):
         if interaction.user.id != self.draft.reporter_id:
             await interaction.response.send_message(
                 "Chỉ người gửi feedback được thao tác các nút này.", ephemeral=True
+            )
+            return False
+        if self.owner._active(self.draft.guild_id, self.draft.reporter_id) is not self.draft:
+            await interaction.response.send_message(
+                "Bản nháp cũ đã hết hạn hoặc được thay bằng báo cáo mới.", ephemeral=True
             )
             return False
         return True
@@ -188,6 +204,53 @@ class FeedbackView(discord.ui.View):
                 preview.set_image(url=original.url)
         self.stop()
         await interaction.response.edit_message(content=None, embed=preview, view=ConfirmView(self.owner, draft))
+
+
+class DraftConflictView(discord.ui.View):
+    """Resolve one user's unfinished draft without losing it silently."""
+
+    def __init__(self, owner: "FeedbackCog", previous: FeedbackDraft, incoming: FeedbackDraft):
+        super().__init__(timeout=300)
+        self.owner, self.previous, self.incoming = owner, previous, incoming
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.incoming.reporter_id:
+            await interaction.response.send_message(
+                "Chỉ người gửi feedback mới được chọn bản nháp.", ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Dùng báo cáo mới", style=discord.ButtonStyle.success)
+    async def replace(self, interaction: discord.Interaction, button: discord.ui.Button):
+        key = self.owner._key(self.incoming.guild_id, self.incoming.reporter_id)
+        current = self.owner._active(*key)
+        if current is not None and current is not self.previous:
+            await interaction.response.send_message(
+                "Bạn đã mở bản nháp khác. Hãy thao tác trên bản mới nhất.", ephemeral=True,
+            )
+            return
+        self.owner.drafts[key] = self.incoming
+        self.stop()
+        await interaction.response.edit_message(
+            content=self.owner._intro(self.incoming), embed=None,
+            view=FeedbackView(self.owner, self.incoming),
+        )
+
+    @discord.ui.button(label="Giữ bản cũ", style=discord.ButtonStyle.secondary)
+    async def keep(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(
+            content="Đã giữ bản nháp trước. Không tạo báo cáo mới.", view=None,
+        )
+
+    @discord.ui.button(label="Hủy bản cũ", style=discord.ButtonStyle.danger)
+    async def cancel_previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.owner.discard(self.previous)
+        self.stop()
+        await interaction.response.edit_message(
+            content="Đã hủy bản nháp cũ. Bạn có thể gửi feedback mới.", view=None,
+        )
 
 
 class FeedbackCog(commands.Cog):
@@ -268,12 +331,6 @@ class FeedbackCog(commands.Cog):
 
     async def start_from_message(self, message: discord.Message, intent: FeedbackIntent) -> bool:
         key = self._key(message.guild.id, message.author.id)
-        if self._active(*key):
-            await message.reply(
-                "Bạn đang có bản nháp feedback chưa gửi. Hãy xác nhận/hủy trước khi tạo bản mới.",
-                mention_author=False, allowed_mentions=discord.AllowedMentions.none(),
-            )
-            return True
         if len(message.attachments) > policy.ASUMI_FEEDBACK_MAX_IMAGES:
             await message.reply(
                 f"Chỉ nhận tối đa {policy.ASUMI_FEEDBACK_MAX_IMAGES} ảnh cho mỗi ticket.",
@@ -281,12 +338,22 @@ class FeedbackCog(commands.Cog):
             )
             return True
         draft = self._build_draft(message, intent)
-        self.drafts[key] = draft
-        view = FeedbackView(self, draft)
-        result = await message.reply(
-            self._intro(draft), view=view, mention_author=False,
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
+        previous = self._active(*key)
+        if previous:
+            result = await message.reply(
+                "Bạn đang có bản nháp chưa gửi. Muốn dùng báo cáo mới thay thế, "
+                "giữ bản cũ hay hủy bản cũ? Chưa có ticket nào được tạo.",
+                view=DraftConflictView(self, previous, draft),
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        else:
+            self.drafts[key] = draft
+            result = await message.reply(
+                self._intro(draft), view=FeedbackView(self, draft),
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
         draft.prompt_message_id = result.id
         return True
 
@@ -300,7 +367,7 @@ class FeedbackCog(commands.Cog):
             and (getattr(getattr(message, "reference", None), "message_id", None) == active.prompt_message_id
                  or "thêm ảnh feedback" in text.casefold())
         )
-        if followup:
+        if followup and not detect_feedback(text):
             if len(active.attachments) + len(message.attachments) > policy.ASUMI_FEEDBACK_MAX_IMAGES:
                 await message.reply("Feedback chỉ nhận tối đa 3 ảnh.", mention_author=False)
                 return True
@@ -374,10 +441,7 @@ class FeedbackCog(commands.Cog):
             await interaction.response.send_message("Chỉ dùng lệnh trong server.", ephemeral=True)
             return
         key = self._key(interaction.guild.id, interaction.user.id)
-        if self._active(*key):
-            await interaction.response.send_message("Bạn đã có một bản nháp chưa hoàn tất.", ephemeral=True)
-            return
-        intent = detect_feedback("báo lỗi " + description)
+        previous = self._active(*key)
         draft = FeedbackDraft(
             reporter_id=interaction.user.id, guild_id=interaction.guild.id,
             channel_id=interaction.channel_id, source_message_id=interaction.id,
@@ -385,10 +449,16 @@ class FeedbackCog(commands.Cog):
             attachments=[(image, interaction.id)] if image is not None else [],
             rule=clarification_text(description, CURRENT_VERSION)[1],
         )
-        self.drafts[key] = draft
-        await interaction.response.send_message(
-            self._intro(draft), view=FeedbackView(self, draft), ephemeral=True
-        )
+        if previous:
+            await interaction.response.send_message(
+                "Đang có bản nháp chưa gửi. Bạn muốn thay bằng báo cáo mới?",
+                view=DraftConflictView(self, previous, draft), ephemeral=True,
+            )
+        else:
+            self.drafts[key] = draft
+            await interaction.response.send_message(
+                self._intro(draft), view=FeedbackView(self, draft), ephemeral=True,
+            )
 
     @feedback.command(name="suggest", description="Góp ý hoặc đề xuất tính năng mới")
     @app_commands.describe(description="Bạn muốn Asumi cải thiện như thế nào?", image="Ảnh minh họa tùy chọn")
@@ -397,11 +467,7 @@ class FeedbackCog(commands.Cog):
             await interaction.response.send_message("Chỉ dùng lệnh trong server.", ephemeral=True)
             return
         key = self._key(interaction.guild.id, interaction.user.id)
-        if self._active(*key):
-            await interaction.response.send_message(
-                "Bạn đang có bản nháp feedback chưa hoàn tất.", ephemeral=True
-            )
-            return
+        previous = self._active(*key)
         draft = FeedbackDraft(
             reporter_id=interaction.user.id, guild_id=interaction.guild.id,
             channel_id=interaction.channel_id, source_message_id=interaction.id,
@@ -409,10 +475,16 @@ class FeedbackCog(commands.Cog):
             attachments=[(image, interaction.id)] if image is not None else [],
             rule=clarification_text(description, CURRENT_VERSION)[1],
         )
-        self.drafts[key] = draft
-        await interaction.response.send_message(
-            self._intro(draft), view=FeedbackView(self, draft), ephemeral=True
-        )
+        if previous:
+            await interaction.response.send_message(
+                "Đang có bản nháp chưa gửi. Bạn muốn thay bằng đề xuất mới?",
+                view=DraftConflictView(self, previous, draft), ephemeral=True,
+            )
+        else:
+            self.drafts[key] = draft
+            await interaction.response.send_message(
+                self._intro(draft), view=FeedbackView(self, draft), ephemeral=True,
+            )
 
     @feedback.command(name="add_image", description="Thêm ảnh vào bản nháp feedback đang mở")
     @app_commands.describe(image="Ảnh PNG, JPG hoặc WebP cần bổ sung")

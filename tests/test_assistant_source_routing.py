@@ -42,6 +42,28 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(decision.tool)
         self.assertEqual(decision.source, "clef_web_search_blocked")
 
+    async def test_cktg_schedule_auto_routes_to_brave_without_clef(self):
+        clef = SimpleNamespace(enabled=False, classify=AsyncMock())
+        result = await route_message(
+            "khi nào CKTG bắt đầu đánh?", cloudflare_router=clef,
+            allowed_search_tools=frozenset({"web.search"}),
+        )
+        self.assertEqual(result.tool, "web.search")
+        self.assertEqual(result.source, "local_public_event_schedule")
+        self.assertRegex(result.arguments["query"], r"20\d{2}$")
+        clef.classify.assert_not_awaited()
+
+        for unsafe in (
+            "khi nào CKTG của <@123456789012345678> bắt đầu?",
+            "khi nào CKTG trong server diễn ra?",
+        ):
+            with self.subTest(unsafe=unsafe):
+                blocked = await route_message(
+                    unsafe, cloudflare_router=clef,
+                    allowed_search_tools=frozenset({"web.search"}),
+                )
+                self.assertIsNone(blocked.tool)
+
     async def test_private_discord_message_not_sent_to_brave(self):
         for query in (
             "Giá chiếc xe Theo nhắn trong server hôm nay là bao nhiêu?",

@@ -13,6 +13,13 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## T25 Search/Feedback follow-up and OpenUI direction (2026-10-09)
+
+- Owner feedback from live Discord: self-chronological History Search (`của t`) previously required a user mention; public CKTG schedule questions fell through to chat; multiple feedback reports were blocked by a pending draft.
+- Patch branch `fix/asumi-20261009-search-feedback-ux` implements self-target History, named tournament schedule Brave routing and replace/keep/cancel draft UX. Regression tests and live provider acceptance remain essential.
+- Read `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`. **Do not treat OpenUI or Components V2 as deployed.** The repo pins `discord.py==2.4.0`; the V2 upgrade must be a separate compatibility-tested goal.
+- Preserve the original historical tabbed Admin Dashboard and its embedded Feedback tab. Do not create another sidebar/dashboard shell.
+
 ## Active Tarot initiative
 
 There is an active planned **Asumi Tarot 2.0** initiative.

@@ -4,6 +4,8 @@ import math
 import re
 import time
 import unicodedata
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict
 
@@ -71,6 +73,7 @@ def _safe_public_web_query(text: str) -> bool:
         "phat hanh", "chinh thuc", "ket qua", "thoi tiet",
         "latest", "news", "release", "today", "bao nhieu",
         "o dau", "gio mo cua", "thong bao moi",
+        "cktg", "worlds", "chung ket the gioi", "lich thi dau",
     )
     return len(folded) >= 12 and any(s in folded for s in public_signals)
 
@@ -91,6 +94,34 @@ def _obvious_fresh_public_search(text: str) -> bool:
         "gia xang", "gia dau", "gia vang", "ty gia",
     ))
     return timely and topics
+
+
+def _obvious_public_event_schedule_search(text: str) -> bool:
+    """Timely public tournament schedule; no private chat content in Brave.
+
+    This is intentionally *not* a general "khi nào" search: the event has to
+    be named explicitly and the user has to request its schedule.
+    """
+    if not _safe_public_web_query(text):
+        return False
+    folded = _fold(text).replace("đ", "d")
+    event = any(x in folded for x in (
+        "cktg", "worlds", "world championship", "chung ket the gioi",
+    ))
+    schedule = any(x in folded for x in (
+        "khi nao", "bao gio", "bat dau", "dien ra",
+        "lich thi dau", "may gio", "vao luc", "hom nao",
+    ))
+    return event and schedule
+
+
+def _public_event_query(text: str) -> str:
+    """Use this year's named tournament, not a stale previous season."""
+    original = text.strip()
+    if re.search(r"\b20\d{2}\b", original):
+        return original
+    year = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).year
+    return f"{original} {year}"
 
 
 def _current_weather_query(text: str) -> bool:
@@ -181,8 +212,12 @@ def route_locally(text: str) -> RouteDecision:
             or any(s in history_folded for s in ("co nhan", "da noi", "noi gi", "tin nhan"))
         )
     )
+    self_reference = bool(re.search(
+        r"\bcua\s+(?:t|toi|tui|minh|em|tao|ban than)\b",
+        history_folded,
+    ))
     temporal_author_recall = (
-        "<@" in text
+        ("<@" in text or self_reference)
         and any(s in history_folded for s in (
             "lan dau", "lan cuoi", "tin nhan dau tien",
             "tin nhan cu nhat", "tin nhan som nhat",
@@ -368,6 +403,22 @@ async def route_message(
             tool="web.search",
             arguments={"query": text.strip()},
             source="local_fresh_public",
+            route_ms=(time.perf_counter() - started) * 1000,
+        )
+
+    # Current public schedules should not become an unsupported chat answer
+    # asking for confirmation to search. Brave's existing quota and missing-key
+    # handling still apply at execution time.
+    if (
+        policy.ASUMI_AUTO_SEARCH_ENABLED
+        and policy.ASUMI_WEB_SEARCH_ENABLED
+        and _obvious_public_event_schedule_search(text)
+    ):
+        return RouteDecision(
+            intent="web_search",
+            tool="web.search",
+            arguments={"query": _public_event_query(text)},
+            source="local_public_event_schedule",
             route_ms=(time.perf_counter() - started) * 1000,
         )
 

@@ -1,3 +1,10 @@
+## Asumi 3.10.2 — T25.0 Search & Feedback hotfix (live validation pending)
+
+- `@Asumi tìm tin nhắn đầu tiên của t` finds the requester's messages; `@Asumi tìm tin nhắn gần nhất của tôi` works likewise. To search another member, tag exactly one target. Responses still require the requester and bot to have permission to read the source channel.
+- `@Asumi khi nào CKTG bắt đầu đánh?` automatically searches the public web through Brave with the current year when enabled and configured. Search evidence is required; the bot must not invent a date.
+- Starting a new `@Asumi feedback ...` or `/feedback report` while an unfinished draft exists now offers replace, keep or cancel rather than deadlocking. The user chooses what to preserve.
+- OpenUI is for a **future isolated panel inside the existing classic dashboard**, not arbitrary UI inside a Discord message. Discord Components V2 require a separate `discord.py` upgrade. See `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
+
 ## T22.5 — Tìm Discord rồi tra cứu nguồn công khai (code-ready; live acceptance pending)
 
 Asumi hỗ trợ tra hai nguồn **trong một yêu cầu** khi người dùng tự ghi một truy vấn công khai tách biệt:

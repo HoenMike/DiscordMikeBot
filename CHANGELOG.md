@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.10.2] - 2026-10-09 — *Search and Feedback UX Hotfix*
+
+### Fixed
+- Discord History resolves the requester's own ID for Vietnamese self-references (e.g. `của t/tôi/mình`) when asking for the first/last message, without requiring a second human mention. An explicit human mention still wins; ambiguous authors still require clarification.
+- `@Asumi khi nào CKTG bắt đầu đánh?` automatically routes to public Brave search with the current Vietnamese calendar year. No unnecessary search confirmation; existing Brave quota, credentials and privacy checks remain in force.
+- New explicit feedback while a draft is pending offers **Dùng báo cáo mới**, **Giữ bản cũ**, or **Hủy bản cũ**. Old views cannot submit a superseded ticket.
+
+### Follow-up
+- Live guild search/Brave API and Discord buttons need authorized post-deployment smoke. OpenUI and Discord Components V2 are **not yet integrated**; see `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
+
 ## [3.10.1] - 2026-10-09 — *Social Embed Resilience*
 
 ### Fixed
