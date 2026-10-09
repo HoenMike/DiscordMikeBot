@@ -177,7 +177,9 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(len(embeds), 1)
-        self.assertIsNone(attachment)
+        self.assertEqual(attachment.filename, "tarot_reading.txt")
+        self.assertIn("Thông điệp quan trọng nhất", attachment.fp.getvalue().decode("utf-8"))
+        attachment.close()
         self.assertIn("HOÀN TẤT", embeds[0].description)
         self.assertIn(card.card.name_vi, embeds[0].description)
         self.assertIn("Thông điệp quan trọng nhất", embeds[0].description)
@@ -217,7 +219,9 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(reading.practical_takeaway[0], embeds[0].description)
         self.assertNotIn(reading.full_reading[:100], embeds[0].description)
         self.assertIn("Đọc đầy đủ", embeds[0].description)
-        self.assertIsNone(attachment)
+        self.assertEqual(attachment.filename, "tarot_reading.txt")
+        self.assertEqual(attachment.fp.getvalue().decode("utf-8"), reading.full_reading)
+        attachment.close()
         task.cancel()
         try:
             await task

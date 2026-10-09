@@ -23,7 +23,7 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 ## T25 Asumi 3.11.0 rich chat UI + answer-first Search
 
 - Owner specifically wants rich generated messages **inside Discord chat**, not a new Admin Dashboard. The practical Tarot single-card pilot uses Pillow-rendered images + existing Discord buttons; do not claim actual OpenUI/React runs in messages.
-- In `feat/asumi-t25-tarot-rich-search-answers`, Tarot Daily/Single/Yes-No have a compact inline Insight card and owner-only **Đọc đầy đủ** button. Preserve legacy multi-card flip flows, Tarot V2 result schemas, draw semantics and secure interactions.
+- In `feat/asumi-t25-tarot-rich-search-answers`, Tarot Daily/Single/Yes-No have a compact inline Insight card and **Đọc đầy đủ** button for message viewers, plus a durable text attachment; Followup, Why and Clarifier remain author-only. Preserve legacy multi-card flip flows, Tarot V2 result schemas, draw semantics and secure interactions.
 - Brave is a background retrieval component. Every non-fuel public search route must attempt answer-first synthesis with short citations, never raw snippets as default UX; lack of evidence should be admitted, not filled in.
 - Read `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md` and validate Search + Tarot regressions before merge. Keep old dashboard, report/ticket, R2/Turso and embed proxy fallbacks unchanged.
 - Post-deploy smoke is still required before calling the design live-accepted.

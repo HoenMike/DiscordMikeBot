@@ -1,7 +1,7 @@
 ## Asumi 3.11.0 — Tarot Rich Reply + Answer-First Web Search
 
 - For ordinary public web questions, Asumi automatically searches and **answers the question first** from the available public evidence; Brave snippets are internal, and the reply keeps only up to two short verification links. If the answer cannot be verified, Asumi says so; it will not invent a start date.
-- For `/tarot` or `.m tarot` with one-card Daily/Single/Yes-No, the completed reading shows a **compact illustrated insight card** inside the Discord chat plus a brief accessible reading and a **📖 Đọc đầy đủ** button for the original reader. Multi-card readings keep their old layout.
+- For `/tarot` or `.m tarot` with one-card Daily/Single/Yes-No, the completed reading shows a **compact illustrated insight card** inside the Discord chat plus a brief accessible reading, a **📖 Đọc đầy đủ** button accessible to channel viewers, and a durable `tarot_reading.txt` attachment. Multi-card readings keep their old layout.
 - This is a Pillow server-rendered PNG + native Discord buttons, **not React/OpenUI executing in Discord messages**. OpenUI and Discord Components V2 remain future options. No new dashboard is created.
 - Live screenshots and Brave synthesis/source quality require authorized post-deploy verification; see `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
 
