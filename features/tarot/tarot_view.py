@@ -1334,26 +1334,52 @@ class TarotResultActionView(discord.ui.View):
         # Before this UI pilot, the full reading was public in the channel.
         # Allow any viewer of this message to open the same text privately,
         # while owner-only Followup / Why / Clarifier remain restricted.
-        description = discord.utils.escape_mentions(self.ai_reading or "Chưa có luận giải.")
-        attachment = None
-        if len(description) > 3900:
-            attachment = discord.File(
+        reading = self.ai_reading or "Chưa có luận giải."
+        description = discord.utils.escape_mentions(reading)
+        needs_attachment = len(description) > 3900
+
+        def full_file():
+            return discord.File(
                 io.BytesIO(description.encode("utf-8")),
                 filename="tarot_reading.txt",
             )
-            description = description[:3750].rstrip() + "\n\n*Có bản đầy đủ trong tarot_reading.txt*"
+
+        # Native V2 is limited to this read-only detail reply, not the
+        # interaction lifecycle for Tarot draw/flip/followup/clarifier.
+        if policy.ASUMI_TAROT_READING_NATIVE_V2_ENABLED:
+            try:
+                kwargs = {
+                    "view": build_full_reading_layout(reading),
+                    "ephemeral": True,
+                    "allowed_mentions": discord.AllowedMentions.none(),
+                }
+                if needs_attachment:
+                    kwargs["file"] = full_file()
+                await interaction.response.send_message(**kwargs)
+                return
+            except discord.HTTPException as exc:
+                if exc.status != 400:
+                    raise
+                # Discord definitively rejected this payload. Only this
+                # failure class is safe to retry as an old-style embed.
+                # Make a fresh file object since failed sends may close it.
+        if needs_attachment:
+            visible = description[:3750].rstrip()
+            description = visible + "\n\n*Có bản đầy đủ trong tarot_reading.txt*"
         embed = discord.Embed(
             title="📖 Luận giải Tarot đầy đủ",
-            description=description,
+            description=description[:4096],
             color=0x6D5D8F,
         )
         embed.set_footer(text="Nội dung thuộc quẻ hiện tại · Không rút lại lá bài")
-        if attachment is not None:
-            await interaction.response.send_message(
-                embed=embed, file=attachment, ephemeral=True,
-            )
-        else:
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+        kwargs = {
+            "embed": embed,
+            "ephemeral": True,
+            "allowed_mentions": discord.AllowedMentions.none(),
+        }
+        if needs_attachment:
+            kwargs["file"] = full_file()
+        await interaction.response.send_message(**kwargs)
 
     @discord.ui.button(label="❓ Hỏi thêm (0/3)", style=discord.ButtonStyle.primary, custom_id="tarot_followup", row=0)
     async def followup_button(self, interaction: discord.Interaction, button: discord.ui.Button):
