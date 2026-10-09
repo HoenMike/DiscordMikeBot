@@ -13,6 +13,13 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## Asumi 3.13.2 — Tarot mention question preservation (2026-10-09)
+
+- A mention such as @Asumi bốc cho quẻ tarot xem mai nên mặc áo màu gì đi nhậu must preserve the actual question through router → tool bridge → TarotCog.
+- Explicit bốc/rút/bói + meaningful question runs the existing Tarot draw command with a recommended spread; a bare Tarot mention never auto-draws. General Tarot questions launch the prefilled question-first view.
+- Do not use "hôm nay" anywhere in a sentence as a Daily classifier: "tarot hôm nay nên mặc gì" is a specific question.
+- Retain Tarot cooldowns, ownership, session persistence and reading safeguards; add router, command bridge and recommendation regressions.
+
 ## T25.1b — Tarot read-only Components V2 (2026-10-09)
 
 - Scoped to the one-card `📖 Đọc đầy đủ` callback; only its *ephemeral reply* uses LayoutView, never mutate the original Tarot V1 reveal/edit message into V2.
