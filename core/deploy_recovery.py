@@ -38,7 +38,7 @@ def eligible_replay(message, bot_user_id: int | None) -> bool:
     query = strip_bot_mention(message.content or "", bot_user_id).strip()
     if not query or query.startswith((".m", ".M", "/", "!", ".")):
         return False
-    from features.feedback.intent import detect_feedback
+    from features.feedback.policy import detect_feedback
     if detect_feedback(query):
         return False
     return True
