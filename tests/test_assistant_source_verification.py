@@ -168,7 +168,7 @@ class VerifiedFuelToolTests(unittest.IsolatedAsyncioTestCase):
             result = await registry.execute(route_locally("tìm trên web giá xăng hôm nay"), msg)
         embed = msg.reply.await_args.kwargs["embed"]
         self.assertIn("chưa đủ để xác nhận", embed.description)
-        self.assertIn("https://example.org/gas", embed.fields[0].value)
+        self.assertIn("[1](https://example.org/gas)", embed.description)
         self.assertEqual(result.details["first_party_status"], "unavailable")
         self.assertNotIn("query", result.details)
 

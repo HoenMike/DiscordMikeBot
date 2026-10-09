@@ -59,44 +59,69 @@ def prioritize_sources(query: str, hits, maximum: int | None = None):
     return tuple(options[:max(1, min(int(maximum), 3))])
 
 
-def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
-    """Answer-first Discord response; Brave is an invisible retrieval layer.
+def _format_search_answer(summary: str) -> str:
+    """Highlight the answer, not provider snippets or a fabricated fact.
 
-    The model produces only the answer. Link citations remain user-clickable,
-    but raw search snippets and keyword-result dumps are not the product.
+    Renderer-owned Markdown means the model doesn't need to invent styling.
+    The leading sentence is the takeaway; the remainder adds context.
     """
-    title = _plain(query, 105) or "Câu hỏi của bạn"
-    answer = re.sub(r"\[(?:[1-9]|10)\]", "", _plain(summary, 700))
-    answer = " ".join(answer.split())
-    if not answer:
-        answer = (
-            "Mình chưa thể xác minh câu trả lời chính xác từ dữ liệu công khai "
-            "vừa tìm được. Bạn có thể đối chiếu các nguồn gốc bên dưới."
+    clean = re.sub(r"\[(?:[1-9]|10)\]", "", _plain(summary, 850))
+    clean = discord.utils.escape_mentions(clean.replace("**", "")).strip()
+    if not clean:
+        return (
+            "**Mình chưa thể xác minh câu trả lời chính xác** "
+            "từ dữ liệu công khai vừa tìm được."
         )
-    embed = discord.Embed(
+    boundary = re.search(r"(?<=[.!?])\s+(?=[A-ZÀ-ỸĐ0-9])", clean)
+    if boundary:
+        takeaway, detail = clean[:boundary.start()].strip(), clean[boundary.end():].strip()
+    else:
+        takeaway, detail = clean, ""
+
+    # Avoid turning a whole wall of text bold if a synthesis provider failed
+    # to produce a short first sentence.
+    if len(takeaway) > 210:
+        match = re.search(r"[,;:]\s", takeaway[:210])
+        if match and match.start() >= 65:
+            detail = (takeaway[match.end():] + (" " + detail if detail else "")).strip()
+            takeaway = takeaway[:match.start()].strip()
+        else:
+            pos = takeaway.rfind(" ", 0, 165)
+            pos = pos if pos >= 65 else 165
+            detail = (takeaway[pos:].strip() + (" " + detail if detail else "")).strip()
+            takeaway = takeaway[:pos].strip()
+
+    return f"**{takeaway}**" + (f"\n\n{detail}" if detail else "")
+
+
+def _source_number_links(query: str, hits) -> str:
+    """Up to two clickable numbered sources; no titles, domains or snippets."""
+    links: list[str] = []
+    for item in prioritize_sources(query, hits, maximum=2):
+        url = str(item.url or "").strip()
+        parsed = urlsplit(url)
+        if (parsed.scheme not in ("https", "http") or not parsed.hostname
+                or len(url) > 550 or any(ch in url for ch in "<>\r\n")):
+            continue
+        # Keep Discord Markdown links intact when providers use parentheses.
+        safe_url = url.replace("(", "%28").replace(")", "%29")
+        links.append(f"[{len(links) + 1}]({safe_url})")
+    return " · ".join(links)
+
+
+def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
+    """Answer-first Discord reply with bold takeaway and minimal citations."""
+    title = _plain(query, 105) or "Câu hỏi của bạn"
+    answer = _format_search_answer(summary)
+    sources = _source_number_links(query, hits)
+    if sources:
+        answer += f"\n\n{sources}"
+    return discord.Embed(
         title=f"🔎 {title}",
-        description=discord.utils.escape_mentions(answer)[:800],
+        description=answer[:4096],
         color=0x5888A8,
     )
-    # A handful of links is enough for provenance, not a substitute for an
-    # answer. Snippets can be stale, contradictory or malicious: don't
-    # display them as if they were Asumi's own explanation.
-    lines = []
-    for item in prioritize_sources(query, hits, maximum=2):
-        host = (urlsplit(item.url).hostname or "").lower().removeprefix("www.")
-        if not host or not item.url.startswith(("https://", "http://")):
-            continue
-        label = discord.utils.escape_markdown(
-            discord.utils.escape_mentions(_plain(item.title, 70))
-        )
-        entry = f"[{label}]({item.url}) · `{host[:55]}`"
-        if len("\n".join([*lines, entry])) > 900:
-            break
-        lines.append(entry)
-    if lines:
-        embed.add_field(name="Kiểm chứng thông tin", value="\n".join(lines), inline=False)
-    embed.set_footer(text="Asumi · Tổng hợp từ web công khai · Kiểm tra ngày và nguồn gốc")
-    return embed
+
 
 def build_verified_fuel_embed(query: str, report) -> discord.Embed:
     """Show actual dated first-party prices, not search-result excerpts.
