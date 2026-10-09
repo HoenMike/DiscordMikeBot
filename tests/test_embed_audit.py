@@ -48,13 +48,13 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.preview.delete.side_effect = delete
         self.cog._register_preview(1, 2, 4)
         task = asyncio.create_task(self.cog._discard_preview(1, self.preview))
-        await started.wait()
+        await asyncio.wait_for(started.wait(), timeout=2)
         task.cancel()
         await asyncio.sleep(0)
         self.assertIn(4, self.cog._preview_to_origin_map)
         finish.set()
         with self.assertRaises(asyncio.CancelledError):
-            await task
+            await asyncio.wait_for(task, timeout=8)
         self.assertNotIn(4, self.cog._preview_to_origin_map)
 
     async def test_origin_deleted_before_send(self):
@@ -73,11 +73,11 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
                 self.channel.send.side_effect = send
                 self.preview.delete.side_effect = http_error() if deletion_fails else None
                 task = asyncio.create_task(self.cog._send_embed_preview(self.message, content="x"))
-                await started.wait()
+                await asyncio.wait_for(started.wait(), timeout=2)
                 task.cancel()
                 accepted.set()
                 with self.assertRaises(asyncio.CancelledError):
-                    await task
+                    await asyncio.wait_for(task, timeout=8)
                 self.assertEqual(4 in self.cog._preview_to_origin_map, deletion_fails)
 
     async def test_delayed_unfurl_after_two_empty_fetches(self):
