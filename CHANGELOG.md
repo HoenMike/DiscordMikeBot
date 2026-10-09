@@ -7,6 +7,17 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.11.0] - 2026-10-09 — *Rich Tarot & Answer-First Search*
+
+### Added
+- One-card Tarot Daily/Single/Yes-No inline rich PNG (1200×760), combining the actual drawn card with structured headline/takeaway. Keep compact accessible Discord text and a user-only **Đọc đầy đủ** button. No additional AI request, no HTML inside messages.
+- Public web Search now synthesizes grounded answers across all routing paths, including explicit search and named events. The answer takes priority over raw Brave results; citations are two short clickable links.
+- Missing/conflicting evidence or model failure cannot invent a schedule; uncertainty is shown briefly, sources remain available. Existing fuel, weather, quota, ACL and multi-source privacy behavior unchanged.
+
+### Acceptance
+- Dedicated tests for new Tarot image and direct-answer search UX plus existing Tarot V2 and Search regressions. Live Discord/Brave and render visuals must still be verified post-deploy.
+- This is **not** React/OpenUI native rendering or a Discord Components V2 library upgrade; the historic Admin Dashboard is unchanged.
+
 ## [3.10.2] - 2026-10-09 — *Search and Feedback UX Hotfix*
 
 ### Fixed
