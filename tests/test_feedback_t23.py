@@ -167,6 +167,46 @@ class DiscordWizardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cog._active(5, 20).source_message_id, 30)
         create.assert_not_awaited()
 
+    async def test_new_report_offers_replace_keep_cancel_instead_of_deadlock(self):
+        cog = FeedbackCog(self.bot())
+        def make_message(mid, text):
+            return SimpleNamespace(
+                guild=SimpleNamespace(id=5), channel=SimpleNamespace(id=10),
+                author=SimpleNamespace(id=20), id=mid, content=text,
+                reference=None, attachments=[],
+                reply=AsyncMock(return_value=SimpleNamespace(id=mid + 100)),
+            )
+        first = make_message(30, "báo lỗi: không lấy được history")
+        second = make_message(40, "feedback lỗi tìm CKTG")
+        await cog.start_from_message(first, detect_feedback(first.content))
+        old = cog._active(5, 20)
+        old_view = first.reply.await_args.kwargs["view"]
+
+        await cog.start_from_message(second, detect_feedback(second.content))
+        self.assertIs(cog._active(5, 20), old)
+        conflict = second.reply.await_args.kwargs["view"]
+        self.assertEqual(
+            {button.label for button in conflict.children},
+            {"Dùng báo cáo mới", "Giữ bản cũ", "Hủy bản cũ"},
+        )
+        response = SimpleNamespace(edit_message=AsyncMock(), send_message=AsyncMock())
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=20), response=response,
+        )
+        await next(button for button in conflict.children
+                   if button.label == "Dùng báo cáo mới").callback(interaction)
+        self.assertIs(cog._active(5, 20), conflict.incoming)
+        self.assertEqual(cog._active(5, 20).source_message_id, 40)
+        self.assertFalse(await old_view.interaction_check(interaction))
+        response.send_message.assert_awaited_once()
+
+        third = make_message(50, "báo lỗi phần feedback")
+        await cog.start_from_message(third, detect_feedback(third.content))
+        cancel = third.reply.await_args.kwargs["view"]
+        await next(button for button in cancel.children
+                   if button.label == "Hủy bản cũ").callback(interaction)
+        self.assertIsNone(cog._active(5, 20))
+
     async def test_followup_images_are_collected_not_submitted(self):
         bot = self.bot()
         cog = FeedbackCog(bot)
