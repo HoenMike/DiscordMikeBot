@@ -84,7 +84,7 @@ class AssistantRouterTests(unittest.TestCase):
         self.assertEqual(CommandToolRegistry._command_for(route_locally("tarot")), ".m tarot")
 
     def test_question_length_and_mentions_are_safe_in_bridge(self):
-        decision = route_locally("bốc tarot xem " + "a" * 600 + " @everyone")
+        decision = route_locally("bốc tarot xem @everyone " + "a" * 600)
         self.assertLessEqual(len(decision.arguments["question"]), 500)
         self.assertNotIn("@everyone", CommandToolRegistry._command_for(decision))
 
