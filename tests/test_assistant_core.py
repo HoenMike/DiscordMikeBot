@@ -48,9 +48,45 @@ class AssistantRouterTests(unittest.TestCase):
         decision = route_locally("cho tôi tarot daily đi")
         self.assertEqual(decision.tool, "tarot.daily")
 
-    def test_tarot_question_routes_to_launcher(self):
+    def test_tarot_question_draw_uses_original_question(self):
         decision = route_locally("bói bài cho tôi chuyện công việc")
+        self.assertEqual(decision.tool, "tarot.draw")
+        self.assertEqual(decision.arguments["question"], "chuyện công việc")
+
+    def test_reported_mention_draws_one_card_for_outfit_question(self):
+        decision = route_locally("bốc cho quẻ tarot xem mai nên mặc áo màu gì đi nhậu")
+        self.assertEqual(decision.tool, "tarot.draw")
+        self.assertEqual(decision.arguments["question"], "mai nên mặc áo màu gì đi nhậu")
+        self.assertEqual(decision.arguments["spread_key"], "single")
+        self.assertEqual(
+            CommandToolRegistry._command_for(decision),
+            ".m tarot single mai nên mặc áo màu gì đi nhậu",
+        )
+
+    def test_question_only_tarot_launcher_is_prefilled(self):
+        decision = route_locally("xem tarot cho mình chuyện tình cảm")
         self.assertEqual(decision.tool, "tarot.launch")
+        self.assertEqual(decision.arguments["question"], "chuyện tình cảm")
+        self.assertEqual(
+            CommandToolRegistry._command_for(decision),
+            ".m tarot ui chuyện tình cảm",
+        )
+
+    def test_tarot_daily_remains_direct_but_today_question_is_not_daily(self):
+        self.assertEqual(route_locally("tarot daily đi").tool, "tarot.daily")
+        self.assertEqual(route_locally("tarot hôm nay").tool, "tarot.daily")
+        decision = route_locally("tarot hôm nay nên mặc áo màu gì?")
+        self.assertEqual(decision.tool, "tarot.launch")
+        self.assertEqual(decision.arguments["question"], "hôm nay nên mặc áo màu gì")
+
+    def test_empty_tarot_request_never_autodraws(self):
+        self.assertEqual(route_locally("bốc tarot đi").tool, "tarot.launch")
+        self.assertEqual(CommandToolRegistry._command_for(route_locally("tarot")), ".m tarot")
+
+    def test_question_length_and_mentions_are_safe_in_bridge(self):
+        decision = route_locally("bốc tarot xem @everyone " + "a" * 600)
+        self.assertLessEqual(len(decision.arguments["question"]), 500)
+        self.assertNotIn("@everyone", CommandToolRegistry._command_for(decision))
 
     def test_summary_extracts_hours(self):
         decision = route_locally("tóm tắt 2 tiếng vừa rồi")

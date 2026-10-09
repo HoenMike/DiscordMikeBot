@@ -164,6 +164,18 @@ def recommend_spread(question: str, context: Optional[str] = None) -> SpreadReco
             "Câu hỏi có dòng diễn biến rõ. Trải Quá khứ · Hiện tại · Tương lai giúp nhìn nguyên nhân, trạng thái hiện tại và xu hướng tiếp theo như một mạch.",
         )
 
+    # Concrete outfit/color advice is a single decision, not a three-phase
+    # past/present/future timeline. Preserve earlier A/B comparison precedence.
+    if has(
+        "nen mac", "mac ao", "ao mau gi", "mau nao", "trang phuc",
+        "phoi do", "outfit", "di nhau mac",
+    ):
+        return SpreadRecommendation(
+            "single",
+            "Single Card (1 lá)",
+            "Bạn đang muốn một gợi ý cụ thể cho cách ăn mặc. Một lá giúp tập trung vào cảm hứng và lựa chọn dễ áp dụng.",
+        )
+
     # Explicit advice/focus questions do better with one deep card.
     if has(
         "loi khuyen", "nen tap trung", "dieu gi quan trong", "toi can biet gi",

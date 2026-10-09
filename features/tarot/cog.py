@@ -594,17 +594,19 @@ class TarotCog(commands.Cog):
         *,
         rest: Optional[str] = None
     ):
-        # 1. Trường hợp không truyền tham số hoặc yêu cầu mở menu tương tác (UI)
+        # 1. Launcher UI. When Assistant invokes ".m tarot ui <question>",
+        # carry the actual question into the first embed instead of losing it.
         if spread_arg is None or spread_arg.lower() in ["ui", "menu", "panel", "chon", "open", "launcher"]:
+            initial_question = rest.strip()[:500] if spread_arg is not None and rest else None
             user_avatar = ctx.author.display_avatar.url if ctx.author.display_avatar else None
             launcher = TarotLauncherView(
                 author_id=ctx.author.id,
                 author_name=ctx.author.display_name,
                 author_avatar_url=user_avatar,
                 tarot_manager=self.tarot_manager,
-                selected_spread="daily",
+                selected_spread="single" if initial_question else "daily",
                 selected_reader="auto",
-                question=None
+                question=initial_question
             )
             await launcher.prepare()
             embed = launcher.build_launcher_embed()

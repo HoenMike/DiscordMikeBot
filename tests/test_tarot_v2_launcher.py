@@ -80,6 +80,10 @@ class TarotV2RecommendationTests(unittest.TestCase):
         rec = recommend_spread("Tôi có nên gửi proposal này không?")
         self.assertEqual(rec.spread_key, "yes_no")
 
+    def test_simple_outfit_advice_recommends_single_not_timeline(self):
+        rec = recommend_spread("mai nên mặc áo màu gì đi nhậu")
+        self.assertEqual(rec.spread_key, "single")
+
     def test_similarity_detects_paraphrased_recent_question(self):
         score = question_similarity(
             "Tôi có nên đổi việc hay ở lại?",

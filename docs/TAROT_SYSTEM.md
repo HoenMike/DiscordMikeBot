@@ -2,6 +2,8 @@
 
 Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).
 
+**Asumi 3.13.2 (2026-10-09):** Khi nhận lời gọi @Asumi có câu hỏi Tarot, bot giữ câu hỏi qua `features/assistant/router.py` → `features/assistant/tools.py` → `TarotCog`. Nếu có yêu cầu bốc/rút/bói kèm câu hỏi rõ, bot dùng command Tarot sẵn có để rút theo spread đề xuất, giữ cooldown. Nếu không yêu cầu rút ngay thì mở launcher với câu hỏi điền sẵn. Daily vẫn là thao tác riêng, không suy từ mọi câu chứa “hôm nay”.
+
 > **Tarot roadmap T20.1–T20.9 đã hoàn tất; runtime hiện được phát hành trong Asumi 3.0.0 với Tarot 2.x làm subsystem chính.** Asumi 3.0 thêm launcher UX question-first + one-tap Daily + one-click recommendation trên baseline Tarot 2.1.
 
 > v2.8.0: Asumi là nhân vật Tarot duy nhất. `auto` là mặc định; `neutral`, `healer`, `chaos` là các style ID tương thích dữ liệu cũ, nay hiển thị lần lượt là Tĩnh, Dịu, Tinh quái. Prompt mới điều chỉnh cách nói theo câu hỏi, vẫn dùng schema JSON và các ranh giới an toàn hiện có.

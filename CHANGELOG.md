@@ -7,6 +7,14 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.13.2] - 2026-10-09 — *Tarot mention question hotfix*
+
+### Fixed
+- Mention requests such as `@Asumi bốc cho quẻ tarot xem mai nên mặc áo màu gì đi nhậu` no longer discard the actual question and display an empty launcher.
+- Explicit `bốc/rút/bói` plus a real question use the existing Tarot draw command with its cooldown and reading pipeline. Generic `xem tarot ...` opens a launcher with the question prefilled.
+- Clothing/color recommendations use **Single Card**; `tarot daily` still works, and `tarot hôm nay nên mặc gì` is not misclassified as Daily.
+- Slash/prefix commands, historical Admin Dashboard, Search and deployment recovery remain unchanged.
+
 ## [3.13.1] - 2026-10-09 — *Native Tarot Reading Panel*
 
 ### Improved

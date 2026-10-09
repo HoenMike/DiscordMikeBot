@@ -811,9 +811,24 @@ class CommandToolRegistry:
         if decision.tool == "help.show":
             return ".m help"
         if decision.tool == "tarot.daily":
-            return ".m tarot daily"
-        if decision.tool == "tarot.launch":
-            return ".m tarot"
+            question = str(decision.arguments.get("question") or "").strip()[:500]
+            question = discord.utils.escape_mentions(" ".join(question.split()))
+            return f".m tarot daily {question}" if question else ".m tarot daily"
+        if decision.tool in {"tarot.launch", "tarot.draw"}:
+            question = str(decision.arguments.get("question") or "").strip()[:500]
+            question = discord.utils.escape_mentions(" ".join(question.split()))
+            if decision.tool == "tarot.draw" and question:
+                # Never accept an arbitrary command name from a classifier.
+                spread_key = decision.arguments.get("spread_key")
+                allowed_spreads = {
+                    "single", "yes_no", "ppf", "choices", "mbs",
+                    "horseshoe", "two_paths", "celtic",
+                }
+                if spread_key in allowed_spreads:
+                    return f".m tarot {spread_key} {question}"
+            # An explicit UI subcommand avoids interpreting words such as
+            # "history" or "daily" at the start of the question as subcommands.
+            return f".m tarot ui {question}" if question else ".m tarot"
         if decision.tool == "summary.catchup":
             hours = decision.arguments.get("hours")
             if hours is None:

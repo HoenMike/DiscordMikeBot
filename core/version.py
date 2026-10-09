@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.13.1"
+CURRENT_VERSION = "3.13.2"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.13.1 - Native Tarot Reading Panel"
+CODENAME = "Asumi 3.13.2 - Conversational Tarot Intent Fix"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.13.2", "date": "2026-10-09", "type": "bugfix",
+        "title": "Conversational Tarot Questions",
+        "summary": "Sửa mất câu hỏi khi nhắc @Asumi bóc Tarot; bốc quẻ trực tiếp khi yêu cầu rõ ràng, chọn spread phù hợp.",
+        "changes": [
+            {"category": "Tarot Routing", "items": [
+                "Giữ đúng câu hỏi gốc khi nhận yêu cầu Tarot bằng hội thoại; không mở launcher rỗng.",
+                "Yêu cầu bốc/rút/bói kèm câu hỏi dùng Tarot command sẵn có, giữ cooldown và quyền.",
+                "Câu chỉ muốn tham khảo Tarot mở launcher với câu hỏi đã điền; màu áo ưu tiên trải một lá.",
+                "Giữ Daily, slash/prefix, Search, Components V2 và deploy recovery.",
+            ]},
+        ],
+    },
     {
         "version": "3.13.1", "date": "2026-10-09", "type": "bugfix",
         "title": "Native Tarot Reading Panel",
