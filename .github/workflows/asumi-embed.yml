@@ -40,4 +40,4 @@ jobs:
           python -m compileall -q features/embed
           python -m unittest discover -s tests -p "test_embed_resilience.py" -v
           python -m unittest discover -s tests -p "test_release28.py" -v
-          python -m unittest discover -s tests -p "test_embed_audit.py" -v
+          timeout 90s python -m unittest discover -s tests -p "test_embed_audit.py" -v
