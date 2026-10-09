@@ -225,7 +225,7 @@ class DraftConflictView(discord.ui.View):
     async def replace(self, interaction: discord.Interaction, button: discord.ui.Button):
         key = self.owner._key(self.incoming.guild_id, self.incoming.reporter_id)
         current = self.owner._active(*key)
-        if current not in (None, self.previous):
+        if current is not None and current is not self.previous:
             await interaction.response.send_message(
                 "Bạn đã mở bản nháp khác. Hãy thao tác trên bản mới nhất.", ephemeral=True,
             )
