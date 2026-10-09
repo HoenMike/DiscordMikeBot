@@ -63,6 +63,17 @@ DEFAULT_SCAN_LIMIT = 150
 # A missing credential always disables the corresponding external provider.
 # ---------------------------------------------------------------------------
 
+# Recovery after Render/Gateway restarts (explicit @mentions only).
+# Turso required; no private Discord message text is stored in the queue.
+ASUMI_RECOVERY_LOOKBACK_SECONDS = 15 * 60
+ASUMI_RECOVERY_FIRST_BOOT_SECONDS = 2 * 60
+ASUMI_RECOVERY_HEARTBEAT_SECONDS = 60
+ASUMI_RECOVERY_CLAIM_LEASE_SECONDS = 90
+ASUMI_RECOVERY_MAX_RETRIES = 2
+ASUMI_RECOVERY_MAX_CHANNELS = 80
+ASUMI_RECOVERY_MAX_MESSAGES_PER_CHANNEL = 100
+ASUMI_RECOVERY_MAX_MESSAGES_PER_PASS = 60
+
 ASUMI_SESSION_TTL_SECONDS = 1200
 ASUMI_SESSION_MAX_TURNS = 4
 

@@ -1,3 +1,10 @@
+## Asumi 3.12.0 — Deploy Recovery Queue
+
+- If Render restarts while someone is tagging Asumi in a normal Discord chat, once the Gateway reconnects the bot will try to find that original message within a bounded recent window and answer it automatically.
+- Only **explicit @Asumi conversational messages** qualify. Slash commands, Tarot draws, Feedback, admin commands and other state-changing actions will not be replayed without a new confirmation.
+- Durable queue uses Turso IDs/status only (no private chat body); requires persistent Turso connectivity. Native Discord Gateway does not queue messages while a bot is offline, so recovery is best-effort and requires a live smoke.
+- Details, limits and acceptance checklist: docs/ASUMI_DEPLOY_RECOVERY.md.
+
 ## Asumi 3.11.1 — Readable answer-first Search
 
 Web answers now start with a **bold conclusion**, supporting detail follows in a short paragraph, and sources appear as compact clickable **[1] · [2]** links below. No source-title list, domain badge or long verification section; searching remains an internal tool. Missing evidence still produces an explicit uncertainty statement.

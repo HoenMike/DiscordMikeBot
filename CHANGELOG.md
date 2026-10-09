@@ -7,6 +7,14 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.12.0] - 2026-10-09 — *Deploy Recovery Queue*
+
+### Added
+- When the Discord Gateway reconnects after Render deploy, Asumi scans a short, permission-checked window for missed explicit @Asumi conversation requests and replies to the original message.
+- Register/claim/finish live conversation requests via Turso with message-ID-only rows and atomic claims; stale in-flight requests get a bounded lease retry. Temporary recovery acknowledgement is removed once completed.
+- Safe recovery only: never replay slash/prefix commands, Tarot, Feedback submission, Archive mutations or admin actions automatically.
+- Existing Search/Tarot/Feedback paths unchanged. Recovery requires a healthy persistent Turso DB and is best effort, not guaranteed delivery. See docs/ASUMI_DEPLOY_RECOVERY.md.
+
 ## [3.11.1] - 2026-10-09 — *Readable Search Replies*
 
 ### Improved

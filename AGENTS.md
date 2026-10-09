@@ -13,6 +13,14 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## T26 Deploy Recovery Queue (2026-10-09)
+
+- Asumi Discord Gateway and Flask share the same Render process; Gateway events can be lost during deploy. Do not claim Discord buffers them.
+- Asumi 3.12.0 adds Turso-backed ID-only queue for incoming conversation mentions and bounded history catch-up when READY; read docs/ASUMI_DEPLOY_RECOVERY.md first.
+- Critical safety: do not auto-replay mutating tools, Tarot draws, slash/prefix commands or Feedback; check permissions, old bot replies, atomic claims and expiring leases.
+- Do not promise a truly zero-downtime bot. Without Turso or if a mention is older than the short scan window, recovery is unavailable.
+- Keep existing historical Admin Dashboard and Tarot/Search/Feedback behavior. Live Render verification remains mandatory.
+
 ## T25 Search/Feedback follow-up and OpenUI direction (2026-10-09)
 
 - Owner feedback from live Discord: self-chronological History Search (`của t`) previously required a user mention; public CKTG schedule questions fell through to chat; multiple feedback reports were blocked by a pending draft.

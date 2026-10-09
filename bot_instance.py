@@ -56,6 +56,7 @@ class SummaryBot(commands.Bot):
             help_command=None  # Sử dụng custom help command bên dưới
         )
         self.config_manager = ConfigManager()
+        self._deploy_recovery_task = None
 
     async def setup_hook(self):
         try:
@@ -178,6 +179,16 @@ class SummaryBot(commands.Bot):
         except Exception as e:
             print(f"⚠️ [Presence] Lỗi khởi tạo presence on_ready: {e}", flush=True)
 
+        # Discord does not buffer Gateway MESSAGE_CREATE while we deploy.
+        # Startup history reconciliation runs in the background, not inside
+        # the READY handler, and the durable DB claim deduplicates live events.
+        from core.deploy_recovery import deploy_recovery
+        if self._deploy_recovery_task is None or self._deploy_recovery_task.done():
+            self._deploy_recovery_task = asyncio.create_task(
+                deploy_recovery.on_ready(self),
+                name="asumi-deploy-recovery",
+            )
+
     async def on_error(self, event_method: str, *args, **kwargs):
         print(f"❌ [Bot Event Error] Lỗi nghiêm trọng tại event '{event_method}'", flush=True)
         traceback.print_exc(file=sys.stdout)
@@ -233,7 +244,35 @@ class SummaryBot(commands.Bot):
 
         assistant = self.get_cog("AssistantCog")
         if assistant and assistant.should_handle(message):
-            handled = await assistant.handle_conversation_message(message)
+            from core.deploy_recovery import deploy_recovery, eligible_replay
+            claim_token = None
+            if eligible_replay(message, getattr(getattr(self, "user", None), "id", None)):
+                tracked = await deploy_recovery.register(message)
+                if tracked:
+                    try:
+                        claim_token = await deploy_recovery.claim(message.id)
+                        if not claim_token:
+                            return  # Already handled or claimed by another worker.
+                    except Exception as exc:
+                        print(
+                            f"[Asumi Recovery] live claim unavailable: {type(exc).__name__}",
+                            flush=True,
+                        )
+                        claim_token = None  # Fail open for newly received messages.
+            handled = False
+            try:
+                handled = await assistant.handle_conversation_message(message)
+            finally:
+                if claim_token:
+                    try:
+                        await deploy_recovery.finish(
+                            message.id, done=handled, claim_token=claim_token,
+                        )
+                    except Exception as exc:
+                        print(
+                            f"[Asumi Recovery] live finish failed: {type(exc).__name__}",
+                            flush=True,
+                        )
             if handled:
                 return
 
