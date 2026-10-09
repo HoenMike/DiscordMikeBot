@@ -227,8 +227,46 @@ class T22SourceRouterTests(unittest.IsolatedAsyncioTestCase):
             )
         embed = message.reply.await_args.kwargs["embed"]
         self.assertIn("https://example.com/news", embed.fields[0].value)
-        self.assertIn("chưa đủ", embed.description)
+        self.assertIn("chưa thể xác minh", embed.description)
         self.assertFalse(result.details["web_synthesized"])
+
+    async def test_cktg_route_now_synthesizes_answer_first(self):
+        from features.assistant.providers.brave import BraveHit, BraveSearchResult
+        from features.assistant.tools import CommandToolRegistry
+        registry = CommandToolRegistry(SimpleNamespace())
+        message = SimpleNamespace(
+            author=SimpleNamespace(id=44),
+            reply=AsyncMock(return_value=SimpleNamespace(id=600)),
+        )
+        report = BraveSearchResult(
+            status="ok",
+            hits=(BraveHit(
+                title="Worlds 2026 lịch",
+                url="https://example.com/official-worlds-2026",
+                description="Thông tin lịch giải đấu.",
+            ),),
+        )
+        decision = await route_message(
+            "khi nào CKTG bắt đầu đánh?",
+            cloudflare_router=SimpleNamespace(enabled=False),
+            allowed_search_tools=frozenset({"web.search"}),
+        )
+        self.assertEqual(decision.source, "local_public_event_schedule")
+        with patch(
+            "features.assistant.tools.brave_search.search",
+            new=AsyncMock(return_value=report),
+        ), patch.object(
+            registry, "_summarize_public_search",
+            new=AsyncMock(return_value="CKTG bắt đầu ngày 15/10/2026."),
+        ) as synth, patch(
+            "core.constants.ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED", True,
+        ):
+            result = await registry.execute(decision, message)
+        synth.assert_awaited_once()
+        embed = message.reply.await_args.kwargs["embed"]
+        self.assertTrue(embed.description.startswith("CKTG bắt đầu"))
+        self.assertIn("https://example.com/official-worlds-2026", embed.fields[0].value)
+        self.assertTrue(result.details["web_synthesized"])
 
     def test_public_safety_gate(self):
         self.assertTrue(_safe_public_web_query(
