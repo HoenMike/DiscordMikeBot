@@ -19,11 +19,14 @@
 - Feedback: an unfinished draft is no longer a dead end; offer replace/keep/cancel. Existing drafts stay intact until the reporter explicitly chooses. Stale views are rejected.
 - Unit regression is mandatory; live Discord Search and Brave API results still require a credentialed smoke.
 
-### T25.1 — Native Discord UX (future, separate PR)
-- Upgrade discord.py from 2.4 to a version with Components V2, after checking compatibility with Tarot, Feedback, social embeds, views and slash commands.
-- Build small native, deterministic response components: source links and pagination for search, compact ticket actions, Tarot menus.
-- Do not render arbitrary model-authored components. Maintain a strict allowlist and per-user interaction permissions.
-- Keep embeds or existing buttons as fallbacks in incompatible contexts.
+### T25.1 — Native Discord UX (implementation in stages)
+
+**T25.1a — Asumi 3.13.0, native Search pilot:** upgrade discord.py 2.4.0 → 2.7.1 and render read-only, non-fuel Brave answers as native `LayoutView → Container → TextDisplay/Separator/TextDisplay`. Keep answer-first bold takeaway and numbered [1] [2] citations. No `content` or `embed` alongside a V2 view. Existing specialised factual sources (fuel/weather), Tarot, Feedback, social embed and other commands retain V1 behavior. On Discord HTTP 400 explicitly rejecting V2, use a single legacy embed fallback; do not retry ambiguous network failures to avoid duplicate answers. Controlled rollback is `ASUMI_SEARCH_NATIVE_V2_ENABLED=False` in `core/constants.py` and redeploy.
+
+**T25.1b — Still pending:** move an individually selected, read-only Tarot or ticket-status view to V2 with permission checks, timeout and existing UI fallback. **T25.1c — Still pending:** native pagination/interactive Search actions where genuinely useful, full mobile/desktop visual acceptance, and follow-up regression for interactions. Do not claim that T25.1 is complete merely because the foundation and Search pilot shipped.
+
+- Never allow AI to emit arbitrary component definitions. Continue using a code-owned allowlist of approved UI builders.
+- Legacy embed/button views remain fully supported; do not convert existing interaction messages in place because the V2 flag is irreversible.
 
 ### T25.2 — In-message rich visual response pilot (Tarot one-card implemented in feature branch; live acceptance pending)
 **Clarification 2026-10-09:** The owner wants Asumi's **replies in ordinary Discord text channels** to look like ChatGPT's rich message UI (metric cards, colored warning labels, AQI timeline charts, tables and well-structured source notes), **not** an OpenUI-powered Admin Dashboard. The AQI Biên Hòa examples are presentation references. Preserve the historical dashboard as-is; a dashboard experiment is not the request.

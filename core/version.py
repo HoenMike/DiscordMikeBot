@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.12.0"
+CURRENT_VERSION = "3.13.0"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.12.0 - Deploy Recovery Queue"
+CODENAME = "Asumi 3.13.0 - Native Discord Components V2 Pilot"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.13.0", "date": "2026-10-09", "type": "minor",
+        "title": "Discord Components V2 Native Search Pilot",
+        "summary": "Nâng discord.py 2.7.1 và render câu trả lời Search công khai bằng Container/TextDisplay trong Discord; giữ fallback embed.",
+        "changes": [
+            {"category": "Discord Rich UI", "items": [
+                "Thêm native Components V2 cho Search công khai: kết luận in đậm, nội dung dễ đọc và nguồn [1] [2].",
+                "Không gửi embed chung với LayoutView; rollback được bằng ASUMI_SEARCH_NATIVE_V2_ENABLED trong code.",
+                "Giữ nguyên các nhánh Tarot, Feedback, social preview, slash/prefix và kết quả giá xăng có nguồn chuyên biệt.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.12.0", "date": "2026-10-09", "type": "minor",
         "title": "Deploy Recovery Queue",

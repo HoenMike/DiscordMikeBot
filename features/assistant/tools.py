@@ -19,7 +19,7 @@ from features.assistant.providers.public_pages import fetch_public_page_evidence
 from features.assistant.providers.vectorize import archive_semantic
 from features.assistant.router import RouteDecision
 from features.assistant.search_presenter import (
-    build_search_embed, build_verified_fuel_embed, build_weather_embed,
+    build_search_embed, build_search_layout, build_verified_fuel_embed, build_weather_embed,
     build_aggregated_fuel_embed,
     prioritize_sources, _plain, _fuel_query,
 )
@@ -493,12 +493,36 @@ class CommandToolRegistry:
                     )
             details["web_synthesized"] = bool(summary)
             details["web_answer_fallback"] = not bool(summary)
-            embed = build_search_embed(query, display_hits, summary=summary)
-            sent = await message.reply(
-                embed=embed,
-                mention_author=False,
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
+            # Pilot only the read-only public-answer surface. Typed fuel
+            # reports deliberately keep their existing verified-source embed.
+            # V2 replaces embeds rather than wrapping them; never send both.
+            if policy.ASUMI_SEARCH_NATIVE_V2_ENABLED and not _fuel_query(query):
+                try:
+                    sent = await message.reply(
+                        view=build_search_layout(query, display_hits, summary=summary),
+                        mention_author=False,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    details["web_ui_renderer"] = "components_v2"
+                except discord.HTTPException as exc:
+                    # An explicitly rejected V2 payload can safely fall back.
+                    # Don't retry on a timeout/5xx: Discord may have accepted
+                    # the message and a second answer would be duplicated.
+                    if exc.status != 400:
+                        raise
+                    sent = await message.reply(
+                        embed=build_search_embed(query, display_hits, summary=summary),
+                        mention_author=False,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    details["web_ui_renderer"] = "legacy_embed_fallback"
+            else:
+                sent = await message.reply(
+                    embed=build_search_embed(query, display_hits, summary=summary),
+                    mention_author=False,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                details["web_ui_renderer"] = "legacy_embed"
         else:
             text = "🔎 **Brave Search:** " + notices.get(
                 report.status, "Không thể tìm kiếm lúc này."
