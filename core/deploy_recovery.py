@@ -147,6 +147,14 @@ class DeployRecovery:
         )
         await self.store.commit()
 
+    async def status(self, message_id: int) -> str:
+        async with self.store.execute(
+            "SELECT status FROM asumi_deploy_queue WHERE message_id=?",
+            (str(message_id),),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return str(row[0]) if row else ""
+
     async def heartbeat(self) -> None:
         if not await self._ready_store():
             return
@@ -252,22 +260,44 @@ class DeployRecovery:
                 return
         if not message.channel.permissions_for(member).view_channel:
             return
+        progress = next((
+            m for m in known_messages
+            if getattr(getattr(m, "author", None), "id", None) == bot_id
+            and getattr(getattr(m, "reference", None), "message_id", None) == message.id
+            and (getattr(m, "content", "") or "").startswith(RECOVERY_ACK)
+        ), None)
         if already_answered(message, known_messages, bot_id):
             await self.register(message)
             await self.mark_already_answered(message.id)
+            if progress:
+                try:
+                    await progress.delete()
+                except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                    pass
             return
         if not await self.register(message):
             return
         token = await self.claim(message.id)
         if not token:
+            # Old worker may still hold the processing lease. Tell the user
+            # the request was seen, rather than remaining silent for ~90 s.
+            if not progress and await self.status(message.id) == "processing":
+                try:
+                    await message.reply(
+                        RECOVERY_ACK, mention_author=False,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                    pass
             return
-        ack = None
+        ack = progress
         done = False
         try:
-            ack = await message.reply(
-                RECOVERY_ACK, mention_author=False,
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
+            if ack is None:
+                ack = await message.reply(
+                    RECOVERY_ACK, mention_author=False,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
             assistant = bot.get_cog("AssistantCog")
             if assistant is None:
                 raise RuntimeError("AssistantCog not available")
