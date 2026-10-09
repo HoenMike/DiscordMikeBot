@@ -66,7 +66,7 @@ def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
     but raw search snippets and keyword-result dumps are not the product.
     """
     title = _plain(query, 105) or "Câu hỏi của bạn"
-    answer = re.sub(r"\\[(?:[1-9]|10)\\]", "", _plain(summary, 700))
+    answer = re.sub(r"\[(?:[1-9]|10)\]", "", _plain(summary, 700))
     answer = " ".join(answer.split())
     if not answer:
         answer = (
@@ -90,11 +90,11 @@ def build_search_embed(query: str, hits, summary: str = "") -> discord.Embed:
             discord.utils.escape_mentions(_plain(item.title, 70))
         )
         entry = f"[{label}]({item.url}) · `{host[:55]}`"
-        if len("\\n".join([*lines, entry])) > 900:
+        if len("\n".join([*lines, entry])) > 900:
             break
         lines.append(entry)
     if lines:
-        embed.add_field(name="Kiểm chứng thông tin", value="\\n".join(lines), inline=False)
+        embed.add_field(name="Kiểm chứng thông tin", value="\n".join(lines), inline=False)
     embed.set_footer(text="Asumi · Tổng hợp từ web công khai · Kiểm tra ngày và nguồn gốc")
     return embed
 
