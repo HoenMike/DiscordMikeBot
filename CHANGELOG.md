@@ -10,7 +10,7 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [3.11.0] - 2026-10-09 — *Rich Tarot & Answer-First Search*
 
 ### Added
-- One-card Tarot Daily/Single/Yes-No inline rich PNG (1200×760), combining the actual drawn card with structured headline/takeaway. Keep compact accessible Discord text and a user-only **Đọc đầy đủ** button. No additional AI request, no HTML inside messages.
+- One-card Tarot Daily/Single/Yes-No inline rich PNG (1200×760), combining the actual drawn card with structured headline/takeaway. Keep compact accessible Discord text, **Đọc đầy đủ** button for viewers and a permanent downloadable `tarot_reading.txt` for the full interpretation. No additional AI request, no HTML inside messages.
 - Public web Search now synthesizes grounded answers across all routing paths, including explicit search and named events. The answer takes priority over raw Brave results; citations are two short clickable links.
 - Missing/conflicting evidence or model failure cannot invent a schedule; uncertainty is shown briefly, sources remain available. Existing fuel, weather, quota, ACL and multi-source privacy behavior unchanged.
 
