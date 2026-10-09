@@ -8,6 +8,7 @@ Feedback, or state-changing assistant tools. No message content is stored.
 from __future__ import annotations
 
 import asyncio
+import secrets
 import time
 from datetime import datetime, timezone
 
@@ -84,6 +85,7 @@ class DeployRecovery:
                     created_at REAL NOT NULL,
                     status TEXT NOT NULL DEFAULT 'pending',
                     attempts INTEGER NOT NULL DEFAULT 0,
+                    claim_token TEXT NOT NULL DEFAULT '',
                     updated_at REAL NOT NULL
                 )"""
             )
@@ -110,25 +112,38 @@ class DeployRecovery:
             print(f"[Asumi Recovery] durable register failed: {type(exc).__name__}", flush=True)
             return False
 
-    async def claim(self, message_id: int) -> bool:
-        """CAS claim: even overlapping old/new instances cannot both execute."""
+    async def claim(self, message_id: int) -> str | None:
+        """Return unique fencing token for one successful atomic job claim."""
         now = time.time()
+        token = secrets.token_hex(16)
         result = await self.store.execute(
             """UPDATE asumi_deploy_queue
-               SET status='processing', attempts=attempts+1, updated_at=?
+               SET status='processing', attempts=attempts+1,
+                   claim_token=?, updated_at=?
                WHERE message_id=? AND attempts<?
                  AND (status='pending' OR
                       (status='processing' AND updated_at<?))""",
-            (now, str(message_id), MAX_RETRIES, now - CLAIM_LEASE_SECONDS),
+            (token, now, str(message_id), MAX_RETRIES, now - CLAIM_LEASE_SECONDS),
         )
         await self.store.commit()
-        return int(result.rowcount or 0) == 1
+        return token if int(result.rowcount or 0) == 1 else None
 
-    async def finish(self, message_id: int, *, done: bool) -> None:
+    async def finish(self, message_id: int, *, done: bool, claim_token: str) -> None:
+        # A stale old worker must NOT reset a newer worker's 'done' result.
         await self.store.execute(
             """UPDATE asumi_deploy_queue SET status=?, updated_at=?
+               WHERE message_id=? AND claim_token=? AND status='processing'""",
+            ("done" if done else "pending", time.time(),
+             str(message_id), claim_token),
+        )
+        await self.store.commit()
+
+    async def mark_already_answered(self, message_id: int) -> None:
+        """Complete a confirmed already-answered Discord message."""
+        await self.store.execute(
+            """UPDATE asumi_deploy_queue SET status='done', updated_at=?
                WHERE message_id=?""",
-            ("done" if done else "pending", time.time(), str(message_id)),
+            (time.time(), str(message_id)),
         )
         await self.store.commit()
 
@@ -239,9 +254,12 @@ class DeployRecovery:
             return
         if already_answered(message, known_messages, bot_id):
             await self.register(message)
-            await self.finish(message.id, done=True)
+            await self.mark_already_answered(message.id)
             return
-        if not await self.register(message) or not await self.claim(message.id):
+        if not await self.register(message):
+            return
+        token = await self.claim(message.id)
+        if not token:
             return
         ack = None
         done = False
@@ -268,7 +286,7 @@ class DeployRecovery:
                     pass
         finally:
             try:
-                await self.finish(message.id, done=done)
+                await self.finish(message.id, done=done, claim_token=token)
             except Exception:
                 pass
             if done and ack is not None:
