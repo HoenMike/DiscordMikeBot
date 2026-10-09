@@ -2,7 +2,7 @@
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace as NS
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from core.deploy_recovery import (
     DeployRecovery, RECOVERY_ACK, already_answered, eligible_replay,
@@ -92,6 +92,59 @@ class RecoveryStore(unittest.IsolatedAsyncioTestCase):
                   if "INSERT OR IGNORE" in c.args[0]][0]
         self.assertEqual(insert.args[1][0], str(request.id))
         self.assertNotIn("bí mật", str(insert.args))
+
+    async def test_inflight_lease_gets_visible_status_without_double_execution(self):
+        class FakeMember:
+            id = 30
+            bot = False
+
+        user = FakeMember()
+        perms = NS(view_channel=True)
+        channel = NS(permissions_for=lambda *_: perms)
+        request = msg()
+        request.author = user
+        request.channel = channel
+        request.reply = AsyncMock()
+        bot = NS(user=NS(id=99))
+        recovery = DeployRecovery()
+        recovery._can_read = lambda *args: True
+        recovery.register = AsyncMock(return_value=True)
+        recovery.claim = AsyncMock(return_value=None)
+        recovery.status = AsyncMock(return_value="processing")
+        with patch("core.deploy_recovery.discord.Member", FakeMember):
+            await recovery._replay(bot, request, [])
+        request.reply.assert_awaited_once()
+        self.assertIn("kết nối lại", request.reply.await_args.args[0])
+        recovery.status.assert_awaited_once_with(request.id)
+
+    async def test_replay_delivers_once_and_cleans_up_progress(self):
+        class FakeMember:
+            id = 30
+            bot = False
+
+        user = FakeMember()
+        channel = NS(permissions_for=lambda *_: NS(view_channel=True))
+        request = msg()
+        request.author = user
+        request.channel = channel
+        ack = NS(delete=AsyncMock())
+        request.reply = AsyncMock(return_value=ack)
+        assistant = NS(handle_conversation_message=AsyncMock(return_value=True))
+        bot = NS(user=NS(id=99), get_cog=lambda name: assistant)
+        recovery = DeployRecovery()
+        recovery._can_read = lambda *args: True
+        recovery.register = AsyncMock(return_value=True)
+        recovery.claim = AsyncMock(return_value="claim-1")
+        recovery.finish = AsyncMock()
+        with patch("core.deploy_recovery.discord.Member", FakeMember):
+            await recovery._replay(bot, request, [])
+        assistant.handle_conversation_message.assert_awaited_once_with(
+            request, recovery_mode=True,
+        )
+        recovery.finish.assert_awaited_once_with(
+            request.id, done=True, claim_token="claim-1",
+        )
+        ack.delete.assert_awaited_once()
 
     async def test_recovery_skips_unsafe_but_finds_eligible_mention(self):
         text = NS(
