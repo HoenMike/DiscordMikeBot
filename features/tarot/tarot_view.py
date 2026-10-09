@@ -1974,14 +1974,14 @@ class TarotFlipView(discord.ui.View):
             insight = ai_reading
             takeaway = ""
 
-        lines.append(f"\\n**Thông điệp chính**\\n{safe(insight[:800])}")
+        lines.append(f"\n**Thông điệp chính**\n{safe(insight[:800])}")
         if takeaway:
-            lines.append(f"\\n**Bạn có thể thử**\\n{safe(takeaway[:330])}")
-        lines.append("\\n*Bấm **📖 Đọc đầy đủ** để xem toàn bộ luận giải.*")
+            lines.append(f"\n**Bạn có thể thử**\n{safe(takeaway[:330])}")
+        lines.append("\n*Bấm **📖 Đọc đầy đủ** để xem toàn bộ luận giải.*")
 
         reading = discord.Embed(
             title=self.style_info.get("embed_title", "Asumi Tarot")[:256],
-            description="\\n".join(lines)[:4096],
+            description="\n".join(lines)[:4096],
             color=self.embed_color,
         )
         reading.set_image(url=f"attachment://{image_filename}")
