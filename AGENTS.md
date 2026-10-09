@@ -13,6 +13,15 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## T25.2 — Rich AQI Discord report (2026-10-09)
+
+- Pilot is explicitly scoped to **Biên Hòa** and the public Open-Meteo AQI model; do not call it an IQAir/station observation or imply it verifies actual sensor-level exposure.
+- Data adapter `features/assistant/providers/air_quality.py` enforces strict source URL, bounded response size, numerical validation, 3-hour freshness, timeout and 10-minute cache. No user-defined arbitrary endpoints or private Discord messages leave Asumi.
+- Pillow renderer `features/assistant/air_quality_renderer.py` creates 1120×800 PNG with metric cards, forecast trend and prominent model warning; the Discord response also has accessible text with source link. If image generation fails, send safe text; missing or stale API values must never become fabricated numbers.
+- `route_message` recognizes only explicit AQI / PM2.5 requests naming Biên Hòa; other cities remain out of scope.
+- Verify mobile and desktop image clarity, provider response correctness, error fallback and latency after deploy. This is **not actual OpenUI/React** or automatically generated arbitrary UI.
+- T25.2 universal model-authored templates and optional Discord Activity remain research/deferred.
+
 ## T25.1b — Tarot read-only Components V2 (2026-10-09)
 
 - Scoped to the one-card `📖 Đọc đầy đủ` callback; only its *ephemeral reply* uses LayoutView, never mutate the original Tarot V1 reveal/edit message into V2.

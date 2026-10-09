@@ -136,6 +136,11 @@ ASUMI_FUEL_AGGREGATE_MAX_PRICE_AGE_DAYS = 14
 
 # Public weather facts: Open-Meteo has no secret required for eligible use.
 # Never use AQI or a generic search snippet as a weather forecast substitute.
+# T25.2 fixed-city AQI report: modeled Open-Meteo data, not measured stations.
+ASUMI_AQI_ENABLED = True
+ASUMI_AQI_TIMEOUT_SECONDS = 5
+ASUMI_AQI_CACHE_SECONDS = 600
+
 ASUMI_WEATHER_ENABLED = True
 ASUMI_WEATHER_TIMEOUT_SECONDS = 5
 ASUMI_WEATHER_CACHE_SECONDS = 300

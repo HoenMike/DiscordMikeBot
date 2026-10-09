@@ -12,12 +12,26 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.13.1"
+CURRENT_VERSION = "3.14.0"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.13.1 - Native Tarot Reading Panel"
+CODENAME = "Asumi 3.14.0 - Rich AQI Report"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.0", "date": "2026-10-09", "type": "minor",
+        "title": "Rich AQI Visual Reply",
+        "summary": "Báo cáo chất lượng không khí Biên Hòa dạng thẻ chỉ số và biểu đồ PNG, lấy nguồn mô hình Open-Meteo.",
+        "changes": [
+            {"category": "Rich UI", "items": [
+                "Tự nhận diện câu hỏi AQI/PM2.5 Biên Hòa và lấy dữ liệu mô hình cập nhật, không suy đoán từ snippets Brave.",
+                "Hiển thị ảnh thẻ US AQI + PM2.5 và xu hướng giờ trong chat Discord, kèm văn bản và link gốc.",
+                "Mọi chỉ số mô hình đều được ghi rõ không phải số đo tại trạm, kiểm tra thời điểm và chống hiển thị dữ liệu quá cũ.",
+                "Nếu không có dữ liệu hoặc lỗi render, trả văn bản rõ ràng thay vì số liệu tự bịa.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.13.1", "date": "2026-10-09", "type": "bugfix",
         "title": "Native Tarot Reading Panel",

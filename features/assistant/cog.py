@@ -198,7 +198,7 @@ class AssistantCog(commands.Cog):
         route_ms = (time.perf_counter() - route_started) * 1000
 
         if recovery_mode and decision.tool and decision.tool not in {
-            "web.search", "weather.forecast", "discord_history.search",
+            "web.search", "weather.forecast", "air_quality.report", "discord_history.search",
         }:
             # We don't replay commands that could charge game quotas, submit
             # feedback, run Tarot draws or mutate Archive after a restart.

@@ -1,3 +1,7 @@
+## Asumi 3.14.0 — Rich AQI Report for Biên Hòa
+
+`@Asumi chất lượng không khí Biên Hòa hôm nay` or `@Asumi AQI Biên Hòa` now queries public Open-Meteo air-quality model data (no Brave snippet guessing) and sends a **card + hourly trend chart PNG directly in Discord**, plus a readable text answer and source link. Every modeled value explicitly says it is **not** a live station measurement. Only Biên Hòa is supported in this pilot. Falls back to text when data/image is unavailable. Source policy in `core/constants.py`; QA docs at `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
+
 ## Asumi 3.13.1 — T25.1b Native Tarot Detail
 
 Tarot's **📖 Đọc đầy đủ** button now displays read-only Components V2 for one-card readings, with a File component for long text and safe fallback to the legacy embed. No additional draw or model call; the original message retains the durable full reading. See `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
