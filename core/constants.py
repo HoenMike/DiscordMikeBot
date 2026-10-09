@@ -114,6 +114,8 @@ ASUMI_WEB_SEARCH_SYNTHESIS_ENABLED = True
 # Read-only Search answers pilot native Discord Components V2.
 # Does not change Tarot/Feedback/social embeds; legacy embed fallback remains.
 ASUMI_SEARCH_NATIVE_V2_ENABLED = True
+# Native read-only Tarot full-reading panel; legacy embed fallback on explicit HTTP 400.
+ASUMI_TAROT_READING_NATIVE_V2_ENABLED = True
 ASUMI_WEB_SEARCH_MONTHLY_REQUEST_CAP = 500
 ASUMI_WEB_SEARCH_MAX_RESULTS = 5
 ASUMI_WEB_SEARCH_DISPLAY_SOURCES = 3  # One short embed, up to 3 source links
