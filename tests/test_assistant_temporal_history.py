@@ -165,6 +165,29 @@ class TemporalApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls2), 3)
         self.assertLessEqual(result2.api_calls, 3)
 
+    async def test_self_author_resolves_without_extra_mention(self):
+        provider, message, _ = self.make_context(mention=False)
+        for query in (
+            "tìm tin nhắn đầu tiên của t",
+            "tìm tin nhắn đầu tiên của tôi",
+            "tin nhắn gần nhất của mình là gì",
+            "lần đầu tui nhắn trong server",
+        ):
+            with self.subTest(query=query):
+                self.assertEqual(provider._author_ids(message, query), [10])
+        self.assertEqual(
+            route_locally("tin nhắn đầu tiên của tôi là gì?").tool,
+            "discord_history.search",
+        )
+        self.assertEqual(
+            provider._author_ids(message, "tìm tin nhắn đầu tiên trong server"), [],
+        )
+        _, targeted, _ = self.make_context(mention=True)
+        self.assertEqual(
+            provider._author_ids(targeted, "tìm tin nhắn đầu tiên của t <@44>"),
+            [44],  # An explicit target wins, and Asumi's own tag is ignored.
+        )
+
     async def test_explicit_author_required_and_permission_safe(self):
         missing, calls, _ = await self.search_with_payloads(
             "tìm tin nhắn đầu tiên trong server", {}, mention=False
