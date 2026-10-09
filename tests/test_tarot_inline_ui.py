@@ -33,7 +33,7 @@ class InlineTarotUiTests(unittest.TestCase):
     def test_rich_inline_image_is_real_compact_png(self):
         state = self.make_state()
         data = render_inline_tarot_to_bytes(state)
-        self.assertTrue(data.getvalue().startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+        self.assertTrue(data.getvalue().startswith(b"\x89PNG\r\n\x1a\n"))
         with Image.open(data) as image:
             self.assertEqual(image.size, (1200, 760))
             self.assertEqual(image.mode, "RGB")
