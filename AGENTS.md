@@ -13,6 +13,13 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## T25.1a — Native Components V2 Pilot (2026-10-09)
+
+- Discord library upgraded to discord.py 2.7.1. Native V2 messages use `discord.ui.LayoutView` and **cannot include content or embed fields alongside the view**.
+- The only production V2 entry point so far is non-fuel public Search replies, using code-owned `build_search_layout`. Preserve bold answer / [1] [2] compact citations, privacy, quota, no raw result dump. HTTP 400 can fall back to legacy; never retry uncertain timeouts or 5xx.
+- Tarot/Feedback/Weather/Fuel/social previews remain on legacy views/embeds until separately compatibility-tested. Do not treat T25.1 as fully finished; see docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md.
+- Roll back UI pilot by editing `ASUMI_SEARCH_NATIVE_V2_ENABLED` in core/constants.py and redeploy. Do not move non-secret flags to Render env.
+
 ## T26 Deploy Recovery Queue (2026-10-09)
 
 - Asumi Discord Gateway and Flask share the same Render process; Gateway events can be lost during deploy. Do not claim Discord buffers them.
