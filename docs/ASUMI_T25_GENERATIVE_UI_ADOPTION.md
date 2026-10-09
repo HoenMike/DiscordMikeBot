@@ -1,3 +1,12 @@
+### 2026-10-09 owner correction — Tarot visual baseline
+
+The original Tarot card board and interactive flip workflow are the approved baseline.
+The T25 one-card Insight PNG replacement and `tarot_reading.txt` preview are rolled back
+in **Asumi 3.13.3**. Final readings render in the original board + separate Discord
+embed. Long text is readable via ephemeral Discord pagination, not a TXT attachment.
+The historical T25.1b native file component was deliberately superseded for Tarot;
+native Components V2 Search continues independently.
+
 # T25 — Generative UI adoption for Asumi (proposal + gated delivery)
 
 **Checkpoint:** 2026-10-09. Owner wants [Thesys OpenUI](https://github.com/thesysdev/openui) to help Asumi deliver **ChatGPT-like rich output directly inside ordinary Discord chat replies**, not inside the Admin Dashboard. Discord cannot directly embed the OpenUI React runtime in a message; use native Components V2 and/or server-rendered images as the in-channel bridge. This is a proposal, **not an implemented rendering runtime**. Functional bugfixes to History, Brave routing and Feedback belong to the separate T25.0 regression patch.
