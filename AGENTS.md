@@ -28,6 +28,12 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 - Read `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md` and validate Search + Tarot regressions before merge. Keep old dashboard, report/ticket, R2/Turso and embed proxy fallbacks unchanged.
 - Post-deploy smoke is still required before calling the design live-accepted.
 
+## Search response style acceptance (Asumi 3.11.1)
+
+- User-approved answer-first Search layout: bold the short direct takeaway, leave supporting detail readable, keep references at the bottom as clickable **[1] · [2]** only.
+- Do not show a source-title list, domain badges, `Kiểm chứng thông tin` heading or provider snippets in ordinary Search embeds. The existing underlying sources must remain accessible from the numeric links.
+- Search routing, privacy, quotas, evidence verification and specific factual provider views remain unchanged. Add regression coverage for the display schema.
+
 ## Active Tarot initiative
 
 There is an active planned **Asumi Tarot 2.0** initiative.
