@@ -1,9 +1,16 @@
+## Asumi 3.11.0 — Tarot Rich Reply + Answer-First Web Search
+
+- For ordinary public web questions, Asumi automatically searches and **answers the question first** from the available public evidence; Brave snippets are internal, and the reply keeps only up to two short verification links. If the answer cannot be verified, Asumi says so; it will not invent a start date.
+- For `/tarot` or `.m tarot` with one-card Daily/Single/Yes-No, the completed reading shows a **compact illustrated insight card** inside the Discord chat plus a brief accessible reading and a **📖 Đọc đầy đủ** button for the original reader. Multi-card readings keep their old layout.
+- This is a Pillow server-rendered PNG + native Discord buttons, **not React/OpenUI executing in Discord messages**. OpenUI and Discord Components V2 remain future options. No new dashboard is created.
+- Live screenshots and Brave synthesis/source quality require authorized post-deploy verification; see `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
+
 ## Asumi 3.10.2 — T25.0 Search & Feedback hotfix (live validation pending)
 
 - `@Asumi tìm tin nhắn đầu tiên của t` finds the requester's messages; `@Asumi tìm tin nhắn gần nhất của tôi` works likewise. To search another member, tag exactly one target. Responses still require the requester and bot to have permission to read the source channel.
 - `@Asumi khi nào CKTG bắt đầu đánh?` automatically searches the public web through Brave with the current year when enabled and configured. Search evidence is required; the bot must not invent a date.
 - Starting a new `@Asumi feedback ...` or `/feedback report` while an unfinished draft exists now offers replace, keep or cancel rather than deadlocking. The user chooses what to preserve.
-- OpenUI is for a **future isolated panel inside the existing classic dashboard**, not arbitrary UI inside a Discord message. Discord Components V2 require a separate `discord.py` upgrade. See `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
+- The OpenUI goal is **rich content inside ordinary Discord chat replies**, not a dashboard rebuild. Discord cannot execute arbitrary React inside its message timeline. Discord Components V2 require a separate `discord.py` upgrade. See `docs/ASUMI_T25_GENERATIVE_UI_ADOPTION.md`.
 
 ## T22.5 — Tìm Discord rồi tra cứu nguồn công khai (code-ready; live acceptance pending)
 
