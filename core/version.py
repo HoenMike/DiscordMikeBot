@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.11.0"
+CURRENT_VERSION = "3.11.1"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.11.0 - Rich Tarot and Answer-First Search"
+CODENAME = "Asumi 3.11.1 - Compact Search Citations"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.11.1", "date": "2026-10-09", "type": "bugfix",
+        "title": "Search Reply Readability",
+        "summary": "Làm nổi bật câu trả lời chính và thu gọn nguồn Search còn [1] [2].",
+        "changes": [
+            {"category": "Search UX", "items": [
+                "Kết luận/ý chính in đậm, phần diễn giải có khoảng cách để đọc nhanh.",
+                "Link tham khảo chỉ còn [1] [2] cuối câu trả lời, bỏ tiêu đề và trích đoạn nguồn dài.",
+                "Vẫn giữ nguồn click được, fallback khi thiếu bằng chứng và mọi giới hạn Search hiện có.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.11.0", "date": "2026-10-09", "type": "minor",
         "title": "T25: Tarot Rich Discord UI + Answer-First Search",
