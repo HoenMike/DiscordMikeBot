@@ -7,6 +7,13 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.11.1] - 2026-10-09 — *Readable Search Replies*
+
+### Improved
+- Answer-first public Search now visually emphasizes the takeaway in bold and separates supporting detail into a short paragraph.
+- Reference links render as a minimal clickable **[1] · [2]** line at the bottom. Removed the extra verification heading, domain badges and long link titles.
+- Render formatting is deterministic; Brave remains a background search provider, and uncertainty, privacy, quota and existing typed fact sources are unchanged.
+
 ## [3.11.0] - 2026-10-09 — *Rich Tarot & Answer-First Search*
 
 ### Added
