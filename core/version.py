@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.10.2"
+CURRENT_VERSION = "3.11.0"
 RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.10.2 - Search and Feedback UX"
+CODENAME = "Asumi 3.11.0 - Rich Tarot and Answer-First Search"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.11.0", "date": "2026-10-09", "type": "minor",
+        "title": "T25: Tarot Rich Discord UI + Answer-First Search",
+        "summary": "Search tự tìm và trả lời thay vì liệt kê snippets; Tarot một lá hiển thị insight trực quan ngay trong chat.",
+        "changes": [
+            {"category": "Search", "items": [
+                "Tất cả truy vấn Brave công khai đều được thử tổng hợp thành câu trả lời trực tiếp, kể cả câu lịch CKTG qua routing nội bộ.",
+                "Nguồn chỉ còn link kiểm chứng gọn, không tự hiện đoạn trích dài; thiếu bằng chứng phải trả lời chưa xác minh.",
+                "Giữ giới hạn quota, bảo mật và nguồn dữ liệu riêng cho các câu hỏi giá xăng, thời tiết.",
+            ]},
+            {"category": "Tarot", "items": [
+                "Daily/Single/Yes-No một lá có giao diện Insight ngang bằng ảnh PNG tự dựng từ lá thật và luận giải có cấu trúc.",
+                "Tin nhắn vẫn có thông điệp chữ, các nút gốc và nút 📖 Đọc đầy đủ riêng cho chủ quẻ.",
+                "Trải nhiều lá, Clarifier, Recap, logic bốc bài vẫn giữ nguyên; ảnh lỗi fallback về board cũ.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.10.2", "date": "2026-10-09", "type": "bugfix",
         "title": "History Self Search, CKTG Web Routing & Feedback Draft",

@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "features/assistant/**"
+      - "features/tarot/**"
+      - "tests/test_tarot_inline_ui.py"
+      - "tests/test_tarot_v2_session.py"
+      - "tests/test_tarot_v2_renderer.py"
       - "features/summary/**"
       - "features/feedback/**"
       - "tests/test_feedback_t23.py"
@@ -41,6 +45,10 @@ on:
     branches: [main]
     paths:
       - "features/assistant/**"
+      - "features/tarot/**"
+      - "tests/test_tarot_inline_ui.py"
+      - "tests/test_tarot_v2_session.py"
+      - "tests/test_tarot_v2_renderer.py"
       - "features/summary/**"
       - "features/feedback/**"
       - "tests/test_feedback_t23.py"
@@ -82,6 +90,9 @@ jobs:
           ADMIN_PASSWORD: ci-only-placeholder
           FLASK_SECRET_KEY: ci-only-placeholder-not-a-production-secret
         run: |
+          python -m unittest discover -s tests -p "test_tarot_inline_ui.py" -v
+          python -m unittest discover -s tests -p "test_tarot_v2_session.py" -v
+          python -m unittest discover -s tests -p "test_tarot_v2_renderer.py" -v
           python -m unittest discover -s tests -p "test_assistant_brave.py" -v
           python -m unittest discover -s tests -p "test_assistant_history.py" -v
           python -m unittest discover -s tests -p "test_assistant_temporal_history.py" -v
@@ -107,7 +118,7 @@ jobs:
           python -m unittest discover -s tests -p "test_feedback_mcp.py" -v
           python -m unittest discover -s tests -p "test_feedback_oauth.py" -v
           python -m unittest discover -s tests -p "test_t24_admin_console.py" -v
-          python -m compileall -q features/feedback web/app.py
+          python -m compileall -q features/tarot features/assistant features/feedback web/app.py
           python - <<'PY'
           from pathlib import Path
           source=Path("web/templates/feedback.html").read_text(encoding="utf-8")

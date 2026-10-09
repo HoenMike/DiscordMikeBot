@@ -65,11 +65,29 @@ class BraveSearchUXTests(unittest.TestCase):
         self.assertIn("https://petrolimex.com.vn/gia-xang-dau", sources)
         self.assertNotIn("<strong>", sources)
         self.assertLessEqual(len(sources), 1024)
-        self.assertIn("Brave Search", embed.footer.text)
+        self.assertIn("Tổng hợp từ web", embed.footer.text)
+
+    def test_answer_first_does_not_dump_snippets(self):
+        hits = [
+            BraveHit(
+                title="Lịch thi đấu giải đấu chính thức",
+                description="Một đoạn trích rất dài không nên hiển thị như câu trả lời.",
+                url="https://example.org/worlds",
+            )
+        ]
+        embed = build_search_embed(
+            "Khi nào CKTG bắt đầu?", hits,
+            "CKTG bắt đầu ngày 15/10/2026 theo lịch công bố.",
+        )
+        self.assertTrue(embed.description.startswith("CKTG bắt đầu"))
+        self.assertNotIn("Một đoạn trích rất dài", str(embed.to_dict()))
+        self.assertEqual(len(embed.fields), 1)
+        self.assertIn("Kiểm chứng", embed.fields[0].name)
+        self.assertIn("https://example.org/worlds", embed.fields[0].value)
 
     def test_no_summary_does_not_invent_price(self):
         embed = build_search_embed("giá xăng hôm nay", self.sample())
-        self.assertIn("chưa đủ để xác minh", embed.description)
+        self.assertIn("chưa thể xác minh", embed.description)
         self.assertNotIn("đ/lít", embed.description)
 
     def test_mass_mentions_are_escaped(self):

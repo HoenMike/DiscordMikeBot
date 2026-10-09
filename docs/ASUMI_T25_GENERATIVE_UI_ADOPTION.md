@@ -25,7 +25,7 @@
 - Do not render arbitrary model-authored components. Maintain a strict allowlist and per-user interaction permissions.
 - Keep embeds or existing buttons as fallbacks in incompatible contexts.
 
-### T25.2 — In-message rich visual response pilot (OWNER'S ACTUAL REQUEST; future, separate PR)
+### T25.2 — In-message rich visual response pilot (Tarot one-card implemented in feature branch; live acceptance pending)
 **Clarification 2026-10-09:** The owner wants Asumi's **replies in ordinary Discord text channels** to look like ChatGPT's rich message UI (metric cards, colored warning labels, AQI timeline charts, tables and well-structured source notes), **not** an OpenUI-powered Admin Dashboard. The AQI Biên Hòa examples are presentation references. Preserve the historical dashboard as-is; a dashboard experiment is not the request.
 
 Discord does not render OpenUI/React/HTML/JavaScript directly inside message bodies. Possible delivery options, in priority order:
@@ -35,7 +35,9 @@ Discord does not render OpenUI/React/HTML/JavaScript directly inside message bod
 
 Architecture proposal: Clef intent classification → trusted domain data adapters (IQAir/model/official sources) → validated structured report schema (with timestamp, observational vs forecast provenance) → OpenUI Lang/component allowlist **only if it adds value** → controlled renderer (Chromium/screenshot or standalone SVG/image renderer) → Discord media + native interaction. **Do not send raw OpenUI markup to Discord or accept arbitrary model-authored HTML/JS as executable.**
 
-Pilot: AQI Biên Hòa in a normal channel, with a mobile-legible 800–1200 px dark-theme report: AQI/PM2.5 observation card, forecast trend as static chart, contrasting observation vs model estimates, data update time and clickable evidence links in the Discord message. Make the report fit attachment limits. Track generation latency, cloud rendering costs, fallback reliability and errors. When rendering fails, return the data-grounded text answer.
+**Tarot pilot (Asumi 3.11.0, branch `feat/asumi-t25-tarot-rich-search-answers`):** Daily, Single and Yes/No one-card results produce a compact 1200×760 inline Pillow-rendered image from the existing real card art + `RecapCardState` (no extra AI call), with a short accessible embed and owner-only `📖 Đọc đầy đủ` button. Existing multi-card boards/clarifiers and one-card full reading stay available. This is **not** the OpenUI library itself; Discord does not run React in message bodies. Full release requires CI, merge, Render deploy and a Discord mobile/desktop screenshot smoke. 
+   
+**Next pilot (not implemented):** AQI Biên Hòa in a normal channel, with a mobile-legible 800–1200 px dark-theme report: AQI/PM2.5 observation card, forecast trend as static chart, contrasting observation vs model estimates, data update time and clickable evidence links in the Discord message. Make the report fit attachment limits. Track generation latency, cloud rendering costs, fallback reliability and errors. When rendering fails, return the data-grounded text answer.
 
 For fixed, repetitive report formats, a typed report template + native plotting is likely cheaper and more reliable than prompting an LLM to generate the full OpenUI layout for every message. Test OpenUI as an optional compositional layer rather than a hard dependency.
 
@@ -45,6 +47,14 @@ For fixed, repetitive report formats, a typed report template + native plotting 
 
 ### T25.4 — Dashboard remains unchanged
 - The historical tabbed dashboard + integrated Feedback tab is a separate product surface. Do not pivot this UI goal into an unrelated dashboard rebuild. The prior 'OpenUI isolated web pilot inside Admin Dashboard' direction was an incorrect interpretation and is superseded.
+
+### T25.5 — Search answer synthesis as a background tool (Asumi 3.11.0 feature branch)
+
+- Root cause: `_execute_web_search` previously synthesized answers only for Clef + `local_fresh_public`; the `local_public_event_schedule` CKTG route and explicit web requests skipped synthesis and showed raw Brave results.
+- For **all non-fuel public Brave searches**, run grounded synthesis from bounded Brave snippets/public page evidence with a direct-answer-first prompt. Never send private Discord context.
+- UI: show the answer first and up to two clickable verification links, without raw search snippets; if synthesis fails, explicitly say that the exact answer could not be verified, not a fake date.
+- Structured fuel, weather and other source-specific verified providers retain their behavior; quota, cooldown and private context gates remain.
+- Later: source quality ranking, contradictory-date checks, structured answer schema with confidence and provenance, latency instrumentation. Do not claim model-synthesized text to be externally verified.
 
 ## Acceptance checklist
 

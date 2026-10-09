@@ -191,6 +191,40 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
             pass
         view.stop()
 
+    async def test_single_card_rich_preview_uses_ai_fields_not_full_dump(self):
+        card = drawn("major_02", 0, "LÁ 1: NĂNG LƯỢNG NGÀY")
+        from unittest.mock import MagicMock
+        task = asyncio.create_task(asyncio.sleep(60))
+        view = TarotFlipView(
+            author_id=1, author_name="Tester", author_avatar_url=None,
+            spread_key="daily", spread_info=SPREAD_DEFINITIONS["daily"],
+            drawn_cards=[card], question=None, reader_style="auto",
+            ai_task=task, tarot_manager=FakeManager(),
+        )
+        reading = TarotReadingResult(
+            full_reading="Luận giải chi tiết rất dài" * 200,
+            headline="Quan sát kỹ",
+            core_message="Thông điệp chính có cấu trúc.",
+            practical_takeaway=["Đặt một câu hỏi nhỏ để chiêm nghiệm."],
+        )
+        embeds, attachment = view.build_final_payload(
+            discord.Embed(title="Cards"),
+            reading.full_reading, reading_result=reading,
+            image_filename="tarot_inline.png",
+        )
+        self.assertEqual(embeds[0].image.url, "attachment://tarot_inline.png")
+        self.assertIn(reading.core_message, embeds[0].description)
+        self.assertIn(reading.practical_takeaway[0], embeds[0].description)
+        self.assertNotIn(reading.full_reading[:100], embeds[0].description)
+        self.assertIn("Đọc đầy đủ", embeds[0].description)
+        self.assertIsNone(attachment)
+        task.cancel()
+        try:
+            await task
+        except BaseException:
+            pass
+        view.stop()
+
     async def test_yes_no_compact_result_keeps_verdict(self):
         one_card_task = asyncio.create_task(asyncio.sleep(60))
         card = drawn("major_02", 0, "LÁ 1: PHÁN QUYẾT")
@@ -294,8 +328,8 @@ class TarotMultiTurnStateTests(unittest.TestCase):
         self.assertEqual(state.last_activity_at, 250.0)
 
 
-class TarotResultSessionControlTests(unittest.TestCase):
-    def test_result_view_exposes_three_turn_followup_and_why(self):
+class TarotResultSessionControlTests(unittest.IsolatedAsyncioTestCase):
+    async def test_result_view_exposes_three_turn_followup_and_why(self):
         view = TarotResultActionView(
             author_id=1,
             author_name="Mai",
