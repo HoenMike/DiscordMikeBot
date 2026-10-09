@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.14.0] - 2026-10-09 — *Rich AQI Report Pilot*
+
+### Added
+- In-channel AQI Biên Hòa report with static illustrated PNG cards for modeled US AQI / PM2.5 and same-day forecast timeline, along with concise accessible Markdown and a source link.
+- A bounded, fresh-only Open-Meteo Air Quality adapter (specific coordinates, no arbitrary URLs or private chat data). All values conspicuously labeled **model estimates**, not ground-station observations.
+- Source outages, stale/unusable metrics and rendering failures result in safe explanatory text, never guessed measurements.
+
+### Scope
+This is typed data + Pillow, **not** executing React/OpenUI in Discord. No dashboard changes or broad automatic geographic AQI support yet; live Render/Discord screenshot and API smoke required.
+
 ## [3.13.1] - 2026-10-09 — *Native Tarot Reading Panel*
 
 ### Improved
