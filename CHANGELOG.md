@@ -7,6 +7,14 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.13.0] - 2026-10-09 — *Native Search Components V2*
+
+### Added
+- discord.py 2.7.1 unlocks native Discord Components V2; generic public Search answers now use an in-channel Container + TextDisplay layout with bold takeaway and clickable [1] [2] citations.
+- Single renderer allowlist (only public Brave Search). Existing Tarot, Feedback, fuel/weather facts, slash commands, social embeds and dashboard remain on their tested legacy flows.
+- If Discord rejects native layout as HTTP 400, fall back to the original embed without changing search data. Source-owned `ASUMI_SEARCH_NATIVE_V2_ENABLED` can disable this pilot.
+- Dedicated LayoutView tests + existing Search/Tarot/Feedback/Embed CI; live Discord desktop/mobile acceptance remains open.
+
 ## [3.12.0] - 2026-10-09 — *Deploy Recovery Queue*
 
 ### Added
