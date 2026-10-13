@@ -10,7 +10,7 @@ Send brief Vietnamese Codex reset notices into a Discord channel and ping
 the selected role (including BANKED announcements). Never send real pings on
 startup, setup, preview, CI, or PR creation. No extra bot/webhook/LLM required.
 
-## Admin setup (guild only, Manage Server permission)
+## Admin setup (guild only: Manage Server OR verified Asumi Discord app owner)
 
 1. Make a Codex role and #codex-alerts channel.
 2. Grant Asumi View Channel and Send Messages. Make role mentionable or give
@@ -23,7 +23,7 @@ startup, setup, preview, CI, or PR creation. No extra bot/webhook/LLM required.
    may trigger role pings. ALL alert categories (including banked) tag role.
 6. /codex-watch status and /codex-watch disable inspect and stop delivery.
 
-If Turso is unavailable Watch fails closed (no alert sent). Do not assume
+Authorization is checked by Discord: either a guild manager or the application's verified owner. Ordinary users cannot configure or trigger role pings. Permission failures receive an ephemeral actionable reply. Checks and commands acknowledge the interaction before potentially slow Discord ownership lookup or Turso calls.\n\nIf Turso is unavailable Watch fails closed (no alert sent). Do not assume
 missing data means the reset happened. Bot downtime may miss brief events.
 
 ## Source and classification policy
