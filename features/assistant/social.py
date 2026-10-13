@@ -124,7 +124,7 @@ def is_social_reply_on_target(reply: str, plan: SocialReplyPlan) -> bool:
     # The reported failure addressed Mike instead of delivering the roast.
     # Restrict rejection to clear meta-questions TO the requester.
     if caller and caller in folded and re.search(
-        r"\b(?:lai tinh lam gi|dinh goi ra|dinh ru|dinh pha gi|"
+        r"\b(?:lai tinh lam gi|dinh goi|dinh ru|dinh pha|"
         r"tinh lam gi|muon lam gi|dinh lam gi)\b",
         folded,
     ):
