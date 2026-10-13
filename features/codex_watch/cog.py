@@ -14,12 +14,14 @@ from discord.ext import commands, tasks
 
 from core import constants as policy
 from features.codex_watch.signals import (
-    extract_signals, format_alert, forecast_warning,
+    extract_signals, extract_backup_signals, merge_signals,
+    format_alert, forecast_warning,
     format_forecast_alert, parse_time,
 )
 from features.codex_watch.store import codex_watch_store, WatchStorageError
 
 FEED = "https://codex-reset.com/api/feed"
+BACKUP = "https://didcodexreset.com/openapi/v1/records?page=1&pageSize=10"
 FORECAST = "https://codex-reset.com/api/forecast"
 OBSERVATORY = "https://codex.gussuriworks.com/en"
 TOKYO = ZoneInfo("Asia/Tokyo")
@@ -237,8 +239,19 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
             return
         now = datetime.now(timezone.utc)
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            feed = await read_public(session, FEED, json_mode=True)
-            events = extract_signals(feed, now)
+            # One tracker being unavailable must not disable the other.
+            primary, secondary = [], []
+            try:
+                feed = await read_public(session, FEED, json_mode=True)
+                primary = extract_signals(feed, now)
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+                pass
+            try:
+                mirror = await read_public(session, BACKUP, json_mode=True)
+                secondary = extract_backup_signals(mirror, now)
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+                pass
+            events = merge_signals(primary, secondary)
             for cfg in configs:
                 for event in events:
                     if event.posted_at <= cfg.active_after:
