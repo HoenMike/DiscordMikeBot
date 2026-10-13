@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.13.3"
-RELEASE_DATE = "2026-10-09"
-CODENAME = "Asumi 3.13.3 - Original Tarot Reading UI"
+CURRENT_VERSION = "3.14.0"
+RELEASE_DATE = "2026-10-13"
+CODENAME = "Asumi 3.14.0 - Codex Reset Watch"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.0", "date": "2026-10-13", "type": "feature",
+        "title": "Codex Reset Discord Alerts",
+        "summary": "Watch reset Codex mỗi 5 phút, cấu hình channel/role thủ công, preview an toàn.",
+        "changes": [
+            {"category": "Codex Watch", "items": [
+                "Slash setup/preview/status/enable/disable dành cho admin; không auto-ping khi deploy.",
+                "Tách global reset khỏi banked, Turso dedupe, giới hạn mention và tắt link embeds.",
+                "Phát hiện dự báo >75% chỉ khi có hai tracker độc lập; hiển thị rõ mức độ chắc chắn.",
+            ]},
+        ],
+    },
+
     {
         "version": "3.13.3", "date": "2026-10-09", "type": "bugfix",
         "title": "Original Tarot Reading UI",

@@ -1,3 +1,10 @@
+
+## Asumi 3.14.0 — Codex Reset Watch (opt-in)
+
+- Admin cấu hình qua /codex-watch setup, preview (ephemeral, không ping), enable, status, disable. Chỉ sự kiện mới sau enable mới có thể tag role đã chọn, kể cả BANKED reset.
+- Theo dõi Codex global reset mỗi 5 phút với Turso dedupe và kiểm tra chéo forecast. Tin nhắn ngắn và link X không tự mở embed preview.
+- **Không tự bật khi deploy.** Hướng dẫn quyền Discord, nguồn và giới hạn tại [Codex Reset Watch](docs/ASUMI_CODEX_RESET_WATCH.md).
+
 ## Asumi 3.13.3 — Original Tarot UI, no TXT
 
 - Tarot uses the **existing card board and flip/draw flow** for all spreads. After the last flip, the AI reading appears **directly in Discord under the board**, not as a `tarot_reading.txt` preview.
