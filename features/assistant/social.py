@@ -60,6 +60,8 @@ def plan_social_reply(query: str, context: AssistantContext | None) -> SocialRep
         return None
 
     target = context.social_referent
+    if _fold(target) == _fold(context.requester):
+        return None
     hint = ""
     # A message by the target is more relevant than ambient chat by bystanders.
     for line in reversed(context.recent):
@@ -121,9 +123,12 @@ def is_social_reply_on_target(reply: str, plan: SocialReplyPlan) -> bool:
         return False
 
     caller = _fold(plan.requester)
-    # The reported failure addressed Mike instead of delivering the roast.
-    # Restrict rejection to clear meta-questions TO the requester.
-    if caller and caller in folded and re.search(
+    # For a direct-target playful request, mentioning the caller by name risks
+    # turning the joke into a question or lecture addressed back to them.
+    # Preserve normal flexibility for all non-banter chat (no plan at all).
+    if caller and re.search(r"(?<!\w)" + re.escape(caller) + r"(?!\w)", folded):
+        return False
+    if re.search(
         r"\b(?:lai tinh lam gi|dinh goi|dinh ru|dinh pha|"
         r"tinh lam gi|muon lam gi|dinh lam gi)\b",
         folded,
