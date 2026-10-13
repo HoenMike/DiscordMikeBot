@@ -51,7 +51,10 @@ def parse_independent_forecast(markup: str, now: datetime) -> tuple[int, int] | 
     if age is None:
         return None
     try:
-        updated = datetime.strptime(age.group(1), "%B %d, %Y, %I:%M %p JST").replace(tzinfo=TOKYO)
+        try:
+            updated = datetime.strptime(age.group(1), "%b %d, %Y, %I:%M %p JST").replace(tzinfo=TOKYO)
+        except ValueError:
+            updated = datetime.strptime(age.group(1), "%B %d, %Y, %I:%M %p JST").replace(tzinfo=TOKYO)
         if not timedelta(0) <= now.astimezone(timezone.utc) - updated.astimezone(timezone.utc) <= timedelta(hours=12):
             return None
         h24 = re.search(r"Within 24h\s*(\d{1,3})%", clean)
