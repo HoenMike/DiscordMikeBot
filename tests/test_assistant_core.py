@@ -600,6 +600,101 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         attachment.read.assert_not_awaited()
 
 
+class AssistantSocialReplyBehaviorTests(unittest.IsolatedAsyncioTestCase):
+    def _context(self):
+        return AssistantContext(
+            requester="Mike",
+            mentioned_people=[(44, "Công túa Bông Gòn")],
+            social_referent="Công túa Bông Gòn",
+            social_referent_source="mention trong lời yêu cầu",
+            recent=[
+                SimpleNamespace(
+                    author="Công túa Bông Gòn",
+                    content="thấy tên t dễ thương khôngmmm",
+                ),
+            ],
+        )
+
+    def test_reported_dm_request_becomes_explicit_teasing_instruction(self):
+        from features.assistant.social import (
+            plan_social_reply, is_social_reply_on_target,
+        )
+        context = self._context()
+        plan = plan_social_reply("đm <@44>", context)
+        self.assertEqual(plan.mode, "tease")
+        self.assertEqual(plan.target, "Công túa Bông Gòn")
+        self.assertIn("dễ thương", plan.topic_hint)
+
+        prompt = _build_prompt("đm <@44>", None, context)
+        self.assertIn("TRỰC TIẾP VỚI Công túa Bông Gòn", prompt)
+        self.assertIn("ĐỪNG hỏi ngược người gọi", prompt)
+        self.assertFalse(is_social_reply_on_target(
+            "Hô hô, lại tính làm gì @Công túa Bông Gòn đấy Mike? "
+            "Định gọi ra để flex hay tính phá gì tiếp đấy :))", plan
+        ))
+        self.assertTrue(is_social_reply_on_target(
+            "Bông Gòn ơi, dễ thương thì tự nhận vừa vừa thôi, "
+            "server còn chỗ cho người khác tự tin nữa =)))", plan
+        ))
+
+    def test_slang_and_real_moderation_are_not_mixed(self):
+        from features.assistant.social import plan_social_reply
+        ctx = AssistantContext(
+            requester="Satoou",
+            mentioned_people=[(30, "Mike")],
+            social_referent="Mike",
+        )
+        self.assertEqual(plan_social_reply("chan <@30>", ctx).mode, "challenge")
+        self.assertIn("'chan' LÀ TỪ LÓNG", _build_prompt("chan <@30>", None, ctx))
+        self.assertIsNone(plan_social_reply("ban <@30> vì spam liên tục", ctx))
+        self.assertIsNone(plan_social_reply("lúc nào Mike về?", ctx))
+        ctx.mentioned_people = [(30, "Mike"), (44, "Bông Gòn")]
+        self.assertIsNone(plan_social_reply("sấy <@30> với <@44>", ctx))
+
+    async def test_bad_target_response_is_rejected_then_regenerated(self):
+        context = self._context()
+        fake_bad = SimpleNamespace(text=(
+            "Hô hô, lại tính làm gì Bông Gòn đấy Mike? "
+            "Định gọi ra để flex hay tính phá gì tiếp đây?"))
+        fake_good = SimpleNamespace(text=(
+            "Bông Gòn ơi, flex tên dễ thương hơi nhiều rồi, "
+            "để dành tí spotlight cho người khác với =)))"))
+        with patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(side_effect=[fake_bad, fake_good]),
+        ) as generate:
+            result = await generate_chat_reply("đm <@44>", context=context)
+        self.assertEqual(generate.await_count, 2)
+        self.assertEqual(result.text, fake_good.text)
+        retry_prompt = generate.await_args_list[1].kwargs["contents"][0].parts[0].text
+        self.assertIn("BẢN NHÁP TRƯỚC BỊ TỪ CHỐI", retry_prompt)
+        self.assertIn("Không hỏi Mike", retry_prompt)
+
+    async def test_both_role_reversed_outputs_use_safe_target_fallback(self):
+        context = self._context()
+        bad = SimpleNamespace(text="Hô hô, Mike định gọi Bông Gòn ra làm gì?")
+        with patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(side_effect=[bad, bad]),
+        ) as generate:
+            result = await generate_chat_reply("đm <@44>", context=context)
+        self.assertEqual(generate.await_count, 2)
+        self.assertEqual(result.model, "local_social_fallback")
+        self.assertIn("Bông Gòn", result.text)
+        self.assertNotIn("Mike", result.text)
+
+    async def test_normal_conversation_does_not_use_social_guard(self):
+        context = self._context()
+        reply = SimpleNamespace(text="Hô hô, Mike đang hỏi gì về bài hát vậy?")
+        with patch(
+            "features.assistant.ai.bounded_ai_generate",
+            new=AsyncMock(return_value=reply),
+        ) as generate:
+            result = await generate_chat_reply("bài này tên gì?", context=context)
+        self.assertEqual(generate.await_count, 1)
+        self.assertEqual(result.text, reply.text)
+
+
 class AssistantMultimodalPromptTests(unittest.IsolatedAsyncioTestCase):
     async def test_generate_chat_reply_sends_image_part(self):
         context = AssistantContext(
