@@ -69,6 +69,48 @@ def parse_independent_forecast(markup: str, now: datetime) -> tuple[int, int] | 
         return None
 
 
+async def can_manage_codex_watch(interaction: discord.Interaction) -> bool:
+    """Server managers OR the verified Discord application owner.
+
+    Application ownership comes from discord.py/Discord, not a user-provided
+    role name, environment user ID, or arbitrary privileged mod role.
+    """
+    guild = interaction.guild
+    member = interaction.user
+    if guild is None:
+        raise app_commands.CheckFailure("Lệnh này chỉ dùng được trong server.")
+    permissions = getattr(member, "guild_permissions", None)
+    if permissions is not None and permissions.manage_guild:
+        return True
+    if member.id == guild.owner_id:
+        return True
+
+    # is_owner may call Discord to load application_info on its first run.
+    # Acknowledge the interaction BEFORE network I/O to avoid 3-second timeouts.
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        owner = await interaction.client.is_owner(member)
+    except (discord.DiscordException, OSError, asyncio.TimeoutError):
+        raise app_commands.CheckFailure(
+            "Không xác minh được chủ ứng dụng Asumi lúc này. Vui lòng thử lại."
+        ) from None
+    if owner:
+        return True
+    raise app_commands.CheckFailure(
+        "Bạn cần quyền Manage Server hoặc là chủ ứng dụng Discord của Asumi "
+        "để cấu hình Codex Watch. Hãy nhờ admin server hỗ trợ."
+    )
+
+
+async def reply_ephemeral(interaction: discord.Interaction, content: str, **kwargs):
+    """Works both with and without an earlier permission-check defer."""
+    kwargs["ephemeral"] = True
+    if interaction.response.is_done():
+        return await interaction.followup.send(content, **kwargs)
+    return await reply_ephemeral(interaction, content, **kwargs)
+
+
 class CodexWatch(commands.GroupCog, group_name="codex-watch",
                  group_description="Codex global reset alerts"):
     def __init__(self, bot: commands.Bot):
@@ -97,17 +139,19 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
 
     @app_commands.command(name="setup", description="Lưu kênh và role; mặc định tắt cảnh báo")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.check(can_manage_codex_watch)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel,
                     role: discord.Role):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
         if interaction.guild is None or channel.guild.id != interaction.guild.id or role.guild.id != interaction.guild.id:
-            await interaction.response.send_message("Channel/role phải cùng server.", ephemeral=True)
+            await reply_ephemeral(interaction, "Channel/role phải cùng server.", ephemeral=True)
             return
         if role.is_default() or role.managed:
-            await interaction.response.send_message("Chọn role thường, không phải @everyone/bot role.", ephemeral=True)
+            await reply_ephemeral(interaction, "Chọn role thường, không phải @everyone/bot role.", ephemeral=True)
             return
         if not self._permitted(channel, role):
-            await interaction.response.send_message(
+            await reply_ephemeral(interaction, 
                 "Asumi cần View Channel, Send Messages và quyền mention role (role mentionable hoặc bot được Mention All Roles).",
                 ephemeral=True,
             )
@@ -115,9 +159,9 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
         try:
             await codex_watch_store.setup(interaction.guild.id, channel.id, role.id)
         except WatchStorageError as exc:
-            await interaction.response.send_message(f"Không lưu được: {exc}", ephemeral=True)
+            await reply_ephemeral(interaction, f"Không lưu được: {exc}", ephemeral=True)
             return
-        await interaction.response.send_message(
+        await reply_ephemeral(interaction, 
             f"✅ Đã lưu {channel.mention} và role {discord.utils.escape_mentions(role.name)}.\n"
             "Watch đang TẮT, chưa gửi ping. Dùng lệnh /codex-watch preview để xem thử, "
             "sau đó /codex-watch enable để bật.",
@@ -126,16 +170,17 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
 
     @app_commands.command(name="preview", description="Xem thử cảnh báo; KHÔNG ping role")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.check(can_manage_codex_watch)
     async def preview(self, interaction: discord.Interaction):
         try:
             cfg = await codex_watch_store.get(interaction.guild_id)
         except WatchStorageError:
             cfg = None
         if cfg is None:
-            await interaction.response.send_message("Chưa setup Watch.", ephemeral=True)
+            await reply_ephemeral(interaction, "Chưa setup Watch.", ephemeral=True)
             return
-        await interaction.response.defer(ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
         content = "Chưa tìm được tín hiệu mới phù hợp."
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as session:
@@ -156,23 +201,25 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
 
     @app_commands.command(name="enable", description="Bật thông báo và ping role cho tin MỚI")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.check(can_manage_codex_watch)
     async def enable(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             cfg = await codex_watch_store.get(interaction.guild_id)
             if cfg is None:
-                await interaction.response.send_message("Hãy setup trước.", ephemeral=True)
+                await reply_ephemeral(interaction, "Hãy setup trước.", ephemeral=True)
                 return
             channel = interaction.guild.get_channel(cfg.channel_id)
             role = interaction.guild.get_role(cfg.role_id)
             if not isinstance(channel, discord.TextChannel) or role is None or not self._permitted(channel, role):
-                await interaction.response.send_message("Channel/role/quyền ping không hợp lệ. Setup lại.", ephemeral=True)
+                await reply_ephemeral(interaction, "Channel/role/quyền ping không hợp lệ. Setup lại.", ephemeral=True)
                 return
             await codex_watch_store.set_enabled(interaction.guild_id, True)
         except WatchStorageError as exc:
-            await interaction.response.send_message(f"Không bật được: {exc}", ephemeral=True)
+            await reply_ephemeral(interaction, f"Không bật được: {exc}", ephemeral=True)
             return
-        await interaction.response.send_message(
+        await reply_ephemeral(interaction, 
             "✅ Watch đã bật. Kiểm tra 5 phút/lần, chỉ tin MỚI kể từ bây giờ. "
             "Mọi cảnh báo kể cả banked đều tag role được chọn.",
             ephemeral=True, allowed_mentions=discord.AllowedMentions.none(),
@@ -180,28 +227,32 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
 
     @app_commands.command(name="disable", description="Tắt toàn bộ thông báo Codex")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.check(can_manage_codex_watch)
     async def disable(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             found = await codex_watch_store.set_enabled(interaction.guild_id, False)
         except WatchStorageError as exc:
-            await interaction.response.send_message(f"Không lưu được: {exc}", ephemeral=True)
+            await reply_ephemeral(interaction, f"Không lưu được: {exc}", ephemeral=True)
             return
-        await interaction.response.send_message("✅ Đã tắt Watch." if found else "Chưa setup.", ephemeral=True)
+        await reply_ephemeral(interaction, "✅ Đã tắt Watch." if found else "Chưa setup.", ephemeral=True)
 
     @app_commands.command(name="status", description="Xem trạng thái Watch")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.check(can_manage_codex_watch)
     async def status(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             cfg = await codex_watch_store.get(interaction.guild_id)
         except WatchStorageError:
-            await interaction.response.send_message("Turso không khả dụng; Watch fail-closed.", ephemeral=True)
+            await reply_ephemeral(interaction, "Turso không khả dụng; Watch fail-closed.", ephemeral=True)
             return
         if cfg is None:
-            await interaction.response.send_message("Watch chưa setup.", ephemeral=True)
+            await reply_ephemeral(interaction, "Watch chưa setup.", ephemeral=True)
             return
-        await interaction.response.send_message(
+        await reply_ephemeral(interaction, 
             f"Codex Watch **{'ON' if cfg.enabled else 'OFF'}**\n"
             f"Channel <#{cfg.channel_id}> · Role <@&{cfg.role_id}>\n"
             "Chu kỳ 5 phút, chống trùng bằng Turso, link preview bị tắt. "
