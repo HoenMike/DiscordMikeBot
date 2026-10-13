@@ -10,6 +10,12 @@ import config
 from core.ai import bounded_ai_generate
 from features.assistant.context import AssistantContext
 from features.assistant.session import ConversationSession
+from features.assistant.social import (
+    plan_social_reply,
+    social_reply_instruction,
+    is_social_reply_on_target,
+    safe_social_fallback,
+)
 
 
 ASSISTANT_SYSTEM_PROMPT = """Bạn là Asumi, trợ lý Discord trong một server bạn bè nhỏ.
@@ -128,6 +134,11 @@ def _build_prompt(
                 )
 
     parts.append(f"Tin nhắn hiện tại của user:\n{query[:4000]}")
+    social_plan = plan_social_reply(query, context)
+    if social_plan:
+        # Deliberately LAST, after noisy channel history. Output task wins over
+        # ambient banter and role names never have to be guessed by the model.
+        parts.append(social_reply_instruction(social_plan))
     return "\n\n".join(parts)
 
 
@@ -145,16 +156,19 @@ async def generate_chat_reply(
         else None,
     )
     prompt = _build_prompt(query, session, context)
-    content_parts = [types.Part.from_text(text=prompt)]
-    if context is not None:
-        for image in context.images:
-            content_parts.append(
-                types.Part.from_bytes(
-                    data=image.data,
-                    mime_type=image.mime_type,
+    social_plan = plan_social_reply(query, context)
+    wrong_target_count = 0
+    def _contents_with_text(text_prompt: str):
+        content_parts = [types.Part.from_text(text=text_prompt)]
+        if context is not None:
+            for image in context.images:
+                content_parts.append(
+                    types.Part.from_bytes(
+                        data=image.data,
+                        mime_type=image.mime_type,
+                    )
                 )
-            )
-    contents = [types.Content(role="user", parts=content_parts)]
+        return [types.Content(role="user", parts=content_parts)]
     per_model_timeout, total_budget, max_attempts = _chat_limits()
     total_started = time.perf_counter()
     last_error: Exception | None = None
@@ -171,9 +185,16 @@ async def generate_chat_reply(
         attempt_started = time.perf_counter()
         models_tried.append(model)
         try:
+            attempt_prompt = prompt
+            if social_plan is not None and wrong_target_count:
+                attempt_prompt += (
+                    "\n\nBẢN NHÁP TRƯỚC BỊ TỪ CHỐI DO ĐỐI ĐÁP SAI NGƯỜI. "
+                    f"Không hỏi {social_plan.requester} định làm gì. "
+                    f"Chỉ trực tiếp trêu {social_plan.target} một câu ngắn."
+                )
             response = await bounded_ai_generate(
                 model=model,
-                contents=contents,
+                contents=_contents_with_text(attempt_prompt),
                 config=generation_config,
                 timeout_sec=attempt_timeout,
                 label="Asumi Conversation",
@@ -181,6 +202,18 @@ async def generate_chat_reply(
             elapsed_ms = (time.perf_counter() - attempt_started) * 1000
             text = (getattr(response, "text", None) or "").strip()
             if text:
+                if social_plan is not None and not is_social_reply_on_target(
+                    text, social_plan
+                ):
+                    wrong_target_count += 1
+                    print(
+                        f"⚠️ [Asumi Conversation] Wrong social target detected; "
+                        f"attempt={attempt} model={model}",
+                        flush=True,
+                    )
+                    # Give the next existing bounded fallback model a chance.
+                    # No extra paid requests or new providers are introduced.
+                    continue
                 total_ms = (time.perf_counter() - total_started) * 1000
                 print(
                     f"⏱️ [Asumi Timing] stage=ai model={model} status=ok "
@@ -205,6 +238,15 @@ async def generate_chat_reply(
                 flush=True,
             )
 
+    if social_plan is not None and wrong_target_count:
+        # Do not publish an obviously backwards roast when both model replies
+        # were rejected. This fallback is explicitly playful, not moderation.
+        return ChatReplyResult(
+            text=safe_social_fallback(social_plan),
+            model="local_social_fallback",
+            elapsed_ms=(time.perf_counter() - total_started) * 1000,
+            attempts=len(models_tried),
+        )
     if timeout_seen:
         raise ChatTimeoutBudgetError(
             models_tried=models_tried,
