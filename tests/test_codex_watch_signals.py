@@ -62,6 +62,16 @@ class ResetSignalsTest(unittest.TestCase):
         bad["url"] = "https://evil.example/status/2109812360596865224"
         self.assertIsNone(classify_post(bad, NOW))
 
+    def test_propagated_other_features_not_assumed_global_reset(self):
+        post = tweet("2109812360596865224",
+                     "New UI rollout all propagated. Enjoy.")
+        self.assertIsNone(classify_post(post, NOW))
+
+    def test_cancellation_takes_precedence_over_landing_word(self):
+        post = tweet("2109812360596865224",
+                     "Global reset landing delayed until tomorrow.")
+        self.assertEqual("changed", classify_post(post, NOW).stage)
+
     def test_stale_feed_and_mismatched_source_rejected(self):
         good = {"fetched_at": "2026-10-13T05:55:00Z", "stale": False}
         self.assertTrue(fresh_feed(good, NOW))
