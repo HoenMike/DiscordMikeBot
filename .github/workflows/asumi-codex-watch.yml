@@ -1,0 +1,38 @@
+name: Asumi Codex Reset Watch Regression
+
+on:
+  pull_request:
+    paths:
+      - "features/codex_watch/**"
+      - "tests/test_codex_watch_*.py"
+      - "bot_instance.py"
+      - ".github/workflows/asumi-codex-watch.yml"
+  push:
+    branches: [main]
+    paths:
+      - "features/codex_watch/**"
+      - "tests/test_codex_watch_*.py"
+      - "bot_instance.py"
+      - ".github/workflows/asumi-codex-watch.yml"
+
+jobs:
+  codex-watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          grep -v '^audioop-lts' requirements.txt > /tmp/asumi-codex-requirements.txt
+          python -m pip install -r /tmp/asumi-codex-requirements.txt
+      - name: Compile and run Codex watch regression tests
+        env:
+          ADMIN_PASSWORD: ci-only-placeholder
+          FLASK_SECRET_KEY: ci-only-placeholder
+        run: |
+          python -m compileall -q features/codex_watch bot_instance.py
+          python -m unittest discover -s tests -p "test_codex_watch_*.py" -v
