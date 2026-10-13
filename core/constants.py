@@ -74,6 +74,10 @@ ASUMI_RECOVERY_MAX_CHANNELS = 80
 ASUMI_RECOVERY_MAX_MESSAGES_PER_CHANNEL = 100
 ASUMI_RECOVERY_MAX_MESSAGES_PER_PASS = 60
 
+# Public Codex reset watch. Per-server opt-in config lives in Turso.
+# Polling cannot auto-ping until admin explicitly enables it.
+ASUMI_CODEX_WATCH_INTERVAL_MINUTES = 5
+
 ASUMI_SESSION_TTL_SECONDS = 1200
 ASUMI_SESSION_MAX_TURNS = 4
 
