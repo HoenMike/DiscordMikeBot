@@ -6,6 +6,15 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.BugFix`).
 
 ---
+## [3.14.3] - 2026-10-13 — *Social target and slang resolution*
+
+### Fixed
+- Lấy danh sách **user mentions đã được Discord xác nhận** và ánh xạ ID → display name để model biết Mike/Satouu là người gọi, Bông Gòn/Mike được tag mới là người được nhắc trong nội dung câu.
+- Với lời gọi ngắn có tag người khác, chỉ đọc tối đa 5 tin gần đó để bắt bối cảnh hài hước; nếu không tag, reply tác giả là tham chiếu phụ. Nhiều tag không tự chọn một người làm target.
+- "Triệu hồi Asumi sấy @Bông Gòn" phải hiểu mục tiêu là Bông Gòn, không biến thành tiết mục DJ/phonk và không quay lại chọc Mike.
+- "chan @Mike" là cách dùng có chủ ý của Satoou, giữ nguyên **chan**, không tự động sửa thành "chặn" hoặc thực hiện hành động moderation.
+- Không đổi permission/command, Search, Tarot, Feedback và không lưu lịch sử server thụ động. Unit regressions cho các trường hợp trong ảnh; hành vi AI thực cần kiểm tra trên Discord.
+
 ## [3.14.2] - 2026-10-13 — *Social banter conversation context*
 
 ### Fixed
