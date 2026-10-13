@@ -12,12 +12,24 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.0"
+CURRENT_VERSION = "3.14.1"
 RELEASE_DATE = "2026-10-13"
-CODENAME = "Asumi 3.14.0 - Codex Reset Watch"
+CODENAME = "Asumi 3.14.1 - Codex Watch Permission Hotfix"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.1", "date": "2026-10-13", "type": "bugfix",
+        "title": "Codex Watch Permission Hotfix",
+        "summary": "Chủ ứng dụng Asumi được cấu hình Watch; lỗi thiếu quyền trả lời riêng thay vì timeout.",
+        "changes": [
+            {"category": "Codex Watch", "items": [
+                "Manage Server hoặc Discord application owner được dùng slash cấu hình Watch.",
+                "Trả lời lỗi thiếu quyền dạng ephemeral; không còn Application did not respond.",
+                "ACK sớm trước khi chờ Turso hoặc xác minh app owner, giữ nguyên mặc định không ping.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.0", "date": "2026-10-13", "type": "feature",
         "title": "Codex Reset Discord Alerts",
