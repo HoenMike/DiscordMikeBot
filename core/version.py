@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.2"
+CURRENT_VERSION = "3.14.3"
 RELEASE_DATE = "2026-10-13"
-CODENAME = "Asumi 3.14.2 - Social Banter Context"
+CODENAME = "Asumi 3.14.3 - Discord Social Target Resolution"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.3", "date": "2026-10-13", "type": "bugfix",
+        "title": "Discord Social Target Resolution",
+        "summary": "Nhận diện đúng người được tag để trêu đúng mục tiêu; giữ nguyên tiếng lóng của thành viên.",
+        "changes": [
+            {"category": "Conversation", "items": [
+                "Ánh xạ mention Discord ID sang display name thật; người gọi, người được tag và tác giả tin được reply tách biệt.",
+                "Lấy tối đa 5 tin liền trước cho lời gọi ngắn có mention; định hướng câu đùa vào người được nhắc, không phản chủ.",
+                "Giữ nguyên từ lóng như 'chan', không tự sửa thành lệnh chặn; chặn/ban thật không được giả vờ đã thực hiện.",
+                "Regression cho Mike gọi sấy Bông Gòn và Satouu dùng 'chan @Mike'.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.2", "date": "2026-10-13", "type": "bugfix",
         "title": "Social Banter Context",
