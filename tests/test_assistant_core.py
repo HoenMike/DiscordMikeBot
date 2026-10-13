@@ -636,6 +636,9 @@ class AssistantSocialReplyBehaviorTests(unittest.IsolatedAsyncioTestCase):
             "Bông Gòn ơi, dễ thương thì tự nhận vừa vừa thôi, "
             "server còn chỗ cho người khác tự tin nữa =)))", plan
         ))
+        self.assertFalse(is_social_reply_on_target(
+            "Mike ơi, đừng trêu Bông Gòn nữa nhé =)))", plan
+        ))
 
     def test_slang_and_real_moderation_are_not_mixed(self):
         from features.assistant.social import plan_social_reply
