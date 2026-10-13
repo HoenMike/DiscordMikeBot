@@ -10,7 +10,7 @@ from features.assistant.ai import (
     _chat_limits,
     generate_chat_reply,
 )
-from features.assistant.context import AssistantContext, ContextBuilder, ImagePayload
+from features.assistant.context import AssistantContext, ContextBuilder, ImagePayload, needs_social_context
 from features.assistant.cog import choose_conversation_route
 from features.assistant.router import route_locally, route_message
 from features.assistant.session import SessionStore
@@ -263,6 +263,55 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(ctx.reply)
         self.assertFalse(channel.history_called)
+
+    async def test_social_reply_resolves_speaker_and_recent_banter(self):
+        replied = SimpleNamespace(
+            id=77,
+            content="@banbe thấy tên t dễ thương khommmmm",
+            author=SimpleNamespace(display_name="Công túa Bông Gòn"),
+            attachments=[],
+            embeds=[],
+        )
+        recent = [
+            SimpleNamespace(
+                id=78,
+                content="Subeo nghe nhạc dân chơi",
+                author=SimpleNamespace(display_name="Mr.Bư"),
+                attachments=[],
+                embeds=[],
+            ),
+            replied,
+        ]
+        channel = _FakeHistoryChannel(recent)
+        msg = fake_message(
+            "<@123> ban thằng này được ko",
+            reply_id=77,
+            resolved=replied,
+            channel=channel,
+        )
+        msg.author.display_name = "Mike"
+        ctx = await ContextBuilder().build(msg, "ban thằng này được ko")
+        prompt = _build_prompt("ban thằng này được ko", None, ctx)
+
+        self.assertTrue(channel.history_called)
+        self.assertEqual(ctx.requester, "Mike")
+        self.assertEqual(ctx.reply.author, "Công túa Bông Gòn")
+        self.assertNotIn(77, [line.message_id for line in ctx.recent])
+        self.assertIn("Người đang gọi Asumi: Mike", prompt)
+        self.assertIn("không phải lời của người gọi", prompt)
+        self.assertIn("Công túa Bông Gòn", prompt)
+        self.assertIn("ban thằng này được ko", prompt)
+
+    async def test_social_reply_fetch_is_bounded_and_real_ban_not_classified_as_joke(self):
+        self.assertTrue(needs_social_context("ban thằng này được ko"))
+        self.assertTrue(needs_social_context("hùa theo tui trêu nó"))
+        self.assertFalse(needs_social_context("ban <@123> vì spam liên tục"))
+        self.assertFalse(needs_social_context("cái này nghĩa là gì?"))
+
+        channel = _FakeHistoryChannel([])
+        msg = fake_message("<@123> ban thằng này được ko", channel=channel)
+        await ContextBuilder(recent_limit=20).build(msg, "ban thằng này được ko")
+        self.assertTrue(channel.history_called)
 
     async def test_broad_catchup_still_scans_recent_even_with_reply(self):
         replied = SimpleNamespace(
