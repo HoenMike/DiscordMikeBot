@@ -299,7 +299,7 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.requester, "Mike")
         self.assertEqual(ctx.reply.author, "Công túa Bông Gòn")
         self.assertNotIn(77, [line.message_id for line in ctx.recent])
-        self.assertIn("Người đang gọi Asumi: Mike", prompt)
+        self.assertIn("mục tiêu mặc định): Mike", prompt)
         self.assertIn("không phải lời của người gọi", prompt)
         self.assertIn("Công túa Bông Gòn", prompt)
         self.assertIn("ban thằng này được ko", prompt)
