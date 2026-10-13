@@ -72,24 +72,26 @@ def classify_post(post: dict, now: datetime) -> ResetSignal | None:
             return None
     elif (
         re.search(r"\b(reset(?:s)?\s+(?:all\s+)?propagated|all\s+propagated)\b", normalized)
-        and ("reset" in normalized or "propagated" in normalized)
+        and "reset" in normalized
     ) or re.search(r"\b(?:the\s+)?reset\s+has\s+been\s+processed\b", normalized):
         # Avoid the ambiguous one-liner "confirmed landed across all accounts"
         # (previously used for a BANKED credit).
         stage = "completed"
         detail = "Tibo xác nhận global reset đã triển khai xong."
-    elif re.search(r"\bglobal\s+reset\b", normalized) and re.search(
-        r"\b(by\s+eod|landing|incoming|will\s+(?:happen|land|reset)|tomorrow|scheduled|planned)\b",
-        normalized,
-    ):
-        stage = "announced"
-        detail = "Tibo công bố global reset sắp diễn ra."
     elif (
         re.search(r"\bglobal\s+reset\b", normalized)
         and re.search(r"\b(?:delayed|postponed|cancelled|canceled)\b", normalized)
     ):
         stage = "changed"
         detail = "Tibo thông báo thay đổi kế hoạch global reset."
+    elif (re.search(r"\bglobal\s+reset\b", normalized)
+          and not re.search(r"\b(?:no|not|won't|never)\s+(?:a\s+)?global\s+reset\b", normalized)
+          and re.search(
+              r"\b(by\s+eod|landing|incoming|will\s+(?:happen|land|reset)|tomorrow|scheduled|planned)\b",
+              normalized,
+          )):
+        stage = "announced"
+        detail = "Tibo công bố global reset sắp diễn ra."
     else:
         # Excludes 'Day 8 / Reset', jokes, polls, vote % and tracker speculation.
         return None
