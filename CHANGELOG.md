@@ -6,6 +6,13 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.BugFix`).
 
 ---
+## [3.14.2] - 2026-10-13 — *Social banter conversation context*
+
+### Fixed
+- @Asumi trong một reply ngắn như “ban thằng này được ko” có ngữ cảnh **người gọi**, **người được reply** và tối đa 5 tin nhắn gần đó để hiểu đối tượng đang bị trêu, không chỉ suy từ câu hỏi đơn lẻ.
+- Hướng dẫn persona hùa theo trò đùa nhẹ nhàng khi rõ ràng, không mặc định câu nào chứa “ban” là yêu cầu moderation thật và không giả vờ đã ban/kick.
+- Context vẫn đọc tại chỗ, có giới hạn, không mở archive thụ động; slash/prefix moderation, Tarot và Search giữ nguyên.
+
 ## [3.14.1] - 2026-10-13 — *Codex Watch permission hotfix*
 
 ### Fixed
