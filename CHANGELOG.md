@@ -6,6 +6,13 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.BugFix`).
 
 ---
+## [3.14.1] - 2026-10-13 — *Codex Watch permission hotfix*
+
+### Fixed
+- Cho phép chủ ứng dụng Discord đã được xác minh của Asumi quản trị Codex Watch ngay cả khi thiếu quyền Manage Server trong server; admin server vẫn được phép như cũ.
+- Tài khoản không đủ quyền nhận thông báo riêng rõ ràng, thay vì `The application did not respond`.
+- Slash setup/preview/status/enable/disable xác nhận tương tác sớm trước Turso/Discord API để tránh timeout; không thay đổi cơ chế role mention, không ping tự động.
+
 
 ## [3.14.0] - 2026-10-13 — *Opt-in Codex Reset Watch*
 
