@@ -113,6 +113,19 @@ def _build_prompt(
         context_text = context.to_prompt_text()
         if context_text:
             parts.append("Context Discord chỉ dùng cho request hiện tại:\n" + context_text)
+        if context.social_referent:
+            from features.assistant.context import needs_social_context
+            if needs_social_context(query):
+                parts.append(
+                    "Quan hệ đối thoại cho lượt này: "
+                    f"{context.requester or 'người gọi'} là người nhờ Asumi; "
+                    f"{context.social_referent} là người được nhắc tới qua "
+                    f"{context.social_referent_source}. "
+                    "Nếu câu đang rủ Asumi chọc vui người được nhắc, hãy "
+                    "hùa theo trêu ĐÚNG người đó thay vì chọc ngược người gọi. "
+                    "Tin chat trước giúp bắt vibe nhưng không được làm lệch "
+                    "đối tượng hoặc gán nghĩa sai cho từ lóng."
+                )
 
     parts.append(f"Tin nhắn hiện tại của user:\n{query[:4000]}")
     return "\n\n".join(parts)
