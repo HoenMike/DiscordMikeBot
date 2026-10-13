@@ -108,7 +108,7 @@ async def reply_ephemeral(interaction: discord.Interaction, content: str, **kwar
     kwargs["ephemeral"] = True
     if interaction.response.is_done():
         return await interaction.followup.send(content, **kwargs)
-    return await reply_ephemeral(interaction, content, **kwargs)
+    return await interaction.response.send_message(content, **kwargs)
 
 
 class CodexWatch(commands.GroupCog, group_name="codex-watch",
@@ -172,6 +172,8 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
     @app_commands.guild_only()
     @app_commands.check(can_manage_codex_watch)
     async def preview(self, interaction: discord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             cfg = await codex_watch_store.get(interaction.guild_id)
         except WatchStorageError:
@@ -179,8 +181,6 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
         if cfg is None:
             await reply_ephemeral(interaction, "Chưa setup Watch.", ephemeral=True)
             return
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True, thinking=True)
         content = "Chưa tìm được tín hiệu mới phù hợp."
         try:
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as session:
