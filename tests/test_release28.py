@@ -65,9 +65,11 @@ class PreviewClassifierTests(unittest.TestCase):
         self.assertTrue(embed.description.startswith("||"))
         cards = discord.Embed(title="Cards", description="Card descriptions")
         embeds, attachment = build_reading_payload(cards, "x" * 12000, "Reading", "Asumi")
-        self.assertIsNotNone(attachment)
+        # Asumi 3.13.3 keeps long readings in Discord pagination; TXT is retired.
+        self.assertIsNone(attachment)
+        self.assertEqual(2, len(embeds))
+        self.assertIn("Đọc đầy đủ", embeds[1].description)
         self.assertLessEqual(sum(len(item) for item in embeds), 6000)
-        attachment.close()
 
 class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
