@@ -12,6 +12,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from core import constants as policy
 from features.codex_watch.signals import (
     extract_signals, format_alert, forecast_warning,
     format_forecast_alert, parse_time,
@@ -266,7 +267,7 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
                 body = format_forecast_alert("https://codex-reset.com/", p24, p48, *second)
                 await self._send(cfg, key, "https://codex-reset.com/", body)
 
-    @tasks.loop(minutes=5)
+    @tasks.loop(minutes=policy.ASUMI_CODEX_WATCH_INTERVAL_MINUTES)
     async def poll(self):
         try:
             await self._cycle()
