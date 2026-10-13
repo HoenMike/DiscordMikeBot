@@ -38,6 +38,16 @@ No mention/reply => no conversational response.
 
 ---
 
+## 2026-10-13 — Social banter context hotfix (3.14.2)
+
+- Screenshot regression: Mike replies to Bông Gòn saying their name sounds cute with “@Asumi ban thằng này được ko”. Expected response is light teasing aimed at Bông Gòn, not asking whether Mike genuinely wants moderation.
+- `features/assistant/context.py`: record current requester, keep replied-message author distinct, and fetch up to five nearby Discord messages for bounded short social referents, including when a direct reply exists. Keep ordinary direct-reply URL/image questions on the current minimal-fetch path.
+- `features/assistant/ai.py`: contextual friendly banter is permitted only when harmless; never claim to have ban/kick permissions or to have performed an unexecuted action. Real moderation requests remain gated by existing commands/permissions.
+- `tests/test_assistant_core.py`: prompt/context assembly regression covers the screenshot shape and negative cases; model-output style still needs a live Discord smoke check.
+- No persistent server-chat collection, no passive bot replies, and no change to unrelated Tarot/Search/Feedback behavior.
+
+---
+
 ## Non-negotiable contracts
 
 - Existing slash/prefix commands remain.

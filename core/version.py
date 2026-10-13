@@ -12,12 +12,24 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.1"
+CURRENT_VERSION = "3.14.2"
 RELEASE_DATE = "2026-10-13"
-CODENAME = "Asumi 3.14.1 - Codex Watch Permission Hotfix"
+CODENAME = "Asumi 3.14.2 - Social Banter Context"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.2", "date": "2026-10-13", "type": "bugfix",
+        "title": "Social Banter Context",
+        "summary": "Asumi hiểu đúng người được reply và ngữ cảnh trêu đùa trong hội thoại bạn bè.",
+        "changes": [
+            {"category": "Conversation", "items": [
+                "Phân biệt người gọi bot với tác giả tin nhắn được reply; đọc tối đa 5 tin gần đây khi có đại từ chỉ người hoặc lời rủ trêu đùa.",
+                "Trả lời linh hoạt với lời trêu vô hại mà không giả vờ đã ban/kick; lệnh moderation thật giữ nguyên quyền và luồng riêng.",
+                "Không thay đổi Tarot, Search, Archive hay việc chỉ phản hồi khi được gọi.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.1", "date": "2026-10-13", "type": "bugfix",
         "title": "Codex Watch Permission Hotfix",
