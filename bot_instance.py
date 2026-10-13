@@ -10,6 +10,7 @@ from core.config_manager import ConfigManager
 from core.activity_logger import activity_logger
 from core.version import CURRENT_VERSION
 from core.branding import BOT_BRAND_NAME
+from core.app_command_errors import reply_app_error
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -72,18 +73,14 @@ class SummaryBot(commands.Bot):
             # Xử lý lỗi toàn cục cho Slash Commands (bao gồm Cooldown)
             @self.tree.error
             async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
-                if isinstance(error, app_commands.CommandOnCooldown):
-                    msg = f"⏳ **Bạn đang thao tác quá nhanh!** Vui lòng đợi `{int(error.retry_after) + 1}s` nữa trước khi dùng lại lệnh."
-                    try:
-                        if interaction.response.is_done():
-                            await interaction.followup.send(msg, ephemeral=True)
-                        else:
-                            await interaction.response.send_message(msg, ephemeral=True)
-                    except Exception as send_err:
-                        print(f"⚠️ Không gửi được thông báo cooldown: {send_err}", flush=True)
-                    return
-                print(f"❌ [Slash Command Error] {type(error).__name__}: {error}", flush=True)
-                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stdout)
+                # A failed permission check happens BEFORE callback invocation.
+                # Always ACK to Discord; otherwise users see "application did not respond".
+                if not isinstance(error, (
+                    app_commands.CheckFailure, app_commands.CommandOnCooldown,
+                )):
+                    print(f"❌ [Slash Command Error] {type(error).__name__}: {error}", flush=True)
+                    traceback.print_exception(type(error), error, error.__traceback__, file=sys.stdout)
+                await reply_app_error(interaction, error)
 
             # Kiểm tra trạng thái tạm ngừng của máy chủ trước khi xử lý Slash Command
             async def check_guild_not_suspended(interaction: discord.Interaction) -> bool:

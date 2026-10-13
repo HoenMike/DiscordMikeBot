@@ -1,4 +1,9 @@
 
+## Asumi 3.14.1 — Codex Watch permission hotfix
+
+- Server managers **or verified Asumi Discord application owner** can configure Codex Watch; unauthorized users receive a private actionable error (no interaction timeout).
+- Long Discord ownership and Turso checks are acknowledged promptly; this release still cannot ping until setup, preview, and enable.
+
 ## Asumi 3.14.0 — Codex Reset Watch (opt-in)
 
 - Admin cấu hình qua /codex-watch setup, preview (ephemeral, không ping), enable, status, disable. Chỉ sự kiện mới sau enable mới có thể tag role đã chọn, kể cả BANKED reset.
