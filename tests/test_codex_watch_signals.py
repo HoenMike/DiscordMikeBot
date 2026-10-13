@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from features.codex_watch.signals import (
     classify_post, estimate_window, extract_signals,
+    extract_backup_signals, merge_signals,
     forecast_warning, format_alert, parse_time, fresh_feed,
 )
 
@@ -90,6 +91,43 @@ class ResetSignalsTest(unittest.TestCase):
         self.assertFalse(forecast_warning(
             {"probabilities":{"model_24h":99,"model_48h":96}}, None
         ))
+
+    def test_backup_api_requires_original_post_and_no_duplicates(self):
+        post_id = "2109812360596865224"
+        record = {
+            "id": post_id, "kind": "reset_scheduled", "resetType": "global",
+            "announcedAt": "2026-10-13T01:03:59Z",
+            "text": "Global reset landing by EOD PST time. Enjoy",
+            "source": {
+                "origin": "x", "postId": post_id,
+                "handle": "thsottiaux",
+                "url": f"https://x.com/thsottiaux/status/{post_id}",
+            }
+        }
+        backup = {"ok": True, "meta": {"generatedAt": "2026-10-13T05:58:00Z"},
+                  "data": {"items": [record]}}
+        found = extract_backup_signals(backup, NOW)
+        self.assertEqual(1, len(found))
+        primary = classify_post(tweet(post_id, record["text"]), NOW)
+        self.assertEqual(1, len(merge_signals([primary], found)))
+        record["source"]["origin"] = "operator"
+        self.assertEqual([], extract_backup_signals(backup, NOW))
+        record["source"]["origin"] = "x"
+        backup["meta"]["generatedAt"] = "2026-10-10T05:58:00Z"
+        self.assertEqual([], extract_backup_signals(backup, NOW))
+
+    def test_backup_banked_not_reinterpreted_as_global(self):
+        pid = "2109812360596865224"
+        backup = {"ok": True, "meta": {"generatedAt": "2026-10-13T05:58:00Z"},
+                  "data": {"items": [{
+                      "kind": "reset_completed", "resetType": "banked",
+                      "completedAt": "2026-10-13T01:03:59Z",
+                      "text": "Put the reset in the bag. All propagated.",
+                      "source": {"origin": "x", "postId": pid,
+                                 "handle": "thsottiaux",
+                                 "url": f"https://x.com/thsottiaux/status/{pid}"}
+                  }]}}
+        self.assertEqual([], extract_backup_signals(backup, NOW))
 
     def test_no_link_onebox_and_no_user_supplied_mentions(self):
         signal = classify_post(tweet("2109812360596865224",
