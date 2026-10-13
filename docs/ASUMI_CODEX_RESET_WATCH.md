@@ -30,12 +30,16 @@ missing data means the reset happened. Bot downtime may miss brief events.
 
 - Poll every five minutes only when at least one guild is enabled.
 - Fixed allowlisted, bounded HTTPS GET endpoints:
-  https://codex-reset.com/api/feed (public Tibo post mirror)
+  https://codex-reset.com/api/feed (primary Tibo post mirror)
+  https://didcodexreset.com/openapi/v1/records?page=1&pageSize=10
+    (second Tibo post mirror, public API quota 60 requests/hour)
   https://codex-reset.com/api/forecast (statistical model)
   https://codex.gussuriworks.com/en (second statistical model)
 - Reject stale feeds, invalid timestamps, non-Tibo X URLs, mismatched status
   ID or very old posts (older than three days).
 - Classify using text attributed to Tibo; never trust tracker enum alone.
+  Deduplicate cross-source results by canonical X post ID: two mirrors of
+  the same Tibo tweet are one source event, not two independent proofs.
   The original tweet URL is preserved; direct X auth is not guaranteed.
 - Exclude Day 8 / Reset alone, jokes, polls, generic preference statements,
   and the banked-only phrase Confirmed landed across all accounts.
