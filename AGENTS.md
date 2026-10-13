@@ -13,6 +13,13 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## Asumi 3.14.4 — Enforce the *reply*, not only the role mapping (2026-10-13)
+
+- 3.14.3 was confirmed live yet failed the owner screenshot. `@Asumi đm @Bông Gòn` must answer Bông Gòn directly, not “lại tính làm gì Bông Gòn đấy Mike”.
+- `features/assistant/social.py` is style guidance only: bounded recognizers for slang/teasing, not a moderation route. Keep literal `chan`, and never trigger actual bans/kicks.
+- Model-output guard rejects obvious off-target questions. Retry only within existing time/model budget, then safe local target-addressed fallback, not a misleading answer.
+- Review `tests/test_assistant_core.py` for exact bad output and double-rejection mock. Do a real Discord mention smoke after CI; passing prompt/role tests alone was inadequate.
+
 ## Asumi 3.14.3 — Correct social target mapping (2026-10-13)
 
 - Discord mention IDs in the request must be resolved from `message.mentions` and not guessed from nearby display names. The caller, direct mention, reply author and previous participants are distinct roles.
