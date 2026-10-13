@@ -141,6 +141,65 @@ def extract_signals(feed: dict, now: datetime) -> list[ResetSignal]:
     return sorted(signals, key=lambda x: x.posted_at)
 
 
+
+def extract_backup_signals(snapshot: dict, now: datetime) -> list[ResetSignal]:
+    """Use DidCodexReset public records as a fallback, NOT independent proof.
+
+    Only origin=x, exact thsottiaux handle, original post ID and authentic-looking
+    canonical X URL are eligible. Operator-manual completions are never trusted
+    as first-party confirmation.
+    """
+    if not isinstance(snapshot, dict) or snapshot.get("ok") is not True:
+        return []
+    try:
+        generated = parse_time(snapshot["meta"]["generatedAt"])
+        age = now.astimezone(timezone.utc) - generated
+        if not timedelta(0) <= age <= MAX_SOURCE_AGE:
+            return []
+        records = snapshot["data"]["items"]
+        if not isinstance(records, list):
+            return []
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return []
+
+    found: list[ResetSignal] = []
+    for record in records[:10]:
+        if not isinstance(record, dict):
+            continue
+        src = record.get("source")
+        if not isinstance(src, dict) or src.get("origin") != "x" or src.get("handle") != "thsottiaux":
+            continue
+        # Never promote the backup's own status label to an official claim.
+        post = {
+            "id": src.get("postId"),
+            "url": src.get("url"),
+            "text": record.get("text"),
+            "at": record.get("announcedAt") or record.get("completedAt"),
+        }
+        item = classify_post(post, now)
+        if item is None:
+            continue
+        category = record.get("resetType")
+        if category == "banked" and item.stage != "banked":
+            continue
+        if category == "global" and item.stage == "banked":
+            continue
+        if record.get("kind") == "reset_scheduled" and item.stage == "completed":
+            continue
+        # An already-completed record that only quotes the earlier commitment
+        # must not trigger a new "upcoming reset" alert.
+        if record.get("kind") == "reset_completed" and item.stage == "announced":
+            continue
+        found.append(item)
+    return sorted(found, key=lambda item: item.posted_at)
+
+
+def merge_signals(first: list[ResetSignal], second: list[ResetSignal]) -> list[ResetSignal]:
+    """Identical original tweet/stage seen by two trackers counts as ONE."""
+    by_key = {s.key: s for s in second}
+    by_key.update({s.key: s for s in first})  # primary preferred
+    return sorted(by_key.values(), key=lambda s: s.posted_at)
+
 def forecast_warning(primary: dict, independent_percent: tuple[int, int] | None) -> bool:
     """Require TWO differing forecast models, never a poll/commitment score."""
     if independent_percent is None or not isinstance(primary, dict):
