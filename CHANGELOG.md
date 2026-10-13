@@ -6,6 +6,15 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.BugFix`).
 
 ---
+## [3.14.4] - 2026-10-13 — *Targeted banter reply guard*
+
+### Fixed
+- Live 3.14.3 regression: `@Asumi đm @Bông Gòn` đã đọc đúng người được tag nhưng lại hỏi Mike “lại tính làm gì Bông Gòn”. Đây là **lỗi output/intention**, không phải lỗi deploy.
+- Thêm bộ nhận diện **playful reply intent** riêng (không phải tool) cho lời trêu/cà khịa ngắn, 'sấy', 'đm', 'chan', và câu ban giả tưởng không có lý do moderation thực. Đặt yêu cầu phản hồi **trực tiếp người được nhắc** cuối prompt, đính kèm bối cảnh có nguồn đúng người đó.
+- Chặn những câu AI có dấu hiệu hỏi ngược người gọi “lại tính làm gì”, “định gọi ...”. Cho phép thử lại tối đa trong budget/model fallback hiện có; nếu cả hai lần đều đảo vai trò thì gửi một câu đùa an toàn nhằm đúng target.
+- Có kiểm thử regression với chính câu trả lời lỗi từ ảnh, test nhánh retry/fallback và phản ví dụ: truy vấn bình thường, nhiều mention, ban thật vì spam.
+- **Chưa thể đảm bảo chất lượng sáng tạo hoàn toàn qua mock:** vẫn cần smoke thử đầu ra trên Discord. Không thay cơ chế moderation, quota, Tarot, Search, Archive.
+
 ## [3.14.3] - 2026-10-13 — *Social target and slang resolution*
 
 ### Fixed

@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.3"
+CURRENT_VERSION = "3.14.4"
 RELEASE_DATE = "2026-10-13"
-CODENAME = "Asumi 3.14.3 - Discord Social Target Resolution"
+CODENAME = "Asumi 3.14.4 - Targeted Banter Reply Guard"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.4", "date": "2026-10-13", "type": "bugfix",
+        "title": "Targeted Banter Reply Guard",
+        "summary": "Trêu đúng người được nhắc và ngừng hỏi ngược người gọi bot.",
+        "changes": [
+            {"category": "Conversational Core", "items": [
+                "Nhận diện các lời gọi ngắn trêu bạn bè như 'đm @Bông Gòn', 'sấy @Bông Gòn' và 'chan @Mike'; tách vai trò người gọi/mục tiêu.",
+                "Đưa chỉ dẫn đối đáp vào cuối prompt, tập trung đúng mục tiêu và tin chat của người đó thay vì hỏi người gọi định làm gì.",
+                "Phát hiện kiểu trả lời sai 'lại tính làm gì ... đấy Mike?': thử lại bằng model fallback trong budget 8 giây; nếu vẫn sai thì trả câu trêu an toàn hướng đúng người.",
+                "Không thực hiện ban/kick thật, không đổi Search/Tarot và không lưu lịch sử server thụ động.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.3", "date": "2026-10-13", "type": "bugfix",
         "title": "Discord Social Target Resolution",
