@@ -277,7 +277,9 @@ class CodexWatch(commands.GroupCog, group_name="codex-watch",
             if not forecast_warning(forecast, second):
                 return
             for cfg in configs:
-                if now <= cfg.active_after:
+                # Never fire a pre-existing forecast just because an admin
+                # enabled the watch for the first time.
+                if updated <= cfg.active_after:
                     continue
                 key = "forecast:" + now.astimezone(LA).strftime("%Y-%m-%d")
                 body = format_forecast_alert("https://codex-reset.com/", p24, p48, *second)
