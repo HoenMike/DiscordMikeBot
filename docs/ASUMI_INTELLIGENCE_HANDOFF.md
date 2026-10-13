@@ -38,6 +38,16 @@ No mention/reply => no conversational response.
 
 ---
 
+## 2026-10-13 — Asumi 3.14.4 targeted-banter output guard
+
+- Owner confirmed Discord bot is live **3.14.3** yet model still reversed the interaction: Mike sent `@Asumi đm @Bông Gòn`, Asumi replied “Hô hô, lại tính làm gì @Bông Gòn đấy Mike? Định gọi ra để flex hay tính phá gì tiếp đây :))”. Treat as a **model-output failure**, not deploy lag.
+- `features/assistant/social.py`: bounded, conservative `SocialReplyPlan` selects a single known Discord mention or reply referent and recognizes direct harmless playful requests; never authorizes admin actions. Preserve intentional `chan` slang.
+- `features/assistant/ai.py`: late prompt directive explicitly addresses Bông Gòn, not Mike; cheap guard rejects obvious role-reversal text, permits one existing bounded fallback model retry, and emits a short target-safe fallback if every generated candidate is invalid.
+- `tests/test_assistant_core.py`: exact bad text negative assertion, a targeted positive example, generated output retry/fallback, ordinary chat unaffected and real spam ban request not turned into a joke.
+- CI passing only validates the control flow and mock expectations; **live Discord model acceptance still required** after deploy. No unbounded retries, private-chat persistence, Search or Tarot changes.
+
+---
+
 ## 2026-10-13 — Social target regression follow-up (3.14.3)
 
 - Screenshots: Mike requests “đm @Bông Gòn đi @Asumi” and “triệu hồi @Asumi sấy @Bông Gòn”; expected playful reply is about **Bông Gòn**, not directed at Mike, not a literal hairdryer or phonk DJ request.
