@@ -328,6 +328,7 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.social_referent, "Công túa Bông Gòn")
         self.assertEqual(ctx.social_referent_source, "mention trong lời yêu cầu")
         self.assertIn("<@44> = Công túa Bông Gòn", prompt)
+        self.assertIn("trêu ĐÚNG người đó", prompt)
         self.assertNotIn("<@123> =", prompt)
         self.assertTrue(channel.history_called)
 
@@ -356,6 +357,7 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         asumi = SimpleNamespace(id=123, display_name="AsumiDaBot")
         msg = fake_message(
             "<@123> nói <@30> với <@44>",
+            author_id=60,
             mentions=[asumi, mike, bong],
             channel=_FakeHistoryChannel([]),
         )
@@ -376,10 +378,12 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(msg.channel.history_called)
         self.assertEqual(ctx.social_referent, "Công túa Bông Gòn")
 
-    async def test_social_reply_fetch_is_bounded_and_real_ban_not_classified_as_joke(self):
+    async def test_social_reply_fetch_is_bounded_and_moderation_stays_separate(self):
         self.assertTrue(needs_social_context("ban thằng này được ko"))
         self.assertTrue(needs_social_context("hùa theo tui trêu nó"))
-        self.assertFalse(needs_social_context("ban <@123> vì spam liên tục"))
+        # Fetching contextual messages is not a banter or ban-action decision.
+        self.assertTrue(needs_social_context("ban <@123> vì spam liên tục"))
+        self.assertIsNone(route_locally("ban <@123> vì spam liên tục").tool)
         self.assertFalse(needs_social_context("cái này nghĩa là gì?"))
 
         channel = _FakeHistoryChannel([])
