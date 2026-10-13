@@ -7,6 +7,16 @@ Tài liệu dựa trên [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [3.14.0] - 2026-10-13 — *Opt-in Codex Reset Watch*
+
+### Added
+- Mỗi 5 phút đọc public tracker, xác thực câu chữ Tibo để phân biệt cam kết, hoàn tất, banked, thay đổi; dự báo cao chỉ khi hai model >75%.
+- Admin cấu hình kênh và role bằng slash setup, xem preview không ping, chủ động enable/disable/status; **tắt mặc định**.
+- Turso per-guild configuration + delivery lease/dedupe; tránh thông báo lại dữ liệu cũ.
+- Chỉ mention role được chọn; suppress_embeds=True tránh link X tự sinh card lớn.
+- Regression tests và CI riêng; không tự gửi ping khi merge/deploy.
+
+
 ## [3.13.3] - 2026-10-09 — *Original Tarot UI, no TXT attachments*
 
 ### Changed
