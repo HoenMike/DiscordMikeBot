@@ -79,7 +79,7 @@ class AppCommandErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
         args, kwargs = i.response.send_message.await_args
         self.assertIn("manage_guild", args[0])
         self.assertTrue(kwargs["ephemeral"])
-        self.assertEqual([], kwargs["allowed_mentions"].roles)
+        self.assertFalse(kwargs["allowed_mentions"].roles)
 
     async def test_custom_permission_failure_after_defer(self):
         i = mock_interaction(already_deferred=True)
