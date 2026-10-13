@@ -41,6 +41,7 @@ class ContextLine:
 @dataclass
 class AssistantContext:
     reply: ContextLine | None = None
+    requester: str | None = None
     prompt_char_limit: int = 7000
     recent: list[ContextLine] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
@@ -52,9 +53,13 @@ class AssistantContext:
     def to_prompt_text(self, max_chars: int | None = None) -> str:
         parts: list[str] = []
 
+        if self.requester:
+            parts.append(f"Người đang gọi Asumi: {self.requester}")
+
         if self.reply:
             parts.append(
-                "Tin nhắn đang được reply:\n"
+                "Tin nhắn gốc mà người gọi đang reply "
+                f"(do {self.reply.author} gửi, không phải lời của người gọi):\n"
                 f"{self.reply.author}: {self.reply.content or '(không có text)'}"
             )
 
@@ -115,6 +120,23 @@ def needs_recent_context(query: str) -> bool:
         "bon no",
     )
     return any(signal in folded for signal in signals)
+
+
+def needs_social_context(query: str) -> bool:
+    """Short social references need a few nearby messages to resolve who's who.
+
+    This only opts into bounded Discord channel context on an explicit Asumi
+    mention/reply; it does not decide that a moderation request is a joke.
+    """
+    folded = _fold(query).replace("đ", "d")
+    if len(folded) > 220:
+        return False
+    return bool(re.search(
+        r"\b(?:thang|dua|ong|ba|nguoi|con|nho|cha)\s+(?:nay|kia|do)\b",
+        folded,
+    )) or any(cue in folded for cue in (
+        "hua theo", "ca khia", "troll", "treu", "dua voi",
+    ))
 
 
 def needs_broad_recent_context(query: str) -> bool:
@@ -305,7 +327,10 @@ class ContextBuilder:
         session=None,
         is_live_continuation: bool = False,
     ) -> AssistantContext:
-        ctx = AssistantContext(prompt_char_limit=self.max_context_chars)
+        ctx = AssistantContext(
+            prompt_char_limit=self.max_context_chars,
+            requester=_author_name(message),
+        )
         reply_message = await _resolve_reply_message(message)
 
         # Plain chat replies are already represented by bounded session turns.
@@ -359,9 +384,12 @@ class ContextBuilder:
             ctx.images.extend(list(session.images)[: self.max_images])
             ctx.used_session_images = True
 
-        should_fetch_recent = needs_recent_context(query) and (
-            needs_broad_recent_context(query)
-            or (ctx.reply is None and not ctx.images)
+        social_reference = needs_social_context(query)
+        should_fetch_recent = social_reference or (
+            needs_recent_context(query) and (
+                needs_broad_recent_context(query)
+                or (ctx.reply is None and not ctx.images)
+            )
         )
         if should_fetch_recent:
             channel = getattr(message, "channel", None)
@@ -370,7 +398,7 @@ class ContextBuilder:
                 lines: list[ContextLine] = []
                 try:
                     async for item in history(
-                        limit=self.recent_limit,
+                        limit=min(self.recent_limit, 5) if social_reference else self.recent_limit,
                         before=message,
                         oldest_first=False,
                     ):
