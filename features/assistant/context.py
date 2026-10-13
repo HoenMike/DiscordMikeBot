@@ -157,7 +157,7 @@ def needs_social_context(query: str) -> bool:
     return bool(USER_MENTION_RE.search(query)) or bool(re.search(
         r"\b(?:thang|dua|ong|ba|nguoi|con|nho|cha)\s+(?:nay|kia|do)\b",
         folded,
-    )) or any(cue in folded for (
+    )) or any(cue in folded for cue in (
         "hua theo", "ca khia", "troll", "treu", "dua voi",
     ))
 
