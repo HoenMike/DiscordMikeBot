@@ -65,8 +65,8 @@ class AssistantContext:
         if self.mentioned_people:
             parts.append(
                 "Người được tag trong lời yêu cầu (Discord ID → tên thật "
-                "trong server, không nhầm với người gọi):\\n"
-                + "\\n".join(
+                "trong server, không nhầm với người gọi):\n"
+                + "\n".join(
                     f"<@{user_id}> = {name}"
                     for user_id, name in self.mentioned_people
                 )
@@ -212,7 +212,7 @@ def _author_name_for_member(member) -> str:
         or getattr(member, "name", None)
         or ""
     )
-    return str(name).replace("\\n", " ").replace("\\r", " ")[:80]
+    return str(name).replace("\n", " ").replace("\r", " ")[:80]
 
 
 def _author_name(message) -> str:
