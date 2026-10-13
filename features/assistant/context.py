@@ -8,6 +8,7 @@ from typing import Iterable, Optional
 
 
 URL_RE = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
+USER_MENTION_RE = re.compile(r"<@!?(\d{1,20})>")
 SUPPORTED_IMAGE_TYPES = {
     "image/png",
     "image/jpeg",
@@ -42,6 +43,9 @@ class ContextLine:
 class AssistantContext:
     reply: ContextLine | None = None
     requester: str | None = None
+    mentioned_people: list[tuple[int, str]] = field(default_factory=list)
+    social_referent: str | None = None
+    social_referent_source: str | None = None
     prompt_char_limit: int = 7000
     recent: list[ContextLine] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
@@ -54,7 +58,26 @@ class AssistantContext:
         parts: list[str] = []
 
         if self.requester:
-            parts.append(f"Người đang gọi Asumi: {self.requester}")
+            parts.append(
+                f"Người đang gọi Asumi (tác giả lời yêu cầu, KHÔNG phải "
+                f"mục tiêu mặc định): {self.requester}"
+            )
+        if self.mentioned_people:
+            parts.append(
+                "Người được tag trong lời yêu cầu (Discord ID → tên thật "
+                "trong server, không nhầm với người gọi):\n"
+                + "\n".join(
+                    f"<@{user_id}> = {name}"
+                    for user_id, name in self.mentioned_people
+                )
+            )
+        if self.social_referent:
+            parts.append(
+                f"Đối tượng được nhắc tới gần nhất: {self.social_referent} "
+                f"(nguồn: {self.social_referent_source}). "
+                "Đây là tham chiếu để hiểu câu, không tự suy diễn mọi lời "
+                "nói đều nhằm công kích người này."
+            )
 
         if self.reply:
             parts.append(
@@ -131,7 +154,7 @@ def needs_social_context(query: str) -> bool:
     folded = _fold(query).replace("đ", "d")
     if len(folded) > 220:
         return False
-    return bool(re.search(
+    return bool(USER_MENTION_RE.search(query)) or bool(re.search(
         r"\b(?:thang|dua|ong|ba|nguoi|con|nho|cha)\s+(?:nay|kia|do)\b",
         folded,
     )) or any(cue in folded for cue in (
@@ -159,6 +182,37 @@ def needs_broad_recent_context(query: str) -> bool:
 
 def _extract_urls(text: str) -> list[str]:
     return [url.rstrip(".,!?)]}>") for url in URL_RE.findall(text or "")]
+
+
+def _mentioned_people(message, query: str) -> list[tuple[int, str]]:
+    """Resolve ONLY actual user mentions supplied by Discord; bot mention was stripped.
+
+    A display name written as plain text is not proof of a Discord mention.
+    """
+    ids = {int(value) for value in USER_MENTION_RE.findall(query)}
+    requester_id = getattr(getattr(message, "author", None), "id", None)
+    result: list[tuple[int, str]] = []
+    seen: set[int] = set()
+    for member in getattr(message, "mentions", None) or []:
+        user_id = getattr(member, "id", None)
+        if user_id not in ids or user_id == requester_id or user_id in seen:
+            continue
+        name = _author_name_for_member(member)
+        if name:
+            result.append((user_id, name))
+            seen.add(user_id)
+        if len(result) >= 6:
+            break
+    return result
+
+
+def _author_name_for_member(member) -> str:
+    name = (
+        getattr(member, "display_name", None)
+        or getattr(member, "name", None)
+        or ""
+    )
+    return str(name).replace("\n", " ").replace("\r", " ")[:80]
 
 
 def _author_name(message) -> str:
@@ -331,6 +385,7 @@ class ContextBuilder:
             prompt_char_limit=self.max_context_chars,
             requester=_author_name(message),
         )
+        ctx.mentioned_people = _mentioned_people(message, query)
         reply_message = await _resolve_reply_message(message)
 
         # Plain chat replies are already represented by bounded session turns.
@@ -356,6 +411,15 @@ class ContextBuilder:
         ):
             ctx.reply = _line_from_message(reply_message)
             ctx.urls.extend(_extract_urls(ctx.reply.content))
+
+        # A single explicit non-bot mention outranks a replied-to bystander.
+        # Multiple mentions are ambiguous; do not silently select a target.
+        if len(ctx.mentioned_people) == 1:
+            ctx.social_referent = ctx.mentioned_people[0][1]
+            ctx.social_referent_source = "mention trong lời yêu cầu"
+        elif not ctx.mentioned_people and ctx.reply:
+            ctx.social_referent = ctx.reply.author
+            ctx.social_referent_source = "tác giả tin được reply"
 
         ctx.urls.extend(_extract_urls(getattr(message, "content", "") or ""))
 

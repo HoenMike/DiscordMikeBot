@@ -38,6 +38,16 @@ No mention/reply => no conversational response.
 
 ---
 
+## 2026-10-13 — Social target regression follow-up (3.14.3)
+
+- Screenshots: Mike requests “đm @Bông Gòn đi @Asumi” and “triệu hồi @Asumi sấy @Bông Gòn”; expected playful reply is about **Bông Gòn**, not directed at Mike, not a literal hairdryer or phonk DJ request.
+- Satouu says “@Asumi chan @Mike”; **chan is user-intended slang**, NOT a misspelling to autocorrect to “chặn”. Preserve the literal word and clarify only if its meaning changes a real action. Mike is the mentioned participant, Satouu is the caller. This change never triggers moderation actions.
+- Runtime mention data from Discord (`message.mentions`) now maps ID to display names. Separate caller, explicit person mentions, reply author and bounded nearby background. Explicit one-person mention wins over reply author; multiple mentions never select an arbitrary target.
+- Prompt makes social target roles explicit and lets Asumi adapt to friendly chat vibe without reversing the target, while preserving existing guardrails and avoiding any claimed or actual ban/kick.
+- Regression cases are in `tests/test_assistant_core.py`; CI pass does not establish live model quality. Preserve no passive archive and only-on-mention response semantics.
+
+---
+
 ## 2026-10-13 — Social banter context hotfix (3.14.2)
 
 - Screenshot regression: Mike replies to Bông Gòn saying their name sounds cute with “@Asumi ban thằng này được ko”. Expected response is light teasing aimed at Bông Gòn, not asking whether Mike genuinely wants moderation.

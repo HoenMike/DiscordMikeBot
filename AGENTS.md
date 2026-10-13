@@ -13,6 +13,13 @@ This repository is expected to be used across multiple AI/agent sessions. Read t
 7. Do not bump the repository version for planning/docs-only changes. Bump version/changelog when a release behavior change warrants it.
 8. Avoid silently deleting compatibility aliases, stored data, commands or configuration.
 
+## Asumi 3.14.3 — Correct social target mapping (2026-10-13)
+
+- Discord mention IDs in the request must be resolved from `message.mentions` and not guessed from nearby display names. The caller, direct mention, reply author and previous participants are distinct roles.
+- For explicit invitations to playful roast one named user, aim at the mentioned person, not the caller. Keep nearby chat as bounded context, not a change of target.
+- "chan" in Satouu's message is intentional slang; never auto-correct to "chặn" or translate it into a moderation command. No ban/kick side effects.
+- Tests: `tests/test_assistant_core.py` and existing assistant, Tarot, Search suites. Confirm Discord output after deploy; CI alone cannot guarantee live AI wording.
+
 ## Asumi 3.13.3 — Restore Tarot legacy presentation (2026-10-09)
 
 - Owner explicitly wants the **original Tarot spread board and flip flow**, just cleaner formatting. Do not substitute the rich Insight PNG, attach a long TXT, or change draws/AI/card selection.

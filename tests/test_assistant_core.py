@@ -28,6 +28,7 @@ def fake_message(
     channel=None,
     attachments=None,
     resolved=None,
+    mentions=None,
 ):
     reference = None
     if reply_id is not None:
@@ -40,6 +41,7 @@ def fake_message(
         author=SimpleNamespace(id=author_id, display_name=f"User{author_id}"),
         reference=reference,
         attachments=list(attachments or []),
+        mentions=list(mentions or []),
     )
 
 
@@ -297,15 +299,91 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.requester, "Mike")
         self.assertEqual(ctx.reply.author, "Công túa Bông Gòn")
         self.assertNotIn(77, [line.message_id for line in ctx.recent])
-        self.assertIn("Người đang gọi Asumi: Mike", prompt)
+        self.assertIn("mục tiêu mặc định): Mike", prompt)
         self.assertIn("không phải lời của người gọi", prompt)
         self.assertIn("Công túa Bông Gòn", prompt)
         self.assertIn("ban thằng này được ko", prompt)
 
-    async def test_social_reply_fetch_is_bounded_and_real_ban_not_classified_as_joke(self):
+    async def test_explicit_tag_is_resolved_and_takes_priority_over_reply(self):
+        mike = SimpleNamespace(id=30, display_name="Mike")
+        bong = SimpleNamespace(id=44, display_name="Công túa Bông Gòn")
+        asumi = SimpleNamespace(id=123, display_name="AsumiDaBot")
+        replied = SimpleNamespace(
+            id=77, content="nghe nhạc phonk",
+            author=SimpleNamespace(id=44, display_name="Công túa Bông Gòn"),
+            attachments=[], embeds=[],
+        )
+        channel = _FakeHistoryChannel([])
+        msg = fake_message(
+            "<@123> triệu hồi <@123> sấy <@44>",
+            reply_id=77, resolved=replied, channel=channel,
+            mentions=[asumi, bong],
+        )
+        msg.author = mike
+        ctx = await ContextBuilder().build(msg, "triệu hồi sấy <@44>")
+        prompt = _build_prompt("triệu hồi sấy <@44>", None, ctx)
+
+        self.assertEqual(ctx.requester, "Mike")
+        self.assertEqual(ctx.mentioned_people, [(44, "Công túa Bông Gòn")])
+        self.assertEqual(ctx.social_referent, "Công túa Bông Gòn")
+        self.assertEqual(ctx.social_referent_source, "mention trong lời yêu cầu")
+        self.assertIn("<@44> = Công túa Bông Gòn", prompt)
+        self.assertIn("trêu ĐÚNG người đó", prompt)
+        self.assertNotIn("<@123> =", prompt)
+        self.assertTrue(channel.history_called)
+
+    async def test_targeted_slang_chan_is_preserved_not_autocorrected(self):
+        satoou = SimpleNamespace(id=56, display_name="Satoou")
+        mike = SimpleNamespace(id=30, display_name="Mike")
+        asumi = SimpleNamespace(id=123, display_name="AsumiDaBot")
+        msg = fake_message(
+            "<@123> chan <@30>",
+            author_id=56,
+            mentions=[asumi, mike],
+            channel=_FakeHistoryChannel([]),
+        )
+        msg.author = satoou
+        ctx = await ContextBuilder().build(msg, "chan <@30>")
+        prompt = _build_prompt("chan <@30>", None, ctx)
+
+        self.assertEqual(ctx.requester, "Satoou")
+        self.assertEqual(ctx.social_referent, "Mike")
+        self.assertIn("chan <@30>", prompt)
+        self.assertNotIn("chặn <@30>", prompt)
+
+    async def test_multiple_tags_do_not_select_an_arbitrary_target(self):
+        mike = SimpleNamespace(id=30, display_name="Mike")
+        bong = SimpleNamespace(id=44, display_name="Bông Gòn")
+        asumi = SimpleNamespace(id=123, display_name="AsumiDaBot")
+        msg = fake_message(
+            "<@123> nói <@30> với <@44>",
+            author_id=60,
+            mentions=[asumi, mike, bong],
+            channel=_FakeHistoryChannel([]),
+        )
+        ctx = await ContextBuilder().build(msg, "nói <@30> với <@44>")
+        self.assertEqual(ctx.mentioned_people, [(30, "Mike"), (44, "Bông Gòn")])
+        self.assertIsNone(ctx.social_referent)
+
+    async def test_roast_tagged_person_without_reply_still_fetches_chat_vibe(self):
+        bong = SimpleNamespace(id=44, display_name="Công túa Bông Gòn")
+        msg = fake_message(
+            "<@123> đm <@44> đi",
+            mentions=[bong],
+            channel=_FakeHistoryChannel([]),
+        )
+        msg.author.display_name = "Mike"
+        ctx = await ContextBuilder().build(msg, "đm <@44> đi")
+        self.assertTrue(ctx.used_recent_history is False)
+        self.assertTrue(msg.channel.history_called)
+        self.assertEqual(ctx.social_referent, "Công túa Bông Gòn")
+
+    async def test_social_reply_fetch_is_bounded_and_moderation_stays_separate(self):
         self.assertTrue(needs_social_context("ban thằng này được ko"))
         self.assertTrue(needs_social_context("hùa theo tui trêu nó"))
-        self.assertFalse(needs_social_context("ban <@123> vì spam liên tục"))
+        # Fetching contextual messages is not a banter or ban-action decision.
+        self.assertTrue(needs_social_context("ban <@123> vì spam liên tục"))
+        self.assertIsNone(route_locally("ban <@123> vì spam liên tục").tool)
         self.assertFalse(needs_social_context("cái này nghĩa là gì?"))
 
         channel = _FakeHistoryChannel([])
