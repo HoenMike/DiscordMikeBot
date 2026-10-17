@@ -10,6 +10,7 @@ from features.embed.cog import EmbedCog
 from features.embed.builder import PostData
 from features.embed.result import PreviewResult
 from features.embed.validator import build_proxy_url, validate_via_og_metadata
+from features.embed.facebook_urls import resolve_facebook_share_video, _trusted_facebook_url
 
 
 VIDEO_URL = "https://www.facebook.com/share/v/1Ht6IiKfrP/?mibextid=wwXIfr"
@@ -36,6 +37,79 @@ def origin():
     )
     channel.fetch_message = AsyncMock(return_value=msg)
     return msg
+
+
+class FacebookShortLinkResolutionTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def session_for(*responses):
+        class Response:
+            def __init__(self, status, location="", html=""):
+                self.status = status
+                self.headers = (
+                    {"Location": location} if location else
+                    {"Content-Type": "text/html"}
+                )
+                self.content = SimpleNamespace(read=AsyncMock(return_value=html.encode()))
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+        entries = iter([Response(*entry) for entry in responses])
+        return SimpleNamespace(get=lambda *args, **kwargs: next(entries))
+
+    async def test_short_reel_redirects_to_numeric_video_without_login(self):
+        session = self.session_for(
+            (302, "https://www.facebook.com/reel/123456789/")
+        )
+        result = await resolve_facebook_share_video(
+            session, "https://www.facebook.com/share/r/1KfknmPddc/"
+        )
+        self.assertEqual(result, "https://www.facebook.com/reel/123456789/")
+
+    async def test_short_video_metadata_can_provide_numeric_reel(self):
+        session = self.session_for((
+            200, "", '<meta property="og:url" content="https://www.facebook.com/reel/9876543/">'
+        ))
+        result = await resolve_facebook_share_video(
+            session, "https://www.facebook.com/share/v/ABCDE/"
+        )
+        self.assertEqual(result, "https://www.facebook.com/reel/9876543/")
+
+    async def test_login_redirect_and_external_redirect_never_get_followed(self):
+        for location in (
+            "https://www.facebook.com/login.php?next=%2Freel%2F1234",
+            "https://evil.example/private",
+            "http://127.0.0.1/",
+            "//evil.example/x",
+        ):
+            with self.subTest(location=location):
+                session = self.session_for((302, location))
+                self.assertIsNone(await resolve_facebook_share_video(
+                    session, "https://www.facebook.com/share/r/1KfknmPddc/"
+                ))
+
+    async def test_generic_login_page_never_resolves_to_player(self):
+        session = self.session_for((
+            200, "", '<meta property="og:title" content="Log in or sign up to view">'
+        ))
+        self.assertIsNone(await resolve_facebook_share_video(
+            session, "https://www.facebook.com/share/r/1KfknmPddc/"
+        ))
+
+    async def test_untrusted_host_cannot_be_fetched(self):
+        s = SimpleNamespace(get=AsyncMock())
+        for url in (
+            "http://www.facebook.com/share/r/123/",
+            "https://facebook.com.evil.test/share/r/123/",
+            "https://user:secret@facebook.com/share/r/123/",
+            "https://facebook.com:8443/share/r/123/",
+        ):
+            self.assertFalse(_trusted_facebook_url(url))
+            self.assertIsNone(await resolve_facebook_share_video(s, url))
+        s.get.assert_not_awaited()
 
 
 class FacebookURLTests(unittest.TestCase):
@@ -156,10 +230,11 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(out.status, "action_required")
         sent = self.cog._send_embed_preview.await_args.kwargs
-        self.assertIn("Không lấy được preview video", sent["content"])
+        self.assertIn("Chưa lấy được video Reel", sent["content"])
         self.assertNotIn("Preview lỗi?", sent["content"])
-        self.assertTrue(any(
-            isinstance(item, discord.ui.Button) and item.url == VIDEO_URL
+        self.assertEqual(len(sent["view"].children), 2)
+        self.assertFalse(any(
+            isinstance(item, discord.ui.Button) and item.url
             for item in sent["view"].children
         ))
 
@@ -308,6 +383,33 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(
             "facecot.com",
             self.cog._facebook_proxy_roll_state.get((10, VIDEO_URL), set()),
+        )
+
+    async def test_facebook_share_prefers_canonical_video_for_proxy_and_fallback(self):
+        canonical = "https://www.facebook.com/reel/123456789/"
+        self.cog._try_api_fetcher = AsyncMock(return_value=False)
+        self.cog._try_proxy_chain = AsyncMock(return_value=PreviewResult(
+            reason="no_valid_proxy", platform="facebook",
+        ))
+        self.cog._try_ytdlp_fallback = AsyncMock(return_value=PreviewResult(
+            "success", "ytdlp", "fallback_sent", "facebook",
+            origin_message_id=10, preview_message_id=99, used_fallback=True,
+        ))
+        with patch(
+            "features.embed.cog.resolve_facebook_share_video",
+            new=AsyncMock(return_value=canonical),
+        ) as resolver:
+            out = await self.cog._run_fallback_chain(
+                self.msg, "facebook", "https://www.facebook.com/share/r/1KfknmPddc/",
+                None, {}
+            )
+        self.assertTrue(out.success)
+        resolver.assert_awaited_once()
+        self.assertEqual(
+            self.cog._try_proxy_chain.await_args.kwargs["lookup_url"], canonical
+        )
+        self.assertEqual(
+            self.cog._try_ytdlp_fallback.await_args.kwargs["download_url"], canonical
         )
 
     async def test_twitter_ytdlp_stays_enabled(self):
