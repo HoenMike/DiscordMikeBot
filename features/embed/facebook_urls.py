@@ -15,8 +15,8 @@ _ALLOWED_HOSTS = frozenset({
     "web.facebook.com", "mbasic.facebook.com",
 })
 _SHORT_VIDEO = re.compile(r"^/share/[rv]/[A-Za-z0-9_-]+/?$")
-_DIRECT_REEL = re.compile(r"^/reels?/(\\d+)/?$")
-_DIRECT_VIDEO = re.compile(r"/videos/(\\d+)(?:/|$)")
+_DIRECT_REEL = re.compile(r"^/reels?/(\d+)/?$")
+_DIRECT_VIDEO = re.compile(r"/videos/(\d+)(?:/|$)")
 _MAX_REDIRECTS = 4
 _HTML_LIMIT = 98304
 _RESOLVE_TIMEOUT = aiohttp.ClientTimeout(total=5.0, connect=2.0)
@@ -82,6 +82,11 @@ async def resolve_facebook_share_video(session: aiohttp.ClientSession, original_
         async with asyncio.timeout(5.5):
             for _ in range(_MAX_REDIRECTS + 1):
                 if not _trusted_facebook_url(current):
+                    return None
+                # Auth redirects cannot produce a public video and must not
+                # trigger any further probe of the Facebook login route.
+                path = urlsplit(current).path.lower()
+                if path.startswith(("/login", "/checkpoint", "/auth", "/challenge")):
                     return None
                 direct = _direct_video_url(current)
                 if direct:
