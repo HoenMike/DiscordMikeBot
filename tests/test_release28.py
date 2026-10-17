@@ -219,9 +219,9 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsInstance(view, EmbedActionView)
         self.assertEqual(view.payload["platform"], "twitter")
-        self.assertEqual(view.reload_button.label, "Thử lại")
+        self.assertIsNone(view.reload_button.label)
         self.assertEqual(str(view.reload_button.emoji), "🔄")
-        self.assertEqual(view.remove_button.label, "Ẩn")
+        self.assertIsNone(view.remove_button.label)
         self.assertEqual(str(view.remove_button.emoji), "❌")
 
     async def test_facebook_does_not_auto_roll_after_first_verified_proxy(self):
@@ -264,6 +264,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         new_preview = SimpleNamespace(id=41, channel=channel)
         self.cog._send_embed_preview = AsyncMock(return_value=new_preview)
         self.cog._discard_preview = AsyncMock(return_value=True)
+        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(True, "usable_embed"))
         self.cog._try_ytdlp_fallback = AsyncMock()
 
         payload = {
