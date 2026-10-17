@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -216,9 +217,11 @@ class _FakeHistoryChannel:
         self.id = 20
         self.items = list(items)
         self.history_called = False
+        self.history_kwargs = None
 
     def history(self, **kwargs):
         self.history_called = True
+        self.history_kwargs = kwargs
         async def _iterate():
             for item in self.items:
                 yield item
@@ -226,7 +229,7 @@ class _FakeHistoryChannel:
 
 
 class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
-    async def test_reply_target_is_included_without_channel_history(self):
+    async def test_reply_target_is_kept_alongside_bounded_channel_history(self):
         replied = SimpleNamespace(
             id=77,
             content="Theo gửi link https://example.com/game",
@@ -243,9 +246,9 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         ctx = await ContextBuilder().build(msg, "game này có mobile không?")
         self.assertEqual(ctx.reply.author, "Theo")
         self.assertIn("https://example.com/game", ctx.urls)
-        self.assertFalse(channel.history_called)
+        self.assertTrue(channel.history_called)
 
-    async def test_direct_reply_referent_does_not_scan_recent_history(self):
+    async def test_direct_reply_referent_keeps_priority_with_recent_history(self):
         replied = SimpleNamespace(
             id=77,
             content="nội dung cần hỏi",
@@ -264,7 +267,7 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         ctx = await ContextBuilder().build(msg, "cái này nghĩa là gì?")
 
         self.assertIsNotNone(ctx.reply)
-        self.assertFalse(channel.history_called)
+        self.assertTrue(channel.history_called)
 
     async def test_social_reply_resolves_speaker_and_recent_banter(self):
         replied = SimpleNamespace(
@@ -448,6 +451,95 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(ctx.used_recent_history)
         self.assertEqual([x.author for x in ctx.recent], ["Theo", "Mai"])
         self.assertIn("https://example.com/a", ctx.urls)
+
+    async def test_short_bot_to_bot_invite_uses_fifteen_minute_conversation(self):
+        anchor = datetime(2026, 10, 17, 13, 31, tzinfo=timezone.utc)
+        regiko = SimpleNamespace(id=44, display_name="Regiko")
+        lines = [
+            SimpleNamespace(
+                id=103,
+                content="con của a chỉ cần tag là nó ra th",
+                author=SimpleNamespace(display_name="Mike", bot=False),
+                created_at=anchor - timedelta(seconds=20),
+                attachments=[], embeds=[], mentions=[],
+            ),
+            SimpleNamespace(
+                id=102,
+                content="giờ cho 2 con bot chơi với nhau đc ko <@44>",
+                author=SimpleNamespace(display_name="Mike", bot=False),
+                created_at=anchor - timedelta(seconds=50),
+                attachments=[], embeds=[], mentions=[regiko],
+            ),
+            SimpleNamespace(
+                id=101,
+                content="cũng là nó nhma e ném cho gehihi làm",
+                author=SimpleNamespace(display_name="Regiko", bot=False),
+                created_at=anchor - timedelta(minutes=1),
+                attachments=[], embeds=[], mentions=[],
+            ),
+            SimpleNamespace(
+                id=100,
+                content="chuyện hoàn toàn khác cũ hơn 15 phút",
+                author=SimpleNamespace(display_name="Bystander", bot=False),
+                created_at=anchor - timedelta(minutes=16),
+                attachments=[], embeds=[], mentions=[],
+            ),
+        ]
+        channel = _FakeHistoryChannel(lines)
+        msg = fake_message("<@123> chơi ko?", channel=channel)
+        msg.created_at = anchor
+        ctx = await ContextBuilder().build(msg, "chơi ko?")
+        prompt = _build_prompt("chơi ko?", None, ctx)
+
+        self.assertTrue(channel.history_called)
+        self.assertEqual(channel.history_kwargs["after"], anchor - timedelta(minutes=15))
+        self.assertEqual(channel.history_kwargs["before"], msg)
+        self.assertEqual([line.message_id for line in ctx.recent], [101, 102, 103])
+        self.assertIn("2 con bot chơi với nhau", prompt)
+        self.assertIn("@Regiko", prompt)
+        self.assertIn("đề nghị/chủ đề", prompt)
+        self.assertIn("bot nào được rủ tham gia", prompt)
+        self.assertNotIn("chuyện hoàn toàn khác", prompt)
+
+    async def test_recent_bot_messages_and_replies_keep_speaker_roles(self):
+        anchor = datetime(2026, 10, 17, 13, 31, tzinfo=timezone.utc)
+        person = SimpleNamespace(id=44, display_name="Regiko")
+        bot_message = SimpleNamespace(
+            id=11,
+            content="<@44> thử turn based đi",
+            mentions=[person],
+            author=SimpleNamespace(display_name="GehihiBot", bot=True),
+            created_at=anchor - timedelta(seconds=50),
+            attachments=[], embeds=[],
+            reference=SimpleNamespace(
+                resolved=SimpleNamespace(author=SimpleNamespace(display_name="Mike"))
+            ),
+        )
+        msg = fake_message("<@123> chơi ko?", channel=_FakeHistoryChannel([bot_message]))
+        msg.created_at = anchor
+        ctx = await ContextBuilder().build(msg, "chơi ko?")
+        prompt = _build_prompt("chơi ko?", None, ctx)
+
+        self.assertIn("GehihiBot: [reply to Mike] @Regiko thử turn based", prompt)
+        self.assertEqual(ctx.recent[0].author, "GehihiBot")
+
+    async def test_recent_context_prefers_newest_and_caps_message_count(self):
+        anchor = datetime(2026, 10, 17, 13, 31, tzinfo=timezone.utc)
+        recent = [
+            SimpleNamespace(
+                id=n, content=f"message {n}",
+                author=SimpleNamespace(display_name="User"),
+                created_at=anchor - timedelta(seconds=n),
+                attachments=[], embeds=[],
+            )
+            for n in (1, 2, 3, 4)
+        ]
+        channel = _FakeHistoryChannel(recent)
+        msg = fake_message("<@123> ừ", channel=channel)
+        msg.created_at = anchor
+        ctx = await ContextBuilder(recent_limit=2).build(msg, "ừ")
+        self.assertEqual([line.message_id for line in ctx.recent], [2, 1])
+        self.assertEqual(channel.history_kwargs["limit"], 2)
 
     async def test_reply_embed_metadata_is_included(self):
         embed = SimpleNamespace(
