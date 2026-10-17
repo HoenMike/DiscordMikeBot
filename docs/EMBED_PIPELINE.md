@@ -1,6 +1,6 @@
 # Social Embed Pipeline
 
-Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v3.10.1 (2026-10-09)**. Giữ UX owner-only của v2.8.5, khôi phục fallback video an toàn.
+Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v3.14.5 (2026-10-17)**. Bảo toàn fallback video và UX owner-only; bổ sung xác thực kết quả unfurl của Discord.
 
 ## Mục tiêu
 
@@ -16,7 +16,7 @@ Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl
    - Proxy được lấy từ `PROXY_DOMAINS` hoặc guild override.
    - Các candidate có thể được pre-validate bằng API/OpenGraph trước khi gửi.
    - Với Twitter/TikTok/Instagram/Reddit/... flow cũ vẫn có thể tự thử proxy tiếp theo nếu candidate gửi ra không dùng được.
-   - Với **Facebook**, thử các provider theo thứ tự `facebed.com` → `facebed.seria.moe` → `facecot.com` → `fixacebook.com` (có thể cấu hình override theo guild). Chỉ chấp nhận video nếu metadata có video/player thật, không dùng mỗi ảnh thumbnail hay login card. Sau khi gửi thành công vẫn **dừng**, giữ quyền chọn Reload thủ công.
+   - Với **Facebook**, thử các provider theo thứ tự `facebed.com` → `facebed.seria.moe` → `facecot.com` → `fixacebook.com` (có thể cấu hình override theo guild). Chỉ chấp nhận video nếu metadata có video/player thật. Sau khi gửi link, bot kiểm tra tiếp **Discord có dựng được player hay không**; login card, poster tĩnh và không có card không phải thành công. Candidate thất bại được dọn và thử ứng viên tiếp theo. **Dừng** khi player đầu tiên được xác nhận; giữ Reload để người gửi chủ động đổi về sau.
 
 3. **Tier 2 — yt-dlp**
    - Dùng cho Twitter/X, TikTok, Instagram, Reddit và Twitch khi các tầng trước thất bại.
@@ -123,3 +123,15 @@ Các case cần giữ khi chỉnh pipeline:
 - `action_required` (manual failure notice) never suppresses the user's native original embed by itself. The notice includes the original Facebook URL in a link button; **🔄** still retries, **❌** still reverts. Keep original preview if a reload cannot create a replacement. Multi-link messages with any action-required result keep native previews.
 - Regression workflow `.github/workflows/asumi-embed.yml` runs `test_embed_resilience.py`, historical `test_release28.py` and `test_embed_audit.py`. No external video requests in automated tests. The actual Facebook sample must be re-tested in the Discord guild after Render deployment, including fallback file-size and embed-permission behavior.
 - Status checklist: **code CI** is necessary but not proof of live Facebook permission/access. On the original screenshot's `/share/v/` link, verify provider selection, playback, preview controls, and Dashboard embed `reason/tier/proxy_domain`. If public extraction genuinely fails, original message and open-original action must remain available with honest diagnostics.
+
+
+## v3.14.5 — Facebook Reels/Share verification (2026-10-17)
+
+Case phát hiện: Facebook `/share/v/{token}/` phát được khi người xem đang đăng nhập trong trình duyệt nhưng bot nhận link có thể chỉ thấy thẻ `Log in or sign up to view`. Kết quả Facebook đang có thể không công khai với bot/Discord; tuyệt đối không suy luận thành công chỉ từ ảnh hoặc việc `send()` trả về message.
+
+- **Đường đi tự động:** validate proxy bằng Discord crawler User-Agent thật (thời gian chờ Facebook cold preview có giới hạn), gửi candidate, rồi poll Discord message đã render. Link Facebook video yêu cầu `embed.video.url` hoặc `embed.type == "video"`; ảnh/poster/text card là thất bại. Chỉ suppress embed nguyên bản khi có player hoặc file video thực sự được gửi.
+- **Nếu candidate lỗi:** xóa preview thử (không để rác), thử host khác, và chỉ sau đó thử yt-dlp video-only có giới hạn kích thước. Nếu cleanup không chắc chắn thì dừng, không gửi trùng nhiều preview.
+- **Reload thủ công:** phải xác nhận preview mới rồi mới thay preview cũ. Candidate timeout/login-card chỉ tính là thử trong lượt hiện tại, không vĩnh viễn đánh dấu `tried`; sau 30 giây có thể thử lại. Khi đã thực sự đi hết proxy hợp lệ, reset một vòng mới sau cooldown.
+- **UX:** Facebook có nút ghi rõ `🔄 Thử lại` / `❌ Ẩn`; không khóa nút retry vĩnh viễn sau lỗi. Khi không phát được video, giữ link Facebook gốc và giải thích ngắn gọn. Không yêu cầu cookie/tài khoản người dùng.
+- **Kiểm thử:** unit tests cho Reel chỉ có thumbnail, login card, candidate đầu sai nhưng candidate thứ hai phát được, manual reload lỗi giữ preview cũ. CI kiểm thử API/tình huống giả lập; chưa thay thế smoke test trên Discord thật với link cụ thể.
+- **Giới hạn khách quan:** không thể phát video private/geo-locked/đòi đăng nhập nếu Facebook hoặc proxy không cấp luồng công khai, ngay cả khi người dùng tự xem được trên browser đăng nhập. Không tự nhận đã xác minh live khi CI mới chạy.
