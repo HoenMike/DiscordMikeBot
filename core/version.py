@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.6"
+CURRENT_VERSION = "3.14.7"
 RELEASE_DATE = "2026-10-17"
-CODENAME = "Asumi 3.14.6 - Facebook Reel Short Link Resolution"
+CODENAME = "Asumi 3.14.7 - 15-Minute Conversation Context"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.7", "date": "2026-10-17", "type": "bugfix",
+        "title": "15-Minute Conversation Context",
+        "summary": "Asumi theo được mạch chat 15 phút, kể cả lời rủ hai bot tương tác.",
+        "changes": [
+            {"category": "Conversational Core", "items": [
+                "Đọc lịch sử cùng kênh theo yêu cầu trong cửa sổ 15 phút, tối đa 40 tin và giới hạn ký tự; không lưu nội dung thụ động.",
+                "Không cần từ khóa ngữ cảnh cho lời gọi ngắn như 'chơi ko?'; giữ thứ tự cũ-mới, tên được tag và quan hệ reply.",
+                "Hiểu lời rủ Asumi tương tác với bot khác, tránh hỏi nhầm như đang rủ người chơi game; không giả vờ đã kích hoạt bot khác.",
+                "Bổ sung regression cho ngữ cảnh bot-to-bot, giới hạn thời gian/số tin và sự phân vai.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.6", "date": "2026-10-17", "type": "bugfix",
         "title": "Facebook Reel Short Link Resolution",

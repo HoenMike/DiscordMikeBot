@@ -1,3 +1,10 @@
+## 3.14.7 — 15-Minute Conversational Context (2026-10-17)
+
+- When someone explicitly invites Asumi into a conversation, pull the current channel's preceding **15 minutes** on demand (up to 40 messages; strict prompt character cap), instead of relying on 5/8 messages and keyword triggers.
+- Keep old-to-new dialogue order, resolve adjacent Discord @mentions to display names and include already-resolved reply relationships and other bot messages.
+- Model instruction: short follow-ups such as `@Asumi chơi ko?` must refer to the nearby proposal (e.g., two bots playing together), not reset the conversation and ask the human "game gì?".
+- Regression fixtures verify cutoff, caps and bot-to-bot context. No background indexing/archiving, cross-channel reads, actual bot-to-bot protocol or unrelated feature changes. Live Discord validation remains pending.
+
 ## 3.14.6 — Facebook Reel Share URL Resolution (2026-10-17)
 
 - Facebook `/share/r/` and `/share/v/` can now resolve an available public numeric Reel/video URL before proxy metadata and yt-dlp, using bounded HTTPS redirects and canonical metadata without cookies.
