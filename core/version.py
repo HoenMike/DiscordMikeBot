@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.4"
-RELEASE_DATE = "2026-10-13"
-CODENAME = "Asumi 3.14.4 - Targeted Banter Reply Guard"
+CURRENT_VERSION = "3.14.5"
+RELEASE_DATE = "2026-10-17"
+CODENAME = "Asumi 3.14.5 - Facebook Embed Verification"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.5", "date": "2026-10-17", "type": "bugfix",
+        "title": "Facebook Embed Verification & Retry Recovery",
+        "summary": "Không báo preview Facebook thành công nếu Discord chỉ hiện thẻ đăng nhập hoặc ảnh thay vì video.",
+        "changes": [
+            {"category": "Social Embed", "items": [
+                "Chỉ chấp nhận Facebook video/Reel khi Discord thực sự unfurl được player; tự thử candidate khác nếu card không hợp lệ.",
+                "Dọn candidate lỗi, giữ tin nhắn gốc và yt-dlp video fallback; không tính gửi link proxy là thành công.",
+                "Không đánh dấu timeout/403 là proxy đã dùng mãi mãi; hồi phục retry sau cooldown 30 giây.",
+                "Dùng User-Agent Discord đúng định dạng, tăng timeout giới hạn cho Facebook share link, cải thiện nút Thử lại/Ẩn.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.4", "date": "2026-10-13", "type": "bugfix",
         "title": "Targeted Banter Reply Guard",
