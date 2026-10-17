@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.5"
+CURRENT_VERSION = "3.14.6"
 RELEASE_DATE = "2026-10-17"
-CODENAME = "Asumi 3.14.5 - Facebook Embed Verification"
+CODENAME = "Asumi 3.14.6 - Facebook Reel Short Link Resolution"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.6", "date": "2026-10-17", "type": "bugfix",
+        "title": "Facebook Reel Short Link Resolution",
+        "summary": "Xử lý thêm link chia sẻ Reel dạng /share/r/, giảm tin lỗi dài trong Discord.",
+        "changes": [
+            {"category": "Social Embed", "items": [
+                "Thử resolve chuyển hướng/OG canonical của Facebook share/r và share/v thành địa chỉ video số /reel/ hoặc /watch, chỉ trên host Facebook HTTPS hợp lệ và không dùng cookie.",
+                "Đưa URL video trực tiếp vào proxy và yt-dlp fallback khi có; giữ nguyên URL gốc cho quyền Reload, tracking và link người gửi.",
+                "Bản thất bại chỉ còn một dòng gọn, giữ Thử lại và Ẩn; bỏ nút Mở Facebook trùng với link gốc.",
+                "Thêm regression cho link Reel, redirect sang login và domain ngoài, giữ chế độ fail-safe khi không có video công khai.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.5", "date": "2026-10-17", "type": "bugfix",
         "title": "Facebook Embed Verification & Retry Recovery",
