@@ -74,6 +74,8 @@ async def resolve_facebook_share_video(session: aiohttp.ClientSession, original_
     """
     if not _trusted_facebook_url(original_url) or not _SHORT_VIDEO.fullmatch(urlsplit(original_url).path):
         return None
+    if not callable(getattr(session, "get", None)):
+        return None
 
     current = original_url
     try:
