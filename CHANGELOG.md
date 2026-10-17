@@ -1,3 +1,11 @@
+## 3.14.5 — Facebook Embed Verification & Retry Recovery (2026-10-17)
+
+- Facebook share/Reel: gửi URL proxy không còn được tính là preview thành công; Discord phải trả player video thật. Thẻ `Log in or sign up to view`, ảnh poster và kết quả unfurl rỗng đều bị loại.
+- Bỏ preview candidate lỗi trước khi thử nguồn kế tiếp; giữ nguyên tin nhắn gốc nếu không có video hợp lệ và fallback yt-dlp video-only không tải được file.
+- Manual Reload kiểm tra candidate mới trước khi xóa preview cũ, không ghi nhớ mãi proxy timeout/403, mở vòng retry mới sau cooldown 30 giây.
+- Nhãn nút Facebook rõ ràng hơn; dùng Discord crawler UA chuẩn; nới timeout có giới hạn để xử lý cold preview.
+- Thêm regression tests. Video bị giới hạn quyền xem trên Facebook vẫn có thể không nhúng được nếu không có nguồn công khai.
+
 # Changelog
 
 Các thay đổi của bot Discord **Asumi** được ghi tại đây.
