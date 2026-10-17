@@ -42,11 +42,13 @@ class EmbedActionView(discord.ui.View):
 
         self.reload_button = discord.ui.Button(
             emoji="🔄",
+            label="Thử lại" if platform == "facebook" else None,
             style=discord.ButtonStyle.secondary,
             custom_id=f"asumi:embed-reload:{platform}:{origin_id}",
         )
         self.remove_button = discord.ui.Button(
             emoji="❌",
+            label="Ẩn" if platform == "facebook" else None,
             style=discord.ButtonStyle.secondary,
             custom_id=f"asumi:embed-remove:{platform}:{origin_id}",
         )
@@ -89,9 +91,7 @@ class EmbedActionView(discord.ui.View):
 
         reason = getattr(result, "reason", "reload_failed")
         self._set_busy(False)
-        if reason == "no_more_proxy":
-            self.reload_button.disabled = True
-        elif result is not None and result.status == "action_required" and result.preview_message_id is not None:
+        if result is not None and result.status == "action_required" and result.preview_message_id is not None:
             self.stop()
             await interaction.followup.send(
                 "Đã tạo lại preview và giữ quyền điều khiển trên preview mới.",
@@ -105,7 +105,7 @@ class EmbedActionView(discord.ui.View):
             pass
 
         message = (
-            "Đã thử hết các proxy còn lại. Preview hiện tại vẫn được giữ; bạn có thể mở link gốc."
+            "Đã thử hết nguồn xem trước trong lượt này. Link gốc được giữ nguyên; thử lại sau 30 giây."
             if reason == "no_more_proxy"
             else "Proxy đang tạm không truy xuất được Facebook. Giữ nguyên preview hiện tại; thử lại sau 30 giây."
             if reason == "proxy_temporarily_unavailable"

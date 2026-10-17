@@ -108,6 +108,9 @@ _MAX_READ_BYTES = 262144
 
 # Timeout cho mỗi request xác thực đơn lẻ (3.5s tổng, 1.5s kết nối để fail-fast khi gặp proxy treo)
 _VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=3.5, connect=1.5)
+# Facebook cold-share endpoints often resolve more slowly than other proxies.
+# Discord's crawler itself has a ten-second fetch budget; allow a bounded warm-up.
+_FACEBOOK_VALIDATE_TIMEOUT = aiohttp.ClientTimeout(total=7.5, connect=2.5)
 
 # Cache tạm thời cho các domain proxy đang bị lỗi kết nối/502/down (TTL 30 giây)
 _FAILED_DOMAINS_CACHE: dict[str, float] = {}
@@ -316,13 +319,13 @@ async def validate_via_og_metadata(
     """Xác thực proxy URL bằng cách kiểm tra OpenGraph/Twitter Card metadata. Trả về (is_valid, is_nsfw)."""
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)",
+            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,video/*,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         }
         async with session.get(
             proxy_url,
-            timeout=_VALIDATE_TIMEOUT,
+            timeout=_FACEBOOK_VALIDATE_TIMEOUT if platform_key == "facebook" else _VALIDATE_TIMEOUT,
             headers=headers,
             allow_redirects=True,
             max_redirects=5,

@@ -226,6 +226,90 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
             await self.cog.on_message(self.msg)
         self.msg.edit.assert_not_awaited()
 
+    async def test_facebook_video_requires_a_playable_unfurl(self):
+        """A login prompt or attractive thumbnail is not a Reel player."""
+        login = discord.Embed(title="Log in or sign up to view",
+                              description="See posts, photos and more on Facebook.")
+        poster = discord.Embed(title="Max Verstappen driving", description="Watch video")
+        poster.set_image(url="https://cdn.example/frame.jpg")
+        video = SimpleNamespace(
+            title="Real video", description="", url="", type="video",
+            video=SimpleNamespace(url="https://cdn.example/video.mp4"),
+            image=SimpleNamespace(url=None), thumbnail=SimpleNamespace(url=None),
+        )
+        preview = SimpleNamespace(id=80, channel=self.msg.channel)
+        for candidate, ok in [(login, False), (poster, False), (video, True)]:
+            with self.subTest(card=candidate.title), patch(
+                "features.embed.cog._UNFURL_DELAYS", (0,)
+            ):
+                self.msg.channel.fetch_message = AsyncMock(
+                    return_value=SimpleNamespace(embeds=[candidate])
+                )
+                result, _ = await self.cog._verify_proxy_unfurl(
+                    10, preview, "facebook", require_video=True
+                )
+                self.assertEqual(result, ok)
+
+    async def test_failed_login_proxy_is_cleaned_and_next_candidate_verified(self):
+        """Sending a proxy URL no longer counts as success or suppresses native."""
+        previews = [SimpleNamespace(id=81), SimpleNamespace(id=82)]
+        self.cog._send_embed_preview = AsyncMock(side_effect=previews)
+        self.cog._verify_proxy_unfurl = AsyncMock(side_effect=[
+            (False, "generic_or_login_card"), (True, "usable_video"),
+        ])
+        self.cog._discard_preview = AsyncMock(return_value=True)
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(
+            side_effect=[
+                ("https://facebed.com/share/v/199BjfPzAj/", False),
+                ("https://facecot.com/share/v/199BjfPzAj/", False),
+            ]
+        )):
+            result = await self.cog._try_proxy_chain(
+                self.msg, "facebook",
+                "https://www.facebook.com/share/v/199BjfPzAj/", {}
+            )
+        self.assertTrue(result.success)
+        self.assertTrue(result.unfurl_verified)
+        self.assertEqual(result.proxy_domain, "facecot.com")
+        self.assertEqual(result.preview_message_id, 82)
+        self.assertEqual(self.cog._verify_proxy_unfurl.await_count, 2)
+        self.cog._discard_preview.assert_awaited_once_with(10, previews[0])
+        self.assertEqual(self.cog._facebook_proxy_roll_state[
+            (10, "https://www.facebook.com/share/v/199BjfPzAj/")
+        ], {"facecot.com"})
+        # Failed candidates are not stored as consumed for future retries.
+        final_view = self.cog._send_embed_preview.await_args.kwargs["view"]
+        self.assertEqual(final_view.payload["tried_domains"], ["facecot.com"])
+
+    async def test_manual_roll_failure_retains_old_card_and_allows_retry(self):
+        payload = {
+            "origin_id": 10, "channel_id": 20, "author_id": 50,
+            "platform": "facebook", "url": VIDEO_URL,
+            "tried_domains": ["facebed.com"],
+        }
+        old = SimpleNamespace(id=70, channel=self.msg.channel)
+        new = SimpleNamespace(id=71, channel=self.msg.channel)
+        self.cog._send_embed_preview = AsyncMock(return_value=new)
+        self.cog._discard_preview = AsyncMock(return_value=True)
+        self.cog._verify_proxy_unfurl = AsyncMock(
+            return_value=(False, "thumbnail_only")
+        )
+        self.cog._try_ytdlp_fallback = AsyncMock(return_value=False)
+        with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(
+            return_value=("https://facecot.com/share/v/1Ht6IiKfrP/", False)
+        )):
+            result = await self.cog.roll_facebook_proxy(
+                payload, current_preview=old
+            )
+        self.assertEqual(result.status, "action_required")
+        self.assertEqual(result.reason, "proxy_temporarily_unavailable")
+        self.cog._discard_preview.assert_awaited_once_with(10, new)
+        self.assertIsNotNone(self.cog._facebook_retry_at.get((10, VIDEO_URL)))
+        self.assertNotIn(
+            "facecot.com",
+            self.cog._facebook_proxy_roll_state.get((10, VIDEO_URL), set()),
+        )
+
     async def test_twitter_ytdlp_stays_enabled(self):
         self.cog._send_embed_preview = AsyncMock()
         with patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock(return_value=None)) as provider:
