@@ -497,7 +497,7 @@ class AssistantContextBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([line.message_id for line in ctx.recent], [101, 102, 103])
         self.assertIn("2 con bot chơi với nhau", prompt)
         self.assertIn("@Regiko", prompt)
-        self.assertIn("đề nghị/chủ đề", prompt)
+        self.assertIn("lời đề nghị", prompt)
         self.assertIn("bot nào được rủ tham gia", prompt)
         self.assertNotIn("chuyện hoàn toàn khác", prompt)
 
