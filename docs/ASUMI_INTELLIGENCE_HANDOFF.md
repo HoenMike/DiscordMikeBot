@@ -38,6 +38,16 @@ No mention/reply => no conversational response.
 
 ---
 
+## 2026-10-17 — Asumi 3.14.7 15-minute live chat context
+
+- Live screenshot: Mike asks `@Asumi chơi ko?` immediately after proposing to let Asumi and Regiko's bot play together. Reply "Game gì thế Mike?" loses the bot-to-bot proposal.
+- Root cause: the Context Builder fetches 8 newest messages only for keyword-specific utterances, and no more than 5 for short social references; "chơi ko?" fetched none.
+- `features/assistant/context.py` now reads up to **15 minutes within the same channel on demand** for nonempty Asumi requests, bounded by **40 Discord messages**, **600 characters per nearby message**, and the existing **7000-character** overall context cap. Prefer latest messages but render chronologically; mention display names, known reply authors and other bot speakers are visible. The direct reply target still takes precedence and can be older than 15 minutes.
+- `features/assistant/ai.py` connects short invitations to a recent proposal and specifically distinguishes "play *with another bot*" from "invite humans to a game". Do not imply another bot has been commanded, a game protocol exists, or an action has been performed.
+- `core/constants.py` is the single non-secret policy source. Only explicit mentions/live reply continuations trigger fetching; nothing is passively indexed/stored, and no other channel is scanned. Tests cover cutoff, cap, speaker tags, reply chain, and screenshot scenario. **Live model output and deployment still require Discord verification.**
+
+---
+
 ## 2026-10-13 — Asumi 3.14.4 targeted-banter output guard
 
 - Owner confirmed Discord bot is live **3.14.3** yet model still reversed the interaction: Mike sent `@Asumi đm @Bông Gòn`, Asumi replied “Hô hô, lại tính làm gì @Bông Gòn đấy Mike? Định gọi ra để flex hay tính phá gì tiếp đây :))”. Treat as a **model-output failure**, not deploy lag.
