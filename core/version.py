@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.7"
-RELEASE_DATE = "2026-10-17"
-CODENAME = "Asumi 3.14.7 - 15-Minute Conversation Context"
+CURRENT_VERSION = "3.14.8"
+RELEASE_DATE = "2026-10-18"
+CODENAME = "Asumi 3.14.8 - Cleaner Facebook Preview UX"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.8", "date": "2026-10-18", "type": "bugfix",
+        "title": "Cleaner Facebook Preview UX",
+        "summary": "Ẩn thẻ Facebook mặc định khi Asumi có preview thay thế và bỏ thông báo sau khi bấm nút.",
+        "changes": [
+            {"category": "Social Embed", "items": [
+                "Ẩn native embed Facebook kể cả khi Asumi hiện khung Thử lại/Ẩn, nhưng không xóa tin nhắn hoặc link gốc.",
+                "Sau khi Thử lại thành công, xử lý cả các tin cũ còn sót thẻ Facebook mặc định.",
+                "Nút Thử lại/Ẩn không gửi thêm thông báo ephemeral; thất bại vẫn có thể thao tác lại và được ghi log.",
+                "Kiểm tra quyền Manage Messages tại kênh để phát hiện trường hợp Discord không cho bot ẩn embed của người khác.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.7", "date": "2026-10-17", "type": "bugfix",
         "title": "15-Minute Conversation Context",
