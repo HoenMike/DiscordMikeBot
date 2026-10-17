@@ -208,8 +208,33 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             current_preview=current_preview,
         )
         allowed.response.edit_message.assert_awaited_once()
-        allowed.followup.send.assert_awaited_once()
-        self.assertTrue(allowed.followup.send.await_args.kwargs["ephemeral"])
+        allowed.followup.send.assert_not_awaited()
+
+        # A failed retry must restore controls silently as well.
+        failed_view = self.cog._manual_fallback_view(
+            self.msg, "facebook", "https://facebook.com/post/1"
+        )
+        self.cog.reload_embed.return_value = PreviewResult(
+            status="action_required", tier="proxy",
+            reason="proxy_retry_cooldown", platform="facebook",
+            origin_message_id=10,
+        )
+        await failed_view._reload(allowed)
+        self.assertFalse(failed_view.reload_button.disabled)
+        current_preview.edit.assert_awaited_once()
+        allowed.followup.send.assert_not_awaited()
+
+        # Hide succeeds without sending an extra feedback message.
+        remove_view = self.cog._manual_fallback_view(
+            self.msg, "facebook", "https://facebook.com/post/1"
+        )
+        self.cog.revert_embed = AsyncMock(return_value=PreviewResult(
+            "success", "native", "native_embed_restored", "facebook",
+            origin_message_id=10,
+        ))
+        await remove_view._remove(allowed)
+        self.cog.revert_embed.assert_awaited_once()
+        allowed.followup.send.assert_not_awaited()
 
     async def test_action_view_is_available_for_non_facebook_provider(self):
         view = self.cog._manual_fallback_view(
@@ -512,6 +537,24 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             )
             await self.cog.on_message(msg)
             msg.edit.assert_not_awaited()
+            self.cog._process_url_with_fallback.return_value = PreviewResult(
+                "action_required", "manual", "manual_fallback_offered",
+                "facebook", origin_message_id=10, preview_message_id=99,
+            )
+            await self.cog.on_message(msg)
+            msg.edit.assert_awaited_once_with(suppress=True)
+
+    async def test_suppress_native_embed_requires_manage_messages(self):
+        msg = message()
+        msg.edit = AsyncMock()
+        msg.guild.me = SimpleNamespace(id=123)
+        msg.channel.permissions_for = lambda member: SimpleNamespace(manage_messages=False)
+
+        self.assertFalse(await self.cog._set_origin_embed_suppressed(msg))
+        msg.edit.assert_not_awaited()
+        msg.channel.permissions_for = lambda member: SimpleNamespace(manage_messages=True)
+        self.assertTrue(await self.cog._set_origin_embed_suppressed(msg))
+        msg.edit.assert_awaited_once_with(suppress=True)
 
     async def test_cancellation_removes_temporary_preview(self):
         waiting = asyncio.Event()
