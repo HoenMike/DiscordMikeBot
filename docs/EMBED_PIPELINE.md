@@ -135,3 +135,12 @@ Case phát hiện: Facebook `/share/v/{token}/` phát được khi người xem 
 - **UX:** Facebook có nút ghi rõ `🔄 Thử lại` / `❌ Ẩn`; không khóa nút retry vĩnh viễn sau lỗi. Khi không phát được video, giữ link Facebook gốc và giải thích ngắn gọn. Không yêu cầu cookie/tài khoản người dùng.
 - **Kiểm thử:** unit tests cho Reel chỉ có thumbnail, login card, candidate đầu sai nhưng candidate thứ hai phát được, manual reload lỗi giữ preview cũ. CI kiểm thử API/tình huống giả lập; chưa thay thế smoke test trên Discord thật với link cụ thể.
 - **Giới hạn khách quan:** không thể phát video private/geo-locked/đòi đăng nhập nếu Facebook hoặc proxy không cấp luồng công khai, ngay cả khi người dùng tự xem được trên browser đăng nhập. Không tự nhận đã xác minh live khi CI mới chạy.
+
+
+## v3.14.6 — Facebook short Reel URL canonicalization
+
+- The screenshot `https://www.facebook.com/share/r/1KfknmPddc/` can render a Facebook login card in Discord even while an authenticated browser can open it.
+- To improve publicly accessible Reels, the embed path first makes one **best-effort, bounded HTTP probe** of `/share/r/` and `/share/v/` URLs. It accepts a canonical URL only from explicitly allowed HTTPS Facebook hostnames, and only numeric `/reel/{id}`, `/videos/{id}` or `/watch?v={id}` forms. The probe uses no user cookies, follows at most four redirects and never follows external hosts.
+- When a canonical video is found, try it with the current validated proxy chain and video-only yt-dlp fallback. The original share link remains the source of truth for interaction ownership and original-message cleanup. If no canonical route is available, the original route remains unchanged.
+- When video extraction is denied or unplayable, keep the original Discord message and display **one short, owner-controlled failure line**, not another large login-card link/button; Retry + Hide remain. The original Facebook URL is already clickable in the source message.
+- Regression tests verify canonical redirect, `og:url`, login redirect rejection, foreign/HTTP URL rejection, backend candidate selection, and compact fallback UX. Live Discord playback still requires an actually public Facebook video (and post-deploy smoke is mandatory).
