@@ -136,10 +136,10 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         with patch("features.embed.cog._UNFURL_DELAYS", (0, 0)):
             self.assertEqual(await self.cog._verify_proxy_unfurl(10, preview, "facebook"), (False, "unfurl_timeout"))
 
-    async def test_facebook_proxy_sends_raw_url_and_button_without_auto_verify(self):
+    async def test_facebook_proxy_verifies_rendered_card_before_success(self):
         preview = SimpleNamespace(id=40)
         self.cog._send_embed_preview = AsyncMock(return_value=preview)
-        self.cog._verify_proxy_unfurl = AsyncMock()
+        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(True, "usable_embed"))
         self.cog._discard_preview = AsyncMock()
         with patch("features.embed.cog.find_valid_proxy", new=AsyncMock(return_value=("https://facebed.com/post/1", False))) as find_proxy:
             result = await self.cog._try_proxy_chain(self.msg, "facebook", "https://facebook.com/post/1", {})
@@ -148,16 +148,16 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.proxy_domain, "facebed.com")
         self.assertEqual(result.preview_message_id, 40)
         find_proxy.assert_awaited_once()
-        self.cog._verify_proxy_unfurl.assert_not_awaited()
+        self.cog._verify_proxy_unfurl.assert_awaited_once()
         self.cog._discard_preview.assert_not_awaited()
 
         sent_kwargs = self.cog._send_embed_preview.await_args.kwargs
         self.assertIsInstance(sent_kwargs["view"], EmbedActionView)
         self.assertIn("[facebed.com](https://facebed.com/post/1)", sent_kwargs["content"])
         self.assertNotIn("\nhttps://facebed.com/post/1", sent_kwargs["content"])
-        self.assertIsNone(sent_kwargs["view"].reload_button.label)
+        self.assertEqual(sent_kwargs["view"].reload_button.label, "Thử lại")
         self.assertEqual(str(sent_kwargs["view"].reload_button.emoji), "🔄")
-        self.assertIsNone(sent_kwargs["view"].remove_button.label)
+        self.assertEqual(sent_kwargs["view"].remove_button.label, "Ẩn")
         self.assertEqual(str(sent_kwargs["view"].remove_button.emoji), "❌")
         self.assertIn("facebed.com", sent_kwargs["view"].payload["tried_domains"])
 
@@ -169,9 +169,9 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             tried_domains={"facebed.com"},
         )
         self.assertIsInstance(view, EmbedActionView)
-        self.assertIsNone(view.reload_button.label)
+        self.assertEqual(view.reload_button.label, "Thử lại")
         self.assertEqual(str(view.reload_button.emoji), "🔄")
-        self.assertIsNone(view.remove_button.label)
+        self.assertEqual(view.remove_button.label, "Ẩn")
         self.assertEqual(str(view.remove_button.emoji), "❌")
 
         denied = SimpleNamespace(
@@ -219,15 +219,15 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsInstance(view, EmbedActionView)
         self.assertEqual(view.payload["platform"], "twitter")
-        self.assertIsNone(view.reload_button.label)
+        self.assertEqual(view.reload_button.label, "Thử lại")
         self.assertEqual(str(view.reload_button.emoji), "🔄")
-        self.assertIsNone(view.remove_button.label)
+        self.assertEqual(view.remove_button.label, "Ẩn")
         self.assertEqual(str(view.remove_button.emoji), "❌")
 
-    async def test_facebook_does_not_auto_roll_after_first_proxy_is_sent(self):
+    async def test_facebook_does_not_auto_roll_after_first_verified_proxy(self):
         first = SimpleNamespace(id=40)
         self.cog._send_embed_preview = AsyncMock(return_value=first)
-        self.cog._verify_proxy_unfurl = AsyncMock()
+        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(True, "usable_embed"))
         self.cog._discard_preview = AsyncMock()
         find_proxy = AsyncMock(side_effect=[
             ("https://facebed.com/post/1", False),
@@ -239,7 +239,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.proxy_domain, "facebed.com")
         self.assertEqual(find_proxy.await_count, 1)
-        self.cog._verify_proxy_unfurl.assert_not_awaited()
+        self.cog._verify_proxy_unfurl.assert_awaited_once()
         self.cog._discard_preview.assert_not_awaited()
 
     async def test_manual_proxy_roll_moves_to_next_proxy_without_ytdlp(self):
