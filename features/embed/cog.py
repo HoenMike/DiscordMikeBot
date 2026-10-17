@@ -304,7 +304,8 @@ class EmbedCog(commands.Cog):
         """Wait for Discord unfurl; an image/login card is not playable video."""
         saw_generic_or_login = False
         saw_thumbnail_only = False
-        for delay in _UNFURL_DELAYS:
+        delays = _UNFURL_DELAYS[:3] if require_video else _UNFURL_DELAYS
+        for delay in delays:
             await asyncio.sleep(delay)
             if origin_id in self._deleted_message_ids:
                 return False, "origin_deleted"
@@ -1794,7 +1795,7 @@ class EmbedCog(commands.Cog):
                 domain,
                 origin_id,
                 sent_msg.id,
-                False,
+                True,
                 True,
                 "manual_proxy_roll",
             )
