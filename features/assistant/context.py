@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import unicodedata
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Iterable, Optional
 
@@ -47,6 +48,7 @@ class AssistantContext:
     social_referent: str | None = None
     social_referent_source: str | None = None
     prompt_char_limit: int = 7000
+    history_minutes: int = 15
     recent: list[ContextLine] = field(default_factory=list)
     urls: list[str] = field(default_factory=list)
     images: list[ImagePayload] = field(default_factory=list)
@@ -91,7 +93,11 @@ class AssistantContext:
                 f"{line.author}: {line.content or '(không có text)'}"
                 for line in self.recent
             )
-            parts.append("Một số tin nhắn gần đây có liên quan:\n" + rendered)
+            parts.append(
+                f"Hội thoại trong cùng kênh, tối đa {self.history_minutes} phút trước, "
+                "theo thứ tự cũ → mới (bao gồm cả bot khác, không mặc định "
+                "mọi tin đều đang nói với Asumi):\n" + rendered
+            )
 
         if self.urls:
             parts.append("URL được tham chiếu:\n" + "\n".join(self.urls[:8]))
@@ -226,6 +232,22 @@ def _author_name(message) -> str:
 
 def _line_from_message(message, max_chars: int = 1200) -> ContextLine:
     content = (getattr(message, "content", "") or "").strip()
+    # Resolve mention IDs in nearby messages, not just the current request.
+    # Without this, "@Regiko" and other bot names are opaque numeric IDs.
+    for member in list(getattr(message, "mentions", None) or [])[:8]:
+        member_id = getattr(member, "id", None)
+        name = _author_name_for_member(member)
+        if isinstance(member_id, int) and name:
+            content = re.sub(
+                rf"<@!?{member_id}>",
+                lambda _match, label=name: f"@{label}",
+                content,
+            )
+    # Message references already resolved by the gateway are cheap and clarify
+    # which person/bot a participant was talking to. Never fetch N extra replies.
+    reference = getattr(getattr(message, "reference", None), "resolved", None)
+    if reference is not None and getattr(reference, "author", None) is not None:
+        content = f"[reply to {_author_name(reference)}] {content}"
     extras: list[str] = []
 
     for embed in list(getattr(message, "embeds", None) or [])[:2]:
@@ -353,12 +375,14 @@ class ContextBuilder:
     def __init__(
         self,
         *,
-        recent_limit: int = 8,
+        recent_limit: int = 40,
+        lookback_minutes: int = 15,
         max_context_chars: int = 7000,
         max_images: int = 2,
         max_image_bytes: int = 5 * 1024 * 1024,
     ):
-        self.recent_limit = max(1, min(int(recent_limit), 20))
+        self.recent_limit = max(1, min(int(recent_limit), 60))
+        self.lookback_minutes = max(1, min(int(lookback_minutes), 30))
         self.max_context_chars = max(1000, int(max_context_chars))
         self.max_images = max(1, min(int(max_images), 4))
         self.max_image_bytes = max(256 * 1024, int(max_image_bytes))
@@ -368,6 +392,7 @@ class ContextBuilder:
         from core import constants as policy
         return cls(
             recent_limit=policy.ASUMI_CONTEXT_RECENT_MESSAGES,
+            lookback_minutes=policy.ASUMI_CONTEXT_LOOKBACK_MINUTES,
             max_context_chars=policy.ASUMI_CONTEXT_MAX_CHARS,
             max_images=policy.ASUMI_CONTEXT_MAX_IMAGES,
             max_image_bytes=policy.ASUMI_CONTEXT_MAX_IMAGE_BYTES,
@@ -383,6 +408,7 @@ class ContextBuilder:
     ) -> AssistantContext:
         ctx = AssistantContext(
             prompt_char_limit=self.max_context_chars,
+            history_minutes=self.lookback_minutes,
             requester=_author_name(message),
         )
         ctx.mentioned_people = _mentioned_people(message, query)
@@ -448,46 +474,64 @@ class ContextBuilder:
             ctx.images.extend(list(session.images)[: self.max_images])
             ctx.used_session_images = True
 
-        social_reference = needs_social_context(query)
-        should_fetch_recent = social_reference or (
-            needs_recent_context(query) and (
-                needs_broad_recent_context(query)
-                or (ctx.reply is None and not ctx.images)
-            )
-        )
-        if should_fetch_recent:
+        # A two-word invitation such as "chơi ko?" must see the conversation
+        # that preceded it, even though it has no lexical "context" keywords.
+        # Only explicitly invoked Asumi requests reach this builder. Read the
+        # *same channel* on demand, without persisting anyone's chat history.
+        if query.strip():
             channel = getattr(message, "channel", None)
             history = getattr(channel, "history", None)
             if history:
+                anchor = getattr(message, "created_at", None) or datetime.now(timezone.utc)
+                if anchor.tzinfo is None:
+                    anchor = anchor.replace(tzinfo=timezone.utc)
+                cutoff = anchor - timedelta(minutes=self.lookback_minutes)
                 lines: list[ContextLine] = []
                 try:
+                    # Discord returns newest first. after= enforces the 15m
+                    # server-side window; local timestamps guard test/mock APIs.
                     async for item in history(
-                        limit=min(self.recent_limit, 5) if social_reference else self.recent_limit,
+                        limit=self.recent_limit,
+                        after=cutoff,
                         before=message,
                         oldest_first=False,
                     ):
+                        if len(lines) >= self.recent_limit:
+                            break
                         if getattr(item, "id", None) == getattr(reply_message, "id", None):
                             continue
-                        # Skip system-like messages that have no author/content.
                         if getattr(item, "author", None) is None:
                             continue
-                        lines.append(_line_from_message(item))
+                        item_at = getattr(item, "created_at", None)
+                        if item_at is not None:
+                            if item_at.tzinfo is None:
+                                item_at = item_at.replace(tzinfo=timezone.utc)
+                            if not (cutoff <= item_at < anchor):
+                                continue
+                        lines.append(_line_from_message(item, max_chars=600))
                 except Exception:
                     lines = []
 
-                lines.reverse()
-                budget = self.max_context_chars
+                # Keep most recent utterances, but reserve space for reply,
+                # participant metadata, URLs and the current user request.
+                budget = max(600, self.max_context_chars - 1700)
                 selected: list[ContextLine] = []
-                for line in reversed(lines):
+                for line in lines:
                     cost = len(line.author) + len(line.content) + 4
-                    if cost > budget and selected:
+                    if cost > budget:
+                        if not selected:
+                            line = ContextLine(
+                                author=line.author,
+                                content=line.content[:max(0, budget - len(line.author) - 4)],
+                                message_id=line.message_id,
+                            )
+                            selected.append(line)
                         break
                     selected.append(line)
                     budget -= cost
-                selected.reverse()
-                ctx.recent = selected
+                ctx.recent = list(reversed(selected))
                 ctx.used_recent_history = bool(selected)
-                for line in selected:
+                for line in ctx.recent:
                     ctx.urls.extend(_extract_urls(line.content))
 
         # Preserve ordering while de-duplicating.
