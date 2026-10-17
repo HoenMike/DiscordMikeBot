@@ -1584,8 +1584,13 @@ class EmbedCog(commands.Cog):
                 guild_proxy_domains = None
 
             state_key = (origin_id, url)
-            remembered = set(self._facebook_proxy_roll_state.get(state_key, set()))
-            tried = remembered | payload_tried
+            # Server state is authoritative when present; a prior button's
+            # payload may list proxies from an older completed rotation cycle.
+            tried = (
+                set(self._facebook_proxy_roll_state.get(state_key, set()))
+                if state_key in self._facebook_proxy_roll_state
+                else payload_tried
+            )
             if time.monotonic() < self._facebook_retry_at.get(state_key, 0):
                 return PreviewResult(
                     status="action_required",
@@ -1637,8 +1642,11 @@ class EmbedCog(commands.Cog):
                 # rotations excluded, but allow bounded retries of failures.
                 domains = guild_proxy_domains if guild_proxy_domains is not None else PROXY_DOMAINS.get(platform_key, [])
                 exhausted = bool(domains) and all(d in tried for d in domains)
-                if not exhausted:
-                    self._facebook_retry_at[state_key] = time.monotonic() + 30.0
+                self._facebook_retry_at[state_key] = time.monotonic() + 30.0
+                if exhausted:
+                    # Start a fresh cycle after cooldown instead of permanently
+                    # exhausting every provider for the lifetime of the button.
+                    self._set_facebook_proxy_state(origin_id, url, set())
                 return PreviewResult(
                     status="action_required",
                     tier="proxy",
