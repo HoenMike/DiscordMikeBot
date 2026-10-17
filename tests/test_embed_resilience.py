@@ -232,8 +232,11 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
                               description="See posts, photos and more on Facebook.")
         poster = discord.Embed(title="Max Verstappen driving", description="Watch video")
         poster.set_image(url="https://cdn.example/frame.jpg")
-        video = discord.Embed(title="Real video")
-        video._video = {"url": "https://cdn.example/video.mp4"}
+        video = SimpleNamespace(
+            title="Real video", description="", url="", type="video",
+            video=SimpleNamespace(url="https://cdn.example/video.mp4"),
+            image=SimpleNamespace(url=None), thumbnail=SimpleNamespace(url=None),
+        )
         preview = SimpleNamespace(id=80, channel=self.msg.channel)
         for candidate, ok in [(login, False), (poster, False), (video, True)]:
             with self.subTest(card=candidate.title), patch(
