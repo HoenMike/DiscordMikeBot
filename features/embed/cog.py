@@ -344,6 +344,37 @@ class EmbedCog(commands.Cog):
                     break
         return detected
 
+    async def _set_origin_embed_suppressed(
+        self, message: discord.Message, *, suppress: bool = True
+    ) -> bool:
+        """Set only Discord's native embed flag, never alter the user's text.
+
+        Manage Messages in the channel is required for messages from others.
+        """
+        if message.id in self._deleted_message_ids:
+            return False
+
+        guild = getattr(message, "guild", None)
+        member = getattr(guild, "me", None)
+        channel = getattr(message, "channel", None)
+        if member is not None and callable(getattr(channel, "permissions_for", None)):
+            if not channel.permissions_for(member).manage_messages:
+                print(
+                    f"[EmbedCog] Không thể thay đổi native embed message={message.id}: "
+                    f"thiếu Manage Messages trong channel={channel.id}",
+                    flush=True,
+                )
+                return False
+        try:
+            await message.edit(suppress=suppress)
+            return True
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            print(
+                f"[EmbedCog] Không thể thay đổi native embed message={message.id}: {exc}",
+                flush=True,
+            )
+            return False
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         nonce = str(getattr(message, "nonce", ""))
@@ -380,9 +411,8 @@ class EmbedCog(commands.Cog):
         if not config.get("auto_embed_enabled", True):
             return
 
-        any_success = False
-        any_blocked = False
-        any_action_required = False
+        any_replacement = False
+        any_unhandled = False
         platforms_enabled = config.get("platforms_enabled", {})
 
         curr_task = asyncio.current_task()
@@ -449,13 +479,16 @@ class EmbedCog(commands.Cog):
                 except Exception as act_err:
                     print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Embed: {act_err}", flush=True)
 
-                if result.success:
-                    any_success = True
-                elif result.status == "blocked":
-                    any_blocked = True
-                elif result.status == "action_required":
-                    any_action_required = True
-                elif result.status not in ("blocked", "cancelled", "action_required") and message.id not in self._deleted_message_ids:
+                # A Facebook retry/close panel replaces the useless login card.
+                # Keep the native preview if a link has no Asumi replacement.
+                if result.success or result.status == "blocked" or (
+                    result.status == "action_required" and result.preview_message_id is not None
+                ):
+                    any_replacement = True
+                else:
+                    any_unhandled = True
+
+                if result.status not in ("blocked", "cancelled", "action_required", "success") and message.id not in self._deleted_message_ids:
                     platform_name = PLATFORMS.get(platform_key, {}).get("name", platform_key.capitalize())
                     try:
                         reason = ("🔒 Bài viết có thể không công khai hoặc yêu cầu đăng nhập."
@@ -474,16 +507,10 @@ class EmbedCog(commands.Cog):
         finally:
             self._in_flight_tasks.pop(message.id, None)
 
-        # Only hide native previews when Asumi actually produced media or
-        # moderation blocked it. An action-required warning is NOT a preview.
-        # For mixed-success multi-link messages, keep the original native card
-        # when any platform failed, rather than silently hiding useful media.
-        if (any_success or any_blocked) and not any_action_required and config.get("suppress_original_embed", True):
-            if message.id not in self._deleted_message_ids:
-                try:
-                    await message.edit(suppress=True)
-                except (discord.Forbidden, discord.HTTPException) as e:
-                    print(f"[EmbedCog] Không thể suppress embed tin nhắn gốc: {e}", flush=True)
+        # Replace Discord's native Facebook card after a visible Asumi preview
+        # exists, including retry controls. Never hide unhandled links.
+        if any_replacement and not any_unhandled and config.get("suppress_original_embed", True):
+            await self._set_origin_embed_suppressed(message)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
@@ -1632,6 +1659,8 @@ class EmbedCog(commands.Cog):
                     download_url=resolved_video_url,
                 )
                 if isinstance(fallback, PreviewResult) and fallback.success:
+                    if config.get("suppress_original_embed", True):
+                        await self._set_origin_embed_suppressed(origin_message)
                     if current_preview is not None and (
                         getattr(current_preview, "id", None) != fallback.preview_message_id
                     ):
@@ -1729,6 +1758,8 @@ class EmbedCog(commands.Cog):
                         download_url=resolved_video_url,
                     )
                     if isinstance(fallback, PreviewResult) and fallback.success:
+                        if config.get("suppress_original_embed", True):
+                            await self._set_origin_embed_suppressed(origin_message)
                         if current_preview is not None and getattr(current_preview, "id", None) != fallback.preview_message_id:
                             await self._discard_preview(origin_id, current_preview)
                         return fallback
@@ -1744,6 +1775,10 @@ class EmbedCog(commands.Cog):
 
             tried.add(domain)
             self._set_facebook_proxy_state(origin_id, url, tried)
+
+            # Repair existing duplicate native cards after a successful retry.
+            if config.get("suppress_original_embed", True):
+                await self._set_origin_embed_suppressed(origin_message)
 
             old_removed = True
             if current_preview is not None and getattr(current_preview, "id", None) != sent_msg.id:
