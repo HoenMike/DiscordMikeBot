@@ -1043,7 +1043,7 @@ class EmbedCog(commands.Cog):
                         proxy_link = f"||{proxy_link}||"
                     fallback_view = self._manual_fallback_view(
                         message, platform_key, url,
-                        is_spoiler=is_spoiler, tried_domains=tried,
+                        is_spoiler=is_spoiler, tried_domains={domain},
                     )
                     sent_msg = await self._send_embed_preview(
                         message=message,
@@ -1604,7 +1604,8 @@ class EmbedCog(commands.Cog):
                 excluded_domains=tried,
                 attempted_domains=attempted,
             )
-            tried = attempted
+            # attempted also includes rejected/time-out candidates: keep them
+            # local to this attempt. Never make a transient 403/timeout permanent.
 
             if not proxy_url and (
                 re.search(
@@ -1648,8 +1649,6 @@ class EmbedCog(commands.Cog):
 
             self._facebook_retry_at.pop(state_key, None)
             domain = (urlparse(proxy_url).hostname or "").lower()
-            if domain:
-                tried.add(domain)
 
             is_nsfw_channel = getattr(origin_message.channel, "is_nsfw", False)
             if callable(is_nsfw_channel):
@@ -1679,7 +1678,7 @@ class EmbedCog(commands.Cog):
                 platform_key,
                 url,
                 is_spoiler=is_spoiler,
-                tried_domains=tried,
+                tried_domains=tried | {domain},
             )
             sent_msg = await self._send_embed_preview(
                 message=origin_message,
@@ -1694,6 +1693,41 @@ class EmbedCog(commands.Cog):
                     origin_message_id=origin_id,
                 )
 
+            verified, verify_reason = await self._verify_proxy_unfurl(
+                origin_id, sent_msg, "facebook",
+                require_video=bool(
+                    re.search(r"/(?:share/[vr]/|reels?/|videos/)", urlparse(url).path, flags=re.IGNORECASE)
+                    or urlparse(url).path.lower().startswith("/watch")
+                ),
+            )
+            if not verified:
+                if not await self._discard_preview(origin_id, sent_msg):
+                    return PreviewResult(
+                        "degraded", "proxy", "cleanup_failed", platform_key,
+                        domain, origin_id, sent_msg.id,
+                    )
+                # An invalid new card must never replace the old preview.
+                # A direct video attachment remains the final fallback.
+                if re.search(r"/(?:share/[vr]/|reels?/|videos/)", urlparse(url).path, flags=re.IGNORECASE) or urlparse(url).path.lower().startswith("/watch"):
+                    fallback = await self._try_ytdlp_fallback(
+                        origin_message, "facebook", url, config,
+                        is_spoiler=is_spoiler, manual=True,
+                    )
+                    if isinstance(fallback, PreviewResult) and fallback.success:
+                        if current_preview is not None and getattr(current_preview, "id", None) != fallback.preview_message_id:
+                            await self._discard_preview(origin_id, current_preview)
+                        return fallback
+                    if isinstance(fallback, PreviewResult) and fallback.status == "degraded":
+                        return fallback
+                self._facebook_retry_at[state_key] = time.monotonic() + 30.0
+                return PreviewResult(
+                    status="action_required", tier="proxy",
+                    reason="proxy_temporarily_unavailable", platform=platform_key,
+                    proxy_domain=domain, origin_message_id=origin_id,
+                    fallback_reason=verify_reason,
+                )
+
+            tried.add(domain)
             self._set_facebook_proxy_state(origin_id, url, tried)
 
             old_removed = True
