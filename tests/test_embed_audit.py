@@ -90,7 +90,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
     async def test_facebook_proxy_nsfw_is_spoiler_and_never_ytdlp(self):
         safety = PreviewSafety()
         self.cog._send_embed_preview = AsyncMock(return_value=self.preview)
-        self.cog._verify_proxy_unfurl = AsyncMock()
+        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(True, "usable_embed"))
         with patch(
             "features.embed.cog.find_valid_proxy",
             new=AsyncMock(return_value=("https://facebed.com/p", True)),
@@ -103,7 +103,7 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(safety.is_nsfw)
         sent = self.cog._send_embed_preview.await_args.kwargs
         self.assertIn("||[facebed.com](https://facebed.com/p)||", sent["content"])
-        self.cog._verify_proxy_unfurl.assert_not_awaited()
+        self.cog._verify_proxy_unfurl.assert_awaited_once()
 
         with patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock()) as ytdlp:
             fallback = await self.cog._try_ytdlp_fallback(
