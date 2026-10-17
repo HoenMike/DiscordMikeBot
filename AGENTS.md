@@ -2,6 +2,13 @@
 
 This repository is expected to be used across multiple AI/agent sessions. Read this file before making non-trivial changes.
 
+## Asumi 3.14.7 — Bounded 15-minute live chat context (2026-10-17)
+
+- Screenshot: "giờ cho 2 con bot chơi với nhau được ko" followed by `@Asumi chơi ko?` must be answered as an invitation to interact with **Regiko's bot**, not treated as a brand-new human game invite.
+- Only after an explicit @mention or live reply continuation, the assistant reads up to 15 minutes of **same-channel** history (max 40 messages / 7000 context characters), with current reply and recent turns distinct. Preserve speaker, mentions, reply direction, chronological order; never persist the background chat.
+- Keep non-secret lookback/message caps in `core/constants.py`. Do not reintroduce brittle keyword-only fetching, cross-channel harvesting, unsupported claims of controlling another bot, or a longer synchronous model budget.
+- Regression in `tests/test_assistant_core.py`; live bot-response acceptance still required.
+
 ## General workflow
 
 1. Inspect current `main`, `core/version.py`, open PRs and recent commits before assuming repository state.
