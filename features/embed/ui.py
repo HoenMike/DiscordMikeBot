@@ -85,18 +85,14 @@ class EmbedActionView(discord.ui.View):
             print(f"[EmbedCog] Reload preview lỗi: {exc}", flush=True)
 
         if result is not None and result.success:
+            # The changed preview itself acknowledges success; no ephemeral reply.
             self.stop()
-            await interaction.followup.send("Đã reload preview.", ephemeral=True)
             return
 
         reason = getattr(result, "reason", "reload_failed")
         self._set_busy(False)
         if result is not None and result.status == "action_required" and result.preview_message_id is not None:
             self.stop()
-            await interaction.followup.send(
-                "Đã tạo lại preview và giữ quyền điều khiển trên preview mới.",
-                ephemeral=True,
-            )
             return
 
         try:
@@ -104,16 +100,8 @@ class EmbedActionView(discord.ui.View):
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
-        message = (
-            "Đã thử hết nguồn xem trước trong lượt này. Link gốc được giữ nguyên; thử lại sau 30 giây."
-            if reason == "no_more_proxy"
-            else "Proxy đang tạm không truy xuất được Facebook. Giữ nguyên preview hiện tại; thử lại sau 30 giây."
-            if reason == "proxy_temporarily_unavailable"
-            else "Vui lòng đợi khoảng 30 giây trước khi thử lại proxy Facebook."
-            if reason == "proxy_retry_cooldown"
-            else f"Reload chưa thành công (`{reason}`). Preview hiện tại vẫn được giữ."
-        )
-        await interaction.followup.send(message, ephemeral=True)
+        # On failure retain the preview and retry controls without a status popup.
+        print(f"[EmbedCog] Reload preview chưa thành công: {reason}", flush=True)
 
     async def _remove(self, interaction: discord.Interaction):
         self._set_busy(True)
@@ -127,10 +115,6 @@ class EmbedActionView(discord.ui.View):
 
         if result is not None and result.success:
             self.stop()
-            await interaction.followup.send(
-                "Đã bỏ preview Asumi và khôi phục embed gốc của Discord.",
-                ephemeral=True,
-            )
             return
 
         self._set_busy(False)
@@ -140,10 +124,7 @@ class EmbedActionView(discord.ui.View):
             pass
 
         reason = getattr(result, "reason", "revert_failed")
-        await interaction.followup.send(
-            f"Chưa thể khôi phục embed gốc (`{reason}`).",
-            ephemeral=True,
-        )
+        print(f"[EmbedCog] Ẩn preview chưa thành công: {reason}", flush=True)
 
 
 # Backward-compatible import for older tests/extensions while the generic view rolls out.
