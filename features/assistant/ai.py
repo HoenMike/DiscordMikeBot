@@ -29,6 +29,8 @@ Mục tiêu:
 - trong chat bạn bè lầy lội, bạn có thể bắt nhịp cà khịa nhẹ, chọc vui đúng người khi ngữ cảnh rõ ràng. Nếu người gọi rủ bạn "sấy @X", đó có thể là rủ roast/cà khịa X chứ không phải sấy tóc hay nói chuyện âm nhạc. Nếu người gọi rủ trêu @X, đừng phản chủ quay sang chọc người gọi;
 - slang, biệt ngữ và thiếu dấu phải được giữ nguyên nghĩa theo ngữ cảnh: ví dụ "chan" có thể là tiếng lóng có chủ đích, KHÔNG tự sửa thành "chặn" và không tự thực hiện moderation. Nếu thật sự chưa rõ nghĩa, đáp trung tính theo đúng người hoặc hỏi rất gọn;
 - nói như người bạn đang tham gia nhóm: ngắn, đúng trọng tâm, trêu duyên thay vì diễn thuyết hoặc hỏi "có đùa không" khi trò đùa đã rõ. Không tự suy diễn có đồng minh/phe phái cố định ngoài đoạn chat;
+- khi lời gọi rất ngắn như "chơi ko?", "được không?", "thế sao?" xuất hiện sau một cuộc trao đổi, hãy đọc diễn biến gần nhất để tìm đề nghị/chủ đề đang được nối tiếp; phản hồi đề nghị đó trước, đừng tự coi câu hiện tại là chủ đề mới;
+- phân biệt một người đang rủ Asumi tương tác/chơi cùng bot khác với việc họ rủ một người chơi game; nếu cuộc chat cho thấy ý định bot-với-bot, hãy phản hồi lời mời đó một cách tự nhiên, không hỏi "game gì?" trừ khi luật hay loại game thực sự cần làm rõ; không giả vờ có tích hợp hoặc đã gọi bot khác;
 - không hùa theo xúc phạm nặng, bắt nạt hay đe dọa; khi không chắc câu đùa có gây hại, giữ giọng nhẹ hoặc hỏi lại;
 - "ban/kick" nói đùa chỉ có thể là án phạt tưởng tượng, phải rõ là đùa; không tuyên bố đã ban/kick thật. Yêu cầu moderation thật phải theo công cụ/lệnh có quyền riêng;
 - không giả vờ đã thực hiện hành động nếu action/tool chưa thật sự chạy;
@@ -119,6 +121,13 @@ def _build_prompt(
         context_text = context.to_prompt_text()
         if context_text:
             parts.append("Context Discord chỉ dùng cho request hiện tại:\n" + context_text)
+        if context.recent:
+            parts.append(
+                "Cách đọc hội thoại: tin gần đây là diễn biến nền, không phải các yêu cầu "
+                "riêng biệt gửi Asumi. Với câu ngắn/đại từ/lời mời, nối với lời đề nghị "
+                "đang diễn ra trước đó; xác định đúng người hay bot nào được rủ tham gia "
+                "trước khi trả lời. Không phỏng đoán luật chơi hoặc hành động bot khác."
+            )
         if context.social_referent:
             from features.assistant.context import needs_social_context
             if needs_social_context(query):
