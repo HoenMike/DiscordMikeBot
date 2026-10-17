@@ -1,3 +1,10 @@
+## 3.14.6 — Facebook Reel Share URL Resolution (2026-10-17)
+
+- Facebook `/share/r/` and `/share/v/` can now resolve an available public numeric Reel/video URL before proxy metadata and yt-dlp, using bounded HTTPS redirects and canonical metadata without cookies.
+- Reject login redirects and external hosts; no guarantee for authentication-gated or private Facebook content.
+- Compact the failure notice to one line and keep only Try Again/Hide controls, since the original Facebook link is already present.
+- Add regression tests for short links, URL safety, fallback propagation, and native message preservation.
+
 ## 3.14.5 — Facebook Embed Verification & Retry Recovery (2026-10-17)
 
 - Facebook share/Reel: gửi URL proxy không còn được tính là preview thành công; Discord phải trả player video thật. Thẻ `Log in or sign up to view`, ảnh poster và kết quả unfurl rỗng đều bị loại.
