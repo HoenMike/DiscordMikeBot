@@ -19,6 +19,7 @@ from features.embed.validator import find_valid_proxy
 from features.embed.validator import is_generic_or_login_preview
 from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
+from features.embed.facebook_urls import resolve_facebook_share_video
 from core.webhook_sender import BoundedDict
 
 EMBED_COOLDOWN = commands.CooldownMapping.from_cooldown(5, 30.0, commands.BucketType.channel)
@@ -186,29 +187,14 @@ class EmbedCog(commands.Cog):
                 origin_message_id=message.id,
             )
 
-        # Do not show an empty "Preview lỗi?" ghost as if a video was
-        # generated. Link buttons don't trigger another unfurl/login card.
-        if platform_key == "facebook":
-            parsed = urlparse(url)
-            hostname = (parsed.hostname or "").lower()
-            if (
-                parsed.scheme == "https"
-                and (hostname == "facebook.com" or hostname.endswith(".facebook.com")
-                     or hostname == "fb.watch")
-                and len(url) <= 512
-            ):
-                view.add_item(discord.ui.Button(
-                    label="Mở Facebook",
-                    style=discord.ButtonStyle.link,
-                    url=url,
-                ))
-            hint = (
-                "Không lấy được preview video công khai qua các proxy. "
-                "Link có thể yêu cầu đăng nhập, bị giới hạn chia sẻ "
-                "hoặc proxy đang lỗi. 🔄 để thử lại sau."
-            )
-        else:
-            hint = "Không tạo được preview; nhấn 🔄 để thử lại."
+        # The original user message already contains the Facebook link.
+        # Do not echo an extra login-card URL/button or a four-line error wall.
+        # Keep retry and dismiss controls in a compact, single-line notice.
+        hint = (
+            "Chưa lấy được video Reel • Có thể cần đăng nhập hoặc bị giới hạn."
+            if platform_key == "facebook"
+            else "Chưa tạo được preview • Thử lại sau."
+        )
         author_name = _clean_markdown_label(message.author.display_name)
         sent_msg = await self._send_embed_preview(
             message=message,
@@ -870,8 +856,22 @@ class EmbedCog(commands.Cog):
         if message.id in self._deleted_message_ids:
             return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
+        # Share/r and share/v are opaque tokens, not playable Reel IDs.
+        # Follow only bounded, public Facebook redirects to discover a numeric
+        # /reel/ or /watch/ route before trying the existing proxy chain.
+        resolved_video_url = (
+            await resolve_facebook_share_video(self.session, url)
+            if platform_key == "facebook" and self.session is not None
+            else None
+        )
+        if resolved_video_url:
+            print("[EmbedCog] Facebook short-share canonical video resolved", flush=True)
+
         # Tier 1: Proxy URL Chain
-        proxy_result = await self._try_proxy_chain(message, platform_key, url, config, is_spoiler=is_spoiler, safety=safety)
+        proxy_result = await self._try_proxy_chain(
+            message, platform_key, url, config,
+            is_spoiler=is_spoiler, safety=safety, lookup_url=resolved_video_url,
+        )
         if proxy_result.success or proxy_result.status in ("blocked", "cancelled", "degraded", "action_required"):
             return proxy_result
 
@@ -891,6 +891,7 @@ class EmbedCog(commands.Cog):
                 fallback_result = await self._try_ytdlp_fallback(
                     message, platform_key, url, config,
                     is_spoiler=is_spoiler, safety=safety,
+                    download_url=resolved_video_url,
                 )
                 if isinstance(fallback_result, PreviewResult) and (
                     fallback_result.success or fallback_result.status in
@@ -993,6 +994,7 @@ class EmbedCog(commands.Cog):
         config: dict,
         is_spoiler: bool = False,
         safety: PreviewSafety | None = None,
+        lookup_url: str | None = None,
     ) -> PreviewResult:
         safety = safety if safety is not None else PreviewSafety()
         if self.session is None:
@@ -1012,7 +1014,7 @@ class EmbedCog(commands.Cog):
                 if message.id in self._deleted_message_ids:
                     return PreviewResult("cancelled", "proxy", "origin_deleted", platform_key, origin_message_id=message.id)
                 proxy_url, is_proxy_nsfw = await find_valid_proxy(
-                    self.session, url, platform_key,
+                    self.session, lookup_url or url, platform_key,
                     guild_proxy_domains=guild_proxy_domains, excluded_domains=tried,
                     attempted_domains=tried,
                 )
@@ -1141,6 +1143,7 @@ class EmbedCog(commands.Cog):
         is_spoiler: bool = False,
         safety: PreviewSafety | None = None,
         manual: bool = False,
+        download_url: str | None = None,
     ) -> PreviewResult | bool:
         # Facebook is allowed only for actual video routes; ordinary posts
         # must not be mistaken for playable video based on generic thumbnails.
@@ -1155,7 +1158,7 @@ class EmbedCog(commands.Cog):
             return False
 
         try:
-            post_data = await extract_media_ytdlp(url, platform_key)
+            post_data = await extract_media_ytdlp(download_url or url, platform_key)
             if post_data is None:
                 return False
 
@@ -1601,10 +1604,11 @@ class EmbedCog(commands.Cog):
                     origin_message_id=origin_id,
                 )
             attempted = set(tried)
+            resolved_video_url = await resolve_facebook_share_video(self.session, url)
 
             proxy_url, is_proxy_nsfw = await find_valid_proxy(
                 self.session,
-                url,
+                resolved_video_url or url,
                 platform_key,
                 guild_proxy_domains=guild_proxy_domains,
                 excluded_domains=tried,
@@ -1625,6 +1629,7 @@ class EmbedCog(commands.Cog):
                 fallback = await self._try_ytdlp_fallback(
                     origin_message, "facebook", url, config,
                     is_spoiler=is_spoiler, manual=True,
+                    download_url=resolved_video_url,
                 )
                 if isinstance(fallback, PreviewResult) and fallback.success:
                     if current_preview is not None and (
@@ -1721,6 +1726,7 @@ class EmbedCog(commands.Cog):
                     fallback = await self._try_ytdlp_fallback(
                         origin_message, "facebook", url, config,
                         is_spoiler=is_spoiler, manual=True,
+                        download_url=resolved_video_url,
                     )
                     if isinstance(fallback, PreviewResult) and fallback.success:
                         if current_preview is not None and getattr(current_preview, "id", None) != fallback.preview_message_id:
