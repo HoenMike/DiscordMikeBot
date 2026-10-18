@@ -158,7 +158,8 @@ def render_report(rows, *, days, vnd_per_usd=26000, prepay_vnd=None,
     failed = sum(int(r[4]) for r in rows)
     unpriced = sum(int(r[5]) for r in rows)
     micros = sum(int(r[10] or 0) for r in rows)
-    month_micros = micros * 30 / days
+    priced_count = succeeded - unpriced
+    month_micros = micros * 30 / days if priced_count > 0 else None
     fmt = lambda n: format(round(n / 1_000_000 * vnd_per_usd), ",")
     models = {}
     tasks = {}
@@ -170,17 +171,23 @@ def render_report(rows, *, days, vnd_per_usd=26000, prepay_vnd=None,
     lines = [
         "**AI Cost Monitor — " + str(days) + " ngày gần nhất**",
         f"Requests: **{count:,}** (thành công {succeeded:,}, lỗi {failed:,}, chưa định giá {unpriced:,})",
-        f"Ước tính Gemini: **USD {micros/1_000_000:,.4f}** (~**{fmt(micros)}đ**)",
-        f"Nếu giữ nhịp gọi: **~{fmt(month_micros)}đ / 30 ngày**.",
+        (f"Ước tính Gemini có giá: **USD {micros/1_000_000:,.4f}** (~**{fmt(micros)}đ**)"
+         if priced_count > 0 else "Chi phí: **CHƯA XÁC ĐỊNH** (không có request nào đủ dữ liệu định giá)."),
+        (f"Nếu giữ nhịp gọi: **~{fmt(month_micros)}đ / 30 ngày**."
+         if priced_count > 0 else "Chưa đủ dữ liệu định giá để dự phóng chi phí hàng tháng."),
         "**Theo model:**",
     ]
     for model, (calls, inp, out, thought, cache, val) in sorted(
             models.items(), key=lambda row: row[1][-1], reverse=True)[:6]:
-        lines.append(f"• {model}: {calls} calls · in {inp:,}, out {out:,}, think {thought:,}, cached {cache:,} · ~{fmt(val)}đ")
+        model_unknown = sum(int(row[5] or 0) for row in rows if row[1] == model)
+        model_success = sum(int(row[3] or 0) for row in rows if row[1] == model)
+        price = f"~{fmt(val)}đ" if model_success > model_unknown else "chưa định giá"
+        lines.append(f"• {model}: {calls} calls · in {inp:,}, out {out:,}, think {thought:,}, cached {cache:,} · {price}")
     lines.append("**Theo tính năng:**")
     for task, val in sorted(tasks.items(), key=lambda row: row[1], reverse=True)[:6]:
         lines.append(f"• {task}: ~{fmt(val)}đ")
-    month_vnd = month_micros / 1_000_000 * vnd_per_usd
+    month_vnd = (month_micros / 1_000_000 * vnd_per_usd
+                 if month_micros is not None else 0)
     if prepay_vnd is not None:
         lines.append(f"Prepay do admin nhập: {prepay_vnd:,}đ")
         if month_vnd > 0:
