@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import re
 import uuid
+import weakref
 
 from core import constants as policy
 from core.db import db_client
@@ -100,7 +101,7 @@ def usage_event(*, model: str, response=None, label="AI", outcome="ok",
 
 class UsageStore:
     def __init__(self):
-        self._ready_loops = set()
+        self._ready_loops = weakref.WeakSet()  # Flask creates a short-lived event loop per request
 
     async def _init(self):
         await db_client.connect()
