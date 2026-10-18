@@ -145,6 +145,112 @@ class UsageStore:
             return await cursor.fetchall()
 
 
+    async def dashboard(self, days=7, at=None):
+        """Bounded aggregate for the classic admin dashboard, no raw prompts."""
+        if days not in (7, 30):
+            raise ValueError("days must be 7 or 30")
+        await self._init()
+        at = at or datetime.now(timezone.utc)
+        since = (at - timedelta(days=days)).isoformat()
+        async with db_client.execute(
+            """SELECT SUBSTR(occurred_at,1,10), provider, task, actual_model,
+              COUNT(*),
+              SUM(CASE WHEN outcome='ok' THEN 1 ELSE 0 END),
+              SUM(CASE WHEN outcome!='ok' THEN 1 ELSE 0 END),
+              SUM(CASE WHEN outcome='ok' AND pricing_status!='ESTIMATED' THEN 1 ELSE 0 END),
+              SUM(COALESCE(prompt_tokens,0)),
+              SUM(COALESCE(output_tokens,0)),
+              SUM(COALESCE(thinking_tokens,0)),
+              SUM(COALESCE(cached_tokens,0)),
+              SUM(COALESCE(estimated_usd_micros,0))
+              FROM asumi_ai_usage
+              WHERE occurred_at>=? AND occurred_at<=?
+              GROUP BY SUBSTR(occurred_at,1,10),provider,task,actual_model
+              ORDER BY SUBSTR(occurred_at,1,10) ASC
+              LIMIT 2001""",
+            (since, at.isoformat()),
+        ) as cursor:
+            rows = await cursor.fetchall()
+        async with db_client.execute(
+            "SELECT MIN(occurred_at) FROM asumi_ai_usage"
+        ) as cursor:
+            first = await cursor.fetchone()
+        return build_dashboard_payload(
+            rows[:2000], days=days, at=at,
+            first_recorded_at=(first[0] if first else None),
+            truncated=len(rows) > 2000,
+        )
+
+
+def build_dashboard_payload(rows, *, days, at, first_recorded_at=None, truncated=False):
+    """Presentation-ready numeric aggregates; rate estimates are conditional."""
+    if days not in (7, 30):
+        raise ValueError("invalid days")
+    sums = ["calls", "success", "failed", "unpriced", "input_tokens",
+            "output_tokens", "thinking_tokens", "cached_tokens", "usd_micros"]
+    def zero():
+        return {name: 0 for name in sums}
+    def combine(dst, nums):
+        for name, val in zip(sums, nums):
+            dst[name] += int(val or 0)
+    total = zero()
+    daily = {}
+    models = {}
+    features = {}
+    for day, provider, task, model, *nums in rows:
+        day = str(day)[:10]
+        provider = str(provider)[:32]
+        task = str(task)[:32]
+        model = str(model)[:96]
+        combine(total, nums)
+        combine(daily.setdefault(day, zero()), nums)
+        model_key = (provider, model)
+        combine(models.setdefault(model_key, zero()), nums)
+        combine(features.setdefault(task, zero()), nums)
+
+    initial = None
+    if first_recorded_at:
+        try:
+            initial = datetime.fromisoformat(str(first_recorded_at))
+            if initial.tzinfo is None:
+                initial = initial.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            initial = None
+    elapsed_days = max(1.0, (at - initial).total_seconds() / 86400) if initial else 1.0
+    sample_days = min(float(days), elapsed_days)
+    priced_success = total["success"] - total["unpriced"]
+    has_unknown = total["failed"] > 0 or total["unpriced"] > 0 or truncated
+    forecast = (
+        round(total["usd_micros"] * 30 / sample_days)
+        if priced_success > 0 and not truncated else None
+    )
+    today_key = at.astimezone(timezone.utc).date().isoformat()
+    return {
+        "window_days": days, "as_of": at.astimezone(timezone.utc).isoformat(),
+        "first_recorded_at": first_recorded_at,
+        "observed_days": round(sample_days, 2),
+        "early_sample": elapsed_days < 3,
+        "incomplete": has_unknown,
+        "truncated": bool(truncated),
+        "totals": total,
+        "today_utc": daily.get(today_key, zero()),
+        "forecast_30d_usd_micros": forecast,
+        "daily": [{"date": day, **metrics} for day, metrics in sorted(daily.items())],
+        "by_model": [{"provider": provider, "model": model, **metrics}
+                     for (provider, model), metrics in sorted(
+                         models.items(), key=lambda item: item[1]["usd_micros"], reverse=True)],
+        "by_feature": [{"feature": task, **metrics}
+                       for task, metrics in sorted(
+                           features.items(), key=lambda item: item[1]["usd_micros"], reverse=True)],
+        "disclaimer": (
+            "Ước tính từ Gemini Standard text, không phải hóa đơn Google. "
+            "Clef/provider khác có thể chưa định giá. "
+            "Không bao gồm grounding, phí lưu cache, hosting hoặc các request bị mất metadata. "
+            "GCP Credits và Prepay chỉ là giả định nhập tay; xác minh ở Google Billing."
+        ),
+    }
+
+
 def render_report(rows, *, days, vnd_per_usd=26000, prepay_vnd=None,
                   eligible_credits_vnd=None):
     """Transparent 30-day straight-line projection. Credits are manual only."""
