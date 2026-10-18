@@ -77,20 +77,23 @@ def estimate_micros(model: str, usage: dict | None, at: datetime):
 
 
 def usage_event(*, model: str, response=None, label="AI", outcome="ok",
-                latency_ms=0, error_type=None, at=None) -> tuple:
+                latency_ms=0, error_type=None, at=None,
+                provider="google-gemini") -> tuple:
     at = at or datetime.now(timezone.utc)
     usage = extract_usage(response) if response is not None else None
     actual = normalize_model(getattr(response, "model_version", None) or model)
-    value = estimate_micros(actual, usage, at) if outcome == "ok" else None
+    value = (estimate_micros(actual, usage, at)
+             if outcome == "ok" and provider == "google-gemini" else None)
+    status = ("ESTIMATED" if value is not None else
+              "FAILED_UNKNOWN_BILLING" if outcome != "ok" else
+              "PROVIDER_UNPRICED" if provider != "google-gemini" else "UNPRICED")
     return (uuid.uuid4().hex, at.astimezone(timezone.utc).isoformat(),
-            "google-gemini", task_family(label), normalize_model(model), actual,
+            provider[:32], task_family(label), normalize_model(model), actual,
             outcome, usage["prompt"] if usage else None,
             usage["output"] if usage else None,
             usage["thinking"] if usage else None,
             usage["cached"] if usage else None, value,
-            "ESTIMATED" if value is not None else
-            ("FAILED_UNKNOWN_BILLING" if outcome != "ok" else "UNPRICED"),
-            max(0, int(latency_ms)),
+            status, max(0, int(latency_ms)),
             re.sub("[^A-Za-z0-9_]", "", error_type or "")[:64] or None)
 
 
@@ -199,7 +202,7 @@ def render_report(rows, *, days, vnd_per_usd=26000, prepay_vnd=None,
                 lines.append(f"Nếu hợp lệ, tổng đủ khoảng **{(prepay_vnd+eligible_credits_vnd)/month_vnd:.1f} tháng**.")
     lines += [
         "_Chỉ ước tính Standard text Paid Tier; không phải hóa đơn hoặc số dư thực.",
-        "Chưa tính phí grounding, cache storage, đa phương thức, provider khác, "
+        "Chưa tính phí grounding, cache storage, đa phương thức, Cloudflare Clef, Brave, "
         "request thiếu metadata và các khoản ngoài Gemini. Thinking tính vào output. "
         f"Tỷ giá giả định {vnd_per_usd:,}đ/USD; 7/30 ngày là cửa sổ trượt, "
         "dự báo có thể lệch nếu lưu lượng thay đổi._",
