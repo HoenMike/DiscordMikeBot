@@ -173,6 +173,10 @@
                     <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
                     <span>Tổng Quan Hệ Thống</span>
                 </button>
+                <button onclick="switchTab('ai-usage')" id="tab-btn-ai-usage" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all" aria-controls="tab-content-ai-usage">
+                    <i data-lucide="chart-no-axes-combined" class="w-3.5 h-3.5 text-teal-400"></i>
+                    <span>AI Usage</span>
+                </button>
                 <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
                     <span>Console Logs</span>
@@ -420,6 +424,104 @@
         </section>
 
         <!-- ========================================== -->
+        <!-- ========================================== -->
+        <!-- T31: AI usage and spend estimates INSIDE the historical admin dashboard -->
+        <section id="tab-content-ai-usage" class="tab-content hidden flex-1 min-h-0 overflow-y-auto pr-1" aria-label="AI Usage và chi phí dự kiến">
+            <div class="flex flex-col gap-4 pb-5">
+                <div class="flex flex-wrap items-start justify-between gap-3 bg-dark-card border border-dark-border rounded-xl p-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i data-lucide="chart-no-axes-combined" class="w-4 h-4 text-teal-400"></i>
+                            AI Usage & Cost
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">Token thực tế · model được gọi · chi phí API ước tính, không phải số tiền đã trừ từ Google Billing.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="ai-usage-period" class="text-xs text-slate-300">Khoảng</label>
+                        <select id="ai-usage-period" aria-label="Chọn khoảng thời gian AI Usage" class="bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" onchange="loadAIUsage(true)">
+                            <option value="7">7 ngày</option>
+                            <option value="30">30 ngày</option>
+                        </select>
+                        <button type="button" onclick="loadAIUsage(true)" class="rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-xs text-white hover:bg-dark-border flex items-center gap-1.5">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Làm mới
+                        </button>
+                    </div>
+                </div>
+                <p id="ai-usage-status" role="status" aria-live="polite" class="text-xs text-slate-400 px-1">Mở tab để tải dữ liệu lần đầu.</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Chi phí đã ghi nhận</div>
+                        <div id="ai-usage-known-cost" class="text-lg font-bold text-white mt-1">—</div>
+                        <div id="ai-usage-known-usd" class="text-[11px] text-slate-400">Gemini text · chưa trừ credit</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Dự phóng 30 ngày</div>
+                        <div id="ai-usage-forecast" class="text-lg font-bold text-teal-300 mt-1">—</div>
+                        <div id="ai-usage-confidence" class="text-[11px] text-slate-400">Ước tính theo lưu lượng</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Lượt gọi AI</div>
+                        <div id="ai-usage-requests" class="text-lg font-bold text-white mt-1">—</div>
+                        <div id="ai-usage-failures" class="text-[11px] text-slate-400">Thành công / lỗi</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Tổng token Gemini</div>
+                        <div id="ai-usage-tokens" class="text-lg font-bold text-white mt-1">—</div>
+                        <div id="ai-usage-thinking" class="text-[11px] text-slate-400">Input / Output / Thinking / Cached</div>
+                    </div>
+                </div>
+                <div id="ai-usage-warning" class="hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200" role="note"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+                    <div class="lg:col-span-3 p-4 rounded-xl bg-dark-card border border-dark-border">
+                        <h3 class="text-xs font-bold text-white">Chi phí đã ghi nhận theo ngày (UTC)</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Dùng đơn giá lúc gọi API; khoản chưa định giá không được cộng như miễn phí.</p>
+                        <div class="h-52 w-full mt-3"><canvas id="ai-usage-trend-chart" aria-label="Biểu đồ chi phí AI theo ngày" role="img"></canvas></div>
+                    </div>
+                    <div class="lg:col-span-2 p-4 rounded-xl bg-dark-card border border-dark-border">
+                        <h3 class="text-xs font-bold text-white">Ngân sách còn dùng được bao lâu?</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Nhập <strong>số dư còn lại</strong>; không đọc trực tiếp ví Google. Credit chỉ nhập khi Google Billing đã xác nhận áp dụng cho Gemini.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2 mt-3">
+                            <label class="block text-[11px] text-slate-300">Prepay còn lại (VND)
+                                <input id="ai-usage-prepay" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="Ví dụ: 150000" class="mt-1 w-full bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" oninput="updateAIRunway()">
+                            </label>
+                            <label class="block text-[11px] text-slate-300">GCP Credit hợp lệ, chưa hết hạn (VND)
+                                <input id="ai-usage-credit" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="Không chắc thì để trống" class="mt-1 w-full bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" oninput="updateAIRunway()">
+                            </label>
+                            <label class="block text-[11px] text-slate-300">Tỷ giá dự kiến (VND/USD)
+                                <input id="ai-usage-fx" type="number" min="1000" max="100000" step="100" value="26000" class="mt-1 w-full bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" oninput="updateAIRunway()">
+                            </label>
+                        </div>
+                        <div class="mt-3 rounded-lg bg-dark-surface border border-dark-border p-3">
+                            <div class="text-[11px] text-slate-400">Thời gian duy trì lý thuyết</div>
+                            <div id="ai-usage-runway" class="text-lg text-teal-300 font-bold mt-1">Nhập số dư để tính</div>
+                            <div id="ai-usage-runway-note" class="text-[11px] text-slate-400 mt-1">Không tính hạn dùng credit/Prepay và các phí chưa được thống kê.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div class="rounded-xl bg-dark-card border border-dark-border p-4 overflow-hidden">
+                        <h3 class="text-xs font-bold text-white mb-3">Theo model và nhà cung cấp</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-slate-400 border-b border-dark-border"><tr><th class="pb-2 pr-2">Model</th><th class="pb-2 text-right">Calls</th><th class="pb-2 text-right">Tokens</th><th class="pb-2 text-right">Ước phí</th></tr></thead>
+                                <tbody id="ai-usage-model-rows" class="text-slate-200"><tr><td colspan="4" class="py-3">Chưa tải.</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="rounded-xl bg-dark-card border border-dark-border p-4 overflow-hidden">
+                        <h3 class="text-xs font-bold text-white mb-3">Theo tính năng</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-slate-400 border-b border-dark-border"><tr><th class="pb-2 pr-2">Tính năng</th><th class="pb-2 text-right">Calls</th><th class="pb-2 text-right">Lỗi</th><th class="pb-2 text-right">Ước phí</th></tr></thead>
+                                <tbody id="ai-usage-feature-rows" class="text-slate-200"><tr><td colspan="4" class="py-3">Chưa tải.</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <p id="ai-usage-disclaimer" class="text-[11px] text-slate-400 leading-relaxed">Số liệu bắt đầu từ khi bật monitor, không có lịch sử trước đó. Chi phí chưa bao gồm đầy đủ dịch vụ ngoài Gemini và không phải hóa đơn thực tế.</p>
+            </div>
+        </section>
+
         <!-- ========================================== -->
         <!-- TAB 4: TAROT AI HUB & COOLDOWNS -->
         <!-- ========================================== -->
