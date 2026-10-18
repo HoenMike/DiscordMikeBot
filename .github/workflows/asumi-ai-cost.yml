@@ -1,0 +1,43 @@
+name: Asumi AI Usage & Cost Monitor
+
+on:
+  pull_request:
+    paths:
+      - "core/ai.py"
+      - "core/ai_usage.py"
+      - "features/ai_cost/**"
+      - "core/constants.py"
+      - "bot_instance.py"
+      - "tests/test_ai_usage_cost.py"
+      - ".github/workflows/asumi-ai-cost.yml"
+  push:
+    branches: [main]
+    paths:
+      - "core/ai.py"
+      - "core/ai_usage.py"
+      - "features/ai_cost/**"
+      - "core/constants.py"
+      - "bot_instance.py"
+      - "tests/test_ai_usage_cost.py"
+
+jobs:
+  usage-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Dependencies
+        run: |
+          grep -v '^audioop-lts' requirements.txt > /tmp/asumi-ai-requirements.txt
+          python -m pip install -r /tmp/asumi-ai-requirements.txt
+      - name: Compile and test AI usage
+        env:
+          ADMIN_PASSWORD: ci-only-placeholder
+          FLASK_SECRET_KEY: ci-only-placeholder-not-production
+        run: |
+          python -m compileall -q core/ai.py core/ai_usage.py features/ai_cost
+          python -m unittest discover -s tests -p "test_ai_usage_cost.py" -v
