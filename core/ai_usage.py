@@ -40,6 +40,7 @@ def normalize_model(model: str) -> str:
 
 def task_family(label: str) -> str:
     name = (label or "").lower()
+    if "clef" in name or "router" in name: return "routing"
     if "conversation" in name or "chat" in name: return "chat"
     if "tarot" in name: return "tarot"
     if "cabin" in name: return "cabin"
