@@ -463,6 +463,7 @@
                         <div class="text-[11px] text-slate-400">Lượt gọi AI</div>
                         <div id="ai-usage-requests" class="text-lg font-bold text-white mt-1">—</div>
                         <div id="ai-usage-failures" class="text-[11px] text-slate-400">Thành công / lỗi</div>
+                        <div id="ai-usage-today" class="text-[11px] text-teal-300 mt-1">Hôm nay (UTC): —</div>
                     </div>
                     <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
                         <div class="text-[11px] text-slate-400">Tổng token Gemini</div>
@@ -1636,6 +1637,8 @@
             aiSetText('ai-usage-requests', aiFormatTokens(total.calls));
             aiSetText('ai-usage-failures', aiFormatTokens(total.success) + ' thành công · ' +
                 aiFormatTokens(total.failed) + ' lỗi · ' + aiFormatTokens(total.unpriced) + ' chưa định giá');
+            aiSetText('ai-usage-today', 'Hôm nay (UTC): ' + aiFormatTokens(result.today_utc?.calls) +
+                ' lượt · ~' + aiFormatVND(aiAmount(result.today_utc?.usd_micros) * fx) + ' đã định giá');
             aiSetText('ai-usage-tokens', aiFormatTokens((total.input_tokens || 0) +
                 (total.output_tokens || 0) + (total.thinking_tokens || 0)));
             aiSetText('ai-usage-thinking',
