@@ -21,6 +21,10 @@ MAX_CONSOLE_LOGS_LIMIT = 2000
 MAX_BOT_ACTIVITIES_LIMIT = 5000
 TAROT_HISTORY_RETENTION_DAYS = 90
 
+# T31 — AI Usage & Cost Monitor: records metadata only, no conversation data.
+# Disable when deliberately opting out of usage telemetry.
+ASUMI_AI_USAGE_ENABLED = True
+
 # ---------------------------------------------------------------------------
 # Cấu hình Mô hình AI (Centralized AI Models & Generations)
 # ---------------------------------------------------------------------------
