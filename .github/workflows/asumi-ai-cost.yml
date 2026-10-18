@@ -9,6 +9,9 @@ on:
       - "core/constants.py"
       - "bot_instance.py"
       - "tests/test_ai_usage_cost.py"
+      - "tests/test_ai_usage_dashboard.py"
+      - "web/app.py"
+      - "web/templates/dashboard.html"
       - ".github/workflows/asumi-ai-cost.yml"
   push:
     branches: [main]
@@ -19,6 +22,9 @@ on:
       - "core/constants.py"
       - "bot_instance.py"
       - "tests/test_ai_usage_cost.py"
+      - "tests/test_ai_usage_dashboard.py"
+      - "web/app.py"
+      - "web/templates/dashboard.html"
 
 jobs:
   usage-regression:
@@ -41,3 +47,14 @@ jobs:
         run: |
           python -m compileall -q core/ai.py core/ai_usage.py features/ai_cost
           python -m unittest discover -s tests -p "test_ai_usage_cost.py" -v
+          python -m unittest discover -s tests -p "test_ai_usage_dashboard.py" -v
+      - name: Validate classic dashboard inline JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("web/templates/dashboard.html").read_text("utf-8")
+          Path("/tmp/asumi-cost-dashboard.js").write_text(
+              source.rsplit("<script>", 1)[1].split("</script>", 1)[0], encoding="utf-8"
+          )
+          PY
+          node --check /tmp/asumi-cost-dashboard.js
