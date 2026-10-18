@@ -1,5 +1,15 @@
 # AGENTS.md — DiscordMikeBot Working Context
 
+## T31 — AI usage and cost dashboard (design/code in PR #82, not yet deployed)
+
+- Owner wants long-term Gemini/Clef usage monitoring and spend forecasting inside the **existing historical tabbed** admin Dashboard (`web/templates/dashboard.html`), never the abandoned T24 sidebar or a new parallel console.
+- Read `docs/ASUMI_AI_USAGE_DASHBOARD_ROADMAP.md` and `docs/ASUMI_AI_COST_MONITOR.md` before changing model telemetry, pricing or `/admin`.
+- Gemini token cost uses SDK usage_metadata only, including thinking/cache accounting; calls without data are UNKNOWN, not zero/free. Cloudflare Clef records counts and latency but cannot be assigned an invented Gemini price.
+- Admin GET `/api/admin/ai-usage?days=7|30` is authenticated and returns *aggregates only*. Dashboard lazy-loads its AI Usage tab; Feedback integration and URL bookmarks must remain intact.
+- Prepay/GCP credit values are manual calculator inputs: they are not verified Google Billing balances. Do not auto-reload, charge, or announce spending publicly.
+- PR #82 and its CI do not establish live Discord/Turso/GCP billing acceptance. Verify after merge/deploy; do not switch Asumi AI models under the cover of monitoring work.
+
+
 This repository is expected to be used across multiple AI/agent sessions. Read this file before making non-trivial changes.
 
 ## Asumi 3.14.7 — Bounded 15-minute live chat context (2026-10-17)
