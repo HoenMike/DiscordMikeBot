@@ -102,6 +102,21 @@ class TestUsageStore(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(RuntimeError, "requires Turso"):
                 await store._init()
 
+    async def test_discord_report_rejects_non_owner_without_db_read(self):
+        from features.ai_cost.cog import AICostCog
+        fake_bot = SimpleNamespace(is_owner=AsyncMock(return_value=False))
+        cog = AICostCog(fake_bot)
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=10),
+            response=SimpleNamespace(defer=AsyncMock()),
+            followup=SimpleNamespace(send=AsyncMock()),
+        )
+        with patch("features.ai_cost.cog.store.aggregate", new_callable=AsyncMock) as fetch:
+            await AICostCog.ai_cost.callback(cog, interaction)
+        fetch.assert_not_called()
+        fake_bot.is_owner.assert_awaited_once()
+        self.assertTrue(interaction.followup.send.await_args.kwargs["ephemeral"])
+
     async def test_core_ai_records_success_without_interrupting_request(self):
         from core.ai import bounded_ai_generate
         result = SimpleNamespace(text="reply", model_version="gemini-3.8-flash",
