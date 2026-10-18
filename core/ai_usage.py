@@ -1,6 +1,7 @@
 """Persistent Gemini text-API usage metrics; not Google Cloud billing."""
 from __future__ import annotations
 import asyncio
+import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import re
@@ -101,7 +102,7 @@ class UsageStore:
         await db_client.connect()
         import config
         # Prevent split-brain billing ledger if Render loses Turso.
-        if config.TURSO_AUTH_TOKEN and not db_client.is_cloud:
+        if (config.TURSO_AUTH_TOKEN or os.getenv("RENDER")) and not db_client.is_cloud:
             raise RuntimeError("AI usage store requires Turso in production")
         loop = asyncio.get_running_loop()
         if loop not in self._ready_loops:
