@@ -14,6 +14,14 @@ The application owner runs the private slash command **/ai_cost** from any chann
 
 Nothing is automatically fetched from or written to Google Billing. The balances supplied at query time are NOT stored as account credentials or authoritative balances. No data is backfilled: the ledger begins recording at deployment.
 
+## Web Dashboard (existing historical admin)
+
+After merge/deploy, sign in at /admin and select **AI Usage**, or bookmark /admin?tab=ai-usage. The tab lazy-fetches GET /api/admin/ai-usage?days=7|30 and displays today's UTC request/cost subtotal, 7/30-day token and error counts, model/provider/feature breakdown, and a Chart.js daily price trend. Unlike a new dashboard app, this is part of the old classic tab bar and leaves Feedback/Tarot in place.
+
+The right-side calculator lets the owner manually enter *remaining* prepaid VND, *eligible and unexpired* GCP credit VND (if verified in Google Cloud Billing), and an assumed FX rate. It derives theoretical days/months from the observed 30-day spend rate. No balance is retrieved from Google; figures are not written to Turso or used as a billing cap. An early sample under 3 days or missing prices means projections are tentative/incomplete.
+
+The page never runs an LLM call. Unauthorized API access gives 401, invalid windows 400, and Turso errors 503; no unavailable DB is interpreted as 0đ. Mobile viewing and live production reconciliation are outstanding release gates.
+
 ## What is stored
 
 Instrumented: every call that passes through the common async **core.ai.bounded_ai_generate** Gemini SDK wrapper, including failed attempts and fallbacks. Current Gemini coverage: assistant conversation, Tarot, Cabin, Summary/QA (future Dungeon DM if it uses this wrapper). **Cloudflare Clef** attempts are also recorded by model, routing task, latency and success/failure, but no token or cost is invented for Clef.
