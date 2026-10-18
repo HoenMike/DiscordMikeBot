@@ -380,6 +380,29 @@ def api_stats():
 
 
 # ==========================================
+# T31 — READ-ONLY AI USAGE DASHBOARD (historical /admin)
+# ==========================================
+@app.route('/api/admin/ai-usage', methods=['GET'])
+@login_required
+def api_admin_ai_usage():
+    """No LLM call, no raw content, no public access, no billing mutations."""
+    days_text = request.args.get('days', '7')
+    if days_text not in ('7', '30'):
+        return jsonify({"error": "days phải là 7 hoặc 30"}), 400
+    try:
+        from core.ai_usage import store
+        # Flask runs on a separate thread/event loop from Discord; core.db
+        # deliberately maintains per-loop connections.
+        report = asyncio.run(asyncio.wait_for(store.dashboard(int(days_text)), timeout=10))
+    except Exception as exc:
+        print(f"[AI Usage Dashboard] unavailable: {type(exc).__name__}", flush=True)
+        return jsonify({"error": "Không đọc được số liệu AI từ Turso lúc này."}), 503
+    response = jsonify(report)
+    response.headers['Cache-Control'] = 'no-store, private'
+    return response
+
+
+# ==========================================
 # 4. ACTIVITY TRACE APIS
 # ==========================================
 @app.route('/api/activities')
