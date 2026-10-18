@@ -61,6 +61,15 @@ class TestUsageCalculation(unittest.TestCase):
         self.assertEqual(event[3], "chat")
         self.assertGreater(event[11], 0)
 
+    def test_cloudflare_clef_has_model_and_request_count_but_no_fabricated_cost(self):
+        row = usage_event(model="@cf/cloudflare/clef-flash", provider="cloudflare-workers",
+                          label="clef-router", outcome="ok")
+        self.assertEqual(row[2], "cloudflare-workers")
+        self.assertEqual(row[3], "routing")
+        self.assertEqual(row[5], "@cf/cloudflare/clef-flash")
+        self.assertIsNone(row[11])
+        self.assertEqual(row[12], "PROVIDER_UNPRICED")
+
     def test_failed_request_unknown_billing_and_zero_private_data(self):
         event = usage_event(model="gemini-3.8-flash", label="Tarot", outcome="failed",
                             error_type="TimeoutError")
