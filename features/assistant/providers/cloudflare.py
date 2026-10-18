@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -133,10 +134,30 @@ class CloudflareDecisionRouter:
             "Content-Type": "application/json",
         }
 
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(url, headers=headers, json=payload) as response:
-                response.raise_for_status()
-                body = await response.json()
+        started = time.perf_counter()
+        outcome, error_type = "failed", None
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, headers=headers, json=payload) as response:
+                    response.raise_for_status()
+                    body = await response.json()
+            outcome = "ok"
+        except Exception as exc:
+            error_type = type(exc).__name__
+            raise
+        finally:
+            # Count actual Clef requests, NOT fake Gemini-token costs.
+            # No routing text/payload or credential is saved.
+            try:
+                from core.ai_usage import usage_event, queue
+                queue(usage_event(
+                    model=self.model, provider="cloudflare-workers",
+                    label="clef-router", outcome=outcome,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    error_type=error_type,
+                ))
+            except Exception:
+                pass
 
         result = body.get("result", body) if isinstance(body, dict) else {}
         answers = result.get("answers", {}) if isinstance(result, dict) else {}
