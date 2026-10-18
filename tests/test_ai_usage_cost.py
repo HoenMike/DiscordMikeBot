@@ -80,6 +80,15 @@ class TestUsageCalculation(unittest.TestCase):
         self.assertIn("chưa định giá 1", report)
         self.assertIn("thinking", report.lower())
 
+    def test_only_failed_or_unpriced_calls_never_show_zero_forecast(self):
+        rows = [("chat", "gemma-4-31b-it", 2, 1, 1, 1, 100, 20, 0, 0, 0)]
+        report = render_report(rows, days=7, prepay_vnd=150000)
+        self.assertIn("CHƯA XÁC ĐỊNH", report)
+        self.assertIn("Chưa đủ dữ liệu", report)
+        self.assertIn("chưa định giá", report)
+        self.assertNotIn("0đ / 30 ngày", report)
+        self.assertNotIn("tháng**", report)
+
     def test_no_history_report_does_not_fabricate_costs(self):
         self.assertIn("Chưa có dữ liệu", render_report([], days=7))
 
