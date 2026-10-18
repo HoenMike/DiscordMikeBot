@@ -1,4 +1,5 @@
 import asyncio
+import time
 from google import genai
 import config
 
@@ -24,22 +25,48 @@ def get_aio_client() -> genai.client.AsyncClient:
 AI_CALL_SEMAPHORE = None
 
 
+def _track_ai_call(model, label, outcome, elapsed_ms, response=None, error_type=None):
+    """Telemetry must not change a successful AI request or expose content."""
+    try:
+        from core.ai_usage import usage_event, queue
+        queue(usage_event(model=model, label=label, outcome=outcome,
+                          response=response, latency_ms=elapsed_ms,
+                          error_type=error_type))
+    except Exception as exc:
+        print("[AI Cost] tracking unavailable: " + type(exc).__name__, flush=True)
+
+
 async def bounded_ai_generate(model: str, contents, config, timeout_sec: float, label: str = "AI"):
-    """Gọi AI bất đồng bộ với timeout hủy được request nền và semaphore giới hạn đồng thời toàn cục."""
+    """Bounded Gemini generation with non-blocking per-attempt usage telemetry."""
     global AI_CALL_SEMAPHORE
     if AI_CALL_SEMAPHORE is None:
         AI_CALL_SEMAPHORE = asyncio.Semaphore(6)
-    client = get_aio_client()
-    async with AI_CALL_SEMAPHORE:
-        return await asyncio.wait_for(
-            client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            ),
-            timeout=timeout_sec,
-        )
-
+    started = time.perf_counter()
+    try:
+        client = get_aio_client()
+        async with AI_CALL_SEMAPHORE:
+            result = await asyncio.wait_for(
+                client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                ),
+                timeout=timeout_sec,
+            )
+    except asyncio.CancelledError:
+        _track_ai_call(model, label, "cancelled",
+                       int((time.perf_counter() - started) * 1000),
+                       error_type="CancelledError")
+        raise
+    except Exception as exc:
+        _track_ai_call(model, label, "failed",
+                       int((time.perf_counter() - started) * 1000),
+                       error_type=type(exc).__name__)
+        raise
+    _track_ai_call(model, label, "ok",
+                   int((time.perf_counter() - started) * 1000),
+                   response=result)
+    return result
 
 def split_text(text: str, limit: int | None = None) -> list[str]:
     """
