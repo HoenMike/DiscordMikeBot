@@ -1,6 +1,6 @@
 # Asumi T31 — AI Usage & Cost Dashboard Roadmap
 
-**Status:** Design + implementation in Draft PR #82. Not deployed or live accepted.
+**Status:** T31.0–T31.2 CODE_READY on Draft PR #82 (AI Cost/dashboard tests passing on 2026-10-18); not merged, not deployed and NOT live accepted.
 
 **Owner decision (2026-10-18):** Track models, tokens, estimated AI costs and long-term running expenses in the **historical, classic /admin dashboard**. No new sidebar, separate dashboard shell or replacement of Feedback/Tarot/admin tabs.
 
@@ -27,7 +27,7 @@ The dashboard is *read only* and never invokes Gemini to make a report. Only bil
 | --- | --- | --- |
 | T31.0 | Gemini usage metadata ledger, pricing snapshots and owner Discord /ai_cost | CODE_READY, live pending |
 | T31.1 | Cloudflare Clef unpriced request counters | CODE_READY, live pending |
-| T31.2 | **Historical dashboard AI Usage tab, read-only API, chart, breakdown, runway and tests** | IN PROGRESS |
+| T31.2 | **Historical dashboard AI Usage tab, read-only API, chart, breakdown, runway and tests** | CODE_READY / AI CI PASSED; live pending |
 | T31.3 | Cloud Billing reconciliation for real charges/credit eligibility; explicit authorized read-only access if desired | PLANNED |
 | T31.4 | Optional private owner alerts, retention and spend ceilings, never auto top-up | PLANNED |
 | T31.5 | Cost/quality-aware model router after 1–2 weeks of evidence | PLANNED |
@@ -46,3 +46,15 @@ The dashboard is *read only* and never invokes Gemini to make a report. Only bil
 ## Next-session handoff
 
 Read AGENTS.md and docs/ASUMI_HISTORICAL_DASHBOARD_DECISION.md. Implement changes within existing historic dashboard only. Validate production Turso writes are durable, owner/admin auth is preserved, and use code-owned limits in core/constants.py. No automatic merge, deployment or credit-eligibility claims without evidence.
+
+## Implementation checkpoint — 2026-10-18
+
+Files: core/ai.py, core/ai_usage.py, features/assistant/providers/cloudflare.py, features/ai_cost/cog.py, web/app.py, web/templates/dashboard.html, tests/test_ai_usage_cost.py, tests/test_ai_usage_dashboard.py and .github/workflows/asumi-ai-cost.yml.
+
+- The classic dashboard has a lazy AI Usage tab and can be visited at /admin?tab=ai-usage. Existing Feedback and all classic tabs remain intact.
+- Authenticated GET /api/admin/ai-usage?days=7|30 reads bounded aggregate Turso data only (no message text, no external model call). Unauthorized 401, malformed window 400, storage unavailable 503.
+- The panel shows today (UTC), 7/30-day model/feature/token usage, known estimated USD/VND costs, daily Chart.js trend and a manually entered Prepay/verified-credit forecast.
+- Requests without prices are explicitly marked unknown, not treated as free; periods with insufficient coverage are labeled preliminary.
+- CI: AI Cost unit/API tests and Node dashboard syntax pass on branch revisions. Validate latest Checks before merge; Search/Embed/Codex regressions run on pull-request workflow.
+- Unverified: live Render/Turso writes, Discord /ai_cost command after deploy, official Google API usage/billing reconciliation, mobile browser visual QA and real promotional credit eligibility.
+- Avoid a version bump before release; after verified deployment update version/changelog and this checkpoint.
