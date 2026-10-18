@@ -16,13 +16,13 @@ Nothing is automatically fetched from or written to Google Billing. The balances
 
 ## What is stored
 
-Instrumented: every call that passes through the common async **core.ai.bounded_ai_generate** Gemini SDK wrapper, including failed attempts and fallbacks. Current coverage: assistant conversation, Tarot, Cabin, Summary/QA (future Dungeon DM if it uses this wrapper).
+Instrumented: every call that passes through the common async **core.ai.bounded_ai_generate** Gemini SDK wrapper, including failed attempts and fallbacks. Current Gemini coverage: assistant conversation, Tarot, Cabin, Summary/QA (future Dungeon DM if it uses this wrapper). **Cloudflare Clef** attempts are also recorded by model, routing task, latency and success/failure, but no token or cost is invented for Clef.
 
 Turso record: UTC timestamp, provider, task bucket, requested model, model returned by the provider when available, success/failure, token counts from usage_metadata, micro-USD estimated cost, error class and latency.
 
 No prompts, answers, full message text, Discord user IDs, channel IDs, model raw payload or tokens/credentials are stored. Request timeouts without reliable provider token metadata have **UNKNOWN billing**, not $0. New/unpriced model IDs remain **UNPRICED**, not $0.
 
-**Not included in projected totals:** Cloudflare Clef/Workers AI, Brave, Render, non-Gemini SDK calls, audio/images, taxes, Google Search grounding, cache storage and requests missing usage metadata. Google Cloud Billing is authoritative. The projection may be a lower bound.
+**Not included in priced projected totals:** Cloudflare Clef/Workers AI (request counts tracked but not provider-specific Neurons), Brave, Render, non-Gemini SDK calls, audio/images, taxes, Google Search grounding, cache storage and requests missing usage metadata. Google Cloud Billing is authoritative. The projection may be a lower bound.
 
 ## Price model (October 2026)
 
