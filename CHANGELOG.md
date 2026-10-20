@@ -1,3 +1,11 @@
+## 3.15.0 — Consistent Tarot Stories (2026-10-20)
+
+- **Repeat-question consistency:** for the same user, spread and normalized question on the same VN calendar date, the seed and full card orientations remain stable even when Card Fatigue history changes. Custom spreads also respect stable seeded draws. Different users, questions, dates and explicit new draws may yield different cards.
+- **Intentional redraw:** `/tarot new_draw:true` or the launcher choice *Xem như câu hỏi mới* re-shuffles independently (Daily still one per VN day).
+- **Repeat AI snapshot:** completed new-style readings with matching cards, question, context and channel are reused from existing Tarot history instead of paying for a fresh Gemini call. Previous fallback dictionaries, legacy text, different channels and deliberate re-draws are not cached.
+- **Answer-first Tarot:** concise answer, one meaningful card connection, one practical action and one unobtrusive limitation. For multi-card readings show interpretation before the board; hide elemental flavor blocks on 1–3-card draws while keeping the card image.
+- Prompt avoids literal date predictions, speculative psychoanalysis or forced blame from casual questions. Regression suites cover deterministic draw, cache bypass, new renderer and old compatibility.
+
 ## 3.14.9 — Clef Adaptive Gemini & Discord Mentions (2026-10-20)
 
 - Fix raw `@Display Name` in Asumi chat: convert only verified, explicitly mentioned Discord people to real `<@id>`, permit only that user ID in AllowedMentions, deny role/everyone pings, preserve unknown names as plain text.
