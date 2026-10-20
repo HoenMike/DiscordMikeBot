@@ -90,7 +90,7 @@ class CloudflareDecisionRouter:
         if not isinstance(answer, dict):
             return "balanced"
         tier = answer.get("choice") or answer.get("value") or answer.get("label")
-        if tier not in {"fast", "balanced", "deep"}:
+        if not isinstance(tier, str) or tier not in {"fast", "balanced", "deep"}:
             return "balanced"
         confidence = answer.get("confidence")
         if confidence is None and isinstance(answer.get("probabilities"), dict):
