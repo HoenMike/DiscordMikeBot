@@ -1,4 +1,5 @@
 import asyncio
+import time
 from google import genai
 import config
 
@@ -23,22 +24,69 @@ def get_aio_client() -> genai.client.AsyncClient:
 
 AI_CALL_SEMAPHORE = None
 
+# Shared per-process backoff for project-wide Gemini 429s. Preserve model
+# fallback after one failure; pause only after two distinct models fail.
+_quota_failures: dict[str, float] = {}
+_quota_paused_until = 0.0
+
+
+class GeminiQuotaCircuitOpen(RuntimeError):
+    """No API request made: several models just hit the same quota cap."""
+
+
+def _note_gemini_429(model: str) -> None:
+    global _quota_paused_until
+    from core import constants as policy
+    now = time.monotonic()
+    window = max(1, policy.ASUMI_GEMINI_QUOTA_FAILURE_WINDOW_SECONDS)
+    for key, timestamp in list(_quota_failures.items()):
+        if now - timestamp > window:
+            _quota_failures.pop(key, None)
+    _quota_failures[model] = now
+    if len(_quota_failures) >= 2:
+        _quota_paused_until = max(
+            _quota_paused_until,
+            now + max(10, policy.ASUMI_GEMINI_QUOTA_PAUSE_SECONDS),
+        )
+        print("⚠️ [Gemini Quota] Multiple models returned 429; "
+              "temporarily pausing Gemini calls.", flush=True)
+
+
+def _gemini_quota_remaining_seconds() -> float:
+    return max(0.0, _quota_paused_until - time.monotonic())
+
 
 async def bounded_ai_generate(model: str, contents, config, timeout_sec: float, label: str = "AI"):
     """Gọi AI bất đồng bộ với timeout hủy được request nền và semaphore giới hạn đồng thời toàn cục."""
     global AI_CALL_SEMAPHORE
     if AI_CALL_SEMAPHORE is None:
         AI_CALL_SEMAPHORE = asyncio.Semaphore(6)
+    remaining = _gemini_quota_remaining_seconds()
+    if remaining:
+        raise GeminiQuotaCircuitOpen(
+            f"Gemini quota protection: retry after {remaining:.0f}s (429)."
+        )
     client = get_aio_client()
     async with AI_CALL_SEMAPHORE:
-        return await asyncio.wait_for(
-            client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=config,
-            ),
-            timeout=timeout_sec,
-        )
+        remaining = _gemini_quota_remaining_seconds()
+        if remaining:
+            raise GeminiQuotaCircuitOpen(
+                f"Gemini quota protection: retry after {remaining:.0f}s (429)."
+            )
+        try:
+            return await asyncio.wait_for(
+                client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                ),
+                timeout=timeout_sec,
+            )
+        except Exception as exc:
+            reason = str(exc).lower()
+            if "429" in reason or "resource_exhausted" in reason:
+                _note_gemini_429(model)
+            raise
 
 
 def split_text(text: str, limit: int | None = None) -> list[str]:
