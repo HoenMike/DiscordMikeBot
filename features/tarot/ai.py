@@ -418,14 +418,16 @@ def _clean_and_format_tarot_markdown(text: str) -> str:
     # 2. Xóa các dòng rác chỉ chứa dấu sao hoặc dấu cách
     t = re.sub(r"^\s*\*+\s*$", "", t, flags=re.MULTILINE)
 
-    icons = "🎯🃏💡🔮⚡📖🎭💖✨🏆⚖️⭐⚠️📌🌫️"
+    # Match complete emoji tokens: character classes split variation selectors.
+    icons = ("🎯", "🃏", "💡", "🔮", "⚡", "📖", "🎭", "💖", "✨", "🏆", "⚖️", "⭐", "⚠️", "📌", "🌫️")
+    icon_pattern = "(?:" + "|".join(re.escape(icon) for icon in icons) + ")"
 
     # 3a. Chèn 2 dòng trống trước các icon chính nếu chúng bị dính liền vào câu trước
-    t = re.sub(rf"(?<!\A)(?<!\n)\s*([{icons}])", r"\n\n\1", t)
+    t = re.sub(rf"(?<!\A)(?<!\n)\s*({icon_pattern})", r"\n\n\1", t)
 
     # 3b. Chuẩn hóa dòng tiêu đề chứa icon: tách tiêu đề và nội dung cùng dòng nếu có
     def _fix_header_line(line: str) -> str:
-        m = re.match(rf"^\s*([{icons}])\s*(.*)$", line)
+        m = re.match(rf"^\s*({icon_pattern})\s*(.*)$", line)
         if not m:
             return line
         icon = m.group(1)
