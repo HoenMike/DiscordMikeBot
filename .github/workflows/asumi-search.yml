@@ -9,6 +9,8 @@ on:
       - "tests/test_tarot_native_layout.py"
       - "tests/test_tarot_v2_session.py"
       - "tests/test_tarot_gemini_tier1.py"
+      - "tests/test_tarot_stable_question.py"
+      - "features/tarot/reading/reuse.py"
       - "tests/test_assistant_mentions_and_quota.py"
       - "core/ai.py"
       - "features/assistant/response.py"
@@ -63,6 +65,8 @@ on:
       - "tests/test_tarot_native_layout.py"
       - "tests/test_tarot_v2_session.py"
       - "tests/test_tarot_gemini_tier1.py"
+      - "tests/test_tarot_stable_question.py"
+      - "features/tarot/reading/reuse.py"
       - "tests/test_assistant_mentions_and_quota.py"
       - "core/ai.py"
       - "features/assistant/response.py"
@@ -119,6 +123,7 @@ jobs:
           python -m unittest discover -s tests -p "test_tarot_v2_session.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_reading.py" -v
           python -m unittest discover -s tests -p "test_tarot_gemini_tier1.py" -v
+          python -m unittest discover -s tests -p "test_tarot_stable_question.py" -v
           python -m unittest discover -s tests -p "test_assistant_mentions_and_quota.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_launcher.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_renderer.py" -v
