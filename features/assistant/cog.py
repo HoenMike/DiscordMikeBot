@@ -274,6 +274,7 @@ class AssistantCog(commands.Cog):
                     query or default_query,
                     previous_session,
                     context=context,
+                    model_tier=decision.model_tier,
                 )
             ai_ms = (time.perf_counter() - ai_started) * 1000
         except Exception as exc:
@@ -385,6 +386,7 @@ class AssistantCog(commands.Cog):
                 "send_ms": round(send_ms, 1),
                 "total_ms": round(total_ms, 1),
                 "model": reply.model,
+                "model_tier": decision.model_tier,
                 "attempts": reply.attempts,
                 "query_chars": len(query),
                 "response_chars": len(reply.text),
