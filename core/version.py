@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.9"
+CURRENT_VERSION = "3.15.0"
 RELEASE_DATE = "2026-10-20"
-CODENAME = "Asumi 3.14.9 - Clef Adaptive Models & Mentions"
+CODENAME = "Asumi 3.15.0 - Consistent Tarot Stories"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.15.0", "date": "2026-10-20", "type": "feature",
+        "title": "Consistent Tarot Stories",
+        "summary": "Cùng câu hỏi có một bộ lá ổn định trong ngày, luận giải gọn và trực tiếp hơn.",
+        "changes": [
+            {"category": "Tarot Draw", "items": [
+                "Seed theo ngày VN + người dùng + spread + câu hỏi; card-fatigue không còn làm đổi bài khi seed đã xác định.",
+                "Cho phép chủ động xào lại với /tarot new_draw:true hoặc xem như câu hỏi mới trong launcher; Daily vẫn theo cooldown cũ.",
+                "Cùng câu hỏi/bài/ngữ cảnh trong cùng kênh và ngày có thể dùng lại kết quả AI thành công; không tái sử dụng fallback 429.",
+            ]},
+            {"category": "Tarot Reading UX", "items": [
+                "Trình bày theo Trả lời ngắn → Vì sao → Một điều nên thử → Điều chưa chắc; không lặp ba phần nghĩa từ điển.",
+                "Ba lá trở lên: câu trả lời lên trước hình trải bài; ẩn flavor text rườm rà trong quẻ ngắn.",
+                "Cải thiện prompt: không gán tính cách, không bịa thời điểm có người yêu, không suy diễn câu nói đùa thành vấn đề tâm lý.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.9", "date": "2026-10-20", "type": "feature",
         "title": "Clef Adaptive Gemini + Real Discord Mentions",

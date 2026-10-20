@@ -861,7 +861,7 @@ def compute_tarot_seed(
     question: Optional[str] = None,
 ) -> Optional[int]:
     """
-    Tạo seed năng lượng vũ trụ theo từng khung giờ (1 tiếng/khung) cho mỗi người dùng & câu hỏi.
+    Tạo seed ổn định theo ngày Việt Nam cho người dùng, kiểu trải và câu hỏi.
     - user_id: ID người dùng Discord
     - spread_key: Kiểu trải bài
     - question: Câu hỏi đã chuẩn hóa
@@ -873,11 +873,9 @@ def compute_tarot_seed(
     vn_tz = timezone(timedelta(hours=7))
     now = datetime.now(vn_tz)
 
-    if spread_key == "daily":
-        time_slot = now.strftime("%Y-%m-%d")
-    else:
-        # Mỗi tiếng 1 khung (Ví dụ: 2026-08-25_H09)
-        time_slot = now.strftime("%Y-%m-%d_H%H")
+    # A repeated question should not change its cards within the same VN day.
+    # New dates or an explicit independent seed still create a new draw.
+    time_slot = now.strftime("%Y-%m-%d")
 
     norm_q = ""
     if question:
@@ -898,8 +896,9 @@ def draw_spread(
     fatigue_card_ids: Optional[List[str]] = None
 ) -> List[DrawnCard]:
     """
-    Rút N lá không trùng lặp từ bộ 78 lá bài với seed năng lượng vũ trụ theo từng khung giờ (1 giờ/khung).
-    Hỗ trợ Card Fatigue Tracking (giảm 70% xác suất bốc trùng các lá gần nhất).
+    Rút N lá không trùng lặp từ 78 lá. Cùng user/spread/question trong
+    cùng ngày VN có cùng lá và chiều, bất kể lịch sử bốc gần đây.
+    Card Fatigue chỉ dành cho các lượt ngẫu nhiên hoàn toàn (không seed).
     """
     if spread_key not in SPREAD_DEFINITIONS:
         raise ValueError(f"Kiểu trải bài không hợp lệ: {spread_key}")
@@ -915,8 +914,10 @@ def draw_spread(
 
     all_cards = list(TAROT_DECK.values())
 
-    # Thuật toán Card Fatigue: Nếu có danh sách lá bốc gần đây, giảm nhẹ trọng số
-    if fatigue_card_ids and len(all_cards) >= count:
+    # Seeded readings must depend ONLY on seed. Applying mutable card-fatigue
+    # history would reshuffle the same question whenever a different draw finishes.
+    # Fatigue remains for purely random (unseeded) legacy draws.
+    if seed is None and fatigue_card_ids and len(all_cards) >= count:
         fatigue_set = set(fatigue_card_ids)
         pool = list(all_cards)
         weights = [0.3 if c.id in fatigue_set else 1.0 for c in pool]
@@ -979,7 +980,7 @@ def draw_custom_spread(
     pool = list(TAROT_DECK.values())
     chosen_cards = []
 
-    if fatigue_card_ids:
+    if seed is None and fatigue_card_ids:
         fatigue_set = set(fatigue_card_ids)
         weights = [0.3 if card.id in fatigue_set else 1.0 for card in pool]
         for _ in normalized_positions:

@@ -320,7 +320,7 @@ def _build_tarot_prompt(
         "daily": "Đọc như một điểm chú ý trong ngày: ngắn, có nét riêng, không tiên tri sự kiện.",
         "single": "Tập trung một trục chính và một bước thực tế; tránh kéo dài bằng định nghĩa sách giáo khoa.",
         "yes_no": "Đưa xu hướng biểu tượng lên sớm, rồi giải thích vì sao và điều gì có thể làm kết quả đổi hướng.",
-        "ppf": "Đọc chuyển động Quá khứ → Hiện tại → Tương lai như một tiến trình, không phải ba đoạn độc lập.",
+        "ppf": "Nói ngay xu hướng của câu hỏi, rồi đọc Quá khứ → Hiện tại → Tương lai như một chuyển động biểu tượng, KHÔNG áp đặt mốc thời gian hoặc coi lá Tương lai là sự kiện chắc chắn.",
         "choices": "So sánh hai hướng theo trade-off và điểm mù; không chọn hộ người dùng nếu dữ kiện chưa đủ.",
         "mbs": "Tìm chỗ đồng thuận hoặc lệch pha giữa Tâm trí - Cơ thể - Tinh thần.",
         "horseshoe": "Nối hiện trạng, trở ngại, yếu tố ẩn và lời khuyên thành một bức tranh thống nhất.",
@@ -369,6 +369,8 @@ ANTI-ROBOT
 - Không cấu trúc bài theo kiểu "Lá A cho thấy... Lá B cho thấy... Lá C cho thấy..." trừ khi cần một insight ngắn.
 - Tránh lặp các câu "Điều này có nghĩa rằng", "Vũ trụ muốn nhắn nhủ", "Hãy tin tưởng vào hành trình".
 - Không dùng lời chữa lành chung chung thay cho phân tích.
+- Không bắt người hỏi chịu trách nhiệm hay đoán tính cách/tổn thương chỉ vì một
+  câu hỏi vui; phân biệt giả thuyết từ biểu tượng với dữ kiện thực tế.
 - Không bịa suy nghĩ/bí mật của người khác.
 - Không bịa lá, card id, position hay ký ức không có trong input.
 
@@ -388,11 +390,16 @@ Trả JSON hợp lệ theo schema được yêu cầu:
 - refusal_message
 
 YÊU CẦU CHẤT LƯỢNG
-- core_message: 2-3 câu, trực tiếp vào pattern chính.
-- connections: ưu tiên 1-3 mối liên hệ thực sự có ích; không bắt buộc đủ nếu spread 1 lá.
-- card_insights: ngắn, gắn đúng card_id/position; không biến thành bài đọc từng lá.
-- practical_takeaway: 1-3 ý có thể làm/kiểm chứng, không ra lệnh định mệnh.
-- uncertainty: luôn nói rõ phần còn chưa chắc hoặc phụ thuộc thực tế.
+- core_message: 1-2 câu như đang trò chuyện, PHẢI trả lời đúng câu hỏi trước khi giải thích lá.
+  Nếu người dùng hỏi "khi nào", đừng bịa mốc ngày/tháng; trả lời là chưa thể chốt thời điểm,
+  rồi gợi ý một dấu hiệu/bước thực tế. Không biến câu đùa tình cảm thành kết luận
+  người hỏi thiếu thốn, ganh đua, ghen tị, tự ti hay có vấn đề tâm lý.
+- connections: 1 mối liên hệ nổi bật, gắn tên/vị trí/chiều của 2-3 lá để giải thích
+  kết luận; KHÔNG dựng ba đoạn định nghĩa cho ba lá hay lặp lại core_message.
+- card_insights: ngắn, đúng card_id/position, để dành cho chức năng Xem kỹ.
+- practical_takeaway: một việc nhỏ, cụ thể, người hỏi tự chủ động được.
+- uncertainty: một câu ngắn, không lặp câu trả lời chính; Tarot không xác định
+  chắc thời điểm, bí mật hoặc hành vi tương lai của người khác.
 - key_card phải là một lá thật trong input và có lý do; không tự động chọn Major/Outcome nếu không có căn cứ.
 - suggested_clarifier_targets: 0-2 vị trí đã tồn tại; chỉ đề xuất, KHÔNG rút thêm lá.
 - Nếu có khủng hoảng/nguy hiểm trực tiếp hoặc request vượt ranh giới: is_valid=false; refusal_message ngắn, tử tế, hướng về hỗ trợ thực tế/phần người hỏi có thể tự quyết định; các trường diễn giải khác có thể để ngắn/rỗng.
@@ -575,7 +582,11 @@ def _coerce_v2_schema(data: Dict[str, Any]) -> TarotAIResponseSchema:
 
 
 def _render_v2_reading(result: TarotReadingResult) -> str:
-    """Render structured meaning into current Discord Markdown without losing future reusability."""
+    """Human-first reading: answer the question, justify the pattern, offer one next move.
+
+    Preserve all structured card insights/key-card metadata for follow-ups,
+    recap and history, without making the first reading feel like a checklist.
+    """
     if not result.is_valid:
         return _clean_and_format_tarot_markdown(
             result.full_reading or result.core_message or
@@ -583,41 +594,37 @@ def _render_v2_reading(result: TarotReadingResult) -> str:
         )
 
     parts: List[str] = []
+    answer = (result.core_message or result.headline).strip()
+    if answer:
+        parts.append(f"💬 **TRẢ LỜI NGẮN:**\n{answer}")
 
-    if result.core_message:
-        parts.append(f"✨ **CỐT LÕI CỦA QUẺ:**\n{result.core_message}")
-
-    story_lines: List[str] = []
-    if result.dominant_theme:
-        story_lines.append(result.dominant_theme)
-
-    for connection in result.connections[:3]:
-        meaning = connection.meaning.strip()
-        if meaning:
-            story_lines.append(f"• {meaning}")
-
-    if not result.connections:
-        for insight in result.card_insights[:4]:
-            if insight.insight.strip():
-                label = insight.card_name.strip() or insight.position_id.strip()
-                prefix = f"**{label}:** " if label else ""
-                story_lines.append(f"• {prefix}{insight.insight.strip()}")
-
-    if story_lines:
-        parts.append("🃏 **CÂU CHUYỆN GIỮA CÁC LÁ:**\n" + "\n".join(story_lines))
-
-    if result.practical_takeaway:
-        parts.append(
-            "📌 **ĐIỀU ĐÁNG LÀM LÚC NÀY:**\n"
-            + "\n".join(f"• {item}" for item in result.practical_takeaway[:3])
+    # The model may give overlapping dominant_theme and connections. Prefer one
+    # concrete link, not 3 near-identical interpretations or a card encyclopedia.
+    reason = next(
+        (connection.meaning.strip() for connection in result.connections
+         if connection.meaning.strip()), ""
+    )
+    if not reason:
+        reason = result.dominant_theme.strip()
+    if not reason and result.card_insights:
+        reason = next(
+            (insight.insight.strip() for insight in result.card_insights
+             if insight.insight.strip()), ""
         )
+    if not reason and result.key_card and result.key_card.reason.strip():
+        reason = result.key_card.reason.strip()
+    if reason:
+        parts.append(f"🔍 **VÌ SAO QUẺ NGHIÊNG VỀ HƯỚNG NÀY?**\n{reason}")
 
-    if result.uncertainty:
-        parts.append(f"🌫️ **ĐIỀU QUẺ CHƯA THỂ NÓI CHẮC:**\n{result.uncertainty}")
+    action = next((str(item).strip() for item in result.practical_takeaway
+                   if str(item).strip()), "")
+    if action:
+        parts.append(f"📌 **MỘT ĐIỀU BẠN CÓ THỂ THỬ:**\n{action}")
 
-    if result.key_card and result.key_card.reason.strip():
-        card_name = result.key_card.card_name.strip() or result.key_card.card_id.strip() or "Lá chủ đạo"
-        parts.append(f"🔮 **LÁ CHỦ ĐẠO — {card_name}:**\n{result.key_card.reason.strip()}")
+    uncertainty = result.uncertainty.strip()
+    if uncertainty:
+        # The caveat matters, but should not overwhelm the actual answer.
+        parts.append(f"*🌫️ {uncertainty}*")
 
     return _clean_and_format_tarot_markdown("\n\n".join(parts))
 

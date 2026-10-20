@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 from datetime import datetime, timezone, timedelta
 import traceback
 from typing import Optional, Union
@@ -16,6 +17,7 @@ from features.tarot.deck import (
 from features.tarot.renderer import render_journey_card_to_bytes, render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading, generate_tarot_reading_result, recommend_spread_for_question
 from features.tarot.manager import TarotManager
+from features.tarot.reading.reuse import reuse_or_generate
 from features.tarot.reading.journey import summarize_journey
 from features.tarot.tarot_view import (
     TarotFlipView,
@@ -233,6 +235,7 @@ class TarotCog(commands.Cog):
         question: Optional[str] = None,
         context: Optional[str] = None,
         reader_key: str = "auto",
+        new_draw: bool = False,
         interaction: Optional[discord.Interaction] = None,
         ctx: Optional[commands.Context] = None
     ):
@@ -318,25 +321,43 @@ class TarotCog(commands.Cog):
                 spread_key=spread_key,
                 user_id=user.id,
                 question=clean_question if clean_question else None,
+                seed=secrets.randbits(64) if new_draw and spread_key != "daily" else None,
                 fatigue_card_ids=fatigue_card_ids
             )
 
             # 2. Zero-Latency Pre-fetch (kèm Trí nhớ bạn cũ & Nhận thức đối tượng @mention)
             bot_user = self.bot.user or (interaction.client.user if interaction and interaction.client else None)
             guild_obj = interaction.guild if interaction else (ctx.guild if ctx else None)
+            target_guild_id = (guild_obj.id if guild_obj else None)
+            target_channel_id = (
+                interaction.channel.id if interaction and interaction.channel
+                else ctx.channel.id if ctx and ctx.channel else None
+            )
             ai_task = self.tarot_manager.create_ai_task(
-                generate_tarot_reading_result(
-                    spread_key=spread_key,
-                    drawn_cards=drawn_cards,
-                    question=clean_question if clean_question else None,
-                    context=clean_context if clean_context else None,
-                    reader_style=reader_key,
-                    user_name=user.display_name,
-                    recent_context=recent_ctx,
+                reuse_or_generate(
+                    self.tarot_manager,
                     user_id=user.id,
-                    guild=guild_obj,
-                    bot_id=bot_user.id if bot_user else None,
-                    bot_name=runtime_bot_name(bot_user)
+                    guild_id=target_guild_id,
+                    channel_id=target_channel_id,
+                    spread_key=spread_key,
+                    question=clean_question or None,
+                    context=clean_context or None,
+                    drawn_cards=drawn_cards,
+                    reader_style=reader_key,
+                    fresh=new_draw,
+                    generate=lambda: generate_tarot_reading_result(
+                        spread_key=spread_key,
+                        drawn_cards=drawn_cards,
+                        question=clean_question or None,
+                        context=clean_context or None,
+                        reader_style=reader_key,
+                        user_name=user.display_name,
+                        recent_context=recent_ctx,
+                        user_id=user.id,
+                        guild=guild_obj,
+                        bot_id=bot_user.id if bot_user else None,
+                        bot_name=runtime_bot_name(bot_user),
+                    ),
                 )
             )
 
@@ -430,7 +451,8 @@ class TarotCog(commands.Cog):
         spread="Tuỳ chọn: chọn sẵn kiểu trải bài; bỏ trống để Asumi gợi ý từ câu hỏi",
         question="Điều bạn đang băn khoăn; Asumi có thể dùng nó để gợi ý kiểu trải bài",
         context="Bối cảnh/hoàn cảnh hiện tại (Ví dụ: đang có crush, sắp chuyển việc...) để bài giải chuẩn xác hơn",
-        reader="Phong cách của Asumi (Tự động, Tĩnh, Dịu hoặc Tinh quái)"
+        reader="Phong cách của Asumi (Tự động, Tĩnh, Dịu hoặc Tinh quái)",
+        new_draw="Xào một bộ bài mới dù đã hỏi cùng câu này hôm nay"
     )
     @app_commands.choices(spread=[
         app_commands.Choice(name="🌟 Daily Card (Năng lượng & thông điệp ngày - 1 lá)", value="daily"),
@@ -456,7 +478,8 @@ class TarotCog(commands.Cog):
         spread: app_commands.Choice[str] | None = None,
         question: str | None = None,
         context: str | None = None,
-        reader: app_commands.Choice[str] | None = None
+        reader: app_commands.Choice[str] | None = None,
+        new_draw: bool = False,
     ):
         reader_key = reader.value if reader else "auto"
         if not spread:
@@ -484,6 +507,7 @@ class TarotCog(commands.Cog):
             question=question,
             context=context,
             reader_key=reader_key,
+            new_draw=new_draw,
             interaction=interaction
         )
 

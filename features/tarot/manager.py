@@ -330,6 +330,55 @@ class TarotManager:
         ))
         await db.commit()
 
+    async def find_same_day_reading(
+        self,
+        user_id: int,
+        guild_id: Optional[int],
+        channel_id: Optional[int],
+        spread_type: str,
+        question: Optional[str],
+        drawn_cards: List[DrawnCard],
+    ) -> Optional[dict]:
+        """Reuse a completed non-fallback reading for the SAME channel and VN day.
+
+        Only the user-supplied question/context string and card identities matter;
+        no private reading from another server/channel is leaked. No DB migration.
+        """
+        if not question or spread_type == "daily":
+            return None
+        start_vn = datetime.now(VN_TZ).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        start_utc = start_vn.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        db = await self._get_db()
+        async with db.execute("""
+            SELECT cards_json, ai_reading, topic_tag, mood_tag
+              FROM tarot_history
+             WHERE user_id = ? AND guild_id IS ? AND channel_id IS ?
+               AND spread_type = ? AND question = ? AND created_at >= ?
+             ORDER BY id DESC LIMIT 8
+        """, (user_id, guild_id, channel_id, spread_type, question, start_utc)) as cursor:
+            rows = await cursor.fetchall()
+        signature = [(c.card.id, bool(c.is_reversed)) for c in drawn_cards]
+        for cards_json, reading, topic_tag, mood_tag in rows:
+            # Old formats, AI failures and fallback dictionary results must be
+            # reinterpreted so users can retry after provider recovery.
+            if not reading or "TRẢ LỜI NGẮN" not in reading or "BẢN ĐỌC DỰ PHÒNG" in reading:
+                continue
+            try:
+                previous = json.loads(cards_json)
+                actual = [(str(c["id"]), bool(c["is_reversed"])) for c in previous]
+            except (ValueError, KeyError, TypeError):
+                continue
+            if actual == signature:
+                return {
+                    "ai_reading": reading,
+                    "topic_tag": topic_tag or "general",
+                    "mood_tag": mood_tag or "",
+                }
+        return None
+
+
     async def get_user_history(self, user_id: int, limit: int = 5) -> List[dict]:
         """Lấy lịch sử các lượt bốc bài gần nhất của user."""
         db = await self._get_db()

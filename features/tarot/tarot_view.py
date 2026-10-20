@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 import time
 import io
 from typing import List, Optional, Set, Any
@@ -23,6 +24,7 @@ from features.tarot.reading.custom_spread import CustomSpreadSchema
 from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.reading.recap import build_recap_state
 from features.tarot.reading.schema import TarotReadingResult
+from features.tarot.reading.reuse import reuse_or_generate, history_question
 from features.tarot.rendering.state import ClarifierBoardState
 from features.tarot.reading.followup import TarotSessionState
 from features.tarot.reading.session import (
@@ -419,11 +421,11 @@ class TarotLauncherView(discord.ui.View):
                 f"*{old_question[:220]}*{suffix}",
                 (
                     "Mặc định Asumi sẽ xem đây là **tình hình hiện tại** và chỉ dùng quẻ cũ như ngữ cảnh nhẹ. "
-                    "Bạn có thể đổi sang **xem như câu hỏi mới** ở menu bên dưới."
+                    "Bạn có thể chọn **xem như câu hỏi mới** để chủ động xào bộ bài khác."
                 ),
             ])
             if score >= 0.75:
-                lines.append("*Độ giống khá cao; nếu vẫn là cùng tình huống, hãy xem quẻ mới như một snapshot mới thay vì một cách reset câu trả lời.*")
+                lines.append("*Cùng câu hỏi và kiểu trải trong một ngày sẽ giữ nguyên các lá, trừ khi bạn chọn xem như câu hỏi mới.*")
 
         lines.extend([
             "",
@@ -602,7 +604,7 @@ class TarotLauncherView(discord.ui.View):
                     discord.SelectOption(
                         label="🆕 Xem như câu hỏi mới",
                         value="fresh",
-                        description="Không đưa ngữ cảnh Tarot cũ vào bài đọc lần này",
+                        description="Xào bộ bài mới và không dùng ngữ cảnh cũ",
                         default=(self.reading_context_mode == "fresh"),
                     ),
                 ],
@@ -837,6 +839,13 @@ class TarotLauncherView(discord.ui.View):
         if self.reading_context_mode != "fresh":
             recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
         fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
+        # Only an explicit "fresh" selection creates new cards within the day.
+        # The original question otherwise maps to one stable daily deck.
+        new_draw_seed = (
+            secrets.randbits(64)
+            if self.reading_context_mode == "fresh" and self.selected_spread != "daily"
+            else None
+        )
 
         if self.selection_source == "custom" and self.custom_spread_schema:
             spread_info = self.custom_spread_schema.as_spread_info()
@@ -848,6 +857,7 @@ class TarotLauncherView(discord.ui.View):
                 user_id=self.author_id,
                 question=self.question,
                 schema_title=self.custom_spread_schema.title,
+                seed=new_draw_seed,
                 fatigue_card_ids=fatigue_card_ids,
             )
         else:
@@ -855,6 +865,7 @@ class TarotLauncherView(discord.ui.View):
                 spread_key=self.selected_spread,
                 user_id=self.author_id,
                 question=self.question,
+                seed=new_draw_seed,
                 fatigue_card_ids=fatigue_card_ids
             )
             spread_info = SPREAD_DEFINITIONS[self.selected_spread]
@@ -866,19 +877,31 @@ class TarotLauncherView(discord.ui.View):
 
         bot_user = interaction.client.user if interaction and interaction.client else None
         ai_task = self.tarot_manager.create_ai_task(
-            generate_tarot_reading_result(
+            reuse_or_generate(
+                self.tarot_manager,
+                user_id=self.author_id,
+                guild_id=interaction.guild.id if interaction.guild else None,
+                channel_id=interaction.channel.id if interaction.channel else None,
                 spread_key=self.selected_spread,
-                drawn_cards=drawn_cards,
                 question=self.question,
                 context=self.context,
+                drawn_cards=drawn_cards,
                 reader_style=actual_reader,
-                user_name=self.author_name,
-                recent_context=recent_ctx,
-                user_id=self.author_id,
-                guild=interaction.guild if interaction else None,
-                bot_id=bot_user.id if bot_user else None,
-                bot_name=runtime_bot_name(bot_user),
-                spread_name_override=spread_info["name"] if self.selected_spread == "custom" else None,
+                fresh=new_draw_seed is not None,
+                generate=lambda: generate_tarot_reading_result(
+                    spread_key=self.selected_spread,
+                    drawn_cards=drawn_cards,
+                    question=self.question,
+                    context=self.context,
+                    reader_style=actual_reader,
+                    user_name=self.author_name,
+                    recent_context=recent_ctx,
+                    user_id=self.author_id,
+                    guild=interaction.guild if interaction else None,
+                    bot_id=bot_user.id if bot_user else None,
+                    bot_name=runtime_bot_name(bot_user),
+                    spread_name_override=spread_info["name"] if self.selected_spread == "custom" else None,
+                ),
             )
         )
 
@@ -1951,7 +1974,7 @@ class TarotFlipView(discord.ui.View):
             original = embed_cards.description or ""
             embed_cards.description = state_line + "\n\n" + original
 
-        return build_reading_payload(
+        embeds, attachment = build_reading_payload(
             embed_cards,
             ai_reading,
             self.style_info.get("embed_title", "🔮 THÔNG ĐIỆP TỪ ASUMI"),
@@ -1959,6 +1982,17 @@ class TarotFlipView(discord.ui.View):
             + ("BẢN ĐỌC DỰ PHÒNG" if ai_fallback else "HOÀN TẤT"),
             self.author_avatar_url,
         )
+        # Long three-card boards currently push the answer below the fold.
+        # Once AI has produced the new concise narrative, show the answer first
+        # and retain the exact original cards/image in the second embed.
+        if (
+            len(self.drawn_cards) > 1
+            and not ai_fallback
+            and "TRẢ LỜI NGẮN" in (ai_reading or "")
+            and len(embeds) == 2
+        ):
+            return [embeds[1], embeds[0]], attachment
+        return embeds, attachment
 
     def build_session_embed(self, last_revealed_indices: Optional[Set[int]] = None) -> discord.Embed:
         """Build the FACE_DOWN/REVEALING session state for the single live message."""
@@ -2169,7 +2203,7 @@ class TarotFlipView(discord.ui.View):
 
             # Phát hiện Flavor Text / Easter Egg combo hiếm
             flavor_text = detect_spread_flavor(self.drawn_cards)
-            if flavor_text:
+            if flavor_text and len(self.drawn_cards) >= 5:
                 desc_cards.append(f"\n{WIDE_DIVIDER}\n{flavor_text}")
 
             embed_cards = discord.Embed(
@@ -2294,8 +2328,9 @@ class TarotFlipView(discord.ui.View):
                     user_avatar=self.author_avatar_url
                 )
 
-            saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
-            await self.tarot_manager.save_tarot_history(
+            saved_q = history_question(self.question, self.context)
+            if not (reading_result and reading_result.ai_model == "cached_history"):
+                await self.tarot_manager.save_tarot_history(
                 user_id=self.author_id,
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
@@ -2304,8 +2339,8 @@ class TarotFlipView(discord.ui.View):
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading,
                 topic_tag=topic_tag,
-                mood_tag=mood_tag
-            )
+                    mood_tag=mood_tag
+                )
 
             # Preserve the original rendered board even for single-card
             # spreads. The reading stays inside Discord embeds, not TXT.
@@ -2444,7 +2479,7 @@ class TarotFlipView(discord.ui.View):
             desc_cards.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines))
 
             flavor_text = detect_spread_flavor(self.drawn_cards)
-            if flavor_text:
+            if flavor_text and len(self.drawn_cards) >= 5:
                 desc_cards.append(f"\n{WIDE_DIVIDER}\n{flavor_text}")
 
             embed_cards = discord.Embed(
@@ -2504,8 +2539,9 @@ class TarotFlipView(discord.ui.View):
                     user_avatar=self.author_avatar_url
                 )
 
-            saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
-            await self.tarot_manager.save_tarot_history(
+            saved_q = history_question(self.question, self.context)
+            if not (reading_result and reading_result.ai_model == "cached_history"):
+                await self.tarot_manager.save_tarot_history(
                 user_id=self.author_id,
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
@@ -2514,8 +2550,8 @@ class TarotFlipView(discord.ui.View):
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading,
                 topic_tag=topic_tag,
-                mood_tag=mood_tag
-            )
+                    mood_tag=mood_tag
+                )
 
             # Final one-card readings are intentionally compact: message first,
             # board second. Multi-card spreads keep the richer two-embed layout.

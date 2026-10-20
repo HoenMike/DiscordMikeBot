@@ -1,3 +1,11 @@
+## Asumi 3.15.0 — Stable Tarot and answer-first reading (2026-10-20)
+
+- Same user, spread and normalized question on the same Vietnam date must yield identical cards and orientations. Seeded draws bypass mutable Card Fatigue; explicit new shuffle uses independent secure random seed.
+- `/tarot new_draw:true` or launcher "Xem như câu hỏi mới" opts into a fresh spread. Daily remains one per day. No passive chat history indexing or global deterministic sharing across users.
+- Use successful same-day same-channel reading from existing Turso history to prevent AI reinterpretations, never reuse fallback dictionaries or another channel's private reading. `ai_model=cached_history` skips duplicate Tarot history insertion.
+- Discord final reading is answer-first (brief answer, why, one move, one uncertainty), no per-card textbook. For multi-card new-style AI reading, interpretation first and board second; all cards and related controls remain available.
+- CI: `tests/test_tarot_stable_question.py` + legacy Tarot suites; live Discord and provider smoke still required.
+
 ## Asumi 3.14.9 — Mention rendering and Clef effort tiers (2026-10-20)
 
 - Only explicitly tagged Discord members in incoming request may be pinged by assistant; `response.py` converts their resolved `@Display Name` to `<@id>` with restricted `AllowedMentions`. Never trust Gemini-generated arbitrary IDs or allow everyone/role pings.

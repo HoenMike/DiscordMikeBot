@@ -260,6 +260,35 @@ class TarotFlipSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(attachment)
         self.assertEqual(embeds[0].title, "Cards")
 
+    async def test_new_multi_card_reading_shows_answer_before_board(self):
+        source = discord.Embed(
+            title="Trải bài", description="Câu hỏi và ba lá",
+            color=0x7851A9,
+        )
+        source.set_image(url="attachment://tarot_spread.png")
+        reading = TarotReadingResult(
+            full_reading="💬 **TRẢ LỜI NGẮN:**\\nChưa thể hẹn ngày cụ thể.",
+            core_message="Chưa thể hẹn ngày cụ thể.",
+        )
+        embeds, _ = self.view.build_final_payload(
+            source, reading.full_reading, reading_result=reading,
+        )
+        self.assertEqual(len(embeds), 2)
+        self.assertIn("TRẢ LỜI NGẮN", embeds[0].description)
+        self.assertEqual(embeds[1].title, "Trải bài")
+        self.assertEqual(embeds[1].image.url, "attachment://tarot_spread.png")
+
+    async def test_fallback_still_keeps_board_first(self):
+        source = discord.Embed(title="Trải bài", description="Ba lá")
+        result = TarotReadingResult(
+            full_reading="📖 **BẢN ĐỌC DỰ PHÒNG:**", ai_fallback=True
+        )
+        embeds, _ = self.view.build_final_payload(
+            source, result.full_reading, reading_result=result,
+        )
+        self.assertEqual(embeds[0].title, "Trải bài")
+        self.assertIn("BẢN ĐỌC DỰ PHÒNG", embeds[1].description)
+
     async def test_completed_ai_task_refreshes_ready_indicator_without_new_message(self):
         ready_task = asyncio.create_task(asyncio.sleep(0, result=("reading", "general", "", "", True)))
         view = TarotFlipView(
