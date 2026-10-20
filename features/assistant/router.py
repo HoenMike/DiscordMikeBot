@@ -18,6 +18,7 @@ class RouteDecision:
     source: str = "local"
     route_ms: float = 0.0
     clef_ms: float = 0.0
+    model_tier: str = "balanced"
 
 
 def _fold(text: str) -> str:
@@ -451,6 +452,7 @@ async def route_message(
         return replace(
             local,
             source="local_chat",
+            model_tier="fast",
             route_ms=(time.perf_counter() - started) * 1000,
         )
 
@@ -559,4 +561,9 @@ async def route_message(
         ),
         route_ms=(time.perf_counter() - started) * 1000,
         clef_ms=clef_ms,
+        model_tier=(
+            getattr(clef, "model_tier", "balanced")
+            if routed.intent == "chat" and getattr(clef, "model_tier", None)
+            in {"fast", "balanced", "deep"} else "balanced"
+        ),
     )
