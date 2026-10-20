@@ -351,7 +351,9 @@ class AssistantCog(commands.Cog):
             return True
 
         send_started = time.perf_counter()
-        delivery = await send_conversation_reply(message, reply.text)
+        delivery = await send_conversation_reply(
+            message, reply.text, mentioned_people=context.mentioned_people,
+        )
         sent = delivery.last_message
         send_ms = (time.perf_counter() - send_started) * 1000
         total_ms = (time.perf_counter() - request_started) * 1000
