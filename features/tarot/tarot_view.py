@@ -1974,7 +1974,7 @@ class TarotFlipView(discord.ui.View):
             original = embed_cards.description or ""
             embed_cards.description = state_line + "\n\n" + original
 
-        return build_reading_payload(
+        embeds, attachment = build_reading_payload(
             embed_cards,
             ai_reading,
             self.style_info.get("embed_title", "🔮 THÔNG ĐIỆP TỪ ASUMI"),
@@ -1982,6 +1982,17 @@ class TarotFlipView(discord.ui.View):
             + ("BẢN ĐỌC DỰ PHÒNG" if ai_fallback else "HOÀN TẤT"),
             self.author_avatar_url,
         )
+        # Long three-card boards currently push the answer below the fold.
+        # Once AI has produced the new concise narrative, show the answer first
+        # and retain the exact original cards/image in the second embed.
+        if (
+            len(self.drawn_cards) > 1
+            and not ai_fallback
+            and "TRẢ LỜI NGẮN" in (ai_reading or "")
+            and len(embeds) == 2
+        ):
+            return [embeds[1], embeds[0]], attachment
+        return embeds, attachment
 
     def build_session_embed(self, last_revealed_indices: Optional[Set[int]] = None) -> discord.Embed:
         """Build the FACE_DOWN/REVEALING session state for the single live message."""
@@ -2192,7 +2203,7 @@ class TarotFlipView(discord.ui.View):
 
             # Phát hiện Flavor Text / Easter Egg combo hiếm
             flavor_text = detect_spread_flavor(self.drawn_cards)
-            if flavor_text:
+            if flavor_text and len(self.drawn_cards) >= 5:
                 desc_cards.append(f"\n{WIDE_DIVIDER}\n{flavor_text}")
 
             embed_cards = discord.Embed(
@@ -2468,7 +2479,7 @@ class TarotFlipView(discord.ui.View):
             desc_cards.append("**🃏 Các Lá Bài Rút Được:**\n" + "\n".join(cards_summary_lines))
 
             flavor_text = detect_spread_flavor(self.drawn_cards)
-            if flavor_text:
+            if flavor_text and len(self.drawn_cards) >= 5:
                 desc_cards.append(f"\n{WIDE_DIVIDER}\n{flavor_text}")
 
             embed_cards = discord.Embed(
