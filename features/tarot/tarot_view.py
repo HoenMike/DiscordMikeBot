@@ -24,6 +24,7 @@ from features.tarot.reading.custom_spread import CustomSpreadSchema
 from features.tarot.reading.recommendation import find_similar_recent_question
 from features.tarot.reading.recap import build_recap_state
 from features.tarot.reading.schema import TarotReadingResult
+from features.tarot.reading.reuse import reuse_or_generate, history_question
 from features.tarot.rendering.state import ClarifierBoardState
 from features.tarot.reading.followup import TarotSessionState
 from features.tarot.reading.session import (
@@ -876,19 +877,31 @@ class TarotLauncherView(discord.ui.View):
 
         bot_user = interaction.client.user if interaction and interaction.client else None
         ai_task = self.tarot_manager.create_ai_task(
-            generate_tarot_reading_result(
+            reuse_or_generate(
+                self.tarot_manager,
+                user_id=self.author_id,
+                guild_id=interaction.guild.id if interaction.guild else None,
+                channel_id=interaction.channel.id if interaction.channel else None,
                 spread_key=self.selected_spread,
-                drawn_cards=drawn_cards,
                 question=self.question,
                 context=self.context,
+                drawn_cards=drawn_cards,
                 reader_style=actual_reader,
-                user_name=self.author_name,
-                recent_context=recent_ctx,
-                user_id=self.author_id,
-                guild=interaction.guild if interaction else None,
-                bot_id=bot_user.id if bot_user else None,
-                bot_name=runtime_bot_name(bot_user),
-                spread_name_override=spread_info["name"] if self.selected_spread == "custom" else None,
+                fresh=new_draw_seed is not None,
+                generate=lambda: generate_tarot_reading_result(
+                    spread_key=self.selected_spread,
+                    drawn_cards=drawn_cards,
+                    question=self.question,
+                    context=self.context,
+                    reader_style=actual_reader,
+                    user_name=self.author_name,
+                    recent_context=recent_ctx,
+                    user_id=self.author_id,
+                    guild=interaction.guild if interaction else None,
+                    bot_id=bot_user.id if bot_user else None,
+                    bot_name=runtime_bot_name(bot_user),
+                    spread_name_override=spread_info["name"] if self.selected_spread == "custom" else None,
+                ),
             )
         )
 
@@ -2304,8 +2317,9 @@ class TarotFlipView(discord.ui.View):
                     user_avatar=self.author_avatar_url
                 )
 
-            saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
-            await self.tarot_manager.save_tarot_history(
+            saved_q = history_question(self.question, self.context)
+            if not (reading_result and reading_result.ai_model == "cached_history"):
+                await self.tarot_manager.save_tarot_history(
                 user_id=self.author_id,
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
@@ -2314,8 +2328,8 @@ class TarotFlipView(discord.ui.View):
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading,
                 topic_tag=topic_tag,
-                mood_tag=mood_tag
-            )
+                    mood_tag=mood_tag
+                )
 
             # Preserve the original rendered board even for single-card
             # spreads. The reading stays inside Discord embeds, not TXT.
@@ -2514,8 +2528,9 @@ class TarotFlipView(discord.ui.View):
                     user_avatar=self.author_avatar_url
                 )
 
-            saved_q = f"{self.question} (Bối cảnh: {self.context})" if self.question and self.context else (self.question or (f"Bối cảnh: {self.context}" if self.context else None))
-            await self.tarot_manager.save_tarot_history(
+            saved_q = history_question(self.question, self.context)
+            if not (reading_result and reading_result.ai_model == "cached_history"):
+                await self.tarot_manager.save_tarot_history(
                 user_id=self.author_id,
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
@@ -2524,8 +2539,8 @@ class TarotFlipView(discord.ui.View):
                 drawn_cards=self.drawn_cards,
                 ai_reading=ai_reading,
                 topic_tag=topic_tag,
-                mood_tag=mood_tag
-            )
+                    mood_tag=mood_tag
+                )
 
             # Final one-card readings are intentionally compact: message first,
             # board second. Multi-card spreads keep the richer two-embed layout.
