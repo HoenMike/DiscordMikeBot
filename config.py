@@ -178,14 +178,14 @@ try:
         DEFAULT_SCAN_LIMIT,
     )
 except ImportError:
-    DEFAULT_GEMINI_DATA_MODEL = "gemini-3.1-flash-lite"
-    DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.8-flash"
+    DEFAULT_GEMINI_DATA_MODEL = "gemini-3.5-flash-lite"
+    DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.6-flash"
     DEFAULT_GEMINI_QA_MODEL = "gemini-3.8-flash"
     DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.8-flash"
-    DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.8-flash"
+    DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.5-flash-lite"
     DEFAULT_AI_FALLBACK_MODELS = [
-        "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
-        "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemma-4-31b-it"
+        "gemini-3.8-flash", "gemini-3.6-flash",
+        "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"
     ]
     DEFAULT_TAROT_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
     DEFAULT_CABIN_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS

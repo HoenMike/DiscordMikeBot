@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.7"
-RELEASE_DATE = "2026-10-17"
-CODENAME = "Asumi 3.14.7 - 15-Minute Conversation Context"
+CURRENT_VERSION = "3.14.8"
+RELEASE_DATE = "2026-10-20"
+CODENAME = "Asumi 3.14.8 - Gemini Tier 1 Tarot Reliability"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.8", "date": "2026-10-20", "type": "bugfix",
+        "title": "Tier 1 Gemini Tarot Reliability",
+        "summary": "Sửa Tarot hiển thị hoàn tất giả khi Gemini lỗi và cập nhật model theo quota Tier 1.",
+        "changes": [
+            {"category": "Tarot", "items": [
+                "Gemini 3.x dùng thinking_level=low thay thinking_budget cố định để tránh lỗi cấu hình và giảm độ trễ.",
+                "Coi phản hồi trống/JSON lỗi/429 là lỗi AI; thử model dự phòng có hạn thời gian, không tự gắn cờ thành công.",
+                "Khi không có luận giải AI, vẫn giữ nguyên lá rút và nghĩa cơ bản nhưng Discord ghi rõ BẢN ĐỌC DỰ PHÒNG.",
+                "Activity log ghi model dùng, cờ fallback và nhóm lỗi, không ghi token hoặc dữ liệu nhạy cảm mới.",
+            ]},
+            {"category": "Model Routing", "items": [
+                "Tối ưu model mặc định theo Tier 1: tác vụ nhẹ dùng Gemini 3.5 Flash-Lite, QA/Tarot dùng Gemini 3.8 Flash.",
+                "Loại bỏ các fallback ID không có trong danh sách quota mới; vẫn giữ env override cho từng vai trò.",
+                "Quota Tier 1 là giới hạn tốc độ/lượt gọi, không phải cam kết miễn phí. Theo dõi billing riêng.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.7", "date": "2026-10-17", "type": "bugfix",
         "title": "15-Minute Conversation Context",

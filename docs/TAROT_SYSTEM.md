@@ -2,6 +2,10 @@
 
 Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).
 
+**Asumi 3.14.8 (2026-10-20):** Với Gemini Tier 1, Tarot mặc định dùng `gemini-3.8-flash` (luận giải sâu hơn), fallback `gemini-3.6-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite`. Tất cả model Gemini 3.x dùng `thinking_level=low` thay `thinking_budget` cũ. Runtime giới hạn thời gian thử model; `TarotReadingResult.ai_fallback` phân biệt bài đọc AI thành công với bản nghĩa lá từ điển. Trong chế độ dự phòng, Discord hiển thị **ĐÃ RÚT BÀI · AI CHƯA LUẬN GIẢI**, ghi activity status `error` và mã lý do, không ghi `success`. Model gốc vẫn có thể được đổi qua environment variable hiện có.
+
+> **Billing:** Tier 1 RPM/TPM/RPD là quota tốc độ và số lượt, không phải ngưỡng miễn phí. Ứng dụng cần theo dõi thực tế token/billing tại Google AI Studio. Kết quả test/mock không xác nhận hiệu quả Gemini/Discord live.
+
 **Asumi 3.13.2 (2026-10-09):** Khi nhận lời gọi @Asumi có câu hỏi Tarot, bot giữ câu hỏi qua `features/assistant/router.py` → `features/assistant/tools.py` → `TarotCog`. Nếu có yêu cầu bốc/rút/bói kèm câu hỏi rõ, bot dùng command Tarot sẵn có để rút theo spread đề xuất, giữ cooldown. Nếu không yêu cầu rút ngay thì mở launcher với câu hỏi điền sẵn. Daily vẫn là thao tác riêng, không suy từ mọi câu chứa “hôm nay”.
 
 > **Tarot roadmap T20.1–T20.9 đã hoàn tất; runtime hiện được phát hành trong Asumi 3.0.0 với Tarot 2.x làm subsystem chính.** Asumi 3.0 thêm launcher UX question-first + one-tap Daily + one-click recommendation trên baseline Tarot 2.1.

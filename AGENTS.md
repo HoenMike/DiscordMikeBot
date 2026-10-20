@@ -2,6 +2,13 @@
 
 This repository is expected to be used across multiple AI/agent sessions. Read this file before making non-trivial changes.
 
+## Asumi 3.14.8 — Gemini Tier 1 and truthful Tarot completion (2026-10-20)
+
+- Tarot has two independent milestones: drawn cards may finish while Gemini interpretation fails. Never label a fallback dictionary reading as successful AI interpretation.
+- Model defaults for Tier 1 are in `core/constants.py`; keep `config.py` fallback defaults aligned, respect existing env overrides and do not assume Tier 1 quota equals a free allowance.
+- Gemini 3.x Tarot generation uses `thinking_level=low`; preserve the structured JSON contract, retry within a hard total budget and record only non-sensitive status/model/error category.
+- Regressions: `tests/test_tarot_gemini_tier1.py` plus Tarot UI/reading suites in CI. Verify with a real Discord Yes/No request before claiming provider success.
+
 ## Asumi 3.14.7 — Bounded 15-minute live chat context (2026-10-17)
 
 - Screenshot: "giờ cho 2 con bot chơi với nhau được ko" followed by `@Asumi chơi ko?` must be answered as an invitation to interact with **Regiko's bot**, not treated as a brand-new human game invite.

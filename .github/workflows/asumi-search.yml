@@ -8,6 +8,8 @@ on:
       - "tests/test_tarot_inline_ui.py"
       - "tests/test_tarot_native_layout.py"
       - "tests/test_tarot_v2_session.py"
+      - "tests/test_tarot_gemini_tier1.py"
+      - "tests/test_tarot_v2_reading.py"
       - "tests/test_tarot_v2_launcher.py"
       - "tests/test_assistant_core.py"
       - "tests/test_tarot_v2_renderer.py"
@@ -56,6 +58,8 @@ on:
       - "tests/test_tarot_inline_ui.py"
       - "tests/test_tarot_native_layout.py"
       - "tests/test_tarot_v2_session.py"
+      - "tests/test_tarot_gemini_tier1.py"
+      - "tests/test_tarot_v2_reading.py"
       - "tests/test_tarot_v2_renderer.py"
       - "features/summary/**"
       - "features/feedback/**"
@@ -105,6 +109,8 @@ jobs:
           python -m unittest discover -s tests -p "test_tarot_inline_ui.py" -v
           python -m unittest discover -s tests -p "test_tarot_native_layout.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_session.py" -v
+          python -m unittest discover -s tests -p "test_tarot_v2_reading.py" -v
+          python -m unittest discover -s tests -p "test_tarot_gemini_tier1.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_launcher.py" -v
           python -m unittest discover -s tests -p "test_tarot_v2_renderer.py" -v
           python -m unittest discover -s tests -p "test_assistant_brave.py" -v

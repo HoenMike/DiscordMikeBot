@@ -143,6 +143,11 @@ class TarotReadingResult(BaseModel):
     headline: str = ""
     is_valid: bool = True
 
+    # Runtime provenance; never part of the Gemini response schema or legacy tuple.
+    ai_fallback: bool = False
+    ai_model: str = ""
+    ai_error_category: str = ""
+
     core_message: str = ""
     dominant_theme: str = ""
     card_insights: List[TarotCardInsight] = Field(default_factory=list)
