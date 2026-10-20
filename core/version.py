@@ -12,12 +12,29 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.14.8"
+CURRENT_VERSION = "3.14.9"
 RELEASE_DATE = "2026-10-20"
-CODENAME = "Asumi 3.14.8 - Gemini Tier 1 Tarot Reliability"
+CODENAME = "Asumi 3.14.9 - Clef Adaptive Models & Mentions"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.14.9", "date": "2026-10-20", "type": "feature",
+        "title": "Clef Adaptive Gemini + Real Discord Mentions",
+        "summary": "Clef chọn mức độ suy luận; Asumi trả lời bằng model phù hợp và tag đúng Discord ID.",
+        "changes": [
+            {"category": "Assistant & Clef", "items": [
+                "Phân loại intent và độ sâu fast/balanced/deep trong cùng một lần gọi Clef.",
+                "Chat thường dùng Gemini 3.8 Flash; chat nhanh 3.5 Flash-Lite; tác vụ sâu 3.1 Pro Preview.",
+                "Bot chỉ convert @Tên thành mention Discord thực nếu user tag người đó trong lời yêu cầu; chặn ping bừa.",
+            ]},
+            {"category": "Tarot & Quota", "items": [
+                "Trải bài nhiều lá có thể dùng Pro; Yes/No và Daily ưu tiên Flash.",
+                "Hai model Gemini báo 429 trong cửa sổ ngắn: tạm dừng request để tránh spam khi spend cap hết.",
+                "CI kiểm tra mention, Clef, timeout và quota breaker; không lưu prompt nhạy cảm.",
+            ]},
+        ],
+    },
     {
         "version": "3.14.8", "date": "2026-10-20", "type": "bugfix",
         "title": "Tier 1 Gemini Tarot Reliability",
