@@ -75,9 +75,14 @@ def _safe_public_web_query(text: str) -> bool:
         "latest", "news", "release", "today", "bao nhieu",
         "o dau", "gio mo cua", "thong bao moi",
         "cktg", "worlds", "chung ket the gioi", "lich thi dau",
-        "sap toi", "tran tiep theo", "tran ke tiep", "tran dau",
     )
-    return len(folded) >= 12 and any(s in folded for s in public_signals)
+    return (
+        len(folded) >= 12
+        and (
+            any(s in folded for s in public_signals)
+            or _has_named_public_match_schedule(folded)
+        )
+    )
 
 
 def _obvious_fresh_public_search(text: str) -> bool:
@@ -98,16 +103,8 @@ def _obvious_fresh_public_search(text: str) -> bool:
     return timely and topics
 
 
-def _obvious_public_event_schedule_search(text: str) -> bool:
-    """Route explicit upcoming PUBLIC team/tournament schedules, never chat history.
-
-    Unlike open-ended 'khi nào' requests, this requires a known public
-    sports/esports entity plus a match/schedule question. Private Discord
-    mentions, links and anaphora are rejected by the shared privacy gate.
-    """
-    if not _safe_public_web_query(text):
-        return False
-    folded = _fold(text).replace("đ", "d")
+def _has_named_public_match_schedule(folded: str) -> bool:
+    """Only an explicitly named public team/tournament may trigger fixture search."""
     event = any(x in folded for x in (
         "cktg", "worlds", "world championship", "chung ket the gioi",
         "lck", "lpl", "lcs", "valorant champions", "vct",
@@ -125,6 +122,14 @@ def _obvious_public_event_schedule_search(text: str) -> bool:
         "tran sau", "match", "next game", "next match",
     ))
     return event and schedule
+
+
+def _obvious_public_event_schedule_search(text: str) -> bool:
+    """Public named-team fixtures; never Discord-private conversations."""
+    return (
+        _safe_public_web_query(text)
+        and _has_named_public_match_schedule(_fold(text).replace("đ", "d"))
+    )
 
 
 def _public_event_query(text: str) -> str:
