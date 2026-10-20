@@ -1,3 +1,11 @@
+## 3.14.8 — Gemini Tier 1 Tarot Reliability (2026-10-20)
+
+- Fix screenshot case: a finished Yes/No card no longer claims AI success when Gemini returns nothing; fallback is clearly labeled while the original card and board remain intact.
+- Replace raw thinking budgets with Gemini 3.x `thinking_level=low`; bound retry/cascade time and categorize empty, invalid, quota, and provider errors.
+- Default models: data/cabin/chat Gemini 3.5 Flash-Lite, summary Gemini 3.6 Flash, QA/Tarot Gemini 3.8 Flash. Fallback only through listed Tier 1 Flash/Flash-Lite IDs. Existing environment overrides remain in effect.
+- Add model and fallback provenance to the existing activity log, regression tests and CI coverage; no new dashboard or credentials.
+- Tier 1 rate limits do **not** make API requests free. Monitor Google AI Studio usage and billing separately; live Gemini/Discord smoke testing remains outstanding.
+
 ## 3.14.7 — 15-Minute Conversational Context (2026-10-17)
 
 - When someone explicitly invites Asumi into a conversation, pull the current channel's preceding **15 minutes** on demand (up to 40 messages; strict prompt character cap), instead of relying on 5/8 messages and keyword triggers.
