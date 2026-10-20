@@ -1,3 +1,12 @@
+## 3.15.1 — Flash 3.8 Value + Time/Fixture Routing (2026-10-20)
+
+- **Model pricing:** standard Google API rates (through 2026-12-31) are $0.75/$3.75 per 1M input/output tokens for Gemini 3.8 Flash vs $2/$12 for Gemini 3.1 Pro Preview. Artificial Analysis intelligence benchmark 41 vs 30 (3.8 Flash High vs 3.1 Pro Preview), while individual task results vary. Source: https://ai.google.dev/gemini-api/docs/pricing and https://artificialanalysis.ai/models/comparisons/gemini-3-8-flash-vs-gemini-3-1-pro-preview .
+- No 3.1 Pro in Chat/Tarot routing policy: Clef still classifies fast/balanced/deep but **deep means more thinking on Gemini 3.8 Flash**, not expensive Pro. Flash-Lite remains for trivial chat; Flash fallbacks remain. Explicit admin model settings elsewhere are not silently overridden.
+- Inject current **Asia/Ho_Chi_Minh** date/time into each chat prompt. Correctly parse 20/10 as 20 October and don't invent that today is March from stale model knowledge/context.
+- Deterministic routing sends questions like "sắp tới khi nào T1 có trận đấu?" to Brave for current upcoming **team-specific** fixtures, with date/year/VN time anchor, regardless of Clef availability. Also handles explicitly named follow-up fixtures; private Discord references remain forbidden.
+- Grounded public-search synopsis must confirm the particular team's opponent/date/time where evidence permits; don't fill the gap with generic LCK/Worlds schedules or fabricate next matches. Missing/disabled Brave is explicitly reported by the existing tool.
+- New regression tests cover model selection, time anchoring, routing, private gate, and search query; live credentials and Discord smoke not exercised by CI.
+
 ## 3.15.0 — Consistent Tarot Stories (2026-10-20)
 
 - **Repeat-question consistency:** for the same user, spread and normalized question on the same VN calendar date, the seed and full card orientations remain stable even when Card Fatigue history changes. Custom spreads also respect stable seeded draws. Different users, questions, dates and explicit new draws may yield different cards.

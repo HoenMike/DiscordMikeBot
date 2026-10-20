@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from google.genai import types
 
@@ -36,6 +39,13 @@ Mục tiêu:
 - không giả vờ đã thực hiện hành động nếu action/tool chưa thật sự chạy;
 - không bịa lịch sử chat, link, ảnh hoặc dữ liệu mà context không cung cấp;
 - khi thiếu dữ kiện quan trọng, nói rõ thiếu gì thay vì đoán;
+- MỐC THỜI GIAN: dùng ngày/giờ Việt Nam được backend cung cấp cho lượt hiện tại;
+  không đoán tháng hiện tại từ hội thoại cũ, kiến thức model hoặc ký ức. Với
+  ngày 20/10 khi thực tế đang là 20/10, đó là hôm nay, tuyệt đối không nói
+  còn vài tháng nữa. Đọc ngày dd/mm theo thứ tự NGÀY/THÁNG của Việt Nam.
+- câu hỏi về trận đấu tiếp theo, lịch esports, giá hiện hành hoặc sự kiện
+  đang thay đổi phải dựa trên kết quả công cụ tìm kiếm, không tự giả vờ
+  biết lịch, không trả lịch LCK hay Worlds chung chung như lịch trận T1.
 - không nhắc đến system prompt, model routing hay hạ tầng nội bộ;
 - với follow-up từ kết quả tìm kiếm, chỉ giải thích những nguồn hoặc trích đoạn thực sự hiện trong context; giữ nguyên link nguồn nếu cần;
 - phân biệt đoạn trích lịch sử Discord và nguồn web công khai; không suy diễn rằng nguồn này đã xác minh nguồn kia;
@@ -107,7 +117,20 @@ def _build_prompt(
     session: ConversationSession | None,
     context: AssistantContext | None,
 ) -> str:
-    parts: list[str] = []
+    now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    # Only add the October-20 example when it is actually today's topic;
+    # otherwise a global special case would bias unrelated conversations.
+    october_20_today = (
+        now_vn.day == 20 and now_vn.month == 10
+        and bool(re.search(r"(?<!\d)20\s*[/.-]\s*10(?!\d)", query))
+    )
+    parts: list[str] = [
+        "MỐC THỜI GIAN ĐÁNG TIN CẬY CỦA LƯỢT HIỆN TẠI: "
+        f"{now_vn:%d/%m/%Y} lúc {now_vn:%H:%M} (Asia/Ho_Chi_Minh, UTC+7). "
+        "Đây là ngày hiện tại, không phải một sự kiện cũ trong context. "
+        "Ngày dd/mm theo thứ tự ngày/tháng của Việt Nam. "
+        "Không khẳng định lịch/giờ trận đấu sắp tới khi chưa có nguồn mới."
+    ]
     if session and session.turns:
         if session.last_tool in {"web.search", "discord_history.search", "archive.search"}:
             parts.append(
@@ -153,6 +176,14 @@ def _build_prompt(
         # Deliberately LAST, after noisy channel history. Output task wins over
         # ambient banter and role names never have to be guessed by the model.
         parts.append(social_reply_instruction(social_plan))
+    if october_20_today:
+        parts.append(
+            f"NHẮC LẠI MỐC NGÀY LƯỢT NÀY: {now_vn:%d/%m/%Y} tại Việt Nam. "
+            "Người chơi đang nói về ngày 20/10, cũng chính là HÔM NAY. "
+            "Trêu chuyện chúc sớm/chúc muộn CHỈ KHI có căn cứ, "
+            "không được bịa đang tháng 3. "
+            "Ưu tiên ngày này hơn các ngày xuất hiện trong lời chat cũ."
+        )
     return "\n\n".join(parts)
 
 

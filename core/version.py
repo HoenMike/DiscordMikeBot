@@ -12,12 +12,30 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.15.0"
+CURRENT_VERSION = "3.15.1"
 RELEASE_DATE = "2026-10-20"
-CODENAME = "Asumi 3.15.0 - Consistent Tarot Stories"
+CODENAME = "Asumi 3.15.1 - Flash Routing and Time-Safe Search"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.15.1", "date": "2026-10-20", "type": "bugfix",
+        "title": "Gemini Flash 3.8 + Time-grounded Team Search",
+        "summary": "Loại bỏ Gemini 3.1 Pro, sửa trò đùa 20/10 sai tháng và lịch trận T1 không search.",
+        "changes": [
+            {"category": "AI & Cost", "items": [
+                "Clef fast/balanced/deep giữ nguyên, nhưng balanced và deep đều dùng Gemini 3.8 Flash; deep tăng thinking thay vì gọi Pro.",
+                "Tarot 5+ lá cũng không còn đẩy lên Gemini 3.1 Pro, giữ chuỗi Flash fallback.",
+                "Hạn chế chi phí API mà không hạ chất lượng tác vụ sâu xuống Flash-Lite.",
+            ]},
+            {"category": "Date & Search", "items": [
+                "Chat nhận ngày giờ Việt Nam theo thời gian thực; ngày 20/10 không còn bị hiểu nhầm là cách tháng 3 nhiều tháng.",
+                "Tự định tuyến lịch trận đội T1 và các đội/giải công khai được nêu rõ sang Brave Search, kể cả trong follow-up.",
+                "Tìm lịch được neo theo ngày hiện tại, tổng hợp dựa trên nguồn và nêu rõ khi chưa xác minh được đối thủ/giờ.",
+                "Tuyệt đối không xuất private Discord mentions hay lịch sử riêng ra web search.",
+            ]},
+        ],
+    },
     {
         "version": "3.15.0", "date": "2026-10-20", "type": "feature",
         "title": "Consistent Tarot Stories",

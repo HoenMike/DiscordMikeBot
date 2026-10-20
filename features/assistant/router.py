@@ -76,7 +76,13 @@ def _safe_public_web_query(text: str) -> bool:
         "o dau", "gio mo cua", "thong bao moi",
         "cktg", "worlds", "chung ket the gioi", "lich thi dau",
     )
-    return len(folded) >= 12 and any(s in folded for s in public_signals)
+    return (
+        len(folded) >= 12
+        and (
+            any(s in folded for s in public_signals)
+            or _has_named_public_match_schedule(folded)
+        )
+    )
 
 
 def _obvious_fresh_public_search(text: str) -> bool:
@@ -97,32 +103,63 @@ def _obvious_fresh_public_search(text: str) -> bool:
     return timely and topics
 
 
-def _obvious_public_event_schedule_search(text: str) -> bool:
-    """Timely public tournament schedule; no private chat content in Brave.
-
-    This is intentionally *not* a general "khi nào" search: the event has to
-    be named explicitly and the user has to request its schedule.
-    """
-    if not _safe_public_web_query(text):
-        return False
-    folded = _fold(text).replace("đ", "d")
+def _has_named_public_match_schedule(folded: str) -> bool:
+    """Only an explicitly named public team/tournament may trigger fixture search."""
     event = any(x in folded for x in (
         "cktg", "worlds", "world championship", "chung ket the gioi",
+        "lck", "lpl", "lcs", "valorant champions", "vct",
+        "league of legends", "esports", "bong da", "football",
+    )) or bool(re.search(
+        r"(?<![a-z0-9])(?:t1|gen\.?g|hle|kt rolster|c9|g2|fnatic|"
+        r"arsenal|chelsea|liverpool|barcelona|real madrid|"
+        r"manchester (?:city|united))(?=[^a-z0-9]|$)",
+        folded,
     ))
     schedule = any(x in folded for x in (
         "khi nao", "bao gio", "bat dau", "dien ra",
         "lich thi dau", "may gio", "vao luc", "hom nao",
+        "sap toi", "tran dau", "tran tiep theo", "tran ke tiep",
+        "tran sau", "match", "next game", "next match",
     ))
     return event and schedule
 
 
+def _obvious_public_event_schedule_search(text: str) -> bool:
+    """Public named-team fixtures; never Discord-private conversations."""
+    return (
+        _safe_public_web_query(text)
+        and _has_named_public_match_schedule(_fold(text).replace("đ", "d"))
+    )
+
+
 def _public_event_query(text: str) -> str:
-    """Use this year's named tournament, not a stale previous season."""
+    """Anchor upcoming fixture searches to today's VN date, not last season."""
     original = text.strip()
-    if re.search(r"\b20\d{2}\b", original):
-        return original
-    year = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")).year
-    return f"{original} {year}"
+    now = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    folded = _fold(original).replace("đ", "d")
+    # "T1" is a short team identifier; disambiguate it from generic Tier 1.
+    esports_hint = (
+        " League of Legends esports"
+        if re.search(r"(?<![a-z0-9])t1(?=[^a-z0-9]|$)", folded)
+        and not any(word in folded for word in ("valorant", "lol", "league of legends"))
+        else ""
+    )
+    year_hint = "" if re.search(r"\b20\d{2}\b", original) else f" {now.year}"
+    # A tournament opening-date query is NOT the next match for a team.
+    # Preserve the original CKTG routing contract and its explicit year.
+    named_team = bool(re.search(
+        r"(?<![a-z0-9])(?:t1|gen\.?g|hle|kt rolster|c9|g2|fnatic|"
+        r"arsenal|chelsea|liverpool|barcelona|real madrid|"
+        r"manchester (?:city|united))(?=[^a-z0-9]|$)",
+        folded,
+    ))
+    if not named_team:
+        return f"{original}{year_hint}"
+    return (
+        f"{original}{esports_hint}{year_hint} "
+        f"lịch trận tiếp theo sau ngày {now:%Y-%m-%d} "
+        "giờ Việt Nam (GMT+7)"
+    )
 
 
 def _current_weather_query(text: str) -> bool:
@@ -420,9 +457,9 @@ async def route_message(
             route_ms=(time.perf_counter() - started) * 1000,
         )
 
-    # Current public schedules should not become an unsupported chat answer
-    # asking for confirmation to search. Brave's existing quota and missing-key
-    # handling still apply at execution time.
+    # Explicit public match schedules must search before chat/Clef, including
+    # the "T1 trận tiếp theo" case. If Brave has no configured key, the tool
+    # reports that transparently instead of the model inventing a schedule.
     if (
         policy.ASUMI_AUTO_SEARCH_ENABLED
         and policy.ASUMI_WEB_SEARCH_ENABLED

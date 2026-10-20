@@ -102,11 +102,11 @@ ASUMI_CONTEXT_MAX_CHARS = 7000
 ASUMI_CONTEXT_MAX_IMAGES = 2
 ASUMI_CONTEXT_MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
-# Clef may choose a bounded effort tier, never arbitrary model names.
-# Ordinary conversations get Flash quality; Pro is reserved for confident deep tasks.
+# Clef chooses only effort, never provider/model IDs. Gemini 3.8 Flash
+# handles both balanced and deep reasoning; deep increases thinking effort.
 ASUMI_CHAT_MODEL = "gemini-3.8-flash"
 ASUMI_CHAT_FAST_MODEL = "gemini-3.5-flash-lite"
-ASUMI_CHAT_DEEP_MODEL = "gemini-3.1-pro-preview"
+ASUMI_CHAT_DEEP_MODEL = "gemini-3.8-flash"
 ASUMI_CHAT_FALLBACK_MODELS = ("gemini-3.6-flash", "gemini-3.5-flash-lite")
 ASUMI_CHAT_MODEL_TIMEOUT_SECONDS = 8
 ASUMI_CHAT_TOTAL_BUDGET_SECONDS = 18
@@ -116,7 +116,7 @@ ASUMI_CHAT_MAX_ATTEMPTS = 2
 # Quota circuit opens after two distinct Gemini model 429s in a short window.
 ASUMI_GEMINI_QUOTA_FAILURE_WINDOW_SECONDS = 60
 ASUMI_GEMINI_QUOTA_PAUSE_SECONDS = 90
-ASUMI_TAROT_DEEP_MODEL = "gemini-3.1-pro-preview"
+ASUMI_TAROT_DEEP_MODEL = "gemini-3.8-flash"
 
 ASUMI_CLEF_ENABLED = True
 ASUMI_CLEF_MODEL = "@cf/cloudflare/clef-flash"

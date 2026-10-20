@@ -1,3 +1,11 @@
+## Asumi 3.15.1 — No Pro default, time-safe chat, current public fixtures (2026-10-20)
+
+- Clef may suggest fast/balanced/deep **effort** but cannot choose an arbitrary provider model. Default model map: fast Gemini 3.5 Flash-Lite; balanced/deep Gemini 3.8 Flash; deep increases thinking and output budget. Tarot deep also 3.8 Flash. Do not silently restore 3.1 Pro Preview without updated benchmark/cost justification and owner signoff.
+- Every chat prompt includes date/time from Asia/Ho_Chi_Minh. For local dates like 20/10 (20 Oct), never infer current month from recent chat history or training cutoff.
+- A named PUBLIC team/tournament (T1, Gen.G, Worlds, LCK etc.) + question asking for the **next match** or schedule should search via existing Brave tool before generating current-event claims. Ground result to current Vietnamese date/time. When evidence is missing or tool unavailable, state that openly; no invented fixture.
+- Privacy is higher priority than freshness: messages mentioning Discord users, chat links, archive, or private context must not become Brave queries. See `tests/test_assistant_time_flash_search.py`.
+- Validate CI before merge, then do credentialed Cloudflare/Brave/Gemini/Discord smoke separately. No change to billing or spend cap.
+
 ## Asumi 3.15.0 — Stable Tarot and answer-first reading (2026-10-20)
 
 - Same user, spread and normalized question on the same Vietnam date must yield identical cards and orientations. Seeded draws bypass mutable Card Fatigue; explicit new shuffle uses independent secure random seed.

@@ -12,6 +12,7 @@ on:
       - "tests/test_tarot_stable_question.py"
       - "features/tarot/reading/reuse.py"
       - "tests/test_assistant_mentions_and_quota.py"
+      - "tests/test_assistant_time_flash_search.py"
       - "core/ai.py"
       - "features/assistant/response.py"
       - "config.py"
@@ -68,6 +69,7 @@ on:
       - "tests/test_tarot_stable_question.py"
       - "features/tarot/reading/reuse.py"
       - "tests/test_assistant_mentions_and_quota.py"
+      - "tests/test_assistant_time_flash_search.py"
       - "core/ai.py"
       - "features/assistant/response.py"
       - "config.py"
@@ -139,6 +141,7 @@ jobs:
           python -m unittest discover -s tests -p "test_assistant_public_pages.py" -v
           python -m unittest discover -s tests -p "test_assistant_fuel_aggregate.py" -v
           python -m unittest discover -s tests -p "test_assistant_source_routing.py" -v
+          python -m unittest discover -s tests -p "test_assistant_time_flash_search.py" -v
           python -m unittest discover -s tests -p "test_assistant_multisource.py" -v
           python -m unittest discover -s tests -p "test_assistant_clef_acceptance.py" -v
           python -m unittest discover -s tests -p "test_assistant_member_summary.py" -v
