@@ -54,7 +54,10 @@ class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
             result = await generate_tarot_reading_result("yes_no", [card()], question="Hôm nay có gặp ai không?")
         self.assertFalse(result.ai_fallback)
         self.assertEqual(result.ai_model, "gemini-3.8-flash")
-        self.assertIn("Cởi mở", result.full_reading)
+        self.assertEqual(result.headline, "Cởi mở với cơ hội mới")
+        self.assertIn("Lá bài gợi ý", result.full_reading)
+        self.assertIn("🌫️", result.full_reading)
+        self.assertNotIn("🌫\n", result.full_reading)
         self.assertEqual(generate.await_count, 1)
 
     async def test_empty_response_tries_next_model_instead_of_fake_success(self):
