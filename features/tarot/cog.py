@@ -17,6 +17,7 @@ from features.tarot.deck import (
 from features.tarot.renderer import render_journey_card_to_bytes, render_spread_to_bytes
 from features.tarot.ai import generate_tarot_reading, generate_tarot_reading_result, recommend_spread_for_question
 from features.tarot.manager import TarotManager
+from features.tarot.reading.reuse import reuse_or_generate
 from features.tarot.reading.journey import summarize_journey
 from features.tarot.tarot_view import (
     TarotFlipView,
@@ -327,19 +328,36 @@ class TarotCog(commands.Cog):
             # 2. Zero-Latency Pre-fetch (kèm Trí nhớ bạn cũ & Nhận thức đối tượng @mention)
             bot_user = self.bot.user or (interaction.client.user if interaction and interaction.client else None)
             guild_obj = interaction.guild if interaction else (ctx.guild if ctx else None)
+            target_guild_id = (guild_obj.id if guild_obj else None)
+            target_channel_id = (
+                interaction.channel.id if interaction and interaction.channel
+                else ctx.channel.id if ctx and ctx.channel else None
+            )
             ai_task = self.tarot_manager.create_ai_task(
-                generate_tarot_reading_result(
-                    spread_key=spread_key,
-                    drawn_cards=drawn_cards,
-                    question=clean_question if clean_question else None,
-                    context=clean_context if clean_context else None,
-                    reader_style=reader_key,
-                    user_name=user.display_name,
-                    recent_context=recent_ctx,
+                reuse_or_generate(
+                    self.tarot_manager,
                     user_id=user.id,
-                    guild=guild_obj,
-                    bot_id=bot_user.id if bot_user else None,
-                    bot_name=runtime_bot_name(bot_user)
+                    guild_id=target_guild_id,
+                    channel_id=target_channel_id,
+                    spread_key=spread_key,
+                    question=clean_question or None,
+                    context=clean_context or None,
+                    drawn_cards=drawn_cards,
+                    reader_style=reader_key,
+                    fresh=new_draw,
+                    generate=lambda: generate_tarot_reading_result(
+                        spread_key=spread_key,
+                        drawn_cards=drawn_cards,
+                        question=clean_question or None,
+                        context=clean_context or None,
+                        reader_style=reader_key,
+                        user_name=user.display_name,
+                        recent_context=recent_ctx,
+                        user_id=user.id,
+                        guild=guild_obj,
+                        bot_id=bot_user.id if bot_user else None,
+                        bot_name=runtime_bot_name(bot_user),
+                    ),
                 )
             )
 
