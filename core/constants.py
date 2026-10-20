@@ -24,20 +24,20 @@ TAROT_HISTORY_RETENTION_DAYS = 90
 # ---------------------------------------------------------------------------
 # Cấu hình Mô hình AI (Centralized AI Models & Generations)
 # ---------------------------------------------------------------------------
-DEFAULT_GEMINI_DATA_MODEL = "gemini-3.1-flash-lite"
-DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.8-flash"
+# Tier 1 routing: fast inexpensive work uses Flash-Lite; richer analysis uses Flash.
+# These are defaults only; per-role env overrides in config.py remain supported.
+DEFAULT_GEMINI_DATA_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.6-flash"
 DEFAULT_GEMINI_QA_MODEL = "gemini-3.8-flash"
 DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.8-flash"
-DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.8-flash"
+DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.5-flash-lite"
 
+# Known Tier 1 model IDs; avoid obsolete/non-chat Gemma IDs in a Gemini fallback.
 DEFAULT_AI_FALLBACK_MODELS = [
     "gemini-3.8-flash",
-    "gemini-3.7-flash",
     "gemini-3.6-flash",
-    "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
-    "gemma-4-31b-it",
 ]
 DEFAULT_TAROT_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
 DEFAULT_CABIN_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
@@ -103,7 +103,7 @@ ASUMI_CONTEXT_MAX_IMAGES = 2
 ASUMI_CONTEXT_MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 ASUMI_CHAT_MODEL = "gemini-3.5-flash-lite"
-ASUMI_CHAT_FALLBACK_MODELS = ("gemini-3.1-flash-lite", "gemini-3.5-flash")
+ASUMI_CHAT_FALLBACK_MODELS = ("gemini-3.1-flash-lite", "gemini-3.6-flash")
 ASUMI_CHAT_MODEL_TIMEOUT_SECONDS = 4
 ASUMI_CHAT_TOTAL_BUDGET_SECONDS = 8
 ASUMI_CHAT_MAX_ATTEMPTS = 2
