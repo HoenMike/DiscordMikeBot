@@ -2264,7 +2264,7 @@ class TarotFlipView(discord.ui.View):
                     channel_id=self.channel_id,
                     prompt=f"Câu hỏi: {self.question or '(Không)'} | Bối cảnh: {self.context or '(Không)'}",
                     response=f"Lá bài: {cards_summary}\n\nThông điệp: {ai_reading}",
-                    status="warning" if (reading_result and reading_result.ai_fallback) else "success",
+                    status="error" if (reading_result and reading_result.ai_fallback) else "success",
                     duration_ms=elapsed_ms,
                     details={
                         "ai_model": reading_result.ai_model if reading_result else "",
@@ -2474,9 +2474,12 @@ class TarotFlipView(discord.ui.View):
                     channel_id=self.channel_id,
                     prompt=f"Câu hỏi: {self.question or '(Không)'} | Bối cảnh: {self.context or '(Không)'}",
                     response=f"Lá bài: {cards_summary}\n\nThông điệp: {ai_reading}",
-                    status="success",
+                    status="error" if (reading_result and reading_result.ai_fallback) else "success",
                     duration_ms=elapsed_ms,
                     details={
+                        "ai_model": reading_result.ai_model if reading_result else "",
+                        "ai_fallback": bool(reading_result and reading_result.ai_fallback),
+                        "ai_error_category": reading_result.ai_error_category if reading_result else "",
                         "spread": self.spread_key,
                         "reader": self.reader_style,
                         "topic_tag": topic_tag,
@@ -2519,6 +2522,7 @@ class TarotFlipView(discord.ui.View):
             final_embeds, reading_file = self.build_final_payload(
                 embed_cards,
                 ai_reading,
+                reading_result=reading_result,
             )
 
             action_view = TarotResultActionView(
