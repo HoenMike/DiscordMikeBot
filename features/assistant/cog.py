@@ -9,7 +9,7 @@ from core.activity_logger import activity_logger
 from features.assistant.ai import ChatTimeoutBudgetError, generate_chat_reply
 from features.assistant.context import ContextBuilder
 from features.assistant.response import send_conversation_reply
-from features.assistant.router import RouteDecision, route_locally, route_message
+from features.assistant.router import RouteDecision, route_locally, route_message, _obvious_public_event_schedule_search
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
@@ -41,6 +41,16 @@ async def choose_conversation_route(
         return local
 
     if is_live_continuation:
+        # A fully specified PUBLIC event/team question is a new fact request,
+        # even when it replies to an older Asumi session. Ordinary "thế sao?"
+        # and private-reference followups still keep conversation context.
+        if _obvious_public_event_schedule_search(query):
+            return await route_message(
+                query,
+                cloudflare_router=cloudflare_router,
+                min_confidence=min_confidence,
+                allowed_search_tools=allowed_search_tools,
+            )
         return RouteDecision(
             intent=getattr(previous_session, "intent", None) or "chat",
             source="session_followup",
