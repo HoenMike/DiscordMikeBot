@@ -72,29 +72,34 @@ class ChatTimeoutBudgetError(TimeoutError):
         self.last_error_type = last_error_type
 
 
-def _candidate_models() -> list[str]:
-    """Conversation prefers low-latency models before heavier summary models."""
-
+def _candidate_models(model_tier: str = "balanced") -> list[str]:
+    """Backend-owned model allowlist; Clef chooses effort, never a model ID."""
     from core import constants as policy
-    primary = policy.ASUMI_CHAT_MODEL
+    tier = model_tier if model_tier in {"fast", "balanced", "deep"} else "balanced"
+    primary = {
+        "fast": policy.ASUMI_CHAT_FAST_MODEL,
+        "balanced": policy.ASUMI_CHAT_MODEL,
+        "deep": policy.ASUMI_CHAT_DEEP_MODEL,
+    }[tier]
     configured = list(policy.ASUMI_CHAT_FALLBACK_MODELS)
-    repository_fallbacks = list(
-        getattr(config, "SUMMARY_FALLBACK_MODELS", []) or []
-    )
-
+    # For deep requests, step down to Flash rather than tiny models immediately.
+    extra = [policy.ASUMI_CHAT_MODEL] if tier == "deep" else []
     ordered: list[str] = []
-    for model in [primary, *configured, *repository_fallbacks]:
+    for model in [primary, *extra, *configured]:
         if model and model not in ordered:
             ordered.append(model)
     return ordered
 
 
-def _chat_limits() -> tuple[float, float, int]:
+def _chat_limits(model_tier: str = "balanced") -> tuple[float, float, int]:
     from core import constants as policy
-    per_model_timeout = max(1.0, float(policy.ASUMI_CHAT_MODEL_TIMEOUT_SECONDS))
-    total_budget = max(per_model_timeout, float(policy.ASUMI_CHAT_TOTAL_BUDGET_SECONDS))
-    max_attempts = max(1, int(policy.ASUMI_CHAT_MAX_ATTEMPTS))
-    return per_model_timeout, total_budget, max_attempts
+    if model_tier == "deep":
+        per_model_timeout = max(1.0, float(policy.ASUMI_CHAT_DEEP_TIMEOUT_SECONDS))
+        total_budget = max(per_model_timeout, float(policy.ASUMI_CHAT_DEEP_BUDGET_SECONDS))
+    else:
+        per_model_timeout = max(1.0, float(policy.ASUMI_CHAT_MODEL_TIMEOUT_SECONDS))
+        total_budget = max(per_model_timeout, float(policy.ASUMI_CHAT_TOTAL_BUDGET_SECONDS))
+    return per_model_timeout, total_budget, max(1, int(policy.ASUMI_CHAT_MAX_ATTEMPTS))
 
 
 def _build_prompt(
@@ -155,6 +160,7 @@ async def generate_chat_reply(
     query: str,
     session: ConversationSession | None = None,
     context: AssistantContext | None = None,
+    model_tier: str = "balanced",
 ) -> ChatReplyResult:
     generation_config = types.GenerateContentConfig(
         temperature=0.55,
@@ -178,13 +184,13 @@ async def generate_chat_reply(
                     )
                 )
         return [types.Content(role="user", parts=content_parts)]
-    per_model_timeout, total_budget, max_attempts = _chat_limits()
+    per_model_timeout, total_budget, max_attempts = _chat_limits(model_tier)
     total_started = time.perf_counter()
     last_error: Exception | None = None
     models_tried: list[str] = []
     timeout_seen = False
 
-    for attempt, model in enumerate(_candidate_models()[:max_attempts], start=1):
+    for attempt, model in enumerate(_candidate_models(model_tier)[:max_attempts], start=1):
         elapsed_total = time.perf_counter() - total_started
         remaining_budget = total_budget - elapsed_total
         if remaining_budget <= 0.1:
