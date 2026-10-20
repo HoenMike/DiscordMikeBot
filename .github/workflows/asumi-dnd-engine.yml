@@ -1,0 +1,33 @@
+name: Asumi Dungeon Engine Experimental Tests
+
+on:
+  pull_request:
+    paths:
+      - "features/dnd/**"
+      - "tests/test_dnd_engine.py"
+      - "scripts/simulate_dnd.py"
+      - ".github/workflows/asumi-dnd-engine.yml"
+  push:
+    branches: [main]
+    paths:
+      - "features/dnd/**"
+      - "tests/test_dnd_engine.py"
+      - "scripts/simulate_dnd.py"
+      - ".github/workflows/asumi-dnd-engine.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dungeon-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile, contract tests, and offline simulation
+        run: |
+          python -m compileall -q features/dnd scripts/simulate_dnd.py tests/test_dnd_engine.py
+          python -m unittest discover -s tests -p 'test_dnd_engine.py' -v
+          python -m scripts.simulate_dnd
