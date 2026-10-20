@@ -58,7 +58,7 @@ TAROT_GEN_CONFIG = types.GenerateContentConfig(
     system_instruction=TAROT_SYSTEM_INSTRUCTION,
     response_mime_type="application/json",
     response_schema=TarotAIResponseSchema,
-    thinking_config=types.ThinkingConfig(thinking_budget=1024),
+    thinking_config=types.ThinkingConfig(thinking_level="low"),
 )
 
 # Cấu hình dự phòng nhẹ nếu model không hỗ trợ schema hoặc thinking config
@@ -72,7 +72,7 @@ TAROT_GEN_CONFIG_FALLBACK = types.GenerateContentConfig(
 TAROT_FOLLOWUP_CONFIG = types.GenerateContentConfig(
     temperature=0.65,
     system_instruction=TAROT_SYSTEM_INSTRUCTION,
-    thinking_config=types.ThinkingConfig(thinking_budget=1024),
+    thinking_config=types.ThinkingConfig(thinking_level="low"),
 )
 
 TAROT_CLARIFIER_CONFIG = types.GenerateContentConfig(
@@ -80,7 +80,7 @@ TAROT_CLARIFIER_CONFIG = types.GenerateContentConfig(
     system_instruction=TAROT_SYSTEM_INSTRUCTION,
     response_mime_type="application/json",
     response_schema=TarotClarifierAIResponseSchema,
-    thinking_config=types.ThinkingConfig(thinking_budget=768),
+    thinking_config=types.ThinkingConfig(thinking_level="low"),
 )
 
 TAROT_CLARIFIER_CONFIG_FALLBACK = types.GenerateContentConfig(
@@ -93,7 +93,7 @@ TAROT_CUSTOM_SPREAD_CONFIG = types.GenerateContentConfig(
     temperature=0.45,
     system_instruction=TAROT_SYSTEM_INSTRUCTION,
     response_mime_type="application/json",
-    thinking_config=types.ThinkingConfig(thinking_budget=768),
+    thinking_config=types.ThinkingConfig(thinking_level="low"),
 )
 
 TAROT_CUSTOM_SPREAD_CONFIG_FALLBACK = types.GenerateContentConfig(
@@ -893,69 +893,111 @@ async def generate_tarot_reading_result(
 
     models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
         config.GEMINI_TAROT_MODEL,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
         "gemini-3.6-flash",
-        "gemini-3.5-flash",
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
-        "gemma-4-31b-it"
     ])
 
-    seen = set()
-    ordered_models = []
-    for m in models_to_try:
-        if m and m not in seen:
-            seen.add(m)
-            ordered_models.append(m)
-
+    # A broken model must not stall the entire Tarot interaction for minutes.
+    ordered_models = list(dict.fromkeys(model for model in models_to_try if model))
     card_count = len(drawn_cards)
-    timeout_duration = 26.0 if card_count >= 5 else 16.0
+    timeout_duration = 26.0 if card_count >= 5 else 20.0
+    deadline = asyncio.get_running_loop().time() + (65.0 if card_count >= 5 else 48.0)
+    last_failure = "provider_unavailable"
 
     async with AI_SEMAPHORE:
         for model_name in ordered_models:
-            # Thử với cấu hình chuẩn có schema, nếu model không hỗ trợ thì fallback cấu hình cơ bản
+            # Some provider versions reject response_schema; retry the same model
+            # without the schema ONLY on format errors, not after a quota failure.
             configs_to_try = [TAROT_GEN_CONFIG, TAROT_GEN_CONFIG_FALLBACK]
-
-            for gen_config in configs_to_try:
+            for config_index, gen_config in enumerate(configs_to_try):
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining < 3:
+                    last_failure = "timeout"
+                    break
                 try:
-                    print(f"🔮 [Tarot AI] Thử luận giải quẻ '{spread_name}' bằng model '{model_name}'...", flush=True)
+                    print(
+                        f"🔮 [Tarot AI] Model={model_name}, mode={'schema' if config_index == 0 else 'json'}",
+                        flush=True,
+                    )
                     response = await bounded_ai_generate(
                         model=model_name,
                         contents=prompt,
                         config=gen_config,
-                        timeout_sec=timeout_duration,
+                        timeout_sec=min(timeout_duration, remaining),
                         label="Tarot AI",
                     )
-                    if response and response.text:
-                        raw_text = response.text.strip()
-                        result = parse_tarot_ai_response_v2(raw_text)
+                    raw_text = (getattr(response, "text", None) or "").strip()
+                    if not raw_text:
+                        last_failure = "empty_response"
+                        finish_reasons = [
+                            str(getattr(candidate, "finish_reason", "unknown"))
+                            for candidate in (getattr(response, "candidates", None) or [])[:2]
+                        ]
+                        print(
+                            f"⚠️ [Tarot AI] Empty response: model={model_name}, "
+                            f"finish={','.join(finish_reasons) or 'unknown'}",
+                            flush=True,
+                        )
+                        # No need to pay twice on the same model if it returned no text.
+                        break
 
-                        if result.full_reading:
-                            print(
-                                f"✅ [Tarot AI] Thành công luận giải với model '{model_name}' "
-                                f"(Tag: {result.topic_tag} | Mood: {result.mood_tag} | Valid: {result.is_valid}).",
-                                flush=True,
-                            )
-                            return result
+                    result = parse_tarot_ai_response_v2(raw_text)
+                    if result.full_reading and result.full_reading.strip():
+                        result.ai_model = model_name
+                        print(
+                            f"✅ [Tarot AI] Model={model_name}, tag={result.topic_tag}, "
+                            f"valid={result.is_valid}",
+                            flush=True,
+                        )
+                        return result
+
+                    last_failure = "invalid_response"
+                    print(
+                        f"⚠️ [Tarot AI] Model={model_name} returned unreadable/empty "
+                        f"structured interpretation (chars={len(raw_text)})",
+                        flush=True,
+                    )
+                    # JSON/schema mode already returned a malformed payload. Try a
+                    # different model rather than treating it as success.
+                    break
 
                 except asyncio.TimeoutError:
-                    print(f"⏱️ [Tarot AI] Model '{model_name}' phản hồi quá lâu (>{timeout_duration}s), chuyển sang model tiếp theo...", flush=True)
-                    break  # Chuyển ngay sang model tiếp theo trong cascade
-                except Exception as e:
-                    err_str = str(e)
-                    if "503" in err_str or "UNAVAILABLE" in err_str or "high demand" in err_str.lower():
-                        print(f"⚠️ [Tarot AI] Model '{model_name}' tạm thời quá tải (503 High Demand), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
+                    last_failure = "timeout"
+                    print(f"⏱️ [Tarot AI] Timed out: model={model_name}", flush=True)
+                    break
+                except Exception as exc:
+                    error = str(exc).lower()
+                    if "429" in error or "resource_exhausted" in error or "quota" in error:
+                        last_failure = "quota_exceeded"
+                        print(f"⚠️ [Tarot AI] Quota exhausted: model={model_name}", flush=True)
                         break
-                    elif "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower():
-                        print(f"⚠️ [Tarot AI] Model '{model_name}' chạm giới hạn quota (429 Rate Limit), tự động chuyển sang model dự phòng tiếp theo...", flush=True)
+                    if "503" in error or "unavailable" in error or "high demand" in error:
+                        last_failure = "provider_unavailable"
+                        print(f"⚠️ [Tarot AI] Provider unavailable: model={model_name}", flush=True)
                         break
-                    elif "response_schema" in err_str or "schema" in err_str.lower():
-                        # Model không hỗ trợ response_schema, thử lại với TAROT_GEN_CONFIG_FALLBACK
+                    if config_index == 0 and any(
+                        word in error for word in (
+                            "schema", "invalid_argument", "thinking", "unsupported", "400"
+                        )
+                    ):
+                        last_failure = "schema_incompatible"
+                        print(
+                            f"⚠️ [Tarot AI] Schema/config incompatible: model={model_name}, "
+                            "trying JSON mode",
+                            flush=True,
+                        )
                         continue
-                    else:
-                        print(f"⚠️ [Tarot AI] Model '{model_name}' không khả dụng ({type(e).__name__}: {e}), chuyển sang model tiếp theo...", flush=True)
-                        break
+                    last_failure = "provider_error"
+                    print(
+                        f"⚠️ [Tarot AI] Provider error: model={model_name}, "
+                        f"type={type(exc).__name__}",
+                        flush=True,
+                    )
+                    break
+            if asyncio.get_running_loop().time() >= deadline:
+                last_failure = "timeout"
+                break
 
     print(f"❌ [Tarot AI] Tất cả các model trong danh sách fallback đều thất bại! Sử dụng bộ luận giải chiêm tinh cổ điển từ điển Tarot...", flush=True)
     fallback_parts = [
@@ -978,6 +1020,8 @@ async def generate_tarot_reading_result(
         topic_tag="general",
         mood_tag="Chiêm nghiệm cổ điển",
         headline="Bản đọc dự phòng từ dữ liệu lá bài",
+        ai_fallback=True,
+        ai_error_category=last_failure,
         is_valid=True,
         uncertainty="AI đang tạm thời không phản hồi; phần này chỉ dùng nghĩa cơ bản của các lá đã rút.",
     )
