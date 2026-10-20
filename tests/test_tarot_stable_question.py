@@ -83,6 +83,19 @@ class ReuseReadingTests(unittest.IsolatedAsyncioTestCase):
             "Khi nào có ny? (Bối cảnh: Đang độc thân)",
         )
 
+    async def test_cache_failure_generates_instead_of_aborting(self):
+        manager = type("Manager", (), {})()
+        manager.find_same_day_reading = AsyncMock(side_effect=RuntimeError("DB unavailable"))
+        fallback = TarotReadingResult(full_reading="AI newly generated")
+        generate = AsyncMock(return_value=fallback)
+        result = await reuse_or_generate(
+            manager, user_id=9, guild_id=10, channel_id=11,
+            spread_key="ppf", question="Q", context=None,
+            drawn_cards=[], reader_style="auto", fresh=False, generate=generate,
+        )
+        self.assertIs(result, fallback)
+        generate.assert_awaited_once()
+
     async def test_new_shuffle_and_manual_style_always_regenerate(self):
         manager = type("Manager", (), {})()
         manager.find_same_day_reading = AsyncMock()
