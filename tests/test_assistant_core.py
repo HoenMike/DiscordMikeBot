@@ -850,8 +850,9 @@ class AssistantAdaptiveModelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_candidate_models("fast")[0], "gemini-3.5-flash-lite")
         self.assertEqual(_candidate_models("balanced")[0], "gemini-3.8-flash")
         self.assertEqual(_candidate_models("deep")[:2], [
-            "gemini-3.1-pro-preview", "gemini-3.8-flash",
+            "gemini-3.8-flash", "gemini-3.6-flash",
         ])
+        self.assertNotIn("gemini-3.1-pro-preview", _candidate_models("deep"))
         self.assertEqual(_candidate_models("arbitrary-model")[0], "gemini-3.8-flash")
 
     async def test_clef_high_confidence_depth_drives_chat_routing_only(self):
@@ -865,6 +866,11 @@ class AssistantAdaptiveModelTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(decision.intent, "chat")
         self.assertEqual(decision.model_tier, "deep")
+
+    def test_deep_uses_more_thinking_on_same_flash_model(self):
+        self.assertEqual(_candidate_models("balanced")[0], _candidate_models("deep")[0])
+        per_model, total, attempts = _chat_limits("deep")
+        self.assertEqual((per_model, total, attempts), (12.0, 22.0, 2))
 
     def test_clef_does_not_accept_untrusted_deep_choice(self):
         self.assertEqual(CloudflareDecisionRouter._parse_depth({
