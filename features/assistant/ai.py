@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -117,12 +118,17 @@ def _build_prompt(
     context: AssistantContext | None,
 ) -> str:
     now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
+    # Only add the October-20 example when it is actually today's topic;
+    # otherwise a global special case would bias unrelated conversations.
+    october_20_today = (
+        now_vn.day == 20 and now_vn.month == 10
+        and bool(re.search(r"(?<!\\d)20\\s*[/.-]\\s*10(?!\\d)", query))
+    )
     parts: list[str] = [
         "MỐC THỜI GIAN ĐÁNG TIN CẬY CỦA LƯỢT HIỆN TẠI: "
         f"{now_vn:%d/%m/%Y} lúc {now_vn:%H:%M} (Asia/Ho_Chi_Minh, UTC+7). "
         "Đây là ngày hiện tại, không phải một sự kiện cũ trong context. "
-        "20/10 là ngày 20 tháng 10, không phải tháng 3; "
-        "nếu user hỏi về chính hôm nay thì không đùa như còn nhiều tháng nữa. "
+        "Ngày dd/mm theo thứ tự ngày/tháng của Việt Nam. "
         "Không khẳng định lịch/giờ trận đấu sắp tới khi chưa có nguồn mới."
     ]
     if session and session.turns:
@@ -170,12 +176,14 @@ def _build_prompt(
         # Deliberately LAST, after noisy channel history. Output task wins over
         # ambient banter and role names never have to be guessed by the model.
         parts.append(social_reply_instruction(social_plan))
-    parts.append(
-        f"NHẮC LẠI MỐC NGÀY LƯỢT NÀY: {now_vn:%d/%m/%Y} tại Việt Nam. "
-        "Nếu người chơi nói chúc 20/10 đúng ngày 20/10 thì trêu chuyện "
-        "chúc sớm/chúc muộn CHỈ KHI có căn cứ, không được bịa đang tháng 3. "
-        "Ưu tiên ngày này hơn các ngày xuất hiện trong lời chat cũ."
-    )
+    if october_20_today:
+        parts.append(
+            f"NHẮC LẠI MỐC NGÀY LƯỢT NÀY: {now_vn:%d/%m/%Y} tại Việt Nam. "
+            "Người chơi đang nói về ngày 20/10, cũng chính là HÔM NAY. "
+            "Trêu chuyện chúc sớm/chúc muộn CHỈ KHI có căn cứ, "
+            "không được bịa đang tháng 3. "
+            "Ưu tiên ngày này hơn các ngày xuất hiện trong lời chat cũ."
+        )
     return "\n\n".join(parts)
 
 
