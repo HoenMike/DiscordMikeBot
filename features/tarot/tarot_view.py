@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 import time
 import io
 from typing import List, Optional, Set, Any
@@ -419,11 +420,11 @@ class TarotLauncherView(discord.ui.View):
                 f"*{old_question[:220]}*{suffix}",
                 (
                     "Mặc định Asumi sẽ xem đây là **tình hình hiện tại** và chỉ dùng quẻ cũ như ngữ cảnh nhẹ. "
-                    "Bạn có thể đổi sang **xem như câu hỏi mới** ở menu bên dưới."
+                    "Bạn có thể chọn **xem như câu hỏi mới** để chủ động xào bộ bài khác."
                 ),
             ])
             if score >= 0.75:
-                lines.append("*Độ giống khá cao; nếu vẫn là cùng tình huống, hãy xem quẻ mới như một snapshot mới thay vì một cách reset câu trả lời.*")
+                lines.append("*Cùng câu hỏi và kiểu trải trong một ngày sẽ giữ nguyên các lá, trừ khi bạn chọn xem như câu hỏi mới.*")
 
         lines.extend([
             "",
@@ -602,7 +603,7 @@ class TarotLauncherView(discord.ui.View):
                     discord.SelectOption(
                         label="🆕 Xem như câu hỏi mới",
                         value="fresh",
-                        description="Không đưa ngữ cảnh Tarot cũ vào bài đọc lần này",
+                        description="Xào bộ bài mới và không dùng ngữ cảnh cũ",
                         default=(self.reading_context_mode == "fresh"),
                     ),
                 ],
@@ -837,6 +838,13 @@ class TarotLauncherView(discord.ui.View):
         if self.reading_context_mode != "fresh":
             recent_ctx = await self.tarot_manager.get_user_recent_context(self.author_id)
         fatigue_card_ids = await self.tarot_manager.get_user_recent_card_ids(self.author_id)
+        # Only an explicit "fresh" selection creates new cards within the day.
+        # The original question otherwise maps to one stable daily deck.
+        new_draw_seed = (
+            secrets.randbits(64)
+            if self.reading_context_mode == "fresh" and self.selected_spread != "daily"
+            else None
+        )
 
         if self.selection_source == "custom" and self.custom_spread_schema:
             spread_info = self.custom_spread_schema.as_spread_info()
@@ -848,6 +856,7 @@ class TarotLauncherView(discord.ui.View):
                 user_id=self.author_id,
                 question=self.question,
                 schema_title=self.custom_spread_schema.title,
+                seed=new_draw_seed,
                 fatigue_card_ids=fatigue_card_ids,
             )
         else:
@@ -855,6 +864,7 @@ class TarotLauncherView(discord.ui.View):
                 spread_key=self.selected_spread,
                 user_id=self.author_id,
                 question=self.question,
+                seed=new_draw_seed,
                 fatigue_card_ids=fatigue_card_ids
             )
             spread_info = SPREAD_DEFINITIONS[self.selected_spread]
