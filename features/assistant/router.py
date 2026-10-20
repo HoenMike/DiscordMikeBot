@@ -145,6 +145,16 @@ def _public_event_query(text: str) -> str:
         else ""
     )
     year_hint = "" if re.search(r"\b20\d{2}\b", original) else f" {now.year}"
+    # A tournament opening-date query is NOT the next match for a team.
+    # Preserve the original CKTG routing contract and its explicit year.
+    named_team = bool(re.search(
+        r"(?<![a-z0-9])(?:t1|gen\.?g|hle|kt rolster|c9|g2|fnatic|"
+        r"arsenal|chelsea|liverpool|barcelona|real madrid|"
+        r"manchester (?:city|united))(?=[^a-z0-9]|$)",
+        folded,
+    ))
+    if not named_team:
+        return f"{original}{year_hint}"
     return (
         f"{original}{esports_hint}{year_hint} "
         f"lịch trận tiếp theo sau ngày {now:%Y-%m-%d} "
