@@ -164,7 +164,10 @@ async def generate_chat_reply(
 ) -> ChatReplyResult:
     generation_config = types.GenerateContentConfig(
         temperature=0.55,
-        max_output_tokens=900,
+        max_output_tokens=1800 if model_tier == "deep" else 900,
+        thinking_config=types.ThinkingConfig(
+            thinking_level="medium" if model_tier == "deep" else "low",
+        ),
         system_instruction=ASSISTANT_SYSTEM_PROMPT,
         tools=[{"url_context": {}}]
         if context is not None and context.urls
