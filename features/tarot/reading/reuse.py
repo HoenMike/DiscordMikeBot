@@ -38,14 +38,23 @@ async def reuse_or_generate(
     """
     lookup = getattr(manager, "find_same_day_reading", None)
     if not fresh and reader_style == "auto" and callable(lookup):
-        saved = await lookup(
-            user_id=user_id,
-            guild_id=guild_id,
-            channel_id=channel_id,
-            spread_type=spread_key,
-            question=history_question(question, context),
-            drawn_cards=drawn_cards,
-        )
+        try:
+            saved = await lookup(
+                user_id=user_id,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                spread_type=spread_key,
+                question=history_question(question, context),
+                drawn_cards=drawn_cards,
+            )
+        except Exception as exc:
+            # Cached interpretations are an optimization, never a dependency
+            # that should block an otherwise valid fresh Tarot generation.
+            print(
+                f"⚠️ [Tarot Cache] Lookup unavailable: {type(exc).__name__}",
+                flush=True,
+            )
+            saved = None
         if saved:
             return TarotReadingResult(
                 full_reading=saved["ai_reading"],
