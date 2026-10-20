@@ -1,3 +1,28 @@
+# Mandatory engineering policy — Root-cause-first fixes
+
+**Applies to every agent, contributor, subsystem, hotfix and regression.**
+A test passing is evidence, **not** the definition of a correct fix.
+**Never patch only the observed screenshot/prompt/date/name until that one test passes.**
+
+For every non-trivial bug fix:
+
+1. **Reproduce and trace the failure before editing.** Record actual vs expected behavior and available evidence (user report, code path, logs, request/response, state, configuration). Trace the full flow across the relevant layers; distinguish a confirmed root cause from a hypothesis. If production evidence is inaccessible, say so explicitly.
+2. **Define the broken invariant and root cause.** Explain *why* the system permits the entire **class** of failures, not merely which line emitted the bad output. Inspect upstream inputs, shared normalization/parsing, routing, timezones, provider boundaries, state, permissions, fallback and presentation where relevant. Check neighboring features and past regressions that share that path.
+3. **Repair the underlying abstraction or contract.** Prefer coherent shared logic and explicit domain rules over additional special-case `if` statements, string/prompt patches, test-specific branches, hardcoded dates, users, teams or example phrases. A localized guard is acceptable only when the domain invariant truly is local, and that scope is explained.
+4. **Prove the fix generalizes.** Add a regression test for the reported failure **and** a small representative matrix: equivalent wording/input variants, opposite/negative cases, boundary conditions and adjacent functionality. Where feasible, demonstrate the new regression failing before the fix and passing afterward. Preserve privacy, authorization, compatibility, latency and external API budgets.
+5. **Never alter an assertion merely to make CI green.** First determine whether the failed test reveals a product regression, stale intended contract or faulty test. Change expected output only for a documented, intentional behavior change, with independent evidence. Do not disable, skip or narrow tests to hide failures.
+6. **Review the complete change before merge.** Examine the diff for one-off exceptions, cascading fallbacks, stale documentation and unintended side effects. Run affected suites and relevant broad regressions; report **what actually passed**. Production/provider/Discord smoke tests are separate from mocked CI and must not be claimed as done unless verified.
+7. **Write a short root-cause note in the PR or handoff.** Include: symptom and reproduction; confirmed root cause (or unresolved hypothesis); affected flow/class; why the change fixes that class; tests/negative cases; residual risks and rollout/rollback plan. Do not label the issue fixed if the cause is still unverified.
+
+**Emergency exception:** an urgent containment workaround may ship before root cause is known, but it must be clearly marked **temporary mitigation**, documented with its limitations and tracked for a root-cause follow-up. Never silently promote a workaround to the permanent fix.
+
+**Examples of anti-patterns (not prescriptions to change existing behavior):**
+- One chat reply misreads `20/10` → hardcode this particular date instead of verifying the shared clock, date interpretation and context priority.
+- One T1 fixture request fails → add only `T1` to a keyword list instead of reviewing general public schedule intent, entity disambiguation, retrieval freshness and private-data gates.
+- One CI assertion fails → adjust its expected string without validating the original contract or broader cases.
+
+---
+
 ## Asumi 3.15.1 — No Pro default, time-safe chat, current public fixtures (2026-10-20)
 
 - Clef may suggest fast/balanced/deep **effort** but cannot choose an arbitrary provider model. Default model map: fast Gemini 3.5 Flash-Lite; balanced/deep Gemini 3.8 Flash; deep increases thinking and output budget. Tarot deep also 3.8 Flash. Do not silently restore 3.1 Pro Preview without updated benchmark/cost justification and owner signoff.
