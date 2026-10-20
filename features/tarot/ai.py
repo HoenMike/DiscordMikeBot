@@ -900,6 +900,12 @@ async def generate_tarot_reading_result(
         "gemini-3.1-flash-lite",
     ])
 
+    # Detailed spreads can benefit from Pro, but keep brief Yes/No and Daily
+    # on faster Flash to avoid needless latency and costs.
+    if len(drawn_cards) >= 5:
+        from core import constants as policy
+        models_to_try = [policy.ASUMI_TAROT_DEEP_MODEL, *models_to_try]
+
     # A broken model must not stall the entire Tarot interaction for minutes.
     ordered_models = list(dict.fromkeys(model for model in models_to_try if model))
     card_count = len(drawn_cards)

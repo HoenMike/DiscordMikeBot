@@ -1,3 +1,11 @@
+## 3.14.9 — Clef Adaptive Gemini & Discord Mentions (2026-10-20)
+
+- Fix raw `@Display Name` in Asumi chat: convert only verified, explicitly mentioned Discord people to real `<@id>`, permit only that user ID in AllowedMentions, deny role/everyone pings, preserve unknown names as plain text.
+- Extend Clef's existing intent classification with a **single-call** depth suggestion (fast/balanced/deep). Python validates confidence and chooses hardcoded model IDs (never executable or model-authored provider data).
+- Prefer Gemini 3.8 Flash for regular chat, 3.5 Flash-Lite for greetings, Gemini 3.1 Pro Preview for confident complex requests. Multi-card Tarot (5+) gets Pro first; brief readings stay on Flash.
+- Add process-scoped Gemini 429 circuit breaker (2 distinct model quota failures within a minute pauses attempts for 90s) to avoid storms when project spend caps are exhausted. No billing setting is changed by the bot.
+- Regression/CI coverage for mentions, rejected pings, invalid Clef depth, model selection and quota protection. Live Discord/Clef/paid Gemini verification is still required.
+
 ## 3.14.8 — Gemini Tier 1 Tarot Reliability (2026-10-20)
 
 - Fix screenshot case: a finished Yes/No card no longer claims AI success when Gemini returns nothing; fallback is clearly labeled while the original card and board remain intact.

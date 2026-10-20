@@ -274,6 +274,7 @@ class AssistantCog(commands.Cog):
                     query or default_query,
                     previous_session,
                     context=context,
+                    model_tier=decision.model_tier,
                 )
             ai_ms = (time.perf_counter() - ai_started) * 1000
         except Exception as exc:
@@ -351,7 +352,9 @@ class AssistantCog(commands.Cog):
             return True
 
         send_started = time.perf_counter()
-        delivery = await send_conversation_reply(message, reply.text)
+        delivery = await send_conversation_reply(
+            message, reply.text, mentioned_people=context.mentioned_people,
+        )
         sent = delivery.last_message
         send_ms = (time.perf_counter() - send_started) * 1000
         total_ms = (time.perf_counter() - request_started) * 1000
@@ -383,6 +386,7 @@ class AssistantCog(commands.Cog):
                 "send_ms": round(send_ms, 1),
                 "total_ms": round(total_ms, 1),
                 "model": reply.model,
+                "model_tier": decision.model_tier,
                 "attempts": reply.attempts,
                 "query_chars": len(query),
                 "response_chars": len(reply.text),

@@ -1,3 +1,10 @@
+## Asumi 3.14.9 — Mention rendering and Clef effort tiers (2026-10-20)
+
+- Only explicitly tagged Discord members in incoming request may be pinged by assistant; `response.py` converts their resolved `@Display Name` to `<@id>` with restricted `AllowedMentions`. Never trust Gemini-generated arbitrary IDs or allow everyone/role pings.
+- Clef classifies intent + fast/balanced/deep effort within one Workers AI request. Provider validation and Python allowlist enforce real Gemini model choice; deep uses 3.1 Pro Preview, regular chat 3.8 Flash, greetings 3.5 Flash-Lite.
+- When two distinct Gemini models both return 429, a process-local 90s circuit limits needless retries. Spend caps remain user-managed in AI Studio; credits may not apply to all SKUs.
+- `tests/test_assistant_mentions_and_quota.py` plus `tests/test_assistant_core.py` cover behavior; external live credentialed tests and Discord permission verification remain explicit.
+
 # AGENTS.md — DiscordMikeBot Working Context
 
 This repository is expected to be used across multiple AI/agent sessions. Read this file before making non-trivial changes.
