@@ -122,7 +122,7 @@ def _build_prompt(
     # otherwise a global special case would bias unrelated conversations.
     october_20_today = (
         now_vn.day == 20 and now_vn.month == 10
-        and bool(re.search(r"(?<!\\d)20\\s*[/.-]\\s*10(?!\\d)", query))
+        and bool(re.search(r"(?<!\d)20\s*[/.-]\s*10(?!\d)", query))
     )
     parts: list[str] = [
         "MỐC THỜI GIAN ĐÁNG TIN CẬY CỦA LƯỢT HIỆN TẠI: "
