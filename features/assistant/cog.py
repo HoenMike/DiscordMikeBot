@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 
 from discord.ext import commands, tasks
@@ -9,11 +10,27 @@ from core.activity_logger import activity_logger
 from features.assistant.ai import ChatTimeoutBudgetError, generate_chat_reply
 from features.assistant.context import ContextBuilder
 from features.assistant.response import send_conversation_reply
-from features.assistant.router import RouteDecision, route_locally, route_message, _obvious_public_event_schedule_search
+from features.assistant.router import RouteDecision, route_locally, route_message, _obvious_public_event_schedule_search, _safe_public_web_query
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 from features.assistant.providers.cloudflare import CloudflareDecisionRouter
+
+
+def _self_contained_public_research_followup(query: str) -> bool:
+    """Allow a newly explicit public question to use normal routing on a reply.
+
+    Do not send private pronouns/chat/mentions to Brave or reconstruct a query
+    from Discord history. The current message itself must identify the subject.
+    """
+    if not _safe_public_web_query(query):
+        return False
+    cues = ("thống kê", "số liệu", "nguồn", "kiểm chứng", "fact check",
+            "bao nhiêu", "bao nhieu", "tỷ lệ", "tỉ lệ", "according to",
+            "statistics", "nghiên cứu", "theo báo cáo")
+    has_evidence_request = any(c in query.casefold() for c in cues)
+    named_reference = bool(re.search(r"\b20\d{2}\b|\b[A-Z]{2,}\b", query))
+    return has_evidence_request and named_reference
 
 
 async def choose_conversation_route(
@@ -44,7 +61,8 @@ async def choose_conversation_route(
         # A fully specified PUBLIC event/team question is a new fact request,
         # even when it replies to an older Asumi session. Ordinary "thế sao?"
         # and private-reference followups still keep conversation context.
-        if _obvious_public_event_schedule_search(query):
+        if (_obvious_public_event_schedule_search(query)
+                or _self_contained_public_research_followup(query)):
             return await route_message(
                 query,
                 cloudflare_router=cloudflare_router,
