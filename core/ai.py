@@ -98,10 +98,12 @@ async def bounded_ai_generate(model: str, contents, config, timeout_sec: float, 
                        error_type="CancelledError")
         raise
     except Exception as exc:
-        if not isinstance(exc, GeminiQuotaCircuitOpen):
-            reason = str(exc).lower()
-            if "429" in reason or "resource_exhausted" in reason:
-                _note_gemini_429(model)
+        if isinstance(exc, GeminiQuotaCircuitOpen):
+            # No request was made: do not count a provider API attempt.
+            raise
+        reason = str(exc).lower()
+        if "429" in reason or "resource_exhausted" in reason:
+            _note_gemini_429(model)
         _track_ai_call(model, label, "failed",
                        (time.perf_counter() - started) * 1000,
                        error_type=type(exc).__name__)
