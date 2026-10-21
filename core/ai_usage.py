@@ -146,6 +146,29 @@ class UsageStore:
             return await cursor.fetchall()
 
 
+    async def aggregate_between(self, since: datetime, until: datetime):
+        """Read-only UTC-bounded aggregate for private natural-language reports."""
+        if (since.tzinfo is None or until.tzinfo is None
+                or not since < until or (until - since).days > 32):
+            raise ValueError("Invalid usage window")
+        await self._init()
+        async with db_client.execute(
+            """SELECT task, actual_model, COUNT(*),
+             SUM(CASE WHEN outcome='ok' THEN 1 ELSE 0 END),
+             SUM(CASE WHEN outcome!='ok' THEN 1 ELSE 0 END),
+             SUM(CASE WHEN outcome='ok' AND pricing_status!='ESTIMATED' THEN 1 ELSE 0 END),
+             SUM(COALESCE(prompt_tokens,0)), SUM(COALESCE(output_tokens,0)),
+             SUM(COALESCE(thinking_tokens,0)), SUM(COALESCE(cached_tokens,0)),
+             SUM(COALESCE(estimated_usd_micros,0))
+             FROM asumi_ai_usage WHERE occurred_at>=? AND occurred_at<=?
+             GROUP BY task,actual_model
+             ORDER BY SUM(COALESCE(estimated_usd_micros,0)) DESC LIMIT 100""",
+            (since.astimezone(timezone.utc).isoformat(),
+             until.astimezone(timezone.utc).isoformat()),
+        ) as cursor:
+            return await cursor.fetchall()
+
+
     async def dashboard(self, days=7, at=None):
         """Bounded aggregate for the classic admin dashboard, no raw prompts."""
         if days not in (7, 30):
