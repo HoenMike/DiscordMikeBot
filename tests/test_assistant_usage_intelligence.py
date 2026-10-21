@@ -83,20 +83,20 @@ class UsageOwnerPrivacyTests(unittest.IsolatedAsyncioTestCase):
             reply=AsyncMock(return_value=SimpleNamespace(id=99)),
         )
 
-    async def test_owner_report_is_sent_by_dm_not_in_channel(self):
+    async def test_owner_report_is_visible_in_request_channel(self):
         reg, msg = self.registry(True), self.message()
         with patch("features.assistant.usage_report.quick_usage_report",
-                   new=AsyncMock(return_value="SECRET SPEND $123")) as quick:
+                   new=AsyncMock(return_value="Gemini usage $0.123")) as quick:
             result = await reg.execute(route_locally("token"), msg)
         self.assertTrue(result.handled)
-        self.assertEqual(result.details["ai_usage_status"], "sent_dm")
+        self.assertEqual(result.details["ai_usage_status"], "channel_report")
         quick.assert_awaited_once_with("7d")
-        msg.author.send.assert_awaited_once()
-        self.assertIn("SECRET SPEND", msg.author.send.await_args.args[0])
-        self.assertNotIn("SECRET SPEND", msg.reply.await_args.args[0])
-        self.assertNotIn("SECRET SPEND", result.response_context)
+        msg.author.send.assert_not_awaited()
+        self.assertIn("Gemini usage", msg.reply.await_args.args[0])
+        self.assertFalse(msg.reply.await_args.kwargs["mention_author"])
+        self.assertNotIn("Gemini usage", result.response_context)
 
-    async def test_unauthorized_cannot_read_turso_or_dm(self):
+    async def test_unauthorized_cannot_read_turso_or_see_cost_in_channel(self):
         reg, msg = self.registry(False), self.message()
         with patch("features.assistant.usage_report.quick_usage_report",
                    new_callable=AsyncMock) as quick:
@@ -121,7 +121,7 @@ class ConversationalQualityTests(unittest.IsolatedAsyncioTestCase):
         cog._query_from_message = Mock(return_value="token")
         cog.context_builder = SimpleNamespace(build=AsyncMock())
         cog.tools = SimpleNamespace(execute=AsyncMock(return_value=ToolExecutionResult(
-            handled=True, details={"ai_usage_status": "sent_dm"},
+            handled=True, details={"ai_usage_status": "channel_report"},
         )))
         cog._log_dashboard_activity = Mock()
         message = SimpleNamespace(id=1234)
