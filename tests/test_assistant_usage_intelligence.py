@@ -2,13 +2,13 @@
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from features.assistant.usage_intent import parse_usage_intent
 from features.assistant.usage_report import usage_window, format_quick_usage
 from features.assistant.router import route_locally, RouteDecision
-from features.assistant.cog import choose_conversation_route, _self_contained_public_research_followup
-from features.assistant.tools import CommandToolRegistry
+from features.assistant.cog import AssistantCog, choose_conversation_route, _self_contained_public_research_followup
+from features.assistant.tools import CommandToolRegistry, ToolExecutionResult
 from features.assistant.ai import ASSISTANT_SYSTEM_PROMPT, _build_prompt, _filter_unseen_custom_emotes
 from features.assistant.session import ConversationSession, ConversationTurn
 from features.assistant.context import AssistantContext, ContextLine
@@ -115,6 +115,21 @@ class UsageOwnerPrivacyTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ConversationalQualityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_usage_fast_path_skips_history_and_clef_entirely(self):
+        cog = AssistantCog.__new__(AssistantCog)
+        cog.should_handle = Mock(return_value=True)
+        cog._query_from_message = Mock(return_value="token")
+        cog.context_builder = SimpleNamespace(build=AsyncMock())
+        cog.tools = SimpleNamespace(execute=AsyncMock(return_value=ToolExecutionResult(
+            handled=True, details={"ai_usage_status": "sent_dm"},
+        )))
+        cog._log_dashboard_activity = Mock()
+        message = SimpleNamespace(id=1234)
+        self.assertTrue(await cog.handle_conversation_message(message))
+        cog.context_builder.build.assert_not_awaited()
+        cog.tools.execute.assert_awaited_once()
+        self.assertEqual(cog.tools.execute.await_args.args[0].tool, "ai_usage.report")
+
     async def test_usage_bypasses_live_followup(self):
         with patch("features.assistant.cog.route_message", new_callable=AsyncMock) as route:
             decision = await choose_conversation_route(
