@@ -35,7 +35,7 @@ async def choose_conversation_route(
         local.tool.startswith("archive.")
         or local.tool in {
             "web.search", "discord_history.search", "summary.member",
-            "multi_source.search",
+            "multi_source.search", "ai_usage.report",
         }
     ):
         return local
