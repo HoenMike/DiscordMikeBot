@@ -991,7 +991,42 @@ class CommandToolRegistry:
             },
         )
 
+    async def _execute_ai_usage(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        """Owner-only usage snapshot, directly in the channel where it was requested."""
+        async def notice(text: str, status: str):
+            sent = await message.reply(
+                text, mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return ToolExecutionResult(
+                handled=True, response_message_ids=(int(sent.id),),
+                response_context="[AI usage report: " + status + "]",
+                details={"ai_usage_status": status},
+            )
+
+        try:
+            owner = await asyncio.wait_for(self.bot.is_owner(message.author), timeout=4)
+        except Exception:
+            return await notice("Chưa xác minh được quyền chủ bot; thử lại sau.", "owner_unavailable")
+        if not owner:
+            return await notice("Số liệu token/chi phí toàn bot chỉ chủ Asumi được xem.", "unauthorized")
+
+        period = decision.arguments.get("period")
+        if period not in {"today", "month", "7d", "30d"}:
+            return await notice("Khoảng thời gian báo cáo không hợp lệ.", "invalid_period")
+
+        try:
+            from features.assistant.usage_report import quick_usage_report
+            report = await asyncio.wait_for(quick_usage_report(period), timeout=8)
+        except Exception as exc:
+            print("[AI Usage] report unavailable: " + type(exc).__name__, flush=True)
+            return await notice("Chưa đọc được usage từ Turso; hiện không có số liệu đáng tin để báo.", "unavailable")
+
+        return await notice(report, "channel_report")
+
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
+        if decision.tool == "ai_usage.report":
+            return await self._execute_ai_usage(decision, message)
         if decision.tool == "multi_source.search":
             return await self._execute_multi_source(decision, message)
         if decision.tool == "weather.forecast":

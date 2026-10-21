@@ -2,10 +2,24 @@ from __future__ import annotations
 
 import math
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import aiohttp
+
+
+def _track_clef(model: str, status: str, started: float, error_type=None):
+    """Count unpriced Cloudflare requests without storing routing text."""
+    try:
+        from core.ai_usage import queue, usage_event
+        queue(usage_event(
+            model=model, label="clef-router", provider="cloudflare-workers-ai",
+            outcome=status, latency_ms=(time.perf_counter() - started) * 1000,
+            error_type=error_type,
+        ))
+    except Exception as exc:
+        print("[AI Cost] Clef telemetry unavailable: " + type(exc).__name__, flush=True)
 
 
 @dataclass(frozen=True)
@@ -172,10 +186,17 @@ class CloudflareDecisionRouter:
             "Content-Type": "application/json",
         }
 
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.post(url, headers=headers, json=payload) as response:
-                response.raise_for_status()
-                body = await response.json()
+        started = time.perf_counter()
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, headers=headers, json=payload) as response:
+                    response.raise_for_status()
+                    body = await response.json()
+        except Exception as exc:
+            _track_clef(self.model, "failed", started, type(exc).__name__)
+            raise
+        else:
+            _track_clef(self.model, "ok", started)
 
         result = body.get("result", body) if isinstance(body, dict) else {}
         answers = result.get("answers", {}) if isinstance(result, dict) else {}

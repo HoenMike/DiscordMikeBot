@@ -173,6 +173,10 @@
                     <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
                     <span>Tổng Quan Hệ Thống</span>
                 </button>
+                <button onclick="switchTab('ai-usage')" id="tab-btn-ai-usage" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all" aria-controls="tab-content-ai-usage">
+                    <i data-lucide="chart-no-axes-combined" class="w-3.5 h-3.5 text-teal-400"></i>
+                    <span>AI Usage</span>
+                </button>
                 <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
                     <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
                     <span>Console Logs</span>
@@ -420,6 +424,105 @@
         </section>
 
         <!-- ========================================== -->
+        <!-- ========================================== -->
+        <!-- T31: AI usage and spend estimates INSIDE the historical admin dashboard -->
+        <section id="tab-content-ai-usage" class="tab-content hidden flex-1 min-h-0 overflow-y-auto pr-1" aria-label="AI Usage và chi phí dự kiến">
+            <div class="flex flex-col gap-4 pb-5">
+                <div class="flex flex-wrap items-start justify-between gap-3 bg-dark-card border border-dark-border rounded-xl p-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center gap-2">
+                            <i data-lucide="chart-no-axes-combined" class="w-4 h-4 text-teal-400"></i>
+                            AI Usage & Cost
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-1">Token thực tế · model được gọi · chi phí API ước tính, không phải số tiền đã trừ từ Google Billing.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="ai-usage-period" class="text-xs text-slate-300">Khoảng</label>
+                        <select id="ai-usage-period" aria-label="Chọn khoảng thời gian AI Usage" class="bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" onchange="loadAIUsage(true)">
+                            <option value="7">7 ngày</option>
+                            <option value="30">30 ngày</option>
+                        </select>
+                        <button type="button" onclick="loadAIUsage(true)" class="rounded-lg border border-dark-border bg-dark-surface px-3 py-2 text-xs text-white hover:bg-dark-border flex items-center gap-1.5">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Làm mới
+                        </button>
+                    </div>
+                </div>
+                <p id="ai-usage-status" role="status" aria-live="polite" class="text-xs text-slate-400 px-1">Mở tab để tải dữ liệu lần đầu.</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Chi phí đã ghi nhận</div>
+                        <div id="ai-usage-known-cost" class="text-lg font-bold text-white mt-1">—</div>
+                        <div id="ai-usage-known-usd" class="text-[11px] text-slate-400">Gemini text · chưa trừ credit</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Dự phóng 30 ngày</div>
+                        <div id="ai-usage-forecast" class="text-lg font-bold text-teal-300 mt-1">—</div>
+                        <div id="ai-usage-confidence" class="text-[11px] text-slate-400">Ước tính theo lưu lượng</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Lượt gọi AI</div>
+                        <div id="ai-usage-requests" class="text-lg font-bold text-white mt-1">—</div>
+                        <div id="ai-usage-failures" class="text-[11px] text-slate-400">Thành công / lỗi</div>
+                        <div id="ai-usage-today" class="text-[11px] text-teal-300 mt-1">Hôm nay (UTC): —</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-dark-card border border-dark-border">
+                        <div class="text-[11px] text-slate-400">Tổng token Gemini</div>
+                        <div id="ai-usage-tokens" class="text-lg font-bold text-white mt-1">—</div>
+                        <div id="ai-usage-thinking" class="text-[11px] text-slate-400">Input / Output / Thinking / Cached</div>
+                    </div>
+                </div>
+                <div id="ai-usage-warning" class="hidden rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200" role="note"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+                    <div class="lg:col-span-3 p-4 rounded-xl bg-dark-card border border-dark-border">
+                        <h3 class="text-xs font-bold text-white">Chi phí đã ghi nhận theo ngày (UTC)</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Dùng đơn giá lúc gọi API; khoản chưa định giá không được cộng như miễn phí.</p>
+                        <div class="h-52 w-full mt-3"><canvas id="ai-usage-trend-chart" aria-label="Biểu đồ chi phí AI theo ngày" role="img"></canvas></div>
+                    </div>
+                    <div class="lg:col-span-2 p-4 rounded-xl bg-dark-card border border-dark-border">
+                        <h3 class="text-xs font-bold text-white">Ngân sách còn dùng được bao lâu?</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Nhập <strong>số dư còn lại</strong>; không đọc trực tiếp ví Google. Credit chỉ nhập khi Google Billing đã xác nhận áp dụng cho Gemini.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-2 mt-3">
+                            <label class="block text-[11px] text-slate-300">Prepay còn lại (VND)
+                                <input id="ai-usage-prepay" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="Ví dụ: 150000" class="mt-1 w-full bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" oninput="updateAIRunway()">
+                            </label>
+                            <label class="block text-[11px] text-slate-300">GCP Credit hợp lệ, chưa hết hạn (VND)
+                                <input id="ai-usage-credit" type="number" min="0" max="1000000000" step="1000" inputmode="numeric" placeholder="Không chắc thì để trống" class="mt-1 w-full bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" oninput="updateAIRunway()">
+                            </label>
+                            <label class="block text-[11px] text-slate-300">Tỷ giá dự kiến (VND/USD)
+                                <input id="ai-usage-fx" type="number" min="1000" max="100000" step="100" value="26000" class="mt-1 w-full bg-dark-surface border border-dark-border rounded-lg px-2 py-2 text-sm text-white" oninput="aiUsageResult ? aiRenderUsage(aiUsageResult) : updateAIRunway()">
+                            </label>
+                        </div>
+                        <div class="mt-3 rounded-lg bg-dark-surface border border-dark-border p-3">
+                            <div class="text-[11px] text-slate-400">Thời gian duy trì lý thuyết</div>
+                            <div id="ai-usage-runway" class="text-lg text-teal-300 font-bold mt-1">Nhập số dư để tính</div>
+                            <div id="ai-usage-runway-note" class="text-[11px] text-slate-400 mt-1">Không tính hạn dùng credit/Prepay và các phí chưa được thống kê.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div class="rounded-xl bg-dark-card border border-dark-border p-4 overflow-hidden">
+                        <h3 class="text-xs font-bold text-white mb-3">Theo model và nhà cung cấp</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-slate-400 border-b border-dark-border"><tr><th class="pb-2 pr-2">Model</th><th class="pb-2 text-right">Calls</th><th class="pb-2 text-right">Tokens</th><th class="pb-2 text-right">Ước phí</th></tr></thead>
+                                <tbody id="ai-usage-model-rows" class="text-slate-200"><tr><td colspan="4" class="py-3">Chưa tải.</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="rounded-xl bg-dark-card border border-dark-border p-4 overflow-hidden">
+                        <h3 class="text-xs font-bold text-white mb-3">Theo tính năng</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-slate-400 border-b border-dark-border"><tr><th class="pb-2 pr-2">Tính năng</th><th class="pb-2 text-right">Calls</th><th class="pb-2 text-right">Lỗi</th><th class="pb-2 text-right">Ước phí</th></tr></thead>
+                                <tbody id="ai-usage-feature-rows" class="text-slate-200"><tr><td colspan="4" class="py-3">Chưa tải.</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <p id="ai-usage-disclaimer" class="text-[11px] text-slate-400 leading-relaxed">Số liệu bắt đầu từ khi bật monitor, không có lịch sử trước đó. Chi phí chưa bao gồm đầy đủ dịch vụ ngoài Gemini và không phải hóa đơn thực tế.</p>
+            </div>
+        </section>
+
         <!-- ========================================== -->
         <!-- TAB 4: TAROT AI HUB & COOLDOWNS -->
         <!-- ========================================== -->
@@ -1332,7 +1435,7 @@
         window.addEventListener('popstate', () => {
             const params = new URLSearchParams(location.search);
             const tab = params.get('tab') || 'activity';
-            if (['activity','feedback','presence','version','tarot','cabin','guilds','overview','logs'].includes(tab)) {
+            if (['activity','feedback','presence','version','tarot','cabin','guilds','overview','ai-usage','logs'].includes(tab)) {
                 switchTab(tab, false);
                 if (tab === 'feedback') feedbackFrame()?.contentWindow?.postMessage(
                     {type:'asumi:feedback:open', ticket:params.get('ticket')||''},
@@ -1370,10 +1473,232 @@
                 fetchTarotRatingStats();
             } else if (tab === 'cabin') {
                 fetchCabinData();
+            } else if (tab === 'ai-usage') {
+                loadAIUsage(false);
             } else if (tab === 'logs') {
                 renderLogs(true);
             }
             lucide.createIcons();
+        }
+
+        // T31: lazy-loaded AI spending view; no new AI request and no main chat noise.
+        let aiUsageResult = null;
+        let aiUsageChart = null;
+        let aiUsageLastLoad = 0;
+        let aiUsageLoadedDays = null;
+        let aiUsageRequestSerial = 0;
+        const aiMoney = new Intl.NumberFormat('vi-VN', {maximumFractionDigits: 0});
+        const aiUSD = new Intl.NumberFormat('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 4});
+        const aiSetText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = String(value);
+        };
+        const aiFormatVND = value => aiMoney.format(value) + 'đ';
+        const aiFormatTokens = value => aiMoney.format(Number(value || 0));
+        const aiAmount = value => Number(value || 0) / 1e6;
+        const aiFieldValue = id => {
+            const el = document.getElementById(id);
+            if (!el || el.value.trim() === '') return null;
+            const value = Number(el.value);
+            if (!Number.isFinite(value) || value < 0 || value > 1000000000) return NaN;
+            return value;
+        };
+
+        function aiRenderTable(id, items, renderRow, emptyLabel) {
+            const body = document.getElementById(id);
+            if (!body) return;
+            body.replaceChildren();
+            if (!items.length) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 4;
+                td.className = 'py-3 text-slate-400';
+                td.textContent = emptyLabel;
+                tr.appendChild(td);
+                body.appendChild(tr);
+                return;
+            }
+            for (const item of items) {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-dark-border/70';
+                const cells = renderRow(item);
+                for (let i = 0; i < cells.length; i++) {
+                    const td = document.createElement('td');
+                    td.className = 'py-2 pr-2 align-top' + (i ? ' text-right whitespace-nowrap' : ' break-words max-w-[210px]');
+                    td.textContent = String(cells[i]);
+                    tr.appendChild(td);
+                }
+                body.appendChild(tr);
+            }
+        }
+
+        function aiCostLabel(row, fx) {
+            const priced = Number(row.success || 0) - Number(row.unpriced || 0);
+            if (priced <= 0) return 'Chưa định giá';
+            const value = aiFormatVND(aiAmount(row.usd_micros) * fx);
+            return Number(row.unpriced || 0) || Number(row.failed || 0)
+                ? '~' + value + ' (một phần)' : '~' + value;
+        }
+
+        function updateAIRunway() {
+            const result = aiUsageResult;
+            const prepay = aiFieldValue('ai-usage-prepay');
+            const credits = aiFieldValue('ai-usage-credit');
+            const fx = aiFieldValue('ai-usage-fx');
+            if (!result) {
+                aiSetText('ai-usage-runway', 'Chưa có dữ liệu AI');
+                return;
+            }
+            if (prepay === null) {
+                aiSetText('ai-usage-runway', 'Nhập số dư Prepay để tính');
+                aiSetText('ai-usage-runway-note', 'GCP Credits chỉ nhập sau khi kiểm tra điều kiện ở Google Billing.');
+                return;
+            }
+            if (!Number.isFinite(prepay) || !Number.isFinite(credits === null ? 0 : credits) ||
+                    !Number.isFinite(fx) || fx < 1000 || fx > 100000) {
+                aiSetText('ai-usage-runway', 'Số dư hoặc tỷ giá không hợp lệ');
+                return;
+            }
+            const forecast = result.forecast_30d_usd_micros;
+            if (forecast === null || forecast === undefined || forecast <= 0) {
+                aiSetText('ai-usage-runway', 'Chưa đủ số liệu để tính');
+                return;
+            }
+            const dailyVND = aiAmount(forecast) * fx / 30;
+            const balance = prepay + (credits || 0);
+            const daysLeft = dailyVND > 0 ? balance / dailyVND : null;
+            aiSetText('ai-usage-runway', daysLeft === null ? 'Chưa thể tính'
+                : aiMoney.format(daysLeft) + ' ngày (~' + (daysLeft / 30).toFixed(1) + ' tháng)');
+            aiSetText('ai-usage-runway-note',
+                (credits ? 'Bao gồm credit do bạn nhập, CHỈ khi được Google xác nhận đủ điều kiện. ' : '')
+                + 'Ước tính chưa xét ngày hết hạn Prepay/credit, phí chưa định giá, thay đổi giá và tăng trưởng usage.'
+                + (result.incomplete ? ' Một số request chưa biết chi phí.' : ''));
+        }
+
+        function aiRenderTrend(result, fx) {
+            if (typeof Chart === 'undefined') return;
+            const canvas = document.getElementById('ai-usage-trend-chart');
+            if (!canvas) return;
+            const byDate = new Map((result.daily || []).map(item => [item.date, item.usd_micros]));
+            const days = Number(result.window_days || 7);
+            const end = new Date(result.as_of);
+            const base = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+            const labels = [];
+            const values = [];
+            for (let n = days - 1; n >= 0; n--) {
+                const iso = new Date(base - n * 86400000).toISOString().slice(0, 10);
+                labels.push(iso.slice(5));
+                values.push(aiAmount(byDate.get(iso)) * fx);
+            }
+            if (aiUsageChart) aiUsageChart.destroy();
+            aiUsageChart = new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Chi phí ghi nhận (VND)',
+                        data: values,
+                        backgroundColor: 'rgba(45, 212, 191, .55)',
+                        borderColor: 'rgba(94, 234, 212, 1)',
+                        borderWidth: 1,
+                        borderRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {legend: {display: false},
+                        tooltip: {callbacks: {label: ctx => aiFormatVND(ctx.parsed.y)}}},
+                    scales: {
+                        x: {ticks: {color: '#94a3b8', maxTicksLimit: 9},
+                            grid: {display: false}},
+                        y: {beginAtZero: true, ticks: {
+                            color: '#94a3b8',
+                            callback: value => aiMoney.format(value) + 'đ'
+                        }, grid: {color: 'rgba(255,255,255,.05)'}}
+                    }
+                }
+            });
+        }
+
+        function aiRenderUsage(result) {
+            const fxValue = aiFieldValue('ai-usage-fx');
+            const fx = Number.isFinite(fxValue) && fxValue >= 1000 && fxValue <= 100000 ? fxValue : 26000;
+            const total = result.totals || {};
+            const priced = Number(total.success || 0) - Number(total.unpriced || 0);
+            const known = priced > 0;
+            aiSetText('ai-usage-known-cost', known ? '~' + aiFormatVND(aiAmount(total.usd_micros) * fx) : 'Chưa định giá');
+            aiSetText('ai-usage-known-usd', known
+                ? '$' + aiUSD.format(aiAmount(total.usd_micros)) + ' · phần đã định giá' : 'Không có response đủ dữ liệu giá');
+            aiSetText('ai-usage-forecast', result.forecast_30d_usd_micros == null
+                ? 'Chưa đủ dữ liệu' : '~' + aiFormatVND(aiAmount(result.forecast_30d_usd_micros) * fx));
+            aiSetText('ai-usage-confidence', result.early_sample
+                ? 'Mẫu dưới 3 ngày · chỉ tham khảo'
+                : 'Ước tính theo ' + result.observed_days + ' ngày được quan sát');
+            aiSetText('ai-usage-requests', aiFormatTokens(total.calls));
+            aiSetText('ai-usage-failures', aiFormatTokens(total.success) + ' thành công · ' +
+                aiFormatTokens(total.failed) + ' lỗi · ' + aiFormatTokens(total.unpriced) + ' chưa định giá');
+            aiSetText('ai-usage-today', 'Hôm nay (UTC): ' + aiFormatTokens(result.today_utc?.calls) +
+                ' lượt · ~' + aiFormatVND(aiAmount(result.today_utc?.usd_micros) * fx) + ' đã định giá');
+            aiSetText('ai-usage-tokens', aiFormatTokens((total.input_tokens || 0) +
+                (total.output_tokens || 0) + (total.thinking_tokens || 0)));
+            aiSetText('ai-usage-thinking',
+                'In ' + aiFormatTokens(total.input_tokens) + ' · Out ' + aiFormatTokens(total.output_tokens)
+                + ' · Think ' + aiFormatTokens(total.thinking_tokens) + ' · Cache ' + aiFormatTokens(total.cached_tokens));
+            const warnings = [];
+            if (result.early_sample) warnings.push('Chưa đủ 3 ngày dữ liệu: dự phóng có thể biến động rất mạnh.');
+            if (result.incomplete) warnings.push('Một số request lỗi hoặc chưa định giá; số tiền chỉ phản ánh phần đo được.');
+            if (result.truncated) warnings.push('Dữ liệu vượt giới hạn trả về, không sử dụng dự phóng.');
+            const warning = document.getElementById('ai-usage-warning');
+            warning.classList.toggle('hidden', warnings.length === 0);
+            warning.textContent = warnings.join(' ');
+            aiSetText('ai-usage-status', total.calls
+                ? 'Đã ghi ' + aiFormatTokens(total.calls) + ' lượt gọi trong ' + result.window_days +
+                  ' ngày qua. Cập nhật ' + new Date(result.as_of).toLocaleString('vi-VN') + '.'
+                : 'Chưa có request được ghi nhận trong khoảng này. Monitor chỉ có dữ liệu từ khi deploy.');
+            aiRenderTable('ai-usage-model-rows', result.by_model || [], row => [
+                row.model + ' · ' + row.provider, aiFormatTokens(row.calls),
+                aiFormatTokens((row.input_tokens || 0) + (row.output_tokens || 0) + (row.thinking_tokens || 0)),
+                aiCostLabel(row, fx)
+            ], 'Chưa có model nào được ghi nhận.');
+            aiRenderTable('ai-usage-feature-rows', result.by_feature || [], row => [
+                row.feature, aiFormatTokens(row.calls), aiFormatTokens(row.failed),
+                aiCostLabel(row, fx)
+            ], 'Chưa có tính năng nào được ghi nhận.');
+            aiSetText('ai-usage-disclaimer', result.disclaimer
+                + ' Dữ liệu chỉ bắt đầu từ lúc deploy tính năng. Không có số liệu lịch sử trước đó.');
+            aiRenderTrend(result, fx);
+            updateAIRunway();
+        }
+
+        async function loadAIUsage(force = false) {
+            if (currentTab !== 'ai-usage') return;
+            const days = Number(document.getElementById('ai-usage-period').value);
+            if (![7, 30].includes(days)) return;
+            if (!force && aiUsageResult && aiUsageLoadedDays === days &&
+                Date.now() - aiUsageLastLoad < 60000) {
+                aiRenderUsage(aiUsageResult);
+                return;
+            }
+            const serial = ++aiUsageRequestSerial;
+            aiSetText('ai-usage-status', 'Đang đọc thống kê từ Turso…');
+            try {
+                const response = await fetch('/api/admin/ai-usage?days=' + days,
+                    {credentials: 'same-origin', cache: 'no-store'});
+                if (!response.ok) throw new Error(
+                    response.status === 401 ? 'Phiên đăng nhập đã hết hạn.' : 'API chưa sẵn sàng (' + response.status + ').');
+                const payload = await response.json();
+                if (serial !== aiUsageRequestSerial || currentTab !== 'ai-usage') return;
+                aiUsageResult = payload;
+                aiUsageLastLoad = Date.now();
+                aiUsageLoadedDays = days;
+                aiRenderUsage(payload);
+            } catch (error) {
+                if (serial !== aiUsageRequestSerial) return;
+                aiUsageResult = null;
+                aiSetText('ai-usage-status', 'Không đọc được dữ liệu: ' + error.message +
+                    ' Không hiển thị chi phí 0đ vì chưa xác minh được.');
+                aiSetText('ai-usage-runway', 'Tạm thời không thể dự báo');
+            }
         }
 
         // Action Type Icons & Badges
@@ -3117,7 +3442,7 @@
             // Preserve bookmarked T24 links by selecting the corresponding old tab.
             // Direct /admin visits retain the original Activity landing tab.
             const requestedTab = new URLSearchParams(location.search).get('tab');
-            if (requestedTab && ['activity','feedback','presence','version','tarot','cabin','guilds','overview','logs'].includes(requestedTab)) {
+            if (requestedTab && ['activity','feedback','presence','version','tarot','cabin','guilds','overview','ai-usage','logs'].includes(requestedTab)) {
                 switchTab(requestedTab, false);
             }
             setInterval(() => {

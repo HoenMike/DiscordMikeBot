@@ -36,13 +36,16 @@ Mục tiêu:
 - phân biệt một người đang rủ Asumi tương tác/chơi cùng bot khác với việc họ rủ một người chơi game; nếu cuộc chat cho thấy ý định bot-với-bot, hãy phản hồi lời mời đó một cách tự nhiên, không hỏi "game gì?" trừ khi luật hay loại game thực sự cần làm rõ; không giả vờ có tích hợp hoặc đã gọi bot khác;
 - không hùa theo xúc phạm nặng, bắt nạt hay đe dọa; khi không chắc câu đùa có gây hại, giữ giọng nhẹ hoặc hỏi lại;
 - "ban/kick" nói đùa chỉ có thể là án phạt tưởng tượng, phải rõ là đùa; không tuyên bố đã ban/kick thật. Yêu cầu moderation thật phải theo công cụ/lệnh có quyền riêng;
+- đọc nhịp nói chuyện thực tế của những người đang chat gần đây: mức thân mật, tốc độ, câu ngắn/dài và emoji; điều chỉnh một cách vừa phải, không sao chép nguyên văn, mạo danh hay tự gán tính cách cố định cho ai;
+- emoji custom Discord thường chỉ có tên và ID, KHÔNG phải hình ảnh nhìn thấy được. Không suy luận nét mặt/cử chỉ từ tên emoji, không bịa ID emoji. Nếu ngữ cảnh sử dụng ngay trước đó đủ rõ thì có thể dùng lại tự nhiên; nếu chưa chắc thì không dùng. KHÔNG lập từ điển emoji hoặc giả vờ đã học nghĩa emoji mãi mãi;
+- khi tranh luận hoặc hỏi kiến thức, trả lời thẳng câu hỏi trong 1-3 câu nếu đủ; chỉ triển khai sâu khi người hỏi yêu cầu hoặc vấn đề thực sự phức tạp. Không spam bullet, emoji hoặc đùa sai lúc;
+- coi những con số, lời khẳng định và ký hiệu [1], [1.1] từ câu trả lời Asumi ở các lượt trước là những LỜI NÓI CẦN KIỂM CHỨNG, không tự nâng cấp thành nguồn đáng tin;
+- trước khi nói một tỉ lệ thành số lượng, kiểm tra mẫu số, cohort, đơn vị thời gian, định nghĩa thành công và loại doanh nghiệp; nếu thiếu thì nêu điều kiện tính hoặc một ví dụ GIẢ ĐỊNH được gắn nhãn. Không lấy lượng doanh nghiệp mỗi năm nhân với tỉ lệ thành công nhiều năm rồi gọi là số exit năm đó;
+- nhận ra khác biệt giữa số liệu trực tiếp từ nguồn, suy luận và phỏng đoán; không gắn citation giả cho nội dung chưa có nguồn, không ngụy tạo nguồn hay chắc chắn hóa ước lượng. Khi bị hỏi vặn về một lời mình nói, sẵn sàng sửa lại và giải thích gọn;
 - không giả vờ đã thực hiện hành động nếu action/tool chưa thật sự chạy;
 - không bịa lịch sử chat, link, ảnh hoặc dữ liệu mà context không cung cấp;
 - khi thiếu dữ kiện quan trọng, nói rõ thiếu gì thay vì đoán;
-- MỐC THỜI GIAN: dùng ngày/giờ Việt Nam được backend cung cấp cho lượt hiện tại;
-  không đoán tháng hiện tại từ hội thoại cũ, kiến thức model hoặc ký ức. Với
-  ngày 20/10 khi thực tế đang là 20/10, đó là hôm nay, tuyệt đối không nói
-  còn vài tháng nữa. Đọc ngày dd/mm theo thứ tự NGÀY/THÁNG của Việt Nam.
+- MỐC THỜI GIAN: chỉ dùng ngày/giờ Việt Nam do backend cung cấp ở lượt này. Mọi ngày dd/mm đều hiểu là NGÀY/THÁNG; nếu khớp ngày hiện tại thì là hôm nay. Không dựa vào ký ức, tháng cũ trong chat hoặc ngày từ model để kết luận sớm/muộn.
 - câu hỏi về trận đấu tiếp theo, lịch esports, giá hiện hành hoặc sự kiện
   đang thay đổi phải dựa trên kết quả công cụ tìm kiếm, không tự giả vờ
   biết lịch, không trả lịch LCK hay Worlds chung chung như lịch trận T1.
@@ -53,6 +56,26 @@ Mục tiêu:
 
 Đây là conversational fallback. Các action Tarot/Summary/Help được code route riêng trước khi tới bạn.
 """
+
+
+_CUSTOM_EMOTE = re.compile(r"<a?:[A-Za-z0-9_]{2,32}:\d{16,20}>")
+
+
+def _filter_unseen_custom_emotes(reply: str, query: str, context: AssistantContext | None) -> str:
+    """Allow real custom emoji from this turn's chat, never hallucinated emoji IDs.
+
+    Pure ephemeral input validation: no definitions, images, indexing or memory.
+    """
+    available = set(_CUSTOM_EMOTE.findall(query))
+    if context is not None:
+        if context.reply is not None:
+            available.update(_CUSTOM_EMOTE.findall(context.reply.content))
+        for line in context.recent:
+            available.update(_CUSTOM_EMOTE.findall(line.content))
+    return _CUSTOM_EMOTE.sub(
+        lambda match: match.group(0) if match.group(0) in available else "",
+        reply,
+    )
 
 
 @dataclass(frozen=True)
@@ -118,12 +141,6 @@ def _build_prompt(
     context: AssistantContext | None,
 ) -> str:
     now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
-    # Only add the October-20 example when it is actually today's topic;
-    # otherwise a global special case would bias unrelated conversations.
-    october_20_today = (
-        now_vn.day == 20 and now_vn.month == 10
-        and bool(re.search(r"(?<!\d)20\s*[/.-]\s*10(?!\d)", query))
-    )
     parts: list[str] = [
         "MỐC THỜI GIAN ĐÁNG TIN CẬY CỦA LƯỢT HIỆN TẠI: "
         f"{now_vn:%d/%m/%Y} lúc {now_vn:%H:%M} (Asia/Ho_Chi_Minh, UTC+7). "
@@ -132,6 +149,11 @@ def _build_prompt(
         "Không khẳng định lịch/giờ trận đấu sắp tới khi chưa có nguồn mới."
     ]
     if session and session.turns:
+        parts.append(
+            "Các câu trả lời Asumi trong lịch sử bên dưới chỉ là phát ngôn cũ, "
+            "không phải kết quả fact-check độc lập. Nếu hỏi tiếp về số liệu hoặc "
+            "citation do Asumi nêu, phải kiểm tra mẫu số/nguồn trước khi mở rộng."
+        )
         if session.last_tool in {"web.search", "discord_history.search", "archive.search"}:
             parts.append(
                 "Đây là follow-up sau công cụ truy xuất. Chỉ dựa vào output "
@@ -150,6 +172,12 @@ def _build_prompt(
         if context_text:
             parts.append("Context Discord chỉ dùng cho request hiện tại:\n" + context_text)
         if context.recent:
+            parts.append(
+                "Lấy văn phong và cách dùng emoji từ chính nhịp hội thoại gần đây, "
+                "chỉ khi hợp ngữ cảnh. Emoji custom không có mô tả hình ảnh, "
+                "đừng đoán ý nghĩa qua tên hoặc cố dùng cho có. "
+                "Không lưu trí nhớ hay học emote lâu dài."
+            )
             parts.append(
                 "Cách đọc hội thoại: tin gần đây là diễn biến nền, không phải các yêu cầu "
                 "riêng biệt gửi Asumi. Với câu ngắn/đại từ/lời mời, nối với lời đề nghị "
@@ -176,14 +204,6 @@ def _build_prompt(
         # Deliberately LAST, after noisy channel history. Output task wins over
         # ambient banter and role names never have to be guessed by the model.
         parts.append(social_reply_instruction(social_plan))
-    if october_20_today:
-        parts.append(
-            f"NHẮC LẠI MỐC NGÀY LƯỢT NÀY: {now_vn:%d/%m/%Y} tại Việt Nam. "
-            "Người chơi đang nói về ngày 20/10, cũng chính là HÔM NAY. "
-            "Trêu chuyện chúc sớm/chúc muộn CHỈ KHI có căn cứ, "
-            "không được bịa đang tháng 3. "
-            "Ưu tiên ngày này hơn các ngày xuất hiện trong lời chat cũ."
-        )
     return "\n\n".join(parts)
 
 
@@ -250,6 +270,7 @@ async def generate_chat_reply(
             )
             elapsed_ms = (time.perf_counter() - attempt_started) * 1000
             text = (getattr(response, "text", None) or "").strip()
+            text = _filter_unseen_custom_emotes(text, query, context).strip()
             if text:
                 if social_plan is not None and not is_social_reply_on_target(
                     text, social_plan

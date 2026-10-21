@@ -1,0 +1,70 @@
+name: Asumi AI Usage & Cost Monitor
+
+on:
+  pull_request:
+    paths:
+      - "core/ai.py"
+      - "core/ai_usage.py"
+      - "features/ai_cost/**"
+      - "features/assistant/**"
+      - "tests/test_assistant_usage_intelligence.py"
+      - "tests/test_assistant_time_flash_search.py"
+      - "core/constants.py"
+      - "bot_instance.py"
+      - "tests/test_ai_usage_cost.py"
+      - "tests/test_ai_usage_dashboard.py"
+      - "web/app.py"
+      - "web/templates/dashboard.html"
+      - ".github/workflows/asumi-ai-cost.yml"
+  push:
+    branches: [main]
+    paths:
+      - "core/ai.py"
+      - "core/ai_usage.py"
+      - "features/ai_cost/**"
+      - "features/assistant/**"
+      - "tests/test_assistant_usage_intelligence.py"
+      - "tests/test_assistant_time_flash_search.py"
+      - "core/constants.py"
+      - "bot_instance.py"
+      - "tests/test_ai_usage_cost.py"
+      - "tests/test_ai_usage_dashboard.py"
+      - "web/app.py"
+      - "web/templates/dashboard.html"
+
+jobs:
+  usage-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Dependencies
+        run: |
+          grep -v '^audioop-lts' requirements.txt > /tmp/asumi-ai-requirements.txt
+          python -m pip install -r /tmp/asumi-ai-requirements.txt
+      - name: Compile and test AI usage
+        env:
+          ADMIN_PASSWORD: ci-only-placeholder
+          FLASK_SECRET_KEY: ci-only-placeholder-not-production
+        run: |
+          python -m compileall -q core/ai.py core/ai_usage.py features/ai_cost features/assistant
+          python -m unittest discover -s tests -p "test_ai_usage_cost.py" -v
+          python -m unittest discover -s tests -p "test_ai_usage_dashboard.py" -v
+          python -m unittest discover -s tests -p "test_assistant_usage_intelligence.py" -v
+          python -m unittest discover -s tests -p "test_assistant_time_flash_search.py" -v
+          python -m unittest discover -s tests -p "test_assistant_mentions_and_quota.py" -v
+          python -m unittest discover -s tests -p "test_assistant_search_followup.py" -v
+      - name: Validate classic dashboard inline JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("web/templates/dashboard.html").read_text("utf-8")
+          Path("/tmp/asumi-cost-dashboard.js").write_text(
+              source.rsplit("<script>", 1)[1].split("</script>", 1)[0], encoding="utf-8"
+          )
+          PY
+          node --check /tmp/asumi-cost-dashboard.js

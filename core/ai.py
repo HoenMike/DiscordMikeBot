@@ -56,37 +56,61 @@ def _gemini_quota_remaining_seconds() -> float:
     return max(0.0, _quota_paused_until - time.monotonic())
 
 
+def _track_ai_call(model, label, outcome, elapsed_ms, response=None, error_type=None):
+    """Telemetry cannot block AI success, log messages, or affect the 429 circuit."""
+    try:
+        from core.ai_usage import usage_event, queue
+        queue(usage_event(model=model, label=label, outcome=outcome,
+                          response=response, latency_ms=elapsed_ms,
+                          error_type=error_type))
+    except Exception as exc:
+        print("[AI Cost] tracking unavailable: " + type(exc).__name__, flush=True)
+
+
 async def bounded_ai_generate(model: str, contents, config, timeout_sec: float, label: str = "AI"):
-    """Gọi AI bất đồng bộ với timeout hủy được request nền và semaphore giới hạn đồng thời toàn cục."""
+    """Bounded Gemini request with the existing quota circuit and per-attempt metrics."""
     global AI_CALL_SEMAPHORE
     if AI_CALL_SEMAPHORE is None:
         AI_CALL_SEMAPHORE = asyncio.Semaphore(6)
-    remaining = _gemini_quota_remaining_seconds()
-    if remaining:
-        raise GeminiQuotaCircuitOpen(
-            f"Gemini quota protection: retry after {remaining:.0f}s (429)."
-        )
-    client = get_aio_client()
-    async with AI_CALL_SEMAPHORE:
+    started = time.perf_counter()
+    try:
         remaining = _gemini_quota_remaining_seconds()
         if remaining:
             raise GeminiQuotaCircuitOpen(
                 f"Gemini quota protection: retry after {remaining:.0f}s (429)."
             )
-        try:
-            return await asyncio.wait_for(
+        client = get_aio_client()
+        async with AI_CALL_SEMAPHORE:
+            remaining = _gemini_quota_remaining_seconds()
+            if remaining:
+                raise GeminiQuotaCircuitOpen(
+                    f"Gemini quota protection: retry after {remaining:.0f}s (429)."
+                )
+            response = await asyncio.wait_for(
                 client.models.generate_content(
-                    model=model,
-                    contents=contents,
-                    config=config,
+                    model=model, contents=contents, config=config,
                 ),
                 timeout=timeout_sec,
             )
-        except Exception as exc:
-            reason = str(exc).lower()
-            if "429" in reason or "resource_exhausted" in reason:
-                _note_gemini_429(model)
+    except asyncio.CancelledError:
+        _track_ai_call(model, label, "cancelled",
+                       (time.perf_counter() - started) * 1000,
+                       error_type="CancelledError")
+        raise
+    except Exception as exc:
+        if isinstance(exc, GeminiQuotaCircuitOpen):
+            # No request was made: do not count a provider API attempt.
             raise
+        reason = str(exc).lower()
+        if "429" in reason or "resource_exhausted" in reason:
+            _note_gemini_429(model)
+        _track_ai_call(model, label, "failed",
+                       (time.perf_counter() - started) * 1000,
+                       error_type=type(exc).__name__)
+        raise
+    _track_ai_call(model, label, "ok",
+                   (time.perf_counter() - started) * 1000, response=response)
+    return response
 
 
 def split_text(text: str, limit: int | None = None) -> list[str]:

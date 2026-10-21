@@ -33,8 +33,20 @@ class DateGroundingTests(unittest.TestCase):
             )
         self.assertIn("20/10/2026", prompt)
         self.assertIn("UTC+7", prompt)
-        self.assertIn("MỐC NGÀY LƯỢT NÀY", prompt)
-        self.assertIn("không được bịa đang tháng 3", prompt)
+        self.assertIn("MỐC THỜI GIAN ĐÁNG TIN CẬY", prompt)
+        self.assertIn("Đây là ngày hiện tại", prompt)
+        self.assertNotIn("MỐC NGÀY LƯỢT NÀY", prompt)
+
+
+    def test_any_other_day_uses_same_trusted_clock_not_october_literal(self):
+        class NovemberClock(ActualDatetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 11, 13, 8, 5, tzinfo=tz)
+        with patch("features.assistant.ai.datetime", NovemberClock):
+            prompt = _build_prompt("13/11 là hôm nay không?", None, None)
+        self.assertIn("13/11/2026", prompt)
+        self.assertNotIn("MỐC NGÀY LƯỢT NÀY", prompt)
 
 
 class TeamScheduleRoutingTests(unittest.IsolatedAsyncioTestCase):

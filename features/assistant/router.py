@@ -201,6 +201,17 @@ def route_locally(text: str) -> RouteDecision:
     if not folded:
         return RouteDecision(intent="help", tool="help.show")
 
+    # Owner usage requests are local and private, never Clef/Gemini/Brave.
+    from features.assistant.usage_intent import parse_usage_intent
+    usage = parse_usage_intent(text)
+    if usage is not None:
+        return RouteDecision(
+            intent="ai_usage", tool="ai_usage.report",
+            arguments={"period": usage.period, "metric": usage.metric},
+            source="local_ai_usage",
+            model_tier="fast",
+        )
+
     # T22.5: a multi-source request is permitted only when the first stage
     # independently resolves to Discord History. Never extract a public search
     # term from a private result or ask Clef to compose an outbound query.
