@@ -992,7 +992,7 @@ class CommandToolRegistry:
         )
 
     async def _execute_ai_usage(self, decision: RouteDecision, message) -> ToolExecutionResult:
-        """Owner-only private snapshot; never print costs in a public channel."""
+        """Owner-only usage snapshot, directly in the channel where it was requested."""
         async def notice(text: str, status: str):
             sent = await message.reply(
                 text, mention_author=False,
@@ -1000,7 +1000,7 @@ class CommandToolRegistry:
             )
             return ToolExecutionResult(
                 handled=True, response_message_ids=(int(sent.id),),
-                response_context="[private AI usage request: " + status + "]",
+                response_context="[AI usage report: " + status + "]",
                 details={"ai_usage_status": status},
             )
 
@@ -1019,21 +1019,10 @@ class CommandToolRegistry:
             from features.assistant.usage_report import quick_usage_report
             report = await asyncio.wait_for(quick_usage_report(period), timeout=8)
         except Exception as exc:
-            print("[AI Usage] private report unavailable: " + type(exc).__name__, flush=True)
+            print("[AI Usage] report unavailable: " + type(exc).__name__, flush=True)
             return await notice("Turso chưa trả dữ liệu usage; không thể báo 0 token giả.", "unavailable")
 
-        try:
-            if getattr(message, "guild", None) is None:
-                return await notice(report, "private_dm")
-            await message.author.send(
-                report, allowed_mentions=discord.AllowedMentions.none(),
-            )
-        except (discord.Forbidden, discord.HTTPException, AttributeError):
-            return await notice(
-                "Không gửi DM được; bật DM rồi hỏi lại hoặc dùng `/ai_cost` để xem riêng.",
-                "dm_unavailable",
-            )
-        return await notice("Tui gửi số token và chi phí qua DM rồi nhé.", "sent_dm")
+        return await notice(report, "channel_report")
 
     async def execute(self, decision: RouteDecision, message) -> ToolExecutionResult:
         if decision.tool == "ai_usage.report":
