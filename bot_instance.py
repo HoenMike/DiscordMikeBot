@@ -23,6 +23,7 @@ FEATURE_EXTENSIONS = [
     "features.assistant.cog",
     "features.feedback.cog",
     "features.codex_watch.cog",
+    "features.ai_cost.cog",
 ]
 
 # Danh sách các Slash Command cốt lõi bắt buộc phải có mặt trước khi được phép sync lên Discord
