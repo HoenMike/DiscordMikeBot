@@ -1020,7 +1020,7 @@ class CommandToolRegistry:
             report = await asyncio.wait_for(quick_usage_report(period), timeout=8)
         except Exception as exc:
             print("[AI Usage] report unavailable: " + type(exc).__name__, flush=True)
-            return await notice("Turso chưa trả dữ liệu usage; không thể báo 0 token giả.", "unavailable")
+            return await notice("Chưa đọc được usage từ Turso; hiện không có số liệu đáng tin để báo.", "unavailable")
 
         return await notice(report, "channel_report")
 
