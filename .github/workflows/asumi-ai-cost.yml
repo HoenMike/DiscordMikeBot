@@ -6,6 +6,9 @@ on:
       - "core/ai.py"
       - "core/ai_usage.py"
       - "features/ai_cost/**"
+      - "features/assistant/**"
+      - "tests/test_assistant_usage_intelligence.py"
+      - "tests/test_assistant_time_flash_search.py"
       - "core/constants.py"
       - "bot_instance.py"
       - "tests/test_ai_usage_cost.py"
@@ -19,6 +22,9 @@ on:
       - "core/ai.py"
       - "core/ai_usage.py"
       - "features/ai_cost/**"
+      - "features/assistant/**"
+      - "tests/test_assistant_usage_intelligence.py"
+      - "tests/test_assistant_time_flash_search.py"
       - "core/constants.py"
       - "bot_instance.py"
       - "tests/test_ai_usage_cost.py"
@@ -45,9 +51,13 @@ jobs:
           ADMIN_PASSWORD: ci-only-placeholder
           FLASK_SECRET_KEY: ci-only-placeholder-not-production
         run: |
-          python -m compileall -q core/ai.py core/ai_usage.py features/ai_cost
+          python -m compileall -q core/ai.py core/ai_usage.py features/ai_cost features/assistant
           python -m unittest discover -s tests -p "test_ai_usage_cost.py" -v
           python -m unittest discover -s tests -p "test_ai_usage_dashboard.py" -v
+          python -m unittest discover -s tests -p "test_assistant_usage_intelligence.py" -v
+          python -m unittest discover -s tests -p "test_assistant_time_flash_search.py" -v
+          python -m unittest discover -s tests -p "test_assistant_mentions_and_quota.py" -v
+          python -m unittest discover -s tests -p "test_assistant_search_followup.py" -v
       - name: Validate classic dashboard inline JavaScript
         run: |
           python - <<'PY'
