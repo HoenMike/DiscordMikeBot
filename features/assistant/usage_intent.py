@@ -31,10 +31,19 @@ def parse_usage_intent(query: str) -> UsageIntent | None:
     token = re.search(r"\b(tokens?|token|usage)\b", text)
     finance = re.search(r"\b(chi phi|tien|cost|billing|spend)\b", text)
     ai = re.search(r"\b(asumi|bot|gemini|ai|api|model)\b", text)
+    usage_verb = re.search(
+        r"\b(da|het|con|ton|xai|su dung|tieu|mat|thong ke|bao cao|report)\b", text
+    )
     spending = re.search(r"\b(het|ton|xai|dung|su dung|tieu|mat|bao nhieu|thong ke|bao cao|report)\b", text)
 
-    # Short 'token' alone should work. Longer requests must ask about usage.
-    token_query = bool(token and (spending or len(text.split()) <= 3 or ai))
+    # A question about token length/context/authentication is not bot usage.
+    if re.search(r"\b(context window|context length|context size|context limit|token limit)\b", text):
+        return None
+    # Short 'token' is a command; longer questions must target usage/accounting.
+    token_query = bool(token and (
+        usage_verb or len(text.split()) <= 3
+        or (ai and spending)
+    ))
     finance_query = bool(finance and ai and (spending or "chi phi" in text or "billing" in text))
     if not (token_query or finance_query):
         return None
