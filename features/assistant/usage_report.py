@@ -40,7 +40,9 @@ def format_quick_usage(rows, period: str, *, tracked_since: str | None = None) -
     output = sum(int(r[7] or 0) for r in gemini)
     thinking = sum(int(r[8] or 0) for r in gemini)
     cached = sum(int(r[9] or 0) for r in gemini)
-    usd = sum(int(r[10] or 0) for r in rows) / 1_000_000
+    usd = sum(int(r[10] or 0) for r in gemini) / 1_000_000
+    priced = sum(max(0, int(r[3] or 0) - int(r[5] or 0)) for r in gemini)
+    price_label = f"~${usd:,.4f}" if priced else "CHƯA XÁC ĐỊNH"
     model = max(gemini, key=lambda r: int(r[2] or 0))[1] if gemini else "chưa có"
     lines = [
         "**Asumi AI Usage — " + LABELS[period] + "**",
@@ -48,7 +50,7 @@ def format_quick_usage(rows, period: str, *, tracked_since: str | None = None) -
         f"Output: **{output:,}** · thinking: **{thinking:,}**",
         f"API calls ghi nhận: **{total_calls:,}** (lỗi {failed:,})",
         f"Model gọi nhiều nhất: **{model}**",
-        f"Chi phí Gemini đã định giá: **~${usd:,.4f}**",
+        f"Chi phí Gemini đã định giá: **{price_label}**",
     ]
     if unknown or failed:
         lines.append(f"**Chưa đầy đủ:** {unknown} lượt thiếu giá/metadata, {failed} lượt lỗi không rõ billing.")
