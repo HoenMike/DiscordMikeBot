@@ -4,6 +4,9 @@ Status: **TEST BRANCH / not deployed or live accepted**. Fast natural-language u
 
 ## Discord quick report
 
+New natural-language owner route: `@Asumi token`, `@Asumi hết bao nhiêu token rồi?`, `@Asumi token hôm nay`, `@Asumi token tháng này`, `@Asumi token 30 ngày` and clearly bot-related cost questions return a **short report in the current Discord channel**. The owner explicitly accepted public visibility for this report; non-owners cannot retrieve whole-bot totals. This uses Turso directly without an AI request or reading recent Discord history. `/ai_cost` below remains private/ephemeral.
+
+
 The application owner runs the private slash command **/ai_cost** from any channel; results are ephemeral and do not interrupt the conversation or Dungeon Misfits.
 
 - /ai_cost — last 7 days, requests/model, input/output/thinking/cached tokens, estimated USD/VND spend, 30-day run-rate.
