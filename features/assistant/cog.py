@@ -201,6 +201,26 @@ class AssistantCog(commands.Cog):
         request_started = time.perf_counter()
         request_id = getattr(message, "id", "unknown")
         query = self._query_from_message(message)
+
+        # Fast owner-usage query does not need 15-minute Discord history,
+        # Clef, Brave or Gemini. Restrict and deliver privately in the tool.
+        fast = route_locally(query)
+        if fast.tool == "ai_usage.report":
+            result = await self.tools.execute(fast, message)
+            self._log_dashboard_activity(
+                message, action_name="Asumi → ai_usage.report",
+                status="success" if result.handled else "error",
+                duration_ms=(time.perf_counter() - request_started) * 1000,
+                details={
+                    "request_id": str(request_id),
+                    "path": "fast_local",
+                    "intent": fast.intent,
+                    "source": fast.source,
+                    "ai_usage_status": result.details.get("ai_usage_status", "unknown"),
+                },
+            )
+            return result.handled
+
         previous_session = self.sessions.get(message)
         is_live_continuation = self.sessions.is_live_reply(message)
 
