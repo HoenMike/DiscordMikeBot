@@ -58,7 +58,7 @@ Mục tiêu:
 """
 
 
-_CUSTOM_EMOTE = re.compile(r"<a?:[A-Za-z0-9_]{2,32}:\\d{16,20}>")
+_CUSTOM_EMOTE = re.compile(r"<a?:[A-Za-z0-9_]{2,32}:\d{16,20}>")
 
 
 def _filter_unseen_custom_emotes(reply: str, query: str, context: AssistantContext | None) -> str:
