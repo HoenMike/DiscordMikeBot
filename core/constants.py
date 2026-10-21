@@ -16,6 +16,9 @@ DEFAULT_COLOR_ERROR = 0xE74C3C
 DEFAULT_COLOR_TAROT = 0x9B59B6
 DEFAULT_COLOR_CABIN = 0xE67E22
 
+# T31: persist metadata-only provider token/cost observations to Turso.
+ASUMI_AI_USAGE_ENABLED = True
+
 # Database Pruning Limits
 MAX_CONSOLE_LOGS_LIMIT = 2000
 MAX_BOT_ACTIVITIES_LIMIT = 5000
