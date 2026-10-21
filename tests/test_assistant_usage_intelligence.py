@@ -9,7 +9,7 @@ from features.assistant.usage_report import usage_window, format_quick_usage
 from features.assistant.router import route_locally, RouteDecision
 from features.assistant.cog import choose_conversation_route, _self_contained_public_research_followup
 from features.assistant.tools import CommandToolRegistry
-from features.assistant.ai import ASSISTANT_SYSTEM_PROMPT, _build_prompt
+from features.assistant.ai import ASSISTANT_SYSTEM_PROMPT, _build_prompt, _filter_unseen_custom_emotes
 from features.assistant.session import ConversationSession, ConversationTurn
 from features.assistant.context import AssistantContext, ContextLine
 
@@ -140,6 +140,17 @@ class ConversationalQualityTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result.tool, "web.search")
         routed.assert_awaited_once()
+
+    async def test_custom_emoji_reuses_current_chat_not_fake_ids(self):
+        known = "<:maythicnhonko:123456789012345678>"
+        unknown = "<:made_up:987654321098765432>"
+        ctx = AssistantContext(recent=[
+            ContextLine(author="Friend", content="haizz " + known),
+        ])
+        reply = _filter_unseen_custom_emotes("Okay " + known + " " + unknown, "", ctx)
+        self.assertIn(known, reply)
+        self.assertNotIn(unknown, reply)
+        self.assertNotIn(known, _filter_unseen_custom_emotes(known, "", None))
 
     async def test_prompt_knows_past_bot_answers_are_not_verified_and_emoji_names_unreliable(self):
         s = ConversationSession(
