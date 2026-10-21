@@ -61,6 +61,26 @@ Mục tiêu:
 """
 
 
+_CUSTOM_EMOTE = re.compile(r"<a?:[A-Za-z0-9_]{2,32}:\\d{16,20}>")
+
+
+def _filter_unseen_custom_emotes(reply: str, query: str, context: AssistantContext | None) -> str:
+    """Allow real custom emoji from this turn's chat, never hallucinated emoji IDs.
+
+    Pure ephemeral input validation: no definitions, images, indexing or memory.
+    """
+    available = set(_CUSTOM_EMOTE.findall(query))
+    if context is not None:
+        if context.reply is not None:
+            available.update(_CUSTOM_EMOTE.findall(context.reply.content))
+        for line in context.recent:
+            available.update(_CUSTOM_EMOTE.findall(line.content))
+    return _CUSTOM_EMOTE.sub(
+        lambda match: match.group(0) if match.group(0) in available else "",
+        reply,
+    )
+
+
 @dataclass(frozen=True)
 class ChatReplyResult:
     text: str
@@ -267,6 +287,7 @@ async def generate_chat_reply(
             )
             elapsed_ms = (time.perf_counter() - attempt_started) * 1000
             text = (getattr(response, "text", None) or "").strip()
+            text = _filter_unseen_custom_emotes(text, query, context).strip()
             if text:
                 if social_plan is not None and not is_social_reply_on_target(
                     text, social_plan
