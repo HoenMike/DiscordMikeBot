@@ -228,7 +228,7 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
         sent = self.cog._send_embed_preview.await_args.kwargs
         self.assertIn("Chưa lấy được video Reel", sent["content"])
         self.assertNotIn("Preview lỗi?", sent["content"])
-        self.assertEqual(len(sent["view"].children), 3)
+        self.assertEqual(len(sent["view"].children), 2)
         self.assertFalse(any(
             isinstance(item, discord.ui.Button) and item.url
             for item in sent["view"].children

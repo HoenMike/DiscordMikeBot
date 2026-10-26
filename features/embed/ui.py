@@ -40,20 +40,9 @@ class EmbedActionView(discord.ui.View):
         origin_id = int(self.payload.get("origin_id", 0) or 0)
         platform = str(self.payload.get("platform", "social"))[:20]
 
-        if platform == "facebook":
-            self.prev_button = discord.ui.Button(
-                emoji="◀️", label="Nguồn trước",
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"asumi:embed-prev:{platform}:{origin_id}",
-            )
-            self.prev_button.callback = self._previous
-            self.add_item(self.prev_button)
-        else:
-            self.prev_button = None
-
         self.reload_button = discord.ui.Button(
             emoji="🔄",
-            label="Nguồn sau" if platform == "facebook" else None,
+            label="Đổi nguồn" if platform == "facebook" else None,
             style=discord.ButtonStyle.secondary,
             custom_id=f"asumi:embed-reload:{platform}:{origin_id}",
         )
@@ -81,24 +70,15 @@ class EmbedActionView(discord.ui.View):
     def _set_busy(self, busy: bool) -> None:
         self.reload_button.disabled = busy
         self.remove_button.disabled = busy
-        if self.prev_button is not None:
-            self.prev_button.disabled = busy
 
     async def _reload(self, interaction: discord.Interaction):
-        await self._cycle(interaction, direction=1)
-
-    async def _previous(self, interaction: discord.Interaction):
-        await self._cycle(interaction, direction=-1)
-
-    async def _cycle(self, interaction: discord.Interaction, *, direction: int):
         # Acknowledge without mutating the preview until the single in-place
         # edit succeeds. On failure, the original message/buttons remain usable.
         await interaction.response.defer()
         try:
-            kwargs = {"current_preview": interaction.message}
-            if direction == -1:
-                kwargs["direction"] = -1
-            result = await self.cog.reload_embed(self.payload, **kwargs)
+            result = await self.cog.reload_embed(
+                self.payload, current_preview=interaction.message,
+            )
         except Exception as exc:
             result = None
             print(f"[EmbedCog] Manual preview change failed: {exc}", flush=True)
@@ -106,7 +86,7 @@ class EmbedActionView(discord.ui.View):
         if result is not None and result.success:
             self.stop()
             await interaction.followup.send(
-                "Đã đổi nguồn trong cùng một tin nhắn." if self.prev_button else "Đã tải lại preview.",
+                "Đã đổi nguồn trong cùng một tin nhắn." if self.payload.get("platform") == "facebook" else "Đã tải lại preview.",
                 ephemeral=True,
             )
             return

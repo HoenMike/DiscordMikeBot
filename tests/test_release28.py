@@ -153,17 +153,18 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._discard_preview.assert_not_awaited()
         sent = self.cog._send_embed_preview.await_args.kwargs
         self.assertIn("[facebed.com](https://facebed.com/post/1)", sent["content"])
-        self.assertEqual(sent["view"].reload_button.label, "Nguồn sau")
-        self.assertEqual(sent["view"].prev_button.label, "Nguồn trước")
+        self.assertEqual(sent["view"].reload_button.label, "Đổi nguồn")
+        self.assertEqual(len(sent["view"].children), 2)
         self.assertEqual(sent["view"].remove_button.label, "Ẩn")
         self.assertEqual(sent["view"].payload["current_domain"], "facebed.com")
-    async def test_embed_action_buttons_are_owner_only_and_bidirectional(self):
+    async def test_embed_action_buttons_are_owner_only_and_cycle(self):
         view = self.cog._manual_fallback_view(
             self.msg, "facebook", "https://facebook.com/post/1",
             current_domain="facebed.com",
         )
         self.assertIsInstance(view, EmbedActionView)
-        self.assertIsNotNone(view.prev_button)
+        self.assertEqual(len(view.children), 2)
+        self.assertEqual(view.reload_button.label, "Đổi nguồn")
         denied = SimpleNamespace(
             user=SimpleNamespace(id=999),
             response=SimpleNamespace(send_message=AsyncMock()),
@@ -183,9 +184,9 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             "success", "proxy", "manual_proxy_selected", "facebook",
             proxy_domain="facebed.seria.moe", origin_message_id=10, preview_message_id=40,
         ))
-        await view._previous(allowed)
+        await view._reload(allowed)
         self.cog.reload_embed.assert_awaited_once_with(
-            view.payload, current_preview=current_preview, direction=-1,
+            view.payload, current_preview=current_preview,
         )
         allowed.response.defer.assert_awaited_once()
         allowed.followup.send.assert_awaited_once()
@@ -216,7 +217,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._send_embed_preview.assert_awaited_once()
         self.cog._verify_proxy_unfurl.assert_not_awaited()
         self.cog._discard_preview.assert_not_awaited()
-    async def test_manual_roll_edits_existing_message_and_cycles_back(self):
+    async def test_manual_roll_edits_one_message_and_wraps_back_to_first(self):
         url = "https://facebook.com/post/1"
         channel = SimpleNamespace(id=20, is_nsfw=lambda: False)
         origin = SimpleNamespace(
@@ -227,34 +228,38 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
         channel.fetch_message = AsyncMock(return_value=origin)
         self.cog.bot.get_channel = lambda _: channel
         preview = SimpleNamespace(
-            id=40, channel=channel, content="[facebed.com](https://facebed.com/post/1)",
+            id=40, channel=channel,
+            content="[facebed.com](https://facebed.com/post/1)",
             edit=AsyncMock(),
         )
         self.cog._send_embed_preview = AsyncMock()
         self.cog._discard_preview = AsyncMock()
         self.cog._try_ytdlp_fallback = AsyncMock()
-        payload = {
-            "origin_id": 10, "channel_id": 20, "author_id": 50,
-            "platform": "facebook", "url": url, "current_domain": "facebed.com",
-        }
         self.cog._facebook_current_domain[(10, url)] = "facebed.com"
+        expected = PROXY_DOMAINS["facebook"][1:] + [PROXY_DOMAINS["facebook"][0]]
+        result_domains = []
         with patch("features.embed.cog.resolve_facebook_share_video", new=AsyncMock(return_value=None)), patch(
             "features.embed.cog.validate_via_og_metadata", new=AsyncMock(return_value=(False, False)),
         ):
-            forward = await self.cog.roll_facebook_proxy(payload, current_preview=preview)
-            backward = await self.cog.roll_facebook_proxy(
-                {**payload, "current_domain": "facebed.seria.moe"},
-                current_preview=preview, direction=-1,
-            )
-        self.assertTrue(forward.success and backward.success)
-        self.assertEqual(forward.proxy_domain, "facebed.seria.moe")
-        self.assertEqual(backward.proxy_domain, "facebed.com")
-        self.assertEqual(forward.preview_message_id, backward.preview_message_id)
-        self.assertEqual(preview.edit.await_count, 2)
+            for current in PROXY_DOMAINS["facebook"]:
+                payload = {
+                    "origin_id": 10, "channel_id": 20, "author_id": 50,
+                    "platform": "facebook", "url": url, "current_domain": current,
+                }
+                result = await self.cog.roll_facebook_proxy(payload, current_preview=preview)
+                self.assertTrue(result.success)
+                self.assertEqual(result.preview_message_id, 40)
+                result_domains.append(result.proxy_domain)
+                self.assertEqual(preview.edit.await_args.kwargs["view"].reload_button.label, "Đổi nguồn")
+                self.assertEqual(len(preview.edit.await_args.kwargs["view"].children), 2)
+
+        self.assertEqual(result_domains, expected)
+        self.assertEqual(preview.edit.await_count, len(PROXY_DOMAINS["facebook"]))
         self.cog._send_embed_preview.assert_not_awaited()
         self.cog._discard_preview.assert_not_awaited()
         self.cog._try_ytdlp_fallback.assert_not_awaited()
         self.assertEqual(self.cog._facebook_current_domain[(10, url)], "facebed.com")
+
     async def test_facebook_nonvideo_posts_never_invoke_ytdlp(self):
         result = await self.cog._try_ytdlp_fallback(
             self.msg,
