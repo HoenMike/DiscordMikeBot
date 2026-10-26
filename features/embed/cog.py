@@ -15,7 +15,7 @@ from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
 from features.embed.ui import PlatformToggleView, EmbedActionView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
 from features.embed.fetchers import FETCHER_MAP
-from features.embed.validator import find_valid_proxy
+from features.embed.validator import find_valid_proxy, build_proxy_url, validate_via_og_metadata
 from features.embed.validator import is_generic_or_login_preview
 from features.embed.result import PreviewResult, PreviewSafety
 from features.embed.fallback import extract_media_ytdlp
@@ -75,6 +75,28 @@ def _is_matching_emoji(reaction_emoji, target_emoji: discord.PartialEmoji) -> bo
     return str(reaction_emoji) == str(target_emoji) or getattr(reaction_emoji, "name", None) == target_emoji.name
 
 
+def _facebook_proxy_sources(original_url: str, domains: list[str]) -> list[tuple[str, str]]:
+    """Ordered reversible proxy choices; no render validation is used to rotate."""
+    sources, seen = [], set()
+    for raw_domain in domains:
+        domain = str(raw_domain).strip().lower()
+        if domain in seen or not _validate_domain(domain):
+            continue
+        seen.add(domain)
+        url = build_proxy_url(original_url, "facebook", domain)
+        if url:
+            sources.append((domain, url))
+    return sources
+
+
+def _facebook_proxy_content(message: discord.Message, domain: str, url: str, spoiler: bool) -> str:
+    link = f"[{domain}]({url})"
+    if spoiler:
+        link = f"||{link}||"
+    author = _clean_markdown_label(message.author.display_name)
+    return f"-# [Trả lời]({message.jump_url}) **{author}** • {link}"
+
+
 class EmbedCog(commands.Cog):
     """Cog xử lý tự động phát hiện, sửa lỗi và nhúng link mạng xã hội."""
 
@@ -95,8 +117,7 @@ class EmbedCog(commands.Cog):
         self._reaction_locks = BoundedDict(max_size=1000)
         self._pending_sends = BoundedDict(max_size=3000)
         self._manual_fallback_previews = BoundedDict(max_size=3000)
-        self._facebook_proxy_roll_state = BoundedDict(max_size=3000)
-        self._facebook_retry_at = BoundedDict(max_size=3000)
+        self._facebook_current_domain = BoundedDict(max_size=3000)
 
     def _get_reaction_lock(self, msg_id: int) -> asyncio.Lock:
         lock = self._reaction_locks.get(msg_id)
@@ -113,6 +134,7 @@ class EmbedCog(commands.Cog):
         *,
         is_spoiler: bool = False,
         tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
+        current_domain: str | None = None,
     ) -> dict | None:
         if platform_key not in PLATFORMS or not url:
             return None
@@ -123,7 +145,8 @@ class EmbedCog(commands.Cog):
             "platform": platform_key,
             "url": url,
             "is_spoiler": is_spoiler,
-            "tried_domains": sorted(set(tried_domains or [])),
+            "tried_domains": sorted(set(tried_domains or [])),  # legacy control compatibility
+            "current_domain": current_domain,
         }
 
     def _manual_fallback_view(
@@ -134,6 +157,7 @@ class EmbedCog(commands.Cog):
         *,
         is_spoiler: bool = False,
         tried_domains: set[str] | list[str] | tuple[str, ...] | None = None,
+        current_domain: str | None = None,
     ) -> EmbedActionView | None:
         payload = self._manual_fallback_payload(
             message,
@@ -141,6 +165,7 @@ class EmbedCog(commands.Cog):
             url,
             is_spoiler=is_spoiler,
             tried_domains=tried_domains,
+            current_domain=current_domain,
         )
         return EmbedActionView(self, payload) if payload else None
 
@@ -159,14 +184,6 @@ class EmbedCog(commands.Cog):
         target = (channel_id, preview_id)
         if target not in targets:
             targets.append(target)
-
-    def _set_facebook_proxy_state(
-        self,
-        origin_id: int,
-        url: str,
-        tried_domains: set[str] | list[str] | tuple[str, ...],
-    ) -> None:
-        self._facebook_proxy_roll_state[(origin_id, url)] = set(tried_domains)
 
     async def _offer_manual_fallback(
         self,
@@ -556,9 +573,9 @@ class EmbedCog(commands.Cog):
             except Exception as e:
                 print(f"[EmbedCog] Lỗi khi tự động xóa Embed Preview: {e}", flush=True)
         # Dọn state proxy-roll theo origin để không giữ state/button mapping mồ côi.
-        for state_key in list(self._facebook_proxy_roll_state.keys()):
+        for state_key in list(self._facebook_current_domain.keys()):
             if state_key[0] == payload.message_id:
-                self._facebook_proxy_roll_state.pop(state_key, None)
+                self._facebook_current_domain.pop(state_key, None)
         for state_key in list(self._facebook_retry_at.keys()):
             if state_key[0] == payload.message_id:
                 self._facebook_retry_at.pop(state_key, None)
@@ -1453,12 +1470,9 @@ class EmbedCog(commands.Cog):
             except Exception:
                 cleanup_ok = False
 
-        for state_key in list(self._facebook_proxy_roll_state.keys()):
+        for state_key in list(self._facebook_current_domain.keys()):
             if state_key[0] == origin_id:
-                self._facebook_proxy_roll_state.pop(state_key, None)
-        for state_key in list(self._facebook_retry_at.keys()):
-            if state_key[0] == origin_id:
-                self._facebook_retry_at.pop(state_key, None)
+                self._facebook_current_domain.pop(state_key, None)
         for state_key in list(self._manual_fallback_previews.keys()):
             if state_key[0] == origin_id:
                 self._manual_fallback_previews.pop(state_key, None)
@@ -1591,8 +1605,8 @@ class EmbedCog(commands.Cog):
             # Server state is authoritative when present; a prior button's
             # payload may list proxies from an older completed rotation cycle.
             tried = (
-                set(self._facebook_proxy_roll_state.get(state_key, set()))
-                if state_key in self._facebook_proxy_roll_state
+                set(self._facebook_current_domain.get(state_key, set()))
+                if state_key in self._facebook_current_domain
                 else payload_tried
             )
             if time.monotonic() < self._facebook_retry_at.get(state_key, 0):
