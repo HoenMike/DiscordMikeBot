@@ -31,7 +31,7 @@ def create_platform_view(platform_key: str, original_url: str) -> discord.ui.Vie
 
 
 class EmbedActionView(discord.ui.View):
-    """Owner-only controls shared by every social preview."""
+    """Owner-only controls shared by social previews; Facebook cycles in place."""
 
     def __init__(self, cog, payload: dict, timeout: float = 900):
         super().__init__(timeout=timeout)
@@ -40,9 +40,20 @@ class EmbedActionView(discord.ui.View):
         origin_id = int(self.payload.get("origin_id", 0) or 0)
         platform = str(self.payload.get("platform", "social"))[:20]
 
+        if platform == "facebook":
+            self.prev_button = discord.ui.Button(
+                emoji="◀️", label="Nguồn trước",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"asumi:embed-prev:{platform}:{origin_id}",
+            )
+            self.prev_button.callback = self._previous
+            self.add_item(self.prev_button)
+        else:
+            self.prev_button = None
+
         self.reload_button = discord.ui.Button(
             emoji="🔄",
-            label="Thử lại" if platform == "facebook" else None,
+            label="Nguồn sau" if platform == "facebook" else None,
             style=discord.ButtonStyle.secondary,
             custom_id=f"asumi:embed-reload:{platform}:{origin_id}",
         )
@@ -62,7 +73,7 @@ class EmbedActionView(discord.ui.View):
         if interaction.user.id == author_id:
             return True
         await interaction.response.send_message(
-            "Chỉ người gửi link gốc mới có thể Reload hoặc bỏ embed.",
+            "Chỉ người gửi link gốc mới có thể đổi nguồn hoặc bỏ embed.",
             ephemeral=True,
         )
         return False
@@ -70,50 +81,48 @@ class EmbedActionView(discord.ui.View):
     def _set_busy(self, busy: bool) -> None:
         self.reload_button.disabled = busy
         self.remove_button.disabled = busy
+        if self.prev_button is not None:
+            self.prev_button.disabled = busy
 
     async def _reload(self, interaction: discord.Interaction):
-        self._set_busy(True)
-        await interaction.response.edit_message(view=self)
+        await self._cycle(interaction, direction=1)
 
+    async def _previous(self, interaction: discord.Interaction):
+        await self._cycle(interaction, direction=-1)
+
+    async def _cycle(self, interaction: discord.Interaction, *, direction: int):
+        # Acknowledge without mutating the preview until the single in-place
+        # edit succeeds. On failure, the original message/buttons remain usable.
+        await interaction.response.defer()
         try:
-            result = await self.cog.reload_embed(
-                self.payload,
-                current_preview=interaction.message,
-            )
+            kwargs = {"current_preview": interaction.message}
+            if direction == -1:
+                kwargs["direction"] = -1
+            result = await self.cog.reload_embed(self.payload, **kwargs)
         except Exception as exc:
             result = None
-            print(f"[EmbedCog] Reload preview lỗi: {exc}", flush=True)
+            print(f"[EmbedCog] Manual preview change failed: {exc}", flush=True)
 
         if result is not None and result.success:
             self.stop()
-            await interaction.followup.send("Đã reload preview.", ephemeral=True)
-            return
-
-        reason = getattr(result, "reason", "reload_failed")
-        self._set_busy(False)
-        if result is not None and result.status == "action_required" and result.preview_message_id is not None:
-            self.stop()
             await interaction.followup.send(
-                "Đã tạo lại preview và giữ quyền điều khiển trên preview mới.",
+                "Đã đổi nguồn trong cùng một tin nhắn." if self.prev_button else "Đã tải lại preview.",
                 ephemeral=True,
             )
             return
 
-        try:
-            await interaction.message.edit(view=self)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
-
-        message = (
-            "Đã thử hết nguồn xem trước trong lượt này. Link gốc được giữ nguyên; thử lại sau 30 giây."
-            if reason == "no_more_proxy"
-            else "Proxy đang tạm không truy xuất được Facebook. Giữ nguyên preview hiện tại; thử lại sau 30 giây."
-            if reason == "proxy_temporarily_unavailable"
-            else "Vui lòng đợi khoảng 30 giây trước khi thử lại proxy Facebook."
-            if reason == "proxy_retry_cooldown"
-            else f"Reload chưa thành công (`{reason}`). Preview hiện tại vẫn được giữ."
+        reason = getattr(result, "reason", "reload_failed")
+        messages = {
+            "no_proxy_sources": "Server chưa cấu hình nguồn proxy phù hợp.",
+            "single_proxy_source": "Hiện chỉ có một nguồn proxy để chọn.",
+            "stale_proxy_controls": "Nguồn đã đổi bởi thao tác khác. Hãy dùng nút trên preview mới nhất.",
+            "nsfw_blocked": "Nguồn này bị chặn theo cài đặt NSFW của server.",
+            "proxy_edit_uncertain": "Discord chưa xác nhận thao tác chỉnh sửa. Kiểm tra preview hiện tại trước khi thử lại.",
+        }
+        await interaction.followup.send(
+            messages.get(reason, f"Chưa đổi được nguồn (`{reason}`). Preview hiện tại được giữ nguyên."),
+            ephemeral=True,
         )
-        await interaction.followup.send(message, ephemeral=True)
 
     async def _remove(self, interaction: discord.Interaction):
         self._set_busy(True)
