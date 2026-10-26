@@ -1,10 +1,10 @@
 # Social Embed Pipeline
 
-Tài liệu vận hành pipeline preview mạng xã hội của Asumi. Cập nhật cho **v3.14.5 (2026-10-17)**. Bảo toàn fallback video và UX owner-only; bổ sung xác thực kết quả unfurl của Discord.
+Tài liệu vận hành pipeline preview mạng xã hội của Asumi. **Chính sách Facebook hiện hành: 2026-10-26 — manual reversible proxy cycling, in-place edit.** Các mục ghi phiên bản cũ phía dưới là lịch sử, không còn là contract hiện hành.
 
 ## Mục tiêu
 
-Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Mọi preview do Asumi tạo đều có cùng bộ điều khiển owner-only **🔄 Reload** và **🗑️ Bỏ embed**. Với Facebook, Reload vẫn là thao tác roll proxy thủ công; bot không tự đoán thay người dùng xem proxy hiện tại có "đủ tốt" hay không.
+Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Mọi preview do Asumi tạo đều có cùng bộ điều khiển owner-only **🔄 Reload** và **🗑️ Bỏ embed**. Với Facebook, **◀️ Nguồn trước / 🔄 Nguồn sau** là lựa chọn thủ công và có thể quay về nguồn đã dùng. Bot không đoán thành công qua REST/unfurl polling và không tự đổi nguồn.
 
 ## Pipeline chung
 
@@ -16,11 +16,12 @@ Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl
    - Proxy được lấy từ `PROXY_DOMAINS` hoặc guild override.
    - Các candidate có thể được pre-validate bằng API/OpenGraph trước khi gửi.
    - Với Twitter/TikTok/Instagram/Reddit/... flow cũ vẫn có thể tự thử proxy tiếp theo nếu candidate gửi ra không dùng được.
-   - Với **Facebook**, thử các provider theo thứ tự `facebed.com` → `facebed.seria.moe` → `facecot.com` → `fixacebook.com` (có thể cấu hình override theo guild). Chỉ chấp nhận video nếu metadata có video/player thật. Sau khi gửi link, bot kiểm tra tiếp **Discord có dựng được player hay không**; login card, poster tĩnh và không có card không phải thành công. Candidate thất bại được dọn và thử ứng viên tiếp theo. **Dừng** khi player đầu tiên được xác nhận; giữ Reload để người gửi chủ động đổi về sau.
+   - Với **Facebook**, gửi đúng **nguồn đầu tiên trong cấu hình** có URL hợp lệ, rồi dừng. Metadata probe chỉ phục vụ kiểm tra NSFW best-effort, không dùng trạng thái video/player để tự thay proxy.
+   - Người gửi dùng nút ◀️ / 🔄 để đổi sang nguồn trước/sau. Danh sách xoay vòng, kể cả nguồn đã thử; một proxy từng thất bại vẫn có thể chọn lại.
 
 3. **Tier 2 — yt-dlp**
-   - Dùng cho Twitter/X, TikTok, Instagram, Reddit và Twitch khi các tầng trước thất bại.
-   - **Facebook `/share/v/`, `/share/r/`, Reel, Watch, Video** được thử yt-dlp **cuối cùng** khi không có proxy hợp lệ hoặc chủ link bấm Reload mà các proxy còn lại thất bại. Chỉ gửi kết quả nếu tải được **file video thật** trong giới hạn Discord; không coi ảnh poster Facebook login là video. Bài Facebook dạng post thường không gọi yt-dlp.
+   - Twitter/X, TikTok, Instagram, Reddit và Twitch giữ cơ chế tự động hiện tại.
+   - **Facebook không tự fallback xuống yt-dlp**, cả ở lần gửi đầu lẫn khi bấm đổi proxy. Không có file video riêng được gửi như một lựa chọn ẩn.
 
 ## Facebook: compact masked proxy link
 
@@ -45,7 +46,7 @@ Buttons **🔄 Reload** và **🗑️ Bỏ embed** chỉ là component điều k
 Mọi preview từ Tier 0, Tier 1 và Tier 2 gắn `EmbedActionView` với hai button:
 
 - **🔄 Reload**: chỉ người gửi link gốc được dùng.
-  - Facebook: thử proxy tiếp theo theo state `tried_domains`; chỉ khi không còn proxy hợp lệ mới thử yt-dlp với URL video công khai.
+  - Facebook: nút **◀️ Nguồn trước** / **🔄 Nguồn sau** đổi proxy theo thứ tự, quay vòng ở hai đầu và **edit chính message hiện tại**, không tạo message mới, không delete message cũ.
   - Provider khác: chạy lại pipeline cho đúng URL; preview hiện tại chỉ bị xóa sau khi replacement tạo thành công.
 - **🗑️ Bỏ embed**: chỉ người gửi link gốc được dùng. Asumi unsuppress message gốc để Discord dựng native embed rồi dọn toàn bộ preview Asumi thuộc origin message.
 
@@ -53,30 +54,15 @@ Discord chỉ cho suppress/unsuppress ở cấp **message**, không theo từng 
 
 Cả interaction layer và server-side handler đều kiểm tra lại `author_id`, origin message và original URL trước khi thay đổi trạng thái.
 
-## Facebook proxy roll
+## Facebook proxy roll hiện hành (2026-10-26)
 
-Preview Facebook gắn `EmbedActionView`. Nút **🔄 Reload** gọi manual proxy roll hiện có; nút **🗑️ Bỏ embed** dùng universal native-revert flow.
-
-### Quyền sử dụng
-
-- Payload giữ `origin_id`, `channel_id`, `author_id`, original URL, spoiler state và danh sách proxy đã thử.
-- `interaction_check` chỉ cho đúng `author_id` của origin message dùng Reload/Bỏ embed.
-- User khác nhận phản hồi ephemeral và không thay đổi preview.
-
-### Khi bấm Reload trên Facebook
-
-1. Button hiện tại disable ngay để hạn chế double-click.
-2. Asumi fetch lại origin message và xác minh:
-   - message vẫn tồn tại;
-   - author vẫn đúng;
-   - original URL vẫn còn trong message.
-3. Ghép danh sách `tried_domains` từ payload với state server theo `(origin_message_id, URL)`.
-4. `find_valid_proxy(... excluded_domains=tried)` tìm candidate kế tiếp; validation failure/timeout không khóa domain vĩnh viễn.
-5. Nếu có candidate:
-   - gửi **message mới chứa masked proxy link** và một button mới mang state đã cập nhật;
-   - chỉ sau khi gửi mới thành công mới xóa preview proxy cũ;
-   - log `manual_proxy_roll`.
-6. Nếu không còn candidate: thử yt-dlp video-only cuối cùng; nếu có file video thật, gửi preview mới rồi mới xóa preview cũ. Nếu thất bại, **giữ preview cũ**, nêu lý do tạm lỗi/hết proxy và giữ nút mở Facebook gốc. Không thử tự động vô hạn hoặc sử dụng cookies đăng nhập.
+- Buttons: **◀️ Nguồn trước**, **🔄 Nguồn sau**, **❌ Ẩn**; chỉ người gửi link gốc được thao tác. Xác thực lại origin message/author/original URL trước khi edit.
+- Trạng thái `current_domain` trong control + cache server `_facebook_current_domain[(origin_id, url)]`; không dùng `tried_domains` để ngăn quay lại. Dữ liệu control cũ có thể suy ra domain từ content hiện tại.
+- Danh sách proxy dựa trên guild override hoặc mặc định; loại domain sai định dạng và trùng. Chọn trước/sau theo modulo, luôn cho phép quay lại nguồn cũ.
+- Mỗi lần roll gọi **`current_preview.edit(content=..., view=...)`**. Không gọi send, delete, Discord unfurl verifier hoặc yt-dlp khi chọn nguồn. Cùng `preview_message_id`, vị trí chat không đổi.
+- Nếu Discord từ chối edit: không cập nhật nguồn hiện tại, giữ message và nút cũ. Với lỗi PATCH không rõ kết quả, không tự retry/rollback gây trùng hoặc ghi đè.
+- Preflight OpenGraph chỉ hỗ trợ NSFW; login-card, ảnh thumbnail hoặc timeout không tự động quyết định chuyển nguồn. Kết quả thực tế người dùng nhìn thấy phải được kiểm tra trên Discord client.
+- **❌ Ẩn** vẫn khôi phục native embed và cleanup các Asumi preview; xóa message gốc vẫn cleanup như trước.
 
 ## Vì sao không server-side auto-roll Facebook
 
@@ -90,30 +76,13 @@ v2.8.3 vì vậy dùng quy tắc đơn giản:
 
 Các helper verify unfurl vẫn còn cho flow của nền tảng khác và regression coverage, nhưng không quyết định rotation sau khi Facebook proxy đã được gửi.
 
-## State và cleanup
+## State và regression (hiện hành)
 
-- Mapping chung `_origin_to_preview_map` tiếp tục đảm bảo xóa preview khi origin message bị xóa.
-- `_facebook_proxy_roll_state[(origin_id, url)]` giữ set domain đã thử.
-- `_manual_fallback_previews[(origin_id, url)]` giữ preview liên quan đúng URL đó.
-- Khi roll thành công, cleanup chỉ tác động preview cũ của cùng URL; message có nhiều social link không bị xóa chéo.
-- Nếu message proxy mới gửi thất bại, preview hiện tại không bị xóa.
+- `_origin_to_preview_map` vẫn map cùng một message qua tất cả lần roll; `_facebook_current_domain` lưu nguồn hiện tại, xóa khi origin bị xóa/revert. Không còn "hết nguồn" vĩnh viễn hay cooldown tự động.
+- Test: gửi lần đầu đúng 1 preview dù metadata báo không có player; không gọi `_verify_proxy_unfurl`, `_discard_preview` hoặc `yt-dlp` cho Facebook; nút hai chiều chọn cả nguồn cũ; cùng preview ID khi edit; lỗi edit không xóa; quyền author-only; NSFW spoiler/block; các nguồn ngoài Facebook giữ behavior cũ.
+- Discord có thể không dựng lại unfurl ngay khi edit link. Điều này cần smoke thực tế với 2–3 proxy Facebook khác nhau, kể cả khi thumbnail đã tải, cùng URL reel/share, desktop/mobile. Không diễn giải test mock là chứng minh phát video live.
 
-## Regression checks
-
-Các case cần giữ khi chỉnh pipeline:
-
-- Facebook proxy message phải chứa masked link `[domain](proxy-url)` và không bọc URL đích bằng `<...>`, để tránh suppress unfurl.
-- Sau khi proxy Facebook đầu tiên đã gửi, `_verify_proxy_unfurl` không được tự kích hoạt rotation.
-- Preview mọi provider phải có `EmbedActionView` với **Reload** + **Bỏ embed**.
-- User khác origin author không được dùng cả hai action.
-- Reload Facebook phải tìm proxy kế tiếp bằng excluded/tried state; Reload provider khác phải re-run đúng URL và giữ preview cũ nếu replacement thất bại.
-- Bỏ embed phải unsuppress origin message và cleanup preview Asumi của origin để không tạo duplicate.
-- Manual proxy roll chỉ gọi `_try_ytdlp_fallback` sau khi không còn proxy hợp lệ, cho đường dẫn video Facebook và chỉ với video thật.
-- Facebook bài viết không phải video vẫn phải bị loại khỏi yt-dlp fallback; video chỉ được coi thành công nếu file đính kèm tải được.
-- Proxy cũ chỉ bị cleanup sau khi proxy mới gửi thành công.
-- Khi hết proxy và yt-dlp thất bại, giữ preview hiện tại; lỗi tạm thời có cooldown và không được xem là vĩnh viễn.
-- Twitter/X và các nền tảng ngoài Facebook vẫn giữ automatic yt-dlp fallback hiện tại.
-
+## Historical notes (superseded by 2026-10-26 Facebook policy)
 
 ## v3.10.1 — Incident Facebook shared video & acceptance
 
