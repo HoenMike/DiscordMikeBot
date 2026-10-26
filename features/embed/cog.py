@@ -895,32 +895,11 @@ class EmbedCog(commands.Cog):
         if message.id in self._deleted_message_ids:
             return PreviewResult(status="cancelled", reason="origin_deleted", platform=platform_key, origin_message_id=message.id)
 
-        # Tier 2: bounded yt-dlp fallback for Facebook *video* URLs only.
-        # Never synthesize a playable result from a generic login thumbnail.
-        # Successful native proxy previews above NEVER invoke yt-dlp.
+        # Facebook never auto-falls back from a client-visible proxy to yt-dlp.
         if platform_key == "facebook":
-            facebook_path = urlparse(url).path.lower()
-            facebook_video = bool(
-                re.search(r"/(?:share/[vr]/|reels?/|videos/)", facebook_path)
-                or facebook_path.startswith("/watch")
-            )
-            if facebook_video:
-                fallback_result = await self._try_ytdlp_fallback(
-                    message, platform_key, url, config,
-                    is_spoiler=is_spoiler, safety=safety,
-                    download_url=resolved_video_url,
-                )
-                if isinstance(fallback_result, PreviewResult) and (
-                    fallback_result.success or fallback_result.status in
-                    ("blocked", "cancelled", "degraded")
-                ):
-                    return replace(fallback_result, fallback_reason=proxy_result.reason)
             return await self._offer_manual_fallback(
-                message,
-                platform_key,
-                url,
-                reason=proxy_result.reason,
-                is_spoiler=is_spoiler,
+                message, platform_key, url,
+                reason=proxy_result.reason, is_spoiler=is_spoiler,
             )
 
         # Tier 2: yt-dlp Fallback
@@ -1025,6 +1004,52 @@ class EmbedCog(commands.Cog):
                 )
 
             domains = guild_proxy_domains if guild_proxy_domains is not None else PROXY_DOMAINS.get(platform_key, [])
+            if platform_key == "facebook":
+                sources = _facebook_proxy_sources(lookup_url or url, domains)
+                if not sources:
+                    return PreviewResult(
+                        reason="no_proxy_sources", platform=platform_key, origin_message_id=message.id
+                    )
+                domain, proxy_url = sources[0]
+                # Validate only to retain NSFW policy. Timeout / missing player
+                # must never switch providers behind the user's back.
+                _, is_proxy_nsfw = await validate_via_og_metadata(
+                    self.session, proxy_url, platform_key="facebook", proxy_domain=domain
+                )
+                safety.is_nsfw |= is_proxy_nsfw
+                channel_nsfw = getattr(message.channel, "is_nsfw", False)
+                if callable(channel_nsfw):
+                    channel_nsfw = channel_nsfw()
+                effective_nsfw = safety.is_nsfw and not channel_nsfw
+                if effective_nsfw and config.get("nsfw_mode", "spoiler") == "block":
+                    return PreviewResult("blocked", "proxy", "nsfw_blocked", platform_key, domain, message.id)
+                action_view = self._manual_fallback_view(
+                    message, platform_key, url,
+                    is_spoiler=is_spoiler, current_domain=domain,
+                )
+                preview = await self._send_embed_preview(
+                    message=message,
+                    content=_facebook_proxy_content(
+                        message, domain, proxy_url,
+                        is_spoiler or (effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"),
+                    ),
+                    view=action_view,
+                )
+                if not preview:
+                    return PreviewResult(
+                        reason="proxy_send_failed", platform=platform_key,
+                        origin_message_id=message.id,
+                    )
+                self._register_manual_fallback_preview(
+                    message.id, url, message.channel.id, preview.id
+                )
+                self._facebook_current_domain[(message.id, url)] = domain
+                return PreviewResult(
+                    "success", "proxy", "proxy_sent_user_controlled",
+                    platform_key, domain, message.id, preview.id,
+                    unfurl_verified=False,
+                )
+
             tried: set[str] = set()
             last_reason = "no_valid_proxy"
             for _ in range(len(domains)):
@@ -1054,56 +1079,6 @@ class EmbedCog(commands.Cog):
 
                 author_name = _clean_markdown_label(message.author.display_name)
                 author_jump = f"[Trả lời]({message.jump_url}) **{author_name}**"
-
-                # Facebook requires an actual Discord unfurl, not merely a sent URL.
-                # Verify each candidate before suppressing the original or marking success.
-                if platform_key == "facebook":
-                    proxy_link = f"[{domain}]({proxy_url})"
-                    if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
-                        proxy_link = f"||{proxy_link}||"
-                    fallback_view = self._manual_fallback_view(
-                        message, platform_key, url,
-                        is_spoiler=is_spoiler, tried_domains={domain},
-                    )
-                    sent_msg = await self._send_embed_preview(
-                        message=message,
-                        content=f"-# {author_jump} • {proxy_link}",
-                        view=fallback_view,
-                    )
-                    if not sent_msg:
-                        last_reason = "proxy_send_failed"
-                        continue
-
-                    verified, last_reason = await self._verify_proxy_unfurl(
-                        message.id, sent_msg, "facebook",
-                        require_video=bool(
-                            re.search(r"/(?:share/[vr]/|reels?/|videos/)", urlparse(url).path, flags=re.IGNORECASE)
-                            or urlparse(url).path.lower().startswith("/watch")
-                        ),
-                    )
-                    if verified and message.id not in self._deleted_message_ids:
-                        self._register_manual_fallback_preview(
-                            message.id, url, message.channel.id, sent_msg.id
-                        )
-                        self._set_facebook_proxy_state(message.id, url, {domain})
-                        return PreviewResult(
-                            "success", "proxy", "usable_embed", platform_key,
-                            domain, message.id, sent_msg.id, True,
-                        )
-
-                    # Discard the failed candidate before trying another, otherwise
-                    # login cards/thumbnail-only ghost messages accumulate in chat.
-                    if not await self._discard_preview(message.id, sent_msg):
-                        return PreviewResult(
-                            "degraded", "proxy", "cleanup_failed", platform_key,
-                            domain, message.id, sent_msg.id,
-                        )
-                    if message.id in self._deleted_message_ids:
-                        return PreviewResult(
-                            "cancelled", "proxy", "origin_deleted", platform_key,
-                            origin_message_id=message.id,
-                        )
-                    continue
 
                 link = f"[Xem bài viết gốc]({proxy_url})"
                 if is_spoiler or (is_effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"):
