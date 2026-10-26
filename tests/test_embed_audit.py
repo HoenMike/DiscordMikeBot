@@ -87,23 +87,21 @@ class AuditTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(ok)
         self.assertEqual([c.args[0] for c in sleep.await_args_list], [1, 1.5, 1.5])
 
-    async def test_facebook_proxy_nsfw_is_spoiler_and_never_ytdlp(self):
+    async def test_facebook_nsfw_spoiler_preserved_without_unfurl_poll(self):
         safety = PreviewSafety()
         self.cog._send_embed_preview = AsyncMock(return_value=self.preview)
-        self.cog._verify_proxy_unfurl = AsyncMock(return_value=(True, "usable_embed"))
-        with patch(
-            "features.embed.cog.find_valid_proxy",
-            new=AsyncMock(return_value=("https://facebed.com/p", True)),
-        ):
+        self.cog._verify_proxy_unfurl = AsyncMock()
+        url = "https://www.facebook.com/share/v/123/"
+        with patch("features.embed.cog.validate_via_og_metadata",
+                   new=AsyncMock(return_value=(True, True))):
             result = await self.cog._try_proxy_chain(
-                self.message, "facebook", "url", {}, safety=safety
+                self.message, "facebook", url, {}, safety=safety,
             )
-
         self.assertTrue(result.success)
         self.assertTrue(safety.is_nsfw)
         sent = self.cog._send_embed_preview.await_args.kwargs
-        self.assertIn("||[facebed.com](https://facebed.com/p)||", sent["content"])
-        self.cog._verify_proxy_unfurl.assert_awaited_once()
+        self.assertIn("||[facebed.com](https://facebed.com/share/v/123/)||", sent["content"])
+        self.cog._verify_proxy_unfurl.assert_not_awaited()
 
         with patch("features.embed.cog.extract_media_ytdlp", new=AsyncMock()) as ytdlp:
             fallback = await self.cog._try_ytdlp_fallback(
