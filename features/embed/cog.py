@@ -576,9 +576,6 @@ class EmbedCog(commands.Cog):
         for state_key in list(self._facebook_current_domain.keys()):
             if state_key[0] == payload.message_id:
                 self._facebook_current_domain.pop(state_key, None)
-        for state_key in list(self._facebook_retry_at.keys()):
-            if state_key[0] == payload.message_id:
-                self._facebook_retry_at.pop(state_key, None)
         for state_key in list(self._manual_fallback_previews.keys()):
             if state_key[0] == payload.message_id:
                 self._manual_fallback_previews.pop(state_key, None)
