@@ -1257,8 +1257,7 @@ class EmbedCog(commands.Cog):
                 origin_message_id=origin_id or None,
             )
 
-        # Facebook reload checks remaining proxies, then a bounded video-only
-        # yt-dlp fallback if no validated proxy is available.
+        # Facebook change is user-directed, reversible and edits the existing preview.
         if platform_key == "facebook":
             return await self.roll_facebook_proxy(
                 payload,
@@ -1553,7 +1552,7 @@ class EmbedCog(commands.Cog):
                     current = next((d for d in domains if f"[{d}](" in rendered), None)
             if len(sources) == 1 and current == domains[0]:
                 return failure("single_proxy_source", "action_required")
-            index = (domains.index(current) + direction) % len(domains) if current in domains else 0
+            index = (domains.index(current) + direction) % len(domains) if current in domains else (0 if direction == 1 else len(domains) - 1)
             domain, proxy_url = sources[index]
 
             # Preflight detects NSFW when possible but NEVER vetoes user-selected
