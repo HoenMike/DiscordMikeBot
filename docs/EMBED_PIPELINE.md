@@ -4,7 +4,7 @@ Tài liệu vận hành pipeline preview mạng xã hội của Asumi. **Chính 
 
 ## Mục tiêu
 
-Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Mọi preview do Asumi tạo đều có cùng bộ điều khiển owner-only **🔄 Reload** và **🗑️ Bỏ embed**. Với Facebook, **◀️ Nguồn trước / 🔄 Nguồn sau** là lựa chọn thủ công và có thể quay về nguồn đã dùng. Bot không đoán thành công qua REST/unfurl polling và không tự đổi nguồn.
+Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Mọi preview do Asumi tạo đều có cùng bộ điều khiển owner-only **🔄 Reload** và **🗑️ Bỏ embed**. Với Facebook, **🔄 Đổi nguồn** là lựa chọn thủ công và có thể quay về nguồn đã dùng. Bot không đoán thành công qua REST/unfurl polling và không tự đổi nguồn.
 
 ## Pipeline chung
 
@@ -17,7 +17,7 @@ Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl
    - Các candidate có thể được pre-validate bằng API/OpenGraph trước khi gửi.
    - Với Twitter/TikTok/Instagram/Reddit/... flow cũ vẫn có thể tự thử proxy tiếp theo nếu candidate gửi ra không dùng được.
    - Với **Facebook**, gửi đúng **nguồn đầu tiên trong cấu hình** có URL hợp lệ, rồi dừng. Metadata probe chỉ phục vụ kiểm tra NSFW best-effort, không dùng trạng thái video/player để tự thay proxy.
-   - Người gửi dùng nút ◀️ / 🔄 để đổi sang nguồn trước/sau. Danh sách xoay vòng, kể cả nguồn đã thử; một proxy từng thất bại vẫn có thể chọn lại.
+   - Người gửi bấm 🔄 Đổi nguồn để chuyển sang proxy kế tiếp. Hết danh sách sẽ quay về nguồn đầu tiên. Danh sách xoay vòng, kể cả nguồn đã thử; một proxy từng thất bại vẫn có thể chọn lại.
 
 3. **Tier 2 — yt-dlp**
    - Twitter/X, TikTok, Instagram, Reddit và Twitch giữ cơ chế tự động hiện tại.
@@ -46,7 +46,7 @@ Buttons **🔄 Reload** và **🗑️ Bỏ embed** chỉ là component điều k
 Mọi preview từ Tier 0, Tier 1 và Tier 2 gắn `EmbedActionView` với hai button:
 
 - **🔄 Reload**: chỉ người gửi link gốc được dùng.
-  - Facebook: nút **◀️ Nguồn trước** / **🔄 Nguồn sau** đổi proxy theo thứ tự, quay vòng ở hai đầu và **edit chính message hiện tại**, không tạo message mới, không delete message cũ.
+  - Facebook: nút **🔄 Đổi nguồn** chuyển proxy theo thứ tự, hết danh sách quay về nguồn đầu tiên và **edit chính message hiện tại**, không tạo message mới, không delete message cũ.
   - Provider khác: chạy lại pipeline cho đúng URL; preview hiện tại chỉ bị xóa sau khi replacement tạo thành công.
 - **🗑️ Bỏ embed**: chỉ người gửi link gốc được dùng. Asumi unsuppress message gốc để Discord dựng native embed rồi dọn toàn bộ preview Asumi thuộc origin message.
 
@@ -56,9 +56,9 @@ Cả interaction layer và server-side handler đều kiểm tra lại `author_i
 
 ## Facebook proxy roll hiện hành (2026-10-26)
 
-- Buttons: **◀️ Nguồn trước**, **🔄 Nguồn sau**, **❌ Ẩn**; chỉ người gửi link gốc được thao tác. Xác thực lại origin message/author/original URL trước khi edit.
+- Buttons: **🔄 Đổi nguồn**, **❌ Ẩn**; chỉ người gửi link gốc được thao tác. Xác thực lại origin message/author/original URL trước khi edit.
 - Trạng thái `current_domain` trong control + cache server `_facebook_current_domain[(origin_id, url)]`; không dùng `tried_domains` để ngăn quay lại. Dữ liệu control cũ có thể suy ra domain từ content hiện tại.
-- Danh sách proxy dựa trên guild override hoặc mặc định; loại domain sai định dạng và trùng. Chọn trước/sau theo modulo, luôn cho phép quay lại nguồn cũ.
+- Danh sách proxy dựa trên guild override hoặc mặc định; loại domain sai định dạng và trùng. Chọn proxy tiếp theo theo modulo, tự quay về proxy đầu tiên khi hết danh sách.
 - Mỗi lần roll gọi **`current_preview.edit(content=..., view=...)`**. Không gọi send, delete, Discord unfurl verifier hoặc yt-dlp khi chọn nguồn. Cùng `preview_message_id`, vị trí chat không đổi.
 - Nếu Discord từ chối edit: không cập nhật nguồn hiện tại, giữ message và nút cũ. Với lỗi PATCH không rõ kết quả, không tự retry/rollback gây trùng hoặc ghi đè.
 - Preflight OpenGraph chỉ hỗ trợ NSFW; login-card, ảnh thumbnail hoặc timeout không tự động quyết định chuyển nguồn. Kết quả thực tế người dùng nhìn thấy phải được kiểm tra trên Discord client.
@@ -79,7 +79,7 @@ Các helper verify unfurl vẫn còn cho flow của nền tảng khác và regre
 ## State và regression (hiện hành)
 
 - `_origin_to_preview_map` vẫn map cùng một message qua tất cả lần roll; `_facebook_current_domain` lưu nguồn hiện tại, xóa khi origin bị xóa/revert. Không còn "hết nguồn" vĩnh viễn hay cooldown tự động.
-- Test: gửi lần đầu đúng 1 preview dù metadata báo không có player; không gọi `_verify_proxy_unfurl`, `_discard_preview` hoặc `yt-dlp` cho Facebook; nút hai chiều chọn cả nguồn cũ; cùng preview ID khi edit; lỗi edit không xóa; quyền author-only; NSFW spoiler/block; các nguồn ngoài Facebook giữ behavior cũ.
+- Test: gửi lần đầu đúng 1 preview dù metadata báo không có player; không gọi `_verify_proxy_unfurl`, `_discard_preview` hoặc `yt-dlp` cho Facebook; nút Đổi nguồn quay vòng tới cả nguồn cũ; cùng preview ID khi edit; lỗi edit không xóa; quyền author-only; NSFW spoiler/block; các nguồn ngoài Facebook giữ behavior cũ.
 - Discord có thể không dựng lại unfurl ngay khi edit link. Điều này cần smoke thực tế với 2–3 proxy Facebook khác nhau, kể cả khi thumbnail đã tải, cùng URL reel/share, desktop/mobile. Không diễn giải test mock là chứng minh phát video live.
 
 ## Historical notes (superseded by 2026-10-26 Facebook policy)
