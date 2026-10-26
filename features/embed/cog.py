@@ -1240,7 +1240,6 @@ class EmbedCog(commands.Cog):
         payload: dict,
         *,
         current_preview: discord.Message | None = None,
-        direction: int = 1,
     ) -> PreviewResult:
         """Reload one social preview while keeping the current preview on failure."""
         origin_id = int(payload.get("origin_id", 0) or 0)
@@ -1262,7 +1261,6 @@ class EmbedCog(commands.Cog):
             return await self.roll_facebook_proxy(
                 payload,
                 current_preview=current_preview,
-                direction=direction,
             )
 
         if origin_id in self._deleted_message_ids:
@@ -1485,9 +1483,8 @@ class EmbedCog(commands.Cog):
 
     async def roll_facebook_proxy(
         self, payload: dict, *, current_preview: discord.Message | None = None,
-        direction: int = 1,
     ) -> PreviewResult:
-        """Cycle every configured Facebook provider both ways, in the same message."""
+        """Cycle through configured Facebook providers in one message."""
         origin_id = int(payload.get("origin_id", 0) or 0)
         channel_id = int(payload.get("channel_id", 0) or 0)
         author_id = int(payload.get("author_id", 0) or 0)
@@ -1499,8 +1496,6 @@ class EmbedCog(commands.Cog):
                                  platform=platform, origin_message_id=origin_id or None)
         if platform != "facebook" or not all((origin_id, channel_id, author_id, url)):
             return failure("proxy_roll_invalid_payload")
-        if direction not in (-1, 1):
-            return failure("invalid_roll_direction")
         if origin_id in self._deleted_message_ids:
             return failure("origin_deleted", "cancelled")
         if current_preview is None:
@@ -1552,7 +1547,7 @@ class EmbedCog(commands.Cog):
                     current = next((d for d in domains if f"[{d}](" in rendered), None)
             if len(sources) == 1 and current == domains[0]:
                 return failure("single_proxy_source", "action_required")
-            index = (domains.index(current) + direction) % len(domains) if current in domains else (0 if direction == 1 else len(domains) - 1)
+            index = (domains.index(current) + 1) % len(domains) if current in domains else 0
             domain, proxy_url = sources[index]
 
             # Preflight detects NSFW when possible but NEVER vetoes user-selected
@@ -1585,7 +1580,7 @@ class EmbedCog(commands.Cog):
                 print(f"[EmbedCog] Proxy edit outcome uncertain: {type(exc).__name__}", flush=True)
                 return failure("proxy_edit_uncertain", "degraded")
             self._facebook_current_domain[key] = domain
-            print(f"[EmbedCog] Manual Facebook source: {origin_id} -> {domain} (direction={direction})", flush=True)
+            print(f"[EmbedCog] Manual Facebook source cycle: {origin_id} -> {domain}", flush=True)
             return PreviewResult(
                 "success", "proxy", "manual_proxy_selected", "facebook",
                 domain, origin_id, current_preview.id, unfurl_verified=False,
