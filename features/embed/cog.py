@@ -32,8 +32,8 @@ _SEND_TIMEOUT = 15
 
 
 def _native_social_v2_enabled() -> bool:
-    """Opt-in pilot: production stays on legacy embeds until explicitly enabled."""
-    return os.environ.get("ASUMI_SOCIAL_NATIVE_V2_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
+    """Production enabled; emergency rollback with ASUMI_SOCIAL_NATIVE_V2_ENABLED=false."""
+    return os.environ.get("ASUMI_SOCIAL_NATIVE_V2_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
 
 
 class PreviewSendUncertain(Exception):
