@@ -1,5 +1,6 @@
 import asyncio
 import io
+import os
 import re
 import time
 import secrets
@@ -14,6 +15,7 @@ from discord.ext import commands
 from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
 from features.embed.ui import PlatformToggleView, EmbedActionView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
+from features.embed.native_v2 import can_render_native_social, build_native_social_layout
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy, build_proxy_url, validate_via_og_metadata
 from features.embed.validator import is_generic_or_login_preview
@@ -27,6 +29,11 @@ MAX_LINKS_PER_MESSAGE = 3
 _PIPELINE_TIMEOUT = 70
 _UNFURL_DELAYS = (1.0, 1.5, 1.5, 2.0)
 _SEND_TIMEOUT = 15
+
+
+def _native_social_v2_enabled() -> bool:
+    """Opt-in pilot: production stays on legacy embeds until explicitly enabled."""
+    return os.environ.get("ASUMI_SOCIAL_NATIVE_V2_ENABLED", "false").strip().lower() in ("1", "true", "yes", "on")
 
 
 class PreviewSendUncertain(Exception):
@@ -959,6 +966,36 @@ class EmbedCog(commands.Cog):
             )
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
+            # Native V2 is only for media-backed API results. A valid poster
+            # is NOT a video. Facebook's proxy-unfurl route is untouched.
+            if _native_social_v2_enabled() and can_render_native_social(post_data, filter_result, file):
+                payload = self._manual_fallback_payload(
+                    message, platform_key, url, is_spoiler=is_spoiler,
+                )
+                if payload:
+                    layout = build_native_social_layout(
+                        self, payload, post_data, filter_result,
+                        reply_url=message.jump_url, reply_author=message.author.display_name,
+                        file=file,
+                    )
+                    native_msg = await self._send_embed_preview(
+                        message=message, view=layout, file=file,
+                    )
+                    if native_msg:
+                        self._register_manual_fallback_preview(
+                            message.id, url, message.channel.id, native_msg.id,
+                        )
+                        return PreviewResult(
+                            "success", "api", "api_v2_preview_sent", platform_key,
+                            origin_message_id=message.id, preview_message_id=native_msg.id,
+                        )
+                    # An explicit HTTP 4xx is a safe rejection, not an
+                    # ambiguous send; never retry an unconfirmed send.
+                    if file is not None:
+                        # The send helper owns and closes the file. For a video,
+                        # go to the normal proxy tier rather than lose playback.
+                        return False
+
             sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
@@ -1214,6 +1251,33 @@ class EmbedCog(commands.Cog):
                 url,
                 is_spoiler=is_spoiler,
             )
+            if _native_social_v2_enabled() and can_render_native_social(post_data, filter_result, file):
+                payload = self._manual_fallback_payload(
+                    message, platform_key, url, is_spoiler=is_spoiler,
+                )
+                if payload:
+                    layout = build_native_social_layout(
+                        self, payload, post_data, filter_result,
+                        reply_url=message.jump_url, reply_author=message.author.display_name,
+                        file=file,
+                    )
+                    native_msg = await self._send_embed_preview(
+                        message=message, view=layout, file=file,
+                    )
+                    if native_msg:
+                        self._register_manual_fallback_preview(
+                            message.id, url, message.channel.id, native_msg.id,
+                        )
+                        return PreviewResult(
+                            "success", "ytdlp", "fallback_v2_sent", platform_key,
+                            origin_message_id=message.id, preview_message_id=native_msg.id,
+                            used_fallback=True,
+                        )
+                    if file is not None:
+                        # The file was closed by the failed send. Retrying it is
+                        # unsafe; no static Facebook poster counts as playback.
+                        return False
+
             sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
