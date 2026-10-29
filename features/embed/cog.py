@@ -1,5 +1,6 @@
 import asyncio
 import io
+import os
 import re
 import time
 import secrets
@@ -14,6 +15,7 @@ from discord.ext import commands
 from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
 from features.embed.ui import PlatformToggleView, EmbedActionView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
+from features.embed.native_v2 import can_render_native_social, build_native_social_layout
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy, build_proxy_url, validate_via_og_metadata
 from features.embed.validator import is_generic_or_login_preview
@@ -27,6 +29,11 @@ MAX_LINKS_PER_MESSAGE = 3
 _PIPELINE_TIMEOUT = 70
 _UNFURL_DELAYS = (1.0, 1.5, 1.5, 2.0)
 _SEND_TIMEOUT = 15
+
+
+def _native_social_v2_enabled() -> bool:
+    """Production enabled; emergency rollback with ASUMI_SOCIAL_NATIVE_V2_ENABLED=false."""
+    return os.environ.get("ASUMI_SOCIAL_NATIVE_V2_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
 
 
 class PreviewSendUncertain(Exception):
@@ -95,6 +102,25 @@ def _facebook_proxy_content(message: discord.Message, domain: str, url: str, spo
         link = f"||{link}||"
     author = _clean_markdown_label(message.author.display_name)
     return f"-# [Trả lời]({message.jump_url}) **{author}** • {link}"
+
+
+def _preview_origin_header(preview) -> str:
+    """Find the origin jump link in both legacy content and V2 TextDisplays.
+
+    V2 message.content is empty; without this restart scanning would lose the
+    origin mapping and orphan cleanup for every rich preview.
+    """
+    stack = list(getattr(preview, "components", ()) or ())
+    legacy = str(getattr(preview, "content", "") or "")
+    if "-# [Trả lời]" in legacy:
+        return legacy
+    while stack:
+        item = stack.pop()
+        value = str(getattr(item, "content", "") or "")
+        if "-# [Trả lời]" in value:
+            return value
+        stack.extend(getattr(item, "children", ()) or ())
+    return ""
 
 
 class EmbedCog(commands.Cog):
@@ -959,6 +985,36 @@ class EmbedCog(commands.Cog):
             )
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
+            # Native V2 is only for media-backed API results. A valid poster
+            # is NOT a video. Facebook's proxy-unfurl route is untouched.
+            if _native_social_v2_enabled() and can_render_native_social(post_data, filter_result, file):
+                payload = self._manual_fallback_payload(
+                    message, platform_key, url, is_spoiler=is_spoiler,
+                )
+                if payload:
+                    layout = build_native_social_layout(
+                        self, payload, post_data, filter_result,
+                        reply_url=message.jump_url, reply_author=message.author.display_name,
+                        file=file,
+                    )
+                    native_msg = await self._send_embed_preview(
+                        message=message, view=layout, file=file,
+                    )
+                    if native_msg:
+                        self._register_manual_fallback_preview(
+                            message.id, url, message.channel.id, native_msg.id,
+                        )
+                        return PreviewResult(
+                            "success", "api", "api_v2_preview_sent", platform_key,
+                            origin_message_id=message.id, preview_message_id=native_msg.id,
+                        )
+                    # An explicit HTTP 4xx is a safe rejection, not an
+                    # ambiguous send; never retry an unconfirmed send.
+                    if file is not None:
+                        # The send helper owns and closes the file. For a video,
+                        # go to the normal proxy tier rather than lose playback.
+                        return False
+
             sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
@@ -1214,6 +1270,33 @@ class EmbedCog(commands.Cog):
                 url,
                 is_spoiler=is_spoiler,
             )
+            if _native_social_v2_enabled() and can_render_native_social(post_data, filter_result, file):
+                payload = self._manual_fallback_payload(
+                    message, platform_key, url, is_spoiler=is_spoiler,
+                )
+                if payload:
+                    layout = build_native_social_layout(
+                        self, payload, post_data, filter_result,
+                        reply_url=message.jump_url, reply_author=message.author.display_name,
+                        file=file,
+                    )
+                    native_msg = await self._send_embed_preview(
+                        message=message, view=layout, file=file,
+                    )
+                    if native_msg:
+                        self._register_manual_fallback_preview(
+                            message.id, url, message.channel.id, native_msg.id,
+                        )
+                        return PreviewResult(
+                            "success", "ytdlp", "fallback_v2_sent", platform_key,
+                            origin_message_id=message.id, preview_message_id=native_msg.id,
+                            used_fallback=True,
+                        )
+                    if file is not None:
+                        # The file was closed by the failed send. Retrying it is
+                        # unsafe; no static Facebook poster counts as playback.
+                        return False
+
             sent_msg = await self._send_embed_preview(
                 message=message,
                 content=header_text,
@@ -1631,11 +1714,13 @@ class EmbedCog(commands.Cog):
                             if not self.bot.user or msg.author.id != self.bot.user.id:
                                 continue
 
-                            # Nhận diện embed do bot tạo ra thông qua header jump_url
-                            if not msg.content or "-# [Trả lời]" not in msg.content:
+                            # Components V2 stores the origin jump link in a
+                            # nested TextDisplay, not in message.content.
+                            origin_header = _preview_origin_header(msg)
+                            if not origin_header:
                                 continue
 
-                            match = re.search(r"discord\.com/channels/\d+/\d+/(\d+)", msg.content)
+                            match = re.search(r"discord\.com/channels/\d+/\d+/(\d+)", origin_header)
                             if not match:
                                 continue
 

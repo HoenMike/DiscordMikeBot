@@ -5,6 +5,7 @@ on:
     paths:
       - "features/embed/**"
       - "core/constants.py"
+      - "tests/test_embed_native_v2.py"
       - "tests/test_embed_resilience.py"
       - "tests/test_embed_audit.py"
       - "tests/test_release28.py"
@@ -14,6 +15,7 @@ on:
     paths:
       - "features/embed/**"
       - "core/constants.py"
+      - "tests/test_embed_native_v2.py"
       - "tests/test_embed_resilience.py"
       - "tests/test_embed_audit.py"
       - "tests/test_release28.py"
@@ -38,6 +40,7 @@ jobs:
           FLASK_SECRET_KEY: ci-only-placeholder-not-production
         run: |
           python -m compileall -q features/embed
+          python -m unittest discover -s tests -p "test_embed_native_v2.py" -v
           python -m unittest discover -s tests -p "test_embed_resilience.py" -v
           python -m unittest discover -s tests -p "test_release28.py" -v
           timeout 90s python -m unittest discover -s tests -p "test_embed_audit.py" -v

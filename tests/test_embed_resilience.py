@@ -297,7 +297,10 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
             reason="manual_fallback_offered", platform="facebook",
             origin_message_id=10, preview_message_id=70,
         ))
-        with patch("features.embed.cog.EMBED_COOLDOWN") as bucket:
+        with patch("features.embed.cog.EMBED_COOLDOWN") as bucket, \
+             patch("core.activity_logger.activity_logger.log"):
+            # Unit tests must not spawn a real DB persist task: its libsql
+            # executor can outlive IsolatedAsyncioTestCase and hang CI shutdown.
             bucket.get_bucket.return_value.update_rate_limit.return_value = None
             await self.cog.on_message(self.msg)
         self.msg.edit.assert_not_awaited()
