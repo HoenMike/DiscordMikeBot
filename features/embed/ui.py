@@ -30,8 +30,8 @@ def create_platform_view(platform_key: str, original_url: str) -> discord.ui.Vie
 
 
 
-class EmbedActionView(discord.ui.View):
-    """Owner-only controls shared by social previews; Facebook cycles in place."""
+class _EmbedActionControls:
+    """Shared owner-only controls for legacy View and Components V2 LayoutView."""
 
     def __init__(self, cog, payload: dict, timeout: float = 900):
         super().__init__(timeout=timeout)
@@ -54,8 +54,11 @@ class EmbedActionView(discord.ui.View):
         )
         self.reload_button.callback = self._reload
         self.remove_button.callback = self._remove
-        self.add_item(self.reload_button)
-        self.add_item(self.remove_button)
+        if isinstance(self, discord.ui.LayoutView):
+            self.add_item(discord.ui.ActionRow(self.reload_button, self.remove_button))
+        else:
+            self.add_item(self.reload_button)
+            self.add_item(self.remove_button)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         author_id = int(self.payload.get("author_id", 0) or 0)
@@ -133,6 +136,14 @@ class EmbedActionView(discord.ui.View):
             f"Chưa thể khôi phục embed gốc (`{reason}`).",
             ephemeral=True,
         )
+
+
+class EmbedActionView(_EmbedActionControls, discord.ui.View):
+    """Legacy owner-only preview controls (supports Discord native unfurl)."""
+
+
+class EmbedActionLayoutView(_EmbedActionControls, discord.ui.LayoutView):
+    """Components V2 variant with exactly the same authorization and callbacks."""
 
 
 # Backward-compatible import for older tests/extensions while the generic view rolls out.
