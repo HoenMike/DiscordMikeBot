@@ -2,6 +2,17 @@
 
 Tài liệu vận hành pipeline preview mạng xã hội của Asumi. **Chính sách Facebook hiện hành: 2026-10-26 — manual reversible proxy cycling, in-place edit.** Các mục ghi phiên bản cũ phía dưới là lịch sử, không còn là contract hiện hành.
 
+## Thử nghiệm rich social embed (Components V2, opt-in, 2026-10-29)
+
+- Nhánh thử nghiệm: `feat/asumi-social-native-v2-preview`. Không tự deploy/merge.
+- Bật bằng environment variable `ASUMI_SOCIAL_NATIVE_V2_ENABLED=true` rồi khởi động lại bot. Mặc định **false** để không đổi production khi chưa smoke.
+- Chỉ dựng `LayoutView → Container → Section/Thumbnail + MediaGallery + TextDisplay + ActionRow` khi API/yt-dlp đã cung cấp ảnh trực tiếp hợp lệ hoặc video **thực sự tải được** thành Discord attachment. Không nhận thumbnail thay video. Dữ liệu like/comment/share chỉ hiện khi provider trả giá trị thật.
+- Facebook proxy **vẫn giữ nguyên** masked Markdown link ở `message.content` để Discord native-unfurl. Không tự đổi nguồn, không convert proxy URL thành MediaGallery. Nút Đổi nguồn tiếp tục edit tại chỗ, xoay vòng đến nguồn cũ.
+- Legacy fallback: nếu không có media đủ chuẩn hoặc feature flag tắt, render cũ không đổi. Nếu Discord trả HTTP 4xx chắc chắn từ send V2 cho ảnh URL công khai, thử legacy embed; nếu upload file V2 bị từ chối, dừng và để Tier tiếp theo xử lý (không dùng lại attachment đã đóng). Send outcome không chắc chắn **không retry**.
+- NSFW: chế độ block giữ nguyên; spoiler media chỉ vào gallery khi có attachment, container và gallery đều đánh dấu spoiler. Không truyền image NSFW từ CDN ngoài để tránh lộ.
+- Quyền `Đổi nguồn / Reload` và `Ẩn` vẫn owner-only, dùng cùng callbacks và kiểm tra origin. Map origin khi restart phải đọc header từ V2 TextDisplay vì `message.content` rỗng.
+
+**Smoke trên server thử nghiệm:** ảnh đơn, gallery, video attachment MP4, URL video chỉ có poster, spoiler/block, owner-only, reload/ẩn, xóa origin, restart + orphan cleanup, V2 HTTP 400, Facebook 2–3 proxy, desktop + mobile. Test/mock chưa chứng minh playback thật; chỉ xem là triển khai hoàn tất khi thử media trên Discord thật.
 ## Mục tiêu
 
 Asumi ưu tiên native embed của Discord khi một proxy có thể tự unfurl video/media. Mọi preview do Asumi tạo đều có cùng bộ điều khiển owner-only **🔄 Reload** và **🗑️ Bỏ embed**. Với Facebook, **🔄 Đổi nguồn** là lựa chọn thủ công và có thể quay về nguồn đã dùng. Bot không đoán thành công qua REST/unfurl polling và không tự đổi nguồn.
