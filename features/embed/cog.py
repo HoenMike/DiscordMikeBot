@@ -104,6 +104,25 @@ def _facebook_proxy_content(message: discord.Message, domain: str, url: str, spo
     return f"-# [Trả lời]({message.jump_url}) **{author}** • {link}"
 
 
+def _preview_origin_header(preview) -> str:
+    """Find the origin jump link in both legacy content and V2 TextDisplays.
+
+    V2 message.content is empty; without this restart scanning would lose the
+    origin mapping and orphan cleanup for every rich preview.
+    """
+    stack = list(getattr(preview, "components", ()) or ())
+    legacy = str(getattr(preview, "content", "") or "")
+    if "-# [Trả lời]" in legacy:
+        return legacy
+    while stack:
+        item = stack.pop()
+        value = str(getattr(item, "content", "") or "")
+        if "-# [Trả lời]" in value:
+            return value
+        stack.extend(getattr(item, "children", ()) or ())
+    return ""
+
+
 class EmbedCog(commands.Cog):
     """Cog xử lý tự động phát hiện, sửa lỗi và nhúng link mạng xã hội."""
 
@@ -1695,11 +1714,13 @@ class EmbedCog(commands.Cog):
                             if not self.bot.user or msg.author.id != self.bot.user.id:
                                 continue
 
-                            # Nhận diện embed do bot tạo ra thông qua header jump_url
-                            if not msg.content or "-# [Trả lời]" not in msg.content:
+                            # Components V2 stores the origin jump link in a
+                            # nested TextDisplay, not in message.content.
+                            origin_header = _preview_origin_header(msg)
+                            if not origin_header:
                                 continue
 
-                            match = re.search(r"discord\.com/channels/\d+/\d+/(\d+)", msg.content)
+                            match = re.search(r"discord\.com/channels/\d+/\d+/(\d+)", origin_header)
                             if not match:
                                 continue
 
