@@ -2,10 +2,10 @@
 
 Tài liệu vận hành pipeline preview mạng xã hội của Asumi. **Chính sách Facebook hiện hành: 2026-10-26 — manual reversible proxy cycling, in-place edit.** Các mục ghi phiên bản cũ phía dưới là lịch sử, không còn là contract hiện hành.
 
-## Thử nghiệm rich social embed (Components V2, opt-in, 2026-10-29)
+## Social embed Components V2 — production pilot (2026-10-29)
 
-- Nhánh thử nghiệm: `feat/asumi-social-native-v2-preview`. Không tự deploy/merge.
-- Bật bằng environment variable `ASUMI_SOCIAL_NATIVE_V2_ENABLED=true` rồi khởi động lại bot. Mặc định **false** để không đổi production khi chưa smoke.
+- Bản thử nghiệm được triển khai qua PR #92 lên `main` theo yêu cầu kiểm thử trực tiếp production.
+- Mặc định bật trên production. Có thể rollback tức thì sang legacy bằng environment variable `ASUMI_SOCIAL_NATIVE_V2_ENABLED=false` và redeploy/restart.
 - Chỉ dựng `LayoutView → Container → Section/Thumbnail + MediaGallery + TextDisplay + ActionRow` khi API/yt-dlp đã cung cấp ảnh trực tiếp hợp lệ hoặc video **thực sự tải được** thành Discord attachment. Không nhận thumbnail thay video. Dữ liệu like/comment/share chỉ hiện khi provider trả giá trị thật.
 - Facebook proxy **vẫn giữ nguyên** masked Markdown link ở `message.content` để Discord native-unfurl. Không tự đổi nguồn, không convert proxy URL thành MediaGallery. Nút Đổi nguồn tiếp tục edit tại chỗ, xoay vòng đến nguồn cũ.
 - Legacy fallback: nếu không có media đủ chuẩn hoặc feature flag tắt, render cũ không đổi. Nếu Discord trả HTTP 4xx chắc chắn từ send V2 cho ảnh URL công khai, thử legacy embed; nếu upload file V2 bị từ chối, dừng và để Tier tiếp theo xử lý (không dùng lại attachment đã đóng). Send outcome không chắc chắn **không retry**.
