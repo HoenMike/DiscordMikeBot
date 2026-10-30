@@ -1,3 +1,11 @@
+## 3.15.3 — Two Gemini Models Only (2026-10-30)
+
+- Removed Gemini 3.6/3.7/3.1 and other legacy candidates from **every runtime fallback chain**: Assistant, Summary/MapReduce/QA, Tarot, and Cabin.
+- Gemini **3.8 Flash** is the sole substantive model (including large MapReduce chunks and answer-first Search synthesis); **3.5 Flash-Lite** is reserved for tiny greetings/confirmations and short Cabin.
+- The shared Gemini provider boundary rejects all other IDs before an API call. Retired model environment overrides no longer override the repository's central policy; only API credentials remain in the environment.
+- No quality-downgrading fallback from 3.8 to Lite. Real model failure produces the existing honest timeout/error message or labeled Tarot dictionary reading. The general-chat per-call timeout rises from 8s to 12s now that provider switching has been removed.
+- Added multi-module routing and no-unapproved-model regression tests. Live provider/Discord smoke remains separate from CI.
+
 ## 3.15.2 — Reply-Aware Public Product Research (2026-10-30)
 
 - Reply một tin nhắn nêu rõ hai sản phẩm rồi nhờ "tra thử hộ" sẽ tra thông tin công khai thay vì hỏi xác nhận lại model. Chỉ tách hai nhãn sản phẩm đã kiểm tra; không gửi lời chat riêng tư, username, mention hay lịch sử 15 phút cho Brave.
