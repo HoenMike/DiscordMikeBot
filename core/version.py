@@ -12,12 +12,28 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.15.2"
+CURRENT_VERSION = "3.15.3"
 RELEASE_DATE = "2026-10-30"
-CODENAME = "Asumi 3.15.2 - Reply-Aware Public Research"
+CODENAME = "Asumi 3.15.3 - Strict Two-Model Routing"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.15.3", "date": "2026-10-30", "type": "bugfix",
+        "title": "Strict Two-Gemini-Model Routing",
+        "summary": "Chỉ Gemini 3.8 Flash cho tác vụ thường/sâu và 3.5 Flash-Lite cho việc siêu nhỏ; không còn fallback 3.6/3.7/3.1.",
+        "changes": [
+            {"category": "AI Models", "items": [
+                "Chat, Search, Summary, MapReduce, QA và Tarot chỉ dùng Gemini 3.8 Flash.",
+                "Chào hỏi/xác nhận cực ngắn và phiên dịch Cabin dùng Gemini 3.5 Flash-Lite.",
+                "Chặn mọi model khác ở cổng gọi Gemini; cấu hình env cũ không thể bật lại model đã bỏ.",
+            ]},
+            {"category": "Reliability", "items": [
+                "Không tự hạ task phức tạp xuống Lite nếu 3.8 lỗi; giữ thông báo lỗi minh bạch hoặc bản đọc Tarot dự phòng.",
+                "Tăng timeout một lượt chat thường lên 12s, bỏ chuỗi 8s + 8s sang model khác.",
+            ]},
+        ],
+    },
     {
         "version": "3.15.2", "date": "2026-10-30", "type": "bugfix",
         "title": "Reply-Aware Public Product Research",
