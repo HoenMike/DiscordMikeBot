@@ -40,10 +40,7 @@ VALID_RESULT = json.dumps({
 class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
     def test_tier1_defaults_have_stable_model_ids(self):
         self.assertEqual(DEFAULT_GEMINI_TAROT_MODEL, "gemini-3.8-flash")
-        self.assertEqual(DEFAULT_AI_FALLBACK_MODELS, [
-            "gemini-3.8-flash", "gemini-3.6-flash",
-            "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
-        ])
+        self.assertEqual(DEFAULT_AI_FALLBACK_MODELS, ["gemini-3.8-flash"])
         self.assertEqual(str(TAROT_GEN_CONFIG.thinking_config.thinking_level).lower().split(".")[-1], "low")
 
     async def test_success_sets_model_without_fallback(self):
