@@ -291,6 +291,7 @@ class EmbedCog(commands.Cog):
         )
 
     async def cog_load(self):
+        print(f"[EmbedPresentation] startup native_v2_enabled={_native_social_v2_enabled()}", flush=True)
         self.session = aiohttp.ClientSession(
             headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)"}
         )
