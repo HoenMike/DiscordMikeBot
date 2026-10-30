@@ -79,17 +79,15 @@ class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.ai_fallback)
         self.assertEqual(generate.await_count, 2)
 
-    async def test_quota_failure_is_distinct_and_does_not_retry_same_model(self):
+    async def test_quota_failure_keeps_local_fallback_and_never_demotes(self):
         generate = AsyncMock(side_effect=RuntimeError("429 RESOURCE_EXHAUSTED"))
-        with patch("features.tarot.ai.config.TAROT_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.6-flash"
-        ]), patch("features.tarot.ai.bounded_ai_generate", new=generate):
+        with patch("features.tarot.ai.bounded_ai_generate", new=generate):
             result = await generate_tarot_reading_result("yes_no", [card()])
         self.assertTrue(result.ai_fallback)
         self.assertEqual(result.ai_model, "")
         self.assertEqual(result.ai_error_category, "quota_exceeded")
         self.assertIn("BẢN ĐỌC DỰ PHÒNG", result.full_reading)
-        self.assertEqual(generate.await_count, 2)
+        self.assertEqual(generate.await_count, 1)
 
     async def test_fallback_board_does_not_claim_ai_finished(self):
         task = __import__("asyncio").create_task(__import__("asyncio").sleep(60))
