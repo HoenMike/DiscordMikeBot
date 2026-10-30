@@ -69,6 +69,19 @@ def _clean_candidate(line: str) -> str:
     return " ".join(line.split())
 
 
+def _credible_public_product_label(label: str) -> bool:
+    """Do not mistake one person's short English nickname for a model name."""
+    folded = _fold(label)
+    for cue in _PUBLIC_PRODUCT_CUES:
+        if re.search(r"(?<![a-z])" + re.escape(cue) + r"(?![a-z])", folded):
+            return True
+    # Unrecognized brands are allowed if their catalog-style model has an
+    # alphanumeric SKU *and* a separate suffix (e.g. maker + A7 + Ultra).
+    return len(label.split()) >= 3 and bool(re.search(
+        r"\b[a-z]{1,12}[-_]?\d+[a-z0-9-]*\b", folded,
+    ))
+
+
 def _public_product_pair(line: str) -> tuple[str, str] | None:
     clause = line.split("?", 1)[0]
     clause = _clean_candidate(clause)
@@ -83,8 +96,7 @@ def _public_product_pair(line: str) -> tuple[str, str] | None:
         return None
     if not _MODEL_ID.search(left + " " + right):
         return None
-    folded = _fold(left + " " + right)
-    if not any(cue in folded for cue in _PUBLIC_PRODUCT_CUES):
+    if not all(_credible_public_product_label(item) for item in (left, right)):
         return None
     # Avoid exporting phone numbers or opaque ticket/identifier strings.
     if re.search(r"\b\d{8,}\b", left + " " + right):
