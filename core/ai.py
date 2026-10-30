@@ -58,6 +58,12 @@ def _gemini_quota_remaining_seconds() -> float:
 
 async def bounded_ai_generate(model: str, contents, config, timeout_sec: float, label: str = "AI"):
     """Gọi AI bất đồng bộ với timeout hủy được request nền và semaphore giới hạn đồng thời toàn cục."""
+    from core.constants import ALLOWED_GEMINI_MODELS
+    if model not in ALLOWED_GEMINI_MODELS:
+        # Shared provider boundary: protects old env settings, user-controlled
+        # options and future call sites from silently re-enabling other SKUs.
+        raise ValueError(f"Gemini model is not allowed by Asumi policy: {model}")
+
     global AI_CALL_SEMAPHORE
     if AI_CALL_SEMAPHORE is None:
         AI_CALL_SEMAPHORE = asyncio.Semaphore(6)
