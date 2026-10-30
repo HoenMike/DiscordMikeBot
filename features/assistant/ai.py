@@ -83,22 +83,15 @@ class ChatTimeoutBudgetError(TimeoutError):
 
 
 def _candidate_models(model_tier: str = "balanced") -> list[str]:
-    """Backend-owned model allowlist; Clef chooses effort, never a model ID."""
+    """One provider model per role: fast=Lite, balanced/deep=Flash 3.8.
+
+    The role is selected in Python. Clef may suggest effort, but never an ID.
+    Never replace failed general reasoning with a weaker tiny-task model.
+    """
     from core import constants as policy
-    tier = model_tier if model_tier in {"fast", "balanced", "deep"} else "balanced"
-    primary = {
-        "fast": policy.ASUMI_CHAT_FAST_MODEL,
-        "balanced": policy.ASUMI_CHAT_MODEL,
-        "deep": policy.ASUMI_CHAT_DEEP_MODEL,
-    }[tier]
-    configured = list(policy.ASUMI_CHAT_FALLBACK_MODELS)
-    # For deep requests, step down to Flash rather than tiny models immediately.
-    extra = [policy.ASUMI_CHAT_MODEL] if tier == "deep" else []
-    ordered: list[str] = []
-    for model in [primary, *extra, *configured]:
-        if model and model not in ordered:
-            ordered.append(model)
-    return ordered
+    if model_tier == "fast":
+        return [policy.GEMINI_TINY_MODEL]
+    return [policy.GEMINI_GENERAL_MODEL]
 
 
 def _chat_limits(model_tier: str = "balanced") -> tuple[float, float, int]:
@@ -224,7 +217,14 @@ async def generate_chat_reply(
     models_tried: list[str] = []
     timeout_seen = False
 
-    for attempt, model in enumerate(_candidate_models(model_tier)[:max_attempts], start=1):
+    # A rejected social-target reply can be regenerated once on the SAME
+    # model; a provider timeout/429 must never trigger a weaker-model retry.
+    primary = _candidate_models(model_tier)[0]
+    attempts_to_make = max_attempts if social_plan is not None else 1
+    for attempt in range(1, attempts_to_make + 1):
+        model = primary
+        if attempt > 1 and not wrong_target_count:
+            break
         elapsed_total = time.perf_counter() - total_started
         remaining_budget = total_budget - elapsed_total
         if remaining_budget <= 0.1:
@@ -260,8 +260,7 @@ async def generate_chat_reply(
                         f"attempt={attempt} model={model}",
                         flush=True,
                     )
-                    # Give the next existing bounded fallback model a chance.
-                    # No extra paid requests or new providers are introduced.
+                    # Retry only for incorrect social targets, on the same model.
                     continue
                 total_ms = (time.perf_counter() - total_started) * 1000
                 print(
