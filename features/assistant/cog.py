@@ -38,6 +38,7 @@ async def choose_conversation_route(
     min_confidence: float,
     allowed_search_tools: frozenset[str] | None = None,
     context=None,
+    bot_user_id: int | None = None,
 ) -> RouteDecision:
     """Choose routing without allowing a live reply to reopen tools."""
 
@@ -91,6 +92,20 @@ async def choose_conversation_route(
             intent=getattr(previous_session, "intent", None) or "chat",
             source="session_followup",
             model_tier="fast" if _brief_confirmation(query) else "balanced",
+        )
+    # Another member can explicitly confirm a question Asumi just asked.
+    # That is *not* permission to inherit the first member's private session.
+    # Resolve the replied bot by Discord ID, not its display name. Treat a
+    # short acknowledgement as fast chat without Clef or action replay.
+    if (
+        not local.tool
+        and bot_user_id is not None
+        and context is not None
+        and getattr(getattr(context, "reply", None), "author_id", None) == bot_user_id
+        and _brief_confirmation(query)
+    ):
+        return RouteDecision(
+            intent="chat", source="bot_reply_acknowledgement", model_tier="fast",
         )
     if not query and has_images:
         return RouteDecision(intent="vision", source="image_only")
@@ -242,6 +257,7 @@ class AssistantCog(commands.Cog):
             min_confidence=self.router_min_confidence,
             allowed_search_tools=self._allowed_auto_search_tools(),
             context=context,
+            bot_user_id=getattr(getattr(self.bot, "user", None), "id", None),
         )
         route_ms = (time.perf_counter() - route_started) * 1000
 
