@@ -29,11 +29,8 @@ async def _generate_with_fallback(
 
     # A tiny model should not process arbitrary summary/reduce/QA work. The
     # map-chunk role is substantive too and uses the same general model.
-    from core.constants import GEMINI_GENERAL_MODEL, GEMINI_TINY_MODEL
-    if primary_model != GEMINI_GENERAL_MODEL and not (
-        primary_model == GEMINI_TINY_MODEL and task_label == "Tiny Summary"
-    ):
-        primary_model = GEMINI_GENERAL_MODEL
+    from core.constants import GEMINI_GENERAL_MODEL
+    primary_model = GEMINI_GENERAL_MODEL
     fallback_models = [
         m for m in fallback_models if m == primary_model
     ]
