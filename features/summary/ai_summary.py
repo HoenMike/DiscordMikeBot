@@ -58,15 +58,15 @@ async def _generate_with_fallback(
             if response and response.text:
                 return response.text
         except asyncio.TimeoutError:
-            print(f"⏱️ [{task_label}] Model '{model_name}' quá thời gian ({timeout_sec}s), chuyển model dự phòng...", flush=True)
+            print(f"⏱️ [{task_label}] Model '{model_name}' quá thời gian ({timeout_sec}s); dừng yêu cầu...", flush=True)
             last_error = TimeoutError(f"Model {model_name} timed out after {timeout_sec}s")
         except Exception as e:
             err_str = str(e)
-            print(f"⚠️ [{task_label}] Model '{model_name}' gặp lỗi ({type(e).__name__}: {err_str[:120]}), chuyển model dự phòng tiếp theo...", flush=True)
+            print(f"⚠️ [{task_label}] Model '{model_name}' gặp lỗi ({type(e).__name__}: {err_str[:120]}); không chuyển model...", flush=True)
             last_error = e
 
-    print(f"❌ [{task_label}] Tất cả model trong chuỗi fallback đều thất bại! Lỗi cuối: {last_error}", flush=True)
-    raise last_error or RuntimeError(f"Tất cả model fallback của {task_label} đều thất bại")
+    print(f"❌ [{task_label}] Model được phép không phản hồi! Lỗi cuối: {last_error}", flush=True)
+    raise last_error or RuntimeError(f"Model được phép của {task_label} không phản hồi")
 
 
 async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instruction):
