@@ -238,6 +238,22 @@ class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertIsNone(decision.tool)
 
+    def test_different_member_confirmation_must_not_inherit_requester_session(self):
+        from features.assistant.session import SessionStore
+        from tests.test_assistant_core import fake_message
+        store = SessionStore()
+        source = fake_message("tra thử hộ đê", author_id=30)
+        store.record_exchange(
+            source, 990, "tra thử hộ đê",
+            "Xác nhận hai sản phẩm này đúng không?", intent="chat",
+        )
+        # The original screenshot's confirmation came from another member.
+        other_member = fake_message(
+            "2 con này đúng r đó", reply_id=990, author_id=31
+        )
+        self.assertFalse(store.is_live_reply(other_member))
+        self.assertIsNone(store.get(other_member))
+
     async def test_short_confirmation_uses_fast_tier_without_reopening_tools(self):
         clef = SimpleNamespace(enabled=True, classify=AsyncMock())
         decision = await choose_conversation_route(
