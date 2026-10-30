@@ -15,7 +15,7 @@ from discord.ext import commands
 from features.embed.constants import PLATFORMS, PROXY_DOMAINS, extract_urls
 from features.embed.ui import PlatformToggleView, EmbedActionView
 from features.embed.builder import NSFWFilter, build_embed, build_gallery_embeds
-from features.embed.native_v2 import can_render_native_social, build_native_social_layout
+from features.embed.native_v2 import (can_render_native_social, build_native_social_layout, build_native_social_notice)
 from features.embed.fetchers import FETCHER_MAP
 from features.embed.validator import find_valid_proxy, build_proxy_url, validate_via_og_metadata
 from features.embed.validator import is_generic_or_login_preview
@@ -34,6 +34,31 @@ _SEND_TIMEOUT = 15
 def _native_social_v2_enabled() -> bool:
     """Production enabled; emergency rollback with ASUMI_SOCIAL_NATIVE_V2_ENABLED=false."""
     return os.environ.get("ASUMI_SOCIAL_NATIVE_V2_ENABLED", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
+
+def _preview_presentation(result: PreviewResult) -> str:
+    """Observable V2/native-proxy/legacy decision for live diagnostics."""
+    if result.reason in {"api_v2_preview_sent", "fallback_v2_sent", "manual_fallback_v2_offered"}:
+        return "components_v2"
+    if result.tier == "proxy" and result.preview_message_id is not None:
+        # Native proxy unfurl requires regular message content; V2 cannot
+        # encapsulate a proxy video player in the same Discord message.
+        return "native_proxy_player"
+    if result.preview_message_id is not None:
+        return "legacy"
+    return "none"
+
+
+def _is_components_v2_preview(message: discord.Message) -> bool:
+    """Discord's IS_COMPONENTS_V2 flag is immutable after first send.
+
+    A legacy content-based proxy video must be sent as a new message rather
+    than edited over a V2 no-player notice. Never guess from display names.
+    """
+    flags = getattr(message, "flags", None)
+    value = getattr(flags, "value", 0)
+    return bool(isinstance(value, int) and (value & (1 << 15)))
 
 
 class PreviewSendUncertain(Exception):
@@ -238,12 +263,25 @@ class EmbedCog(commands.Cog):
             if platform_key == "facebook"
             else "Chưa tạo được preview • Thử lại sau."
         )
-        author_name = _clean_markdown_label(message.author.display_name)
-        sent_msg = await self._send_embed_preview(
-            message=message,
-            content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • {hint}",
-            view=view,
+        payload = self._manual_fallback_payload(
+            message, platform_key, url, is_spoiler=is_spoiler,
         )
+        if _native_social_v2_enabled() and payload:
+            # No proxy player exists. A compact V2 notice can safely replace
+            # the legacy one-line retry notice without pretending it is media.
+            view = build_native_social_notice(
+                self, payload, reply_url=message.jump_url,
+                reply_author=message.author.display_name,
+                platform=platform_key, hint=hint,
+            )
+            sent_msg = await self._send_embed_preview(message=message, view=view)
+        else:
+            author_name = _clean_markdown_label(message.author.display_name)
+            sent_msg = await self._send_embed_preview(
+                message=message,
+                content=f"-# [Trả lời]({message.jump_url}) **{author_name}** • {hint}",
+                view=view,
+            )
         if not sent_msg:
             return PreviewResult(
                 reason="manual_fallback_offer_send_failed",
@@ -256,7 +294,7 @@ class EmbedCog(commands.Cog):
         return PreviewResult(
             status="action_required",
             tier="manual",
-            reason="manual_fallback_offered",
+            reason="manual_fallback_v2_offered" if isinstance(view, discord.ui.LayoutView) else "manual_fallback_offered",
             platform=platform_key,
             origin_message_id=message.id,
             preview_message_id=sent_msg.id,
@@ -264,6 +302,7 @@ class EmbedCog(commands.Cog):
         )
 
     async def cog_load(self):
+        print(f"[EmbedPresentation] startup native_v2_enabled={_native_social_v2_enabled()}", flush=True)
         self.session = aiohttp.ClientSession(
             headers={"User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discord.app)"}
         )
@@ -484,6 +523,7 @@ class EmbedCog(commands.Cog):
                             "unfurl_verified": result.unfurl_verified,
                             "used_fallback": result.used_fallback,
                             "fallback_reason": result.fallback_reason,
+                            "presentation": _preview_presentation(result),
                             "origin_message_id": result.origin_message_id,
                             "preview_message_id": result.preview_message_id,
                             "result_status": result.status,
@@ -491,6 +531,14 @@ class EmbedCog(commands.Cog):
                     )
                 except Exception as act_err:
                     print(f"⚠️ [ActivityLogger] Lỗi ghi nhận Embed: {act_err}", flush=True)
+
+                print(
+                    f"[EmbedPresentation] platform={platform_key} "
+                    f"presentation={_preview_presentation(result)} "
+                    f"status={result.status} tier={result.tier or 'none'} "
+                    f"reason={result.reason or 'none'}",
+                    flush=True,
+                )
 
                 if result.success:
                     any_success = True
@@ -985,8 +1033,9 @@ class EmbedCog(commands.Cog):
             )
             header_text = f"-# [Trả lời]({message.jump_url}) **{author_name}**"
 
-            # Native V2 is only for media-backed API results. A valid poster
-            # is NOT a video. Facebook's proxy-unfurl route is untouched.
+            # V2 handles trusted media or structured text-only social posts.
+            # Never present an external poster as playable video; proxy-video
+            # unfurl keeps its ordinary, media-capable Discord message.
             if _native_social_v2_enabled() and can_render_native_social(post_data, filter_result, file):
                 payload = self._manual_fallback_payload(
                     message, platform_key, url, is_spoiler=is_spoiler,
@@ -1650,6 +1699,41 @@ class EmbedCog(commands.Cog):
                 origin, domain, proxy_url,
                 spoiler or (effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"),
             )
+            if _is_components_v2_preview(current_preview):
+                # A previously shown V2 notice cannot turn into a native
+                # proxy player in-place: the V2 message flag is irreversible.
+                # Send the replacement first, then clean up the notice. This
+                # is only for the transition, never regular proxy cycling.
+                try:
+                    replacement = await self._send_embed_preview(
+                        message=origin, content=content, view=view,
+                    )
+                except PreviewSendUncertain:
+                    return failure("proxy_send_uncertain", "degraded")
+                if replacement is None:
+                    return failure("proxy_send_failed")
+                if not await self._discard_preview(origin_id, current_preview):
+                    # If the old notice cannot be removed, undo the new player
+                    # to avoid intentionally leaving duplicate previews.
+                    removed_new = await self._discard_preview(origin_id, replacement)
+                    print(
+                        f"[EmbedCog] V2 notice cleanup failed; "
+                        f"replacement_rolled_back={removed_new}",
+                        flush=True,
+                    )
+                    return failure("notice_cleanup_failed", "degraded")
+                self._facebook_current_domain[key] = domain
+                print(
+                    f"[EmbedCog] Manual Facebook V2 notice -> native proxy "
+                    f"transition: {origin_id} -> {domain}",
+                    flush=True,
+                )
+                return PreviewResult(
+                    "success", "proxy", "manual_proxy_replaced_v2_notice",
+                    "facebook", domain, origin_id, replacement.id,
+                    unfurl_verified=False,
+                )
+
             # Editing a single message means no new chat entry, cleanup or
             # REST unfurl heuristic that might discard a working client embed.
             try:

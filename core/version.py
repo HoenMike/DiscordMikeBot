@@ -12,12 +12,25 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.15.3"
+CURRENT_VERSION = "3.15.4"
 RELEASE_DATE = "2026-10-30"
-CODENAME = "Asumi 3.15.3 - Strict Two-Model Routing"
+CODENAME = "Asumi 3.15.4 - Unified Social Embed V2"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.15.4", "date": "2026-10-30", "type": "feature",
+        "title": "Unified Social Embed V2",
+        "summary": "Khung preview gọn dùng chung cho bài viết có ảnh, gallery, video attachment hoặc text công khai; giữ player proxy thật.",
+        "changes": [
+            {"category": "Embed Presentation", "items": [
+                "Components V2 áp dụng cho bài viết text có dữ liệu API và nội dung ảnh/gallery trên các mạng xã hội hỗ trợ.",
+                "Thông báo fallback thủ công dùng Container V2; nút Reload/Ẩn không gửi popup thừa.",
+                "Facebook và video proxy mạng xã hội khác vẫn giữ native player, không thay bằng thumbnail giả.",
+                "Ghi log presentation để phân biệt V2, native proxy, legacy và unavailable.",
+            ]},
+        ],
+    },
     {
         "version": "3.15.3", "date": "2026-10-30", "type": "bugfix",
         "title": "Strict Two-Gemini-Model Routing",

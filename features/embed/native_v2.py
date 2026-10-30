@@ -51,42 +51,57 @@ def _media_sources(post: PostData, file: discord.File | None, spoiler: bool) -> 
 def can_render_native_social(
     post: PostData, filter_result: NSFWFilterResult, file: discord.File | None,
 ) -> bool:
-    """The new layout is eligible only when its media is not merely a poster."""
-    if filter_result.is_blocked or post.media_type not in ("image", "gallery", "video"):
+    """Eligibility is about trustworthy media *or* verified structured text.
+
+    Proxies relying on Discord unfurl stay separate: a LayoutView has no
+    message content or native link embed, so V2 cannot replace their player.
+    """
+    if filter_result.is_blocked:
+        return False
+    if post.media_type == "text":
+        # A plain text social post is real content, not an invented preview.
+        return bool(str(post.text or "").strip() and _safe_https(post.url))
+    if post.media_type not in ("image", "gallery", "video"):
         return False
     if post.media_type == "video" and file is None:
+        # An external video poster is NOT a playable video in MediaGallery.
         return False
     return bool(_media_sources(post, file, filter_result.should_spoiler_media))
+
+
+def _new_panel(cog, payload: dict, *, colour: int, spoiler: bool = False):
+    view = EmbedActionLayoutView(cog, payload)
+    # One single compact Discord-native container holds the controls too.
+    controls = view.children[0]
+    view.remove_item(controls)
+    panel = discord.ui.Container(
+        accent_colour=discord.Colour(colour), spoiler=spoiler,
+    )
+    return view, panel, controls
 
 
 def build_native_social_layout(
     cog, payload: dict, post: PostData, filter_result: NSFWFilterResult,
     *, reply_url: str, reply_author: str, file: discord.File | None = None,
 ) -> EmbedActionLayoutView:
-    """Construct a compact Discord-native card and reuse legacy owner actions.
+    """Build the same compact card for media and verified text-only posts.
 
-    Call only after can_render_native_social has accepted the media.
-    A LayoutView message must be sent with view (+ optional file) and NEVER
-    with content/embeds.
+    File-backed videos retain playable attachments; no proxy link is ever
+    copied to a TextDisplay in place of its real native Discord video player.
+    LayoutView messages must never include content or embeds.
     """
+    if not can_render_native_social(post, filter_result, file):
+        raise ValueError("native social layout requires trustworthy post content")
     sources = _media_sources(post, file, filter_result.should_spoiler_media)
-    if not sources:
-        raise ValueError("native social layout requires renderable media")
-
-    view = EmbedActionLayoutView(cog, payload)
-    # The controls are constructed first by the shared action mixin. Move their
-    # ActionRow into the container so the entire preview occupies one card.
-    controls = view.children[0]
-    view.remove_item(controls)
-
     info = PLATFORMS.get(post.platform, {})
-    panel = discord.ui.Container(
-        accent_colour=discord.Colour(info.get("color", 0x566477)),
+    view, panel, controls = _new_panel(
+        cog, payload, colour=info.get("color", 0x566477),
         spoiler=bool(filter_result.should_spoiler_media),
     )
     source_author = _plain(reply_author, 80)
-    header = f"-# [Trả lời]({reply_url}) **{source_author}**"
-    panel.add_item(discord.ui.TextDisplay(header))
+    panel.add_item(discord.ui.TextDisplay(
+        f"-# [Trả lời]({reply_url}) **{source_author}**"
+    ))
 
     heading = f"**{_plain(post.author or info.get('name', 'Bài viết'), 150)}**"
     description = _plain(post.text, 600)
@@ -101,12 +116,13 @@ def build_native_social_layout(
     else:
         panel.add_item(discord.ui.TextDisplay(heading))
 
-    panel.add_item(discord.ui.MediaGallery(*[
-        discord.MediaGalleryItem(
-            media=source, spoiler=bool(filter_result.should_spoiler_media),
-            description=_plain(post.text or post.author, 200) or None,
-        ) for source in sources
-    ]))
+    if sources:
+        panel.add_item(discord.ui.MediaGallery(*[
+            discord.MediaGalleryItem(
+                media=source, spoiler=bool(filter_result.should_spoiler_media),
+                description=_plain(post.text or post.author, 200) or None,
+            ) for source in sources
+        ]))
 
     stats = []
     if post.likes is not None:
@@ -123,6 +139,36 @@ def build_native_social_layout(
     panel.add_item(discord.ui.TextDisplay(
         f"-# {footer}" + (f" · [Xem bài gốc]({original})" if original else "")
     ))
+    panel.add_item(controls)
+    view.add_item(panel)
+    return view
+
+
+def build_native_social_notice(
+    cog, payload: dict, *,
+    reply_url: str, reply_author: str, platform: str, hint: str,
+) -> EmbedActionLayoutView:
+    """One compact action-required notice, never a fake media preview.
+
+    This card is only used when no working proxy/player was sent. If a
+    Facebook/other proxy link *was* sent, retain its native video unfurl.
+    """
+    info = PLATFORMS.get(platform, {})
+    view, panel, controls = _new_panel(
+        cog, payload, colour=info.get("color", 0x566477),
+    )
+    panel.add_item(discord.ui.TextDisplay(
+        f"-# [Trả lời]({reply_url}) **{_plain(reply_author, 80)}**"
+    ))
+    panel.add_item(discord.ui.TextDisplay(
+        f"**{_plain(info.get('name', platform.capitalize()), 40)}**\n"
+        f"{_plain(hint, 250)}"
+    ))
+    original = _safe_https(payload.get("url"))
+    if original:
+        panel.add_item(discord.ui.TextDisplay(
+            f"-# [Xem liên kết gốc]({original})"
+        ))
     panel.add_item(controls)
     view.add_item(panel)
     return view

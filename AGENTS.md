@@ -1,3 +1,10 @@
+## Asumi 3.15.4 — Social embed presentation contract (2026-10-30)
+
+- Apply one Components V2 Container for structured social text-only posts, images, galleries and real video attachments. Avoid creating simulated videos from poster/thumb-only links. Works with all configured API-backed platforms; unsupported upstream content retains the safest existing fallback.
+- Discord prohibits content/embeds in Components V2 messages. Proxy-unfurled playable videos on Facebook, X, TikTok, Instagram and similar sites **must** remain a normal message. Do not add a second companion card or trade playable video for a thumbnail just to achieve a V2 label.
+- Use one owner-only control behavior for legacy and V2; no post-click ephemeral confirmation spam. Failed actions retain preview/control state and log the reason.
+- Log final presentation type for every link. Do not call a code flag or CI pass proof of client-side video playback. Old previews are not migrated retroactively.
+
 ## Asumi 3.15.3 — Strict two-Gemini-model runtime policy (2026-10-30)
 
 - Only Gemini 3.8 Flash for substantive work (chat balanced/deep, Search, Tarot, Summary, MapReduce, QA). Only Gemini 3.5 Flash-Lite for genuinely tiny tasks (fast chat greeting/ack, short Cabin). Clef is separately hosted on Cloudflare Workers AI and remains unchanged.
