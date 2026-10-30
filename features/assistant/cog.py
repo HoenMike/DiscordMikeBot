@@ -1,19 +1,31 @@
 from __future__ import annotations
 
 import os
+import re
 import time
+import unicodedata
 
 from discord.ext import commands, tasks
 
 from core.activity_logger import activity_logger
 from features.assistant.ai import ChatTimeoutBudgetError, generate_chat_reply
 from features.assistant.context import ContextBuilder
+from features.assistant.public_reference import public_product_search_query
 from features.assistant.response import send_conversation_reply
 from features.assistant.router import RouteDecision, route_locally, route_message, _obvious_public_event_schedule_search
 from features.assistant.session import SessionStore
 from features.assistant.tools import CommandToolRegistry
 from features.assistant.trigger import has_explicit_mention, strip_bot_mention
 from features.assistant.providers.cloudflare import CloudflareDecisionRouter
+
+
+def _brief_confirmation(query: str) -> bool:
+    """A simple acknowledgement does not need balanced/deep generation."""
+    if len(query) > 45:
+        return False
+    normalized = unicodedata.normalize("NFD", query.lower())
+    folded = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn").replace("đ", "d")
+    return bool(re.search(r"\b(?:dung|chuan|oke?|yes|yep|duoc)\b", folded))
 
 
 async def choose_conversation_route(
@@ -25,12 +37,36 @@ async def choose_conversation_route(
     cloudflare_router,
     min_confidence: float,
     allowed_search_tools: frozenset[str] | None = None,
+    context=None,
 ) -> RouteDecision:
     """Choose routing without allowing a live reply to reopen tools."""
 
     # Explicit Archive and Web Search requests beat live continuation.
     # Never reopen Tarot/Summary automatically from an ordinary follow-up.
     local = route_locally(query)
+
+    # A user explicitly requesting a lookup while replying to a public
+    # product comparison has provided enough intent to search, even though
+    # "tra thử hộ đê" alone contains no product names. Extract ONLY sanitized
+    # product labels, never the private message or ambient channel history.
+    # Do not override explicit Archive/History/Tarot or other tool commands.
+    from core import constants as policy
+    if (
+        policy.ASUMI_AUTO_SEARCH_ENABLED
+        and policy.ASUMI_WEB_SEARCH_ENABLED
+        and (not local.tool or (
+            local.tool == "web.search"
+            and not local.arguments.get("query")
+        ))
+    ):
+        public_query = public_product_search_query(query, context)
+        if public_query:
+            return RouteDecision(
+                intent="web_search",
+                tool="web.search",
+                arguments={"query": public_query},
+                source="reply_public_product",
+            )
     if local.tool and (
         local.tool.startswith("archive.")
         or local.tool in {
@@ -54,6 +90,7 @@ async def choose_conversation_route(
         return RouteDecision(
             intent=getattr(previous_session, "intent", None) or "chat",
             source="session_followup",
+            model_tier="fast" if _brief_confirmation(query) else "balanced",
         )
     if not query and has_images:
         return RouteDecision(intent="vision", source="image_only")
@@ -204,6 +241,7 @@ class AssistantCog(commands.Cog):
             cloudflare_router=self.cloudflare_router,
             min_confidence=self.router_min_confidence,
             allowed_search_tools=self._allowed_auto_search_tools(),
+            context=context,
         )
         route_ms = (time.perf_counter() - route_started) * 1000
 
