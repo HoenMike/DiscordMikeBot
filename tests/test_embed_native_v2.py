@@ -183,6 +183,31 @@ class NativeSocialLayoutTests(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertIsInstance(layout.children[0].children[-1], discord.ui.ActionRow)
 
+    async def test_v2_controls_are_quiet_and_preserve_failed_preview(self):
+        cog = SimpleNamespace(
+            reload_embed=AsyncMock(return_value=PreviewResult(reason="proxy_send_failed")),
+            revert_embed=AsyncMock(return_value=PreviewResult(reason="native_unsuppress_failed")),
+        )
+        layout = build_native_social_layout(
+            cog, payload(), post("text", []), NSFWFilterResult(post("text", [])),
+            reply_url=JUMP, reply_author="Sender",
+        )
+        message = SimpleNamespace(id=611, edit=AsyncMock())
+        interaction = SimpleNamespace(
+            message=message,
+            response=SimpleNamespace(defer=AsyncMock(), edit_message=AsyncMock()),
+            followup=SimpleNamespace(send=AsyncMock()),
+        )
+        await layout._reload(interaction)
+        cog.reload_embed.assert_awaited_once()
+        interaction.followup.send.assert_not_awaited()
+        await layout._remove(interaction)
+        cog.revert_embed.assert_awaited_once()
+        message.edit.assert_awaited_once_with(view=layout)
+        interaction.followup.send.assert_not_awaited()
+        self.assertFalse(layout.reload_button.disabled)
+        self.assertFalse(layout.remove_button.disabled)
+
     async def test_legacy_view_remains_available_for_facebook_proxy(self):
         legacy = EmbedActionView(SimpleNamespace(), {
             **payload(), "platform": "facebook",
