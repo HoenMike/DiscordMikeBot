@@ -829,12 +829,7 @@ OUTPUT JSON DUY NHẤT
 }}
 """.strip()
 
-    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
-        config.GEMINI_TAROT_MODEL,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.5-flash-lite",
-    ])
+    models_to_try = [config.GEMINI_TAROT_MODEL]
     seen = set()
     ordered_models = []
     for model_name in models_to_try:
@@ -900,12 +895,7 @@ async def generate_tarot_reading_result(
         bot_name=bot_name
     )
 
-    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
-        config.GEMINI_TAROT_MODEL,
-        "gemini-3.6-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
-    ])
+    models_to_try = [config.GEMINI_TAROT_MODEL]
 
     # Detailed spreads can benefit from Pro, but keep brief Yes/No and Daily
     # on faster Flash to avoid needless latency and costs.
