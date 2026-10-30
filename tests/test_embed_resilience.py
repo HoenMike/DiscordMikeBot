@@ -212,7 +212,7 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out.status, "action_required")
         self.cog._try_ytdlp_fallback.assert_not_awaited()
         self.cog._offer_manual_fallback.assert_awaited_once()
-    async def test_failed_final_fallback_shows_reason_and_link_button(self):
+    async def test_failed_final_fallback_is_compact_no_fake_player(self):
         self.cog._try_api_fetcher = AsyncMock(return_value=False)
         self.cog._try_proxy_chain = AsyncMock(return_value=PreviewResult(
             reason="no_valid_proxy", platform="facebook",
@@ -221,18 +221,30 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._send_embed_preview = AsyncMock(
             return_value=SimpleNamespace(id=74)
         )
-        out = await self.cog._run_fallback_chain(
-            self.msg, "facebook", VIDEO_URL, None, {}
-        )
+        with patch.dict("os.environ", {"ASUMI_SOCIAL_NATIVE_V2_ENABLED": "true"}):
+            out = await self.cog._run_fallback_chain(
+                self.msg, "facebook", VIDEO_URL, None, {}
+            )
         self.assertEqual(out.status, "action_required")
+        self.assertEqual(out.reason, "manual_fallback_v2_offered")
         sent = self.cog._send_embed_preview.await_args.kwargs
-        self.assertIn("Chưa lấy được video Reel", sent["content"])
-        self.assertNotIn("Preview lỗi?", sent["content"])
-        self.assertEqual(len(sent["view"].children), 2)
+        self.assertNotIn("content", sent)
+        self.assertNotIn("embeds", sent)
+        self.assertIsInstance(sent["view"], discord.ui.LayoutView)
+        panel = sent["view"].children[0]
+        self.assertIsInstance(panel, discord.ui.Container)
         self.assertFalse(any(
-            isinstance(item, discord.ui.Button) and item.url
-            for item in sent["view"].children
+            isinstance(item, discord.ui.MediaGallery) for item in panel.children
         ))
+        visible = "\\n".join(
+            item.content for item in panel.children
+            if isinstance(item, discord.ui.TextDisplay)
+        )
+        self.assertIn("Chưa lấy được video Reel", visible)
+        self.assertNotIn("Preview lỗi?", visible)
+        self.assertIn("Xem liên kết gốc", visible)
+        self.assertIsInstance(panel.children[-1], discord.ui.ActionRow)
+        self.assertEqual(len(panel.children[-1].children), 2)
 
     async def test_static_facebook_poster_is_not_ytdlp_video(self):
         self.cog._send_embed_preview = AsyncMock()
