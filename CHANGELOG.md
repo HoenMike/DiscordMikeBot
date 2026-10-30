@@ -1,3 +1,10 @@
+## 3.15.2 — Reply-Aware Public Product Research (2026-10-30)
+
+- Reply một tin nhắn nêu rõ hai sản phẩm rồi nhờ "tra thử hộ" sẽ tra thông tin công khai thay vì hỏi xác nhận lại model. Chỉ tách hai nhãn sản phẩm đã kiểm tra; không gửi lời chat riêng tư, username, mention hay lịch sử 15 phút cho Brave.
+- Session follow-up cho phép tra cứu web chỉ khi có yêu cầu explicit + cặp tên sản phẩm được kiểm tra; các tool Tarot/Archive/Summary giữ nguyên ranh giới.
+- Trả lời so sánh dựa vào nguồn, nêu rõ chỗ chưa xác minh; câu xác nhận ngắn dùng fast tier. Lỗi timeout provider vẫn được báo trung thực, không coi là đã sửa hết độ trễ.
+- Test có mẫu screenshot, nhiều loại sản phẩm, bảo vệ quyền riêng tư, negative cases và điều khiển bật/tắt. CI và smoke Discord/Brave được theo dõi riêng.
+
 ## 3.15.1 — Flash 3.8 Value + Time/Fixture Routing (2026-10-20)
 
 - **Model pricing:** standard Google API rates (through 2026-12-31) are $0.75/$3.75 per 1M input/output tokens for Gemini 3.8 Flash vs $2/$12 for Gemini 3.1 Pro Preview. Artificial Analysis intelligence benchmark 41 vs 30 (3.8 Flash High vs 3.1 Pro Preview), while individual task results vary. Source: https://ai.google.dev/gemini-api/docs/pricing and https://artificialanalysis.ai/models/comparisons/gemini-3-8-flash-vs-gemini-3-1-pro-preview .
