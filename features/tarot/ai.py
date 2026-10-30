@@ -1150,16 +1150,7 @@ YÊU CẦU
 - Nếu câu hỏi vượt ranh giới riêng tư của người thứ ba, từ chối ngắn gọn và gợi ý một góc hỏi liên quan trực tiếp đến {user_name}.
 """.strip()
 
-    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
-        config.GEMINI_TAROT_MODEL,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
-        "gemma-4-31b-it"
-    ])
+    models_to_try = [config.GEMINI_TAROT_MODEL]
 
     seen = set()
     ordered_models = []
@@ -1311,16 +1302,7 @@ YÊU CẦU
 - Output JSON đúng 5 field: relationship, clarity, effect, practical_implication, uncertainty.\n- Mỗi field chỉ 1-2 câu; toàn bộ phần diễn giải nên dưới khoảng 2200 ký tự.
 """.strip()
 
-    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
-        config.GEMINI_TAROT_MODEL,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
-        "gemma-4-31b-it",
-    ])
+    models_to_try = [config.GEMINI_TAROT_MODEL]
     seen = set()
     ordered_models = []
     for model_name in models_to_try:
@@ -1420,16 +1402,7 @@ Chỉ trả 1 đoạn dưới 700 ký tự:
 - không dùng lời mở đầu/cảm ơn hay câu huyền bí sáo rỗng.
 """.strip()
 
-    models_to_try = getattr(config, "TAROT_FALLBACK_MODELS", [
-        config.GEMINI_TAROT_MODEL,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
-        "gemma-4-31b-it",
-    ])
+    models_to_try = [config.GEMINI_TAROT_MODEL]
 
     seen = set()
     ordered_models = []
