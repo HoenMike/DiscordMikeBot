@@ -50,6 +50,17 @@ def _preview_presentation(result: PreviewResult) -> str:
     return "none"
 
 
+def _is_components_v2_preview(message: discord.Message) -> bool:
+    """Discord's IS_COMPONENTS_V2 flag is immutable after first send.
+
+    A legacy content-based proxy video must be sent as a new message rather
+    than edited over a V2 no-player notice. Never guess from display names.
+    """
+    flags = getattr(message, "flags", None)
+    value = getattr(flags, "value", 0)
+    return bool(isinstance(value, int) and (value & (1 << 15)))
+
+
 class PreviewSendUncertain(Exception):
     """Discord may have accepted a send; another tier must not duplicate it."""
 
@@ -1688,6 +1699,41 @@ class EmbedCog(commands.Cog):
                 origin, domain, proxy_url,
                 spoiler or (effective_nsfw and config.get("nsfw_mode", "spoiler") == "spoiler"),
             )
+            if _is_components_v2_preview(current_preview):
+                # A previously shown V2 notice cannot turn into a native
+                # proxy player in-place: the V2 message flag is irreversible.
+                # Send the replacement first, then clean up the notice. This
+                # is only for the transition, never regular proxy cycling.
+                try:
+                    replacement = await self._send_embed_preview(
+                        message=origin, content=content, view=view,
+                    )
+                except PreviewSendUncertain:
+                    return failure("proxy_send_uncertain", "degraded")
+                if replacement is None:
+                    return failure("proxy_send_failed")
+                if not await self._discard_preview(origin_id, current_preview):
+                    # If the old notice cannot be removed, undo the new player
+                    # to avoid intentionally leaving duplicate previews.
+                    removed_new = await self._discard_preview(origin_id, replacement)
+                    print(
+                        f"[EmbedCog] V2 notice cleanup failed; "
+                        f"replacement_rolled_back={removed_new}",
+                        flush=True,
+                    )
+                    return failure("notice_cleanup_failed", "degraded")
+                self._facebook_current_domain[key] = domain
+                print(
+                    f"[EmbedCog] Manual Facebook V2 notice -> native proxy "
+                    f"transition: {origin_id} -> {domain}",
+                    flush=True,
+                )
+                return PreviewResult(
+                    "success", "proxy", "manual_proxy_replaced_v2_notice",
+                    "facebook", domain, origin_id, replacement.id,
+                    unfurl_verified=False,
+                )
+
             # Editing a single message means no new chat entry, cleanup or
             # REST unfurl heuristic that might discard a working client embed.
             try:
