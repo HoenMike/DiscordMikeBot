@@ -842,16 +842,14 @@ class AssistantChatModelTests(unittest.TestCase):
     def test_chat_model_can_be_overridden(self):
         with patch("core.constants.ASUMI_CHAT_MODEL", "gemini-custom-chat"):
             models = _candidate_models()
-        self.assertEqual(models[0], "gemini-custom-chat")
+        self.assertEqual(models, ["gemini-3.8-flash"])
 
 
 class AssistantAdaptiveModelTests(unittest.IsolatedAsyncioTestCase):
     def test_depth_tiers_have_fixed_backend_allowlist(self):
         self.assertEqual(_candidate_models("fast")[0], "gemini-3.5-flash-lite")
         self.assertEqual(_candidate_models("balanced")[0], "gemini-3.8-flash")
-        self.assertEqual(_candidate_models("deep")[:2], [
-            "gemini-3.8-flash", "gemini-3.6-flash",
-        ])
+        self.assertEqual(_candidate_models("deep"), ["gemini-3.8-flash"])
         self.assertNotIn("gemini-3.1-pro-preview", _candidate_models("deep"))
         self.assertEqual(_candidate_models("arbitrary-model")[0], "gemini-3.8-flash")
 
@@ -885,7 +883,7 @@ class AssistantChatTimeoutBudgetTests(unittest.IsolatedAsyncioTestCase):
     def test_default_chat_limits_are_fast_fail(self):
         with patch.dict("os.environ", {}, clear=True):
             per_model, total_budget, max_attempts = _chat_limits()
-        self.assertEqual(per_model, 8.0)
+        self.assertEqual(per_model, 12.0)
         self.assertEqual(total_budget, 18.0)
         self.assertEqual(max_attempts, 2)
 
@@ -893,7 +891,7 @@ class AssistantChatTimeoutBudgetTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict("os.environ", {}, clear=True):
             models = _candidate_models()
         self.assertEqual(models[0], "gemini-3.8-flash")
-        self.assertEqual(models[1], "gemini-3.6-flash")
+        self.assertEqual(models, ["gemini-3.8-flash"])
 
     async def test_total_budget_prevents_second_attempt_after_exhaustion(self):
         with patch.dict(
