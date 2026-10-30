@@ -240,17 +240,14 @@ class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
 
     def test_different_member_confirmation_must_not_inherit_requester_session(self):
         from features.assistant.session import SessionStore
-        from tests.test_assistant_core import fake_message
         store = SessionStore()
-        source = fake_message("tra thử hộ đê", author_id=30)
+        source = SimpleNamespace(guild=SimpleNamespace(id=10), channel=SimpleNamespace(id=20), author=SimpleNamespace(id=30), reference=None)
         store.record_exchange(
             source, 990, "tra thử hộ đê",
             "Xác nhận hai sản phẩm này đúng không?", intent="chat",
         )
         # The original screenshot's confirmation came from another member.
-        other_member = fake_message(
-            "2 con này đúng r đó", reply_id=990, author_id=31
-        )
+        other_member = SimpleNamespace(guild=source.guild, channel=source.channel, author=SimpleNamespace(id=31), reference=SimpleNamespace(message_id=990))
         self.assertFalse(store.is_live_reply(other_member))
         self.assertIsNone(store.get(other_member))
 
