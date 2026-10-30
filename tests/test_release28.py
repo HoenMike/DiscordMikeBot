@@ -189,8 +189,7 @@ class EmbedPipelineTests(unittest.IsolatedAsyncioTestCase):
             view.payload, current_preview=current_preview,
         )
         allowed.response.defer.assert_awaited_once()
-        allowed.followup.send.assert_awaited_once()
-        self.assertTrue(allowed.followup.send.await_args.kwargs["ephemeral"])
+        allowed.followup.send.assert_not_awaited()
     async def test_action_view_is_available_for_non_facebook_provider(self):
         view = self.cog._manual_fallback_view(
             self.msg,
