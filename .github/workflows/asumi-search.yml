@@ -19,6 +19,7 @@ on:
       - "tests/test_tarot_v2_reading.py"
       - "tests/test_tarot_v2_launcher.py"
       - "tests/test_assistant_core.py"
+      - "tests/test_two_model_policy.py"
       - "tests/test_tarot_v2_renderer.py"
       - "features/summary/**"
       - "features/feedback/**"
@@ -173,6 +174,7 @@ jobs:
           )
           PY
           node --check /tmp/asumi-classic-admin.js
+          python -m unittest discover -s tests -p "test_two_model_policy.py" -v
           python -m unittest discover -s tests -p "test_assistant_core.py" -v
           python -m unittest discover -s tests -p "test_assistant_archive.py" -v
           python -m unittest discover -s tests -p "test_assistant_semantic.py" -v
