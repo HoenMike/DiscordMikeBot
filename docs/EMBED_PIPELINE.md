@@ -1,5 +1,14 @@
 # Social Embed Pipeline
 
+## 2026-10-30 — Unified social Components V2 rollout (v3.15.4)
+
+- Shared compact Container for **verified structured** image/gallery and **text-only** posts across available platform API fetchers: X/Twitter, Reddit, TikTok photo posts, Bluesky, Pixiv, and Threads (where those APIs return actual content). No empty/fictional thumbnails. Media-backed playable Discord attachments remain in MediaGallery.
+- Action-required notices now use the same V2 Container instead of a legacy one-liner, but never claim a poster is a playable video. Reload and Hide buttons retain owner-only permission and silently update their message; errors go to logs.
+- **Technical Discord limitation:** Components V2 cannot coexist with traditional message `content` and native link embeds. Proxy-dependent video on Facebook, X, TikTok, Instagram, etc. MUST retain a normal native-unfurl message to preserve playback. There is no safe single-message V2 wrapper around it. A successful native player is not a rollout failure.
+- Each completed link now records `presentation=components_v2|native_proxy_player|legacy|none` in the activity log and `[EmbedPresentation]` console message. No provider responses are invented. Older posted messages do not change retroactively; post a fresh link or use Reload for eligible non-Facebook posts.
+- Rollback: set `ASUMI_SOCIAL_NATIVE_V2_ENABLED=false` and restart/redeploy. Verify fresh X text/image, Bluesky, Reddit, TikTok photo carousel, Pixiv, Threads text, Facebook video, X/TikTok proxy player, spoiler cases, and button permissions on desktop and mobile. Unit CI is not a live playback test.
+
+
 Tài liệu vận hành pipeline preview mạng xã hội của Asumi. **Chính sách Facebook hiện hành: 2026-10-26 — manual reversible proxy cycling, in-place edit.** Các mục ghi phiên bản cũ phía dưới là lịch sử, không còn là contract hiện hành.
 
 ## Social embed Components V2 — production pilot (2026-10-29)
