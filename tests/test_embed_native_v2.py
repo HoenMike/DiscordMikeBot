@@ -249,8 +249,10 @@ class NativeSocialPipelineTests(unittest.IsolatedAsyncioTestCase):
     async def test_text_only_api_uses_v2_instead_of_legacy(self):
         item = post("text", [])
         self.cog._send_embed_preview = AsyncMock(return_value=SimpleNamespace(id=601))
-        with patch.dict("os.environ", {"ASUMI_SOCIAL_NATIVE_V2_ENABLED": "true"}), \\
-             patch.dict("features.embed.cog.FETCHER_MAP", {"bluesky": AsyncMock(return_value=item)}):
+        with (
+            patch.dict("os.environ", {"ASUMI_SOCIAL_NATIVE_V2_ENABLED": "true"}),
+            patch.dict("features.embed.cog.FETCHER_MAP", {"bluesky": AsyncMock(return_value=item)}),
+        ):
             result = await self.cog._try_api_fetcher(self.msg, "bluesky", URL, None, self.config)
         self.assertEqual(result.reason, "api_v2_preview_sent")
         kwargs = self.cog._send_embed_preview.await_args.kwargs
