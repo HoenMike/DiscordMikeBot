@@ -117,10 +117,6 @@ class DashboardSearchTelemetryTests(unittest.TestCase):
             self.assertIn(expected, dashboard)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
     """Screenshot class: explicit lookup + replied product names + safe continuation."""
 
@@ -213,7 +209,7 @@ class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
 
         # Explicit Tarot and Archive retain their deterministic tool precedence.
         for user_query, expected_tool in (
-            ("bốc tarot cho tôi", "tarot.launch"),
+            ("tarot daily", "tarot.daily"),
             ("tìm trong archive", "archive.search"),
         ):
             with self.subTest(tool=expected_tool):
@@ -256,3 +252,7 @@ class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.source, "session_followup")
         self.assertEqual(decision.model_tier, "fast")
         clef.classify.assert_not_awaited()
+
+
+if __name__ == "__main__":
+    unittest.main()
