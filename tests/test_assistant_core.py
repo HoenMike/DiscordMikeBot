@@ -842,16 +842,14 @@ class AssistantChatModelTests(unittest.TestCase):
     def test_chat_model_can_be_overridden(self):
         with patch("core.constants.ASUMI_CHAT_MODEL", "gemini-custom-chat"):
             models = _candidate_models()
-        self.assertEqual(models[0], "gemini-custom-chat")
+        self.assertEqual(models, ["gemini-3.8-flash"])
 
 
 class AssistantAdaptiveModelTests(unittest.IsolatedAsyncioTestCase):
     def test_depth_tiers_have_fixed_backend_allowlist(self):
         self.assertEqual(_candidate_models("fast")[0], "gemini-3.5-flash-lite")
         self.assertEqual(_candidate_models("balanced")[0], "gemini-3.8-flash")
-        self.assertEqual(_candidate_models("deep")[:2], [
-            "gemini-3.8-flash", "gemini-3.6-flash",
-        ])
+        self.assertEqual(_candidate_models("deep"), ["gemini-3.8-flash"])
         self.assertNotIn("gemini-3.1-pro-preview", _candidate_models("deep"))
         self.assertEqual(_candidate_models("arbitrary-model")[0], "gemini-3.8-flash")
 
@@ -885,7 +883,7 @@ class AssistantChatTimeoutBudgetTests(unittest.IsolatedAsyncioTestCase):
     def test_default_chat_limits_are_fast_fail(self):
         with patch.dict("os.environ", {}, clear=True):
             per_model, total_budget, max_attempts = _chat_limits()
-        self.assertEqual(per_model, 8.0)
+        self.assertEqual(per_model, 12.0)
         self.assertEqual(total_budget, 18.0)
         self.assertEqual(max_attempts, 2)
 
@@ -893,7 +891,7 @@ class AssistantChatTimeoutBudgetTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict("os.environ", {}, clear=True):
             models = _candidate_models()
         self.assertEqual(models[0], "gemini-3.8-flash")
-        self.assertEqual(models[1], "gemini-3.6-flash")
+        self.assertEqual(models, ["gemini-3.8-flash"])
 
     async def test_total_budget_prevents_second_attempt_after_exhaustion(self):
         with patch.dict(
@@ -918,31 +916,14 @@ class AssistantChatTimeoutBudgetTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.attempts, 1)
         self.assertEqual(ctx.exception.budget_seconds, 18.0)
 
-    async def test_second_attempt_uses_only_remaining_budget(self):
-        fake_response = SimpleNamespace(text="fallback ok")
-        with patch.dict(
-            "os.environ",
-            {
-                "ASUMI_CHAT_MODEL_TIMEOUT_SECONDS": "4",
-                "ASUMI_CHAT_TOTAL_BUDGET_SECONDS": "8",
-                "ASUMI_CHAT_MAX_ATTEMPTS": "2",
-            },
-            clear=True,
-        ), patch(
-            "features.assistant.ai.bounded_ai_generate",
-            new=AsyncMock(side_effect=[TimeoutError(), fake_response]),
-        ) as generate, patch(
-            "features.assistant.ai.time.perf_counter",
-            side_effect=[0.0, 0.0, 0.0, 14.0, 14.0, 14.0, 15.0, 15.2],
-        ):
-            result = await generate_chat_reply("hello")
-
-        self.assertEqual(result.text, "fallback ok")
-        self.assertEqual(generate.await_count, 2)
-        first_timeout = generate.await_args_list[0].kwargs["timeout_sec"]
-        second_timeout = generate.await_args_list[1].kwargs["timeout_sec"]
-        self.assertEqual(first_timeout, 8.0)
-        self.assertEqual(second_timeout, 4.0)
+    async def test_timeout_does_not_downgrade_general_to_lite(self):
+        with patch("features.assistant.ai.bounded_ai_generate",
+                   new=AsyncMock(side_effect=TimeoutError("slow"))) as generate:
+            with self.assertRaises(ChatTimeoutBudgetError) as raised:
+                await generate_chat_reply("Giải thích kiến trúc phần mềm")
+        self.assertEqual(generate.await_count, 1)
+        self.assertEqual(generate.await_args.kwargs["model"], "gemini-3.8-flash")
+        self.assertEqual(raised.exception.models_tried, ("gemini-3.8-flash",))
 
 
 class AssistantFollowupRoutingTests(unittest.IsolatedAsyncioTestCase):

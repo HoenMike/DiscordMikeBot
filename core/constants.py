@@ -24,23 +24,22 @@ TAROT_HISTORY_RETENTION_DAYS = 90
 # ---------------------------------------------------------------------------
 # Cấu hình Mô hình AI (Centralized AI Models & Generations)
 # ---------------------------------------------------------------------------
-# Tier 1 routing: fast inexpensive work uses Flash-Lite; richer analysis uses Flash.
-# These are defaults only; per-role env overrides in config.py remain supported.
-DEFAULT_GEMINI_DATA_MODEL = "gemini-3.5-flash-lite"
-DEFAULT_GEMINI_SUMMARY_MODEL = "gemini-3.6-flash"
-DEFAULT_GEMINI_QA_MODEL = "gemini-3.8-flash"
-DEFAULT_GEMINI_TAROT_MODEL = "gemini-3.8-flash"
-DEFAULT_GEMINI_CABIN_MODEL = "gemini-3.5-flash-lite"
+# Locked two-model policy. 3.8 handles all substantive generation, including
+# large summary map chunks; Flash-Lite is only for tiny responses (e.g. Cabin).
+# These are source-owned values: stale Render env overrides must not change IDs.
+GEMINI_GENERAL_MODEL = "gemini-3.8-flash"
+GEMINI_TINY_MODEL = "gemini-3.5-flash-lite"
+ALLOWED_GEMINI_MODELS = frozenset({GEMINI_GENERAL_MODEL, GEMINI_TINY_MODEL})
+DEFAULT_GEMINI_DATA_MODEL = GEMINI_GENERAL_MODEL
+DEFAULT_GEMINI_SUMMARY_MODEL = GEMINI_GENERAL_MODEL
+DEFAULT_GEMINI_QA_MODEL = GEMINI_GENERAL_MODEL
+DEFAULT_GEMINI_TAROT_MODEL = GEMINI_GENERAL_MODEL
+DEFAULT_GEMINI_CABIN_MODEL = GEMINI_TINY_MODEL
 
-# Known Tier 1 model IDs; avoid obsolete/non-chat Gemma IDs in a Gemini fallback.
-DEFAULT_AI_FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-]
-DEFAULT_TAROT_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
-DEFAULT_CABIN_FALLBACK_MODELS = DEFAULT_AI_FALLBACK_MODELS
+# No cross-tier fallback: general research/analysis must NOT degrade to Lite.
+DEFAULT_AI_FALLBACK_MODELS = [GEMINI_GENERAL_MODEL]
+DEFAULT_TAROT_FALLBACK_MODELS = [GEMINI_GENERAL_MODEL]
+DEFAULT_CABIN_FALLBACK_MODELS = [GEMINI_TINY_MODEL]
 
 DEFAULT_SUMMARY_TEMPERATURE = 0.1
 DEFAULT_QA_TEMPERATURE = 0.3
@@ -104,11 +103,11 @@ ASUMI_CONTEXT_MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 # Clef chooses only effort, never provider/model IDs. Gemini 3.8 Flash
 # handles both balanced and deep reasoning; deep increases thinking effort.
-ASUMI_CHAT_MODEL = "gemini-3.8-flash"
-ASUMI_CHAT_FAST_MODEL = "gemini-3.5-flash-lite"
-ASUMI_CHAT_DEEP_MODEL = "gemini-3.8-flash"
-ASUMI_CHAT_FALLBACK_MODELS = ("gemini-3.6-flash", "gemini-3.5-flash-lite")
-ASUMI_CHAT_MODEL_TIMEOUT_SECONDS = 8
+ASUMI_CHAT_MODEL = GEMINI_GENERAL_MODEL
+ASUMI_CHAT_FAST_MODEL = GEMINI_TINY_MODEL
+ASUMI_CHAT_DEEP_MODEL = GEMINI_GENERAL_MODEL
+ASUMI_CHAT_FALLBACK_MODELS = ()  # No cross-role/model fallback
+ASUMI_CHAT_MODEL_TIMEOUT_SECONDS = 12
 ASUMI_CHAT_TOTAL_BUDGET_SECONDS = 18
 ASUMI_CHAT_DEEP_TIMEOUT_SECONDS = 12
 ASUMI_CHAT_DEEP_BUDGET_SECONDS = 22
@@ -116,7 +115,7 @@ ASUMI_CHAT_MAX_ATTEMPTS = 2
 # Quota circuit opens after two distinct Gemini model 429s in a short window.
 ASUMI_GEMINI_QUOTA_FAILURE_WINDOW_SECONDS = 60
 ASUMI_GEMINI_QUOTA_PAUSE_SECONDS = 90
-ASUMI_TAROT_DEEP_MODEL = "gemini-3.8-flash"
+ASUMI_TAROT_DEEP_MODEL = GEMINI_GENERAL_MODEL
 
 ASUMI_CLEF_ENABLED = True
 ASUMI_CLEF_MODEL = "@cf/cloudflare/clef-flash"

@@ -84,7 +84,7 @@ class QuotaCircuitTests(unittest.IsolatedAsyncioTestCase):
             side_effect=RuntimeError("429 RESOURCE_EXHAUSTED")
         )))
         with patch("core.ai.get_aio_client", return_value=client):
-            for model in ("gemini-3.8-flash", "gemini-3.6-flash"):
+            for model in ("gemini-3.8-flash", "gemini-3.5-flash-lite"):
                 with self.assertRaisesRegex(RuntimeError, "429"):
                     await shared_ai.bounded_ai_generate(model, "Hi", None, 1)
             with self.assertRaises(shared_ai.GeminiQuotaCircuitOpen):
@@ -100,7 +100,7 @@ class QuotaCircuitTests(unittest.IsolatedAsyncioTestCase):
         with patch("core.ai.get_aio_client", return_value=client):
             with self.assertRaisesRegex(RuntimeError, "429"):
                 await shared_ai.bounded_ai_generate("gemini-3.8-flash", "Hi", None, 1)
-            response = await shared_ai.bounded_ai_generate("gemini-3.6-flash", "Hi", None, 1)
+            response = await shared_ai.bounded_ai_generate("gemini-3.5-flash-lite", "Hi", None, 1)
         self.assertEqual(response.text, "ok")
 
 

@@ -150,7 +150,7 @@ async def generate_cabin_interpretation(
                 # Kiểm tra nếu bị cắt ngang do chạm max_output_tokens
                 cand = response.candidates[0] if (response and response.candidates) else None
                 if cand and getattr(cand, "finish_reason", None) == types.FinishReason.MAX_TOKENS:
-                    print(f"⚠️ [Cabin AI] Model '{model_name}' bị cắt ngang (MAX_TOKENS), thử fallback...", flush=True)
+                    print(f"⚠️ [Cabin AI] Model '{model_name}' bị cắt ngang (MAX_TOKENS), không chuyển model...", flush=True)
                     continue
 
                 raw_text = response.text or ""
@@ -158,21 +158,21 @@ async def generate_cabin_interpretation(
 
                 # Kiểm tra nếu câu bị cụt hoặc dang dở
                 if is_incomplete_sentence(cleaned):
-                    print(f"⚠️ [Cabin AI] Model '{model_name}' sinh câu chưa hoàn chỉnh ('{cleaned[:40]}...'), thử fallback...", flush=True)
+                    print(f"⚠️ [Cabin AI] Model '{model_name}' sinh câu chưa hoàn chỉnh ('{cleaned[:40]}...'), không chuyển model...", flush=True)
                     continue
 
                 if cleaned:
                     print(f"✅ [Cabin AI] Model '{model_name}' đã tạo bản dịch cabin thành công!", flush=True)
                     return cleaned
             except asyncio.TimeoutError:
-                print(f"⏱️ [Cabin AI] Model '{model_name}' quá thời gian 7s, chuyển sang model dự phòng...", flush=True)
+                print(f"⏱️ [Cabin AI] Model '{model_name}' quá thời gian 7s, dừng vì đã hết lựa chọn model được phép...", flush=True)
                 last_error = "Timeout 7s"
             except Exception as e:
-                print(f"⚠️ [Cabin AI] Model '{model_name}' gặp lỗi: {e}, thử fallback...", flush=True)
+                print(f"⚠️ [Cabin AI] Model '{model_name}' gặp lỗi: {e}, không chuyển model...", flush=True)
                 last_error = e
 
         # Nếu tất cả các model đều gặp lỗi, trả về fallback hài hước
-        print(f"❌ [Cabin AI] Toàn bộ model Gemini đều thất bại: {last_error}", flush=True)
+        print(f"❌ [Cabin AI] Model Gemini được phép không phản hồi: {last_error}", flush=True)
         return "Tai nghe của phiên dịch viên vừa nổ do câu nói quá ảo diệu, không thể phiên dịch nổi!"
 
 
@@ -236,25 +236,25 @@ async def generate_cabin_interpretation_batch(
 
                 cand = response.candidates[0] if (response and response.candidates) else None
                 if cand and getattr(cand, "finish_reason", None) == types.FinishReason.MAX_TOKENS:
-                    print(f"⚠️ [Cabin AI Batch] Model '{model_name}' bị cắt ngang (MAX_TOKENS), thử fallback...", flush=True)
+                    print(f"⚠️ [Cabin AI Batch] Model '{model_name}' bị cắt ngang (MAX_TOKENS), không chuyển model...", flush=True)
                     continue
 
                 raw_text = response.text or ""
                 cleaned = _clean_cabin_output(raw_text)
 
                 if is_incomplete_sentence(cleaned):
-                    print(f"⚠️ [Cabin AI Batch] Model '{model_name}' sinh câu chưa hoàn chỉnh ('{cleaned[:40]}...'), thử fallback...", flush=True)
+                    print(f"⚠️ [Cabin AI Batch] Model '{model_name}' sinh câu chưa hoàn chỉnh ('{cleaned[:40]}...'), không chuyển model...", flush=True)
                     continue
 
                 if cleaned:
                     print(f"✅ [Cabin AI Batch] Model '{model_name}' đã tổng hợp {count} tin nhắn thành công!", flush=True)
                     return cleaned
             except asyncio.TimeoutError:
-                print(f"⏱️ [Cabin AI Batch] Model '{model_name}' quá thời gian 7s, chuyển sang model dự phòng...", flush=True)
+                print(f"⏱️ [Cabin AI Batch] Model '{model_name}' quá thời gian 7s, dừng vì đã hết lựa chọn model được phép...", flush=True)
                 last_error = "Timeout 7s"
             except Exception as e:
-                print(f"⚠️ [Cabin AI Batch] Model '{model_name}' gặp lỗi: {e}, thử fallback...", flush=True)
+                print(f"⚠️ [Cabin AI Batch] Model '{model_name}' gặp lỗi: {e}, không chuyển model...", flush=True)
                 last_error = e
 
-        print(f"❌ [Cabin AI Batch] Toàn bộ model Gemini đều thất bại: {last_error}", flush=True)
+        print(f"❌ [Cabin AI Batch] Model Gemini được phép không phản hồi: {last_error}", flush=True)
         return None

@@ -40,10 +40,7 @@ VALID_RESULT = json.dumps({
 class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
     def test_tier1_defaults_have_stable_model_ids(self):
         self.assertEqual(DEFAULT_GEMINI_TAROT_MODEL, "gemini-3.8-flash")
-        self.assertEqual(DEFAULT_AI_FALLBACK_MODELS, [
-            "gemini-3.8-flash", "gemini-3.6-flash",
-            "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
-        ])
+        self.assertEqual(DEFAULT_AI_FALLBACK_MODELS, ["gemini-3.8-flash"])
         self.assertEqual(str(TAROT_GEN_CONFIG.thinking_config.thinking_level).lower().split(".")[-1], "low")
 
     async def test_success_sets_model_without_fallback(self):
@@ -60,26 +57,15 @@ class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("🌫\n", result.full_reading)
         self.assertEqual(generate.await_count, 1)
 
-    async def test_empty_response_tries_next_model_instead_of_fake_success(self):
-        generate = AsyncMock(side_effect=[ai_reply(""), ai_reply(VALID_RESULT)])
-        with patch("features.tarot.ai.config.TAROT_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.6-flash"
-        ]), patch("features.tarot.ai.bounded_ai_generate", new=generate):
-            result = await generate_tarot_reading_result("yes_no", [card()])
-        self.assertFalse(result.ai_fallback)
-        self.assertEqual(result.ai_model, "gemini-3.6-flash")
-        self.assertEqual(generate.await_count, 2)
-
-    async def test_bad_json_skips_to_next_model(self):
-        generate = AsyncMock(side_effect=[
-            ai_reply('{"core_message": '), ai_reply(VALID_RESULT)
-        ])
-        with patch("features.tarot.ai.config.TAROT_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.6-flash"
-        ]), patch("features.tarot.ai.bounded_ai_generate", new=generate):
-            result = await generate_tarot_reading_result("yes_no", [card()])
-        self.assertEqual(result.ai_model, "gemini-3.6-flash")
-        self.assertEqual(generate.await_count, 2)
+    async def test_empty_and_invalid_answers_keep_dictionary_fallback(self):
+        for text in ("", '{"core_message": '):
+            generate = AsyncMock(return_value=ai_reply(text))
+            with patch("features.tarot.ai.bounded_ai_generate", new=generate):
+                result = await generate_tarot_reading_result("yes_no", [card()])
+            self.assertTrue(result.ai_fallback)
+            self.assertEqual(result.ai_model, "")
+            self.assertEqual(generate.await_count, 1)
+            self.assertEqual(generate.await_args.kwargs["model"], "gemini-3.8-flash")
 
     async def test_schema_rejection_retries_same_model_without_schema(self):
         generate = AsyncMock(side_effect=[
@@ -93,17 +79,15 @@ class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result.ai_fallback)
         self.assertEqual(generate.await_count, 2)
 
-    async def test_quota_failure_is_distinct_and_does_not_retry_same_model(self):
+    async def test_quota_failure_keeps_local_fallback_and_never_demotes(self):
         generate = AsyncMock(side_effect=RuntimeError("429 RESOURCE_EXHAUSTED"))
-        with patch("features.tarot.ai.config.TAROT_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.6-flash"
-        ]), patch("features.tarot.ai.bounded_ai_generate", new=generate):
+        with patch("features.tarot.ai.bounded_ai_generate", new=generate):
             result = await generate_tarot_reading_result("yes_no", [card()])
         self.assertTrue(result.ai_fallback)
         self.assertEqual(result.ai_model, "")
         self.assertEqual(result.ai_error_category, "quota_exceeded")
         self.assertIn("BẢN ĐỌC DỰ PHÒNG", result.full_reading)
-        self.assertEqual(generate.await_count, 2)
+        self.assertEqual(generate.await_count, 1)
 
     async def test_fallback_board_does_not_claim_ai_finished(self):
         task = __import__("asyncio").create_task(__import__("asyncio").sleep(60))

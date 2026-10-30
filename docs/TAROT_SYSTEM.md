@@ -1,3 +1,5 @@
+**Current runtime model policy — 2026-10-30 (3.15.3):** All Tarot AI interpretation, follow-up, why and custom-spread calls use **Gemini 3.8 Flash only**. If Gemini is unavailable, preserve the existing explicitly labeled dictionary fallback; do not switch to 3.5 Flash-Lite or other models. Older version notes below document historical behavior only.
+
 # 🔮 TÀI LIỆU HỆ THỐNG BỐC BÀI VÀ LUẬN GIẢI TAROT AI (TAROT SYSTEM ARCHITECTURE)
 
 Tài liệu này mô tả kiến trúc và luồng xử lý **Tarot hiện đang chạy** của Asumi (repository DiscordMikeBot).

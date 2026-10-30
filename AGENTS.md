@@ -1,3 +1,10 @@
+## Asumi 3.15.3 — Strict two-Gemini-model runtime policy (2026-10-30)
+
+- Only Gemini 3.8 Flash for substantive work (chat balanced/deep, Search, Tarot, Summary, MapReduce, QA). Only Gemini 3.5 Flash-Lite for genuinely tiny tasks (fast chat greeting/ack, short Cabin). Clef is separately hosted on Cloudflare Workers AI and remains unchanged.
+- Legacy per-role GEMINI_*_MODEL environment overrides are no longer effective; non-secret model policy lives in core/constants.py. Shared core/ai.py provider boundary rejects any third model before API use. Never add 3.6/3.7/3.1/Pro/Gemma automatic fallback.
+- Do not demote complex work to Lite on failure. General chat can make a second same-3.8 attempt only for explicit wrong-target validation; provider timeout/429 returns a truthful bounded failure. Tarot uses its labeled dictionary fallback, not another AI model.
+- Preserve actual model labels for dashboard metrics and source-specific quotas. Tests in tests/test_two_model_policy.py plus assistant, Tarot, Summary and Cabin suites; validate CI and live Discord separately.
+
 # Mandatory engineering policy — Root-cause-first fixes
 
 **Applies to every agent, contributor, subsystem, hotfix and regression.**
