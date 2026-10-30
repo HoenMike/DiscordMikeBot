@@ -189,6 +189,7 @@ class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
 
         for quote in (
             "con A với con B ai giỏi hơn?",
+            "Jerry với Samsung Galaxy S25",
             "Nhà <@123456789> có Razer Viper V3 Pro với Logitech G102",
             "địa chỉ nhà ở 12345 với iPhone 16",
             "mình thấy con Logitech G102 với Razer Viper V3 Pro, nhà mình ở 12A",
