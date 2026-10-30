@@ -1,3 +1,11 @@
+## 3.15.4 — Unified Social Embed V2 (2026-10-30)
+
+- Components V2 supports structured text-only posts in addition to images, carousels and attached videos across supported social network API fetchers; manual fallback notices also use compact V2 cards.
+- Unified owner-only button UX: Reload/Hide edit or restore without extra confirmation popups, failure preserves controls and logs reason.
+- Explicit production presentation diagnostics: V2, native proxy player, legacy or none; no false claim that Discord proxy-player can be wrapped in Components V2.
+- Facebook and other external video proxies retain the native playable Discord unfurl. No forced video-thumbnail substitution or unsolicited additional companion messages.
+- CI includes cross-platform content, text, media, spoiler, fallback, owner-controls and proxy contract tests.
+
 ## 3.15.3 — Two Gemini Models Only (2026-10-30)
 
 - Removed Gemini 3.6/3.7/3.1 and other legacy candidates from **every runtime fallback chain**: Assistant, Summary/MapReduce/QA, Tarot, and Cabin.
