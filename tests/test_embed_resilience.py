@@ -303,6 +303,58 @@ class FacebookPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.cog._try_ytdlp_fallback.assert_not_awaited()
         self.cog._send_embed_preview.assert_not_awaited()
         self.cog._discard_preview.assert_not_awaited()
+    async def test_v2_notice_converts_to_working_native_proxy_without_edit(self):
+        notice = SimpleNamespace(
+            id=74, flags=SimpleNamespace(value=32768),
+            content="", edit=AsyncMock(),
+        )
+        replacement = SimpleNamespace(id=75)
+        payload = {
+            "origin_id": 10, "channel_id": 20, "author_id": 50,
+            "platform": "facebook", "url": VIDEO_URL,
+        }
+        self.cog._send_embed_preview = AsyncMock(return_value=replacement)
+        self.cog._discard_preview = AsyncMock(return_value=True)
+        with (
+            patch("features.embed.cog.resolve_facebook_share_video", new=AsyncMock(return_value=None)),
+            patch("features.embed.cog.validate_via_og_metadata", new=AsyncMock(return_value=(False, False))),
+        ):
+            outcome = await self.cog.roll_facebook_proxy(payload, current_preview=notice)
+        self.assertTrue(outcome.success)
+        self.assertEqual(outcome.reason, "manual_proxy_replaced_v2_notice")
+        self.assertEqual(outcome.preview_message_id, replacement.id)
+        notice.edit.assert_not_awaited()
+        self.cog._send_embed_preview.assert_awaited_once()
+        kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIn("content", kwargs)
+        self.assertNotIsInstance(kwargs["view"], discord.ui.LayoutView)
+        self.cog._discard_preview.assert_awaited_once_with(10, notice)
+        self.assertEqual(self.cog._facebook_current_domain[(10, VIDEO_URL)], "facebed.com")
+
+    async def test_failed_v2_notice_cleanup_rolls_back_new_proxy_and_state(self):
+        notice = SimpleNamespace(
+            id=74, flags=SimpleNamespace(value=32768),
+            content="", edit=AsyncMock(),
+        )
+        replacement = SimpleNamespace(id=75)
+        payload = {
+            "origin_id": 10, "channel_id": 20, "author_id": 50,
+            "platform": "facebook", "url": VIDEO_URL,
+        }
+        self.cog._send_embed_preview = AsyncMock(return_value=replacement)
+        self.cog._discard_preview = AsyncMock(side_effect=[False, True])
+        with (
+            patch("features.embed.cog.resolve_facebook_share_video", new=AsyncMock(return_value=None)),
+            patch("features.embed.cog.validate_via_og_metadata", new=AsyncMock(return_value=(False, False))),
+        ):
+            outcome = await self.cog.roll_facebook_proxy(payload, current_preview=notice)
+        self.assertFalse(outcome.success)
+        self.assertEqual(outcome.reason, "notice_cleanup_failed")
+        self.assertEqual(outcome.status, "degraded")
+        self.assertEqual(self.cog._discard_preview.await_count, 2)
+        self.assertNotIn((10, VIDEO_URL), self.cog._facebook_current_domain)
+        notice.edit.assert_not_awaited()
+
     async def test_no_preview_does_not_suppress_native_message(self):
         self.cog._process_url_with_fallback = AsyncMock(return_value=PreviewResult(
             status="action_required", tier="manual",
