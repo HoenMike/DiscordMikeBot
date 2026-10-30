@@ -23,15 +23,20 @@ async def _generate_with_fallback(
     task_label: str = "AI Summary",
     timeout_sec: float = 35.0,
 ) -> str:
-    """
-    Thực hiện gọi Gemini API với chuỗi fallback models tự động theo thứ tự:
-    3.8 flash -> 3.7 flash -> 3.6 flash -> 3.5 flash -> 3.5 flash lite -> 3.1 flash lite -> Gemma 4
-    """
+    """Generate with an explicit role-safe list, never cross from Flash to Lite."""
     if fallback_models is None:
-        fallback_models = getattr(config, "SUMMARY_FALLBACK_MODELS", getattr(config, "DEFAULT_AI_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash",
-            "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemma-4-31b-it"
-        ]))
+        fallback_models = config.SUMMARY_FALLBACK_MODELS
+
+    # A tiny model should not process arbitrary summary/reduce/QA work. The
+    # map-chunk role is substantive too and uses the same general model.
+    from core.constants import GEMINI_GENERAL_MODEL, GEMINI_TINY_MODEL
+    if primary_model != GEMINI_GENERAL_MODEL and not (
+        primary_model == GEMINI_TINY_MODEL and task_label == "Tiny Summary"
+    ):
+        primary_model = GEMINI_GENERAL_MODEL
+    fallback_models = [
+        m for m in fallback_models if m == primary_model
+    ]
 
     models_to_try = [primary_model] + [m for m in fallback_models if m != primary_model]
     seen = set()
@@ -106,7 +111,7 @@ async def summarize_chunk(chunk_index, total_chunks, chunk_messages, focus_instr
     """
     print(f"🧠 [MapReduce] Đang phân tích phân đoạn {chunk_index + 1}/{total_chunks} ({len(chunk_messages)} tin nhắn)...", flush=True)
     try:
-        data_model = getattr(config, "GEMINI_DATA_MODEL", "gemini-3.1-flash-lite")
+        data_model = getattr(config, "GEMINI_DATA_MODEL", "gemini-3.8-flash")
         text = await _generate_with_fallback(
             prompt=prompt,
             gen_config=SUMMARY_CONFIG,
