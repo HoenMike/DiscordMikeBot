@@ -57,26 +57,15 @@ class TarotGeminiTier1Tests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("🌫\n", result.full_reading)
         self.assertEqual(generate.await_count, 1)
 
-    async def test_empty_response_tries_next_model_instead_of_fake_success(self):
-        generate = AsyncMock(side_effect=[ai_reply(""), ai_reply(VALID_RESULT)])
-        with patch("features.tarot.ai.config.TAROT_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.6-flash"
-        ]), patch("features.tarot.ai.bounded_ai_generate", new=generate):
-            result = await generate_tarot_reading_result("yes_no", [card()])
-        self.assertFalse(result.ai_fallback)
-        self.assertEqual(result.ai_model, "gemini-3.6-flash")
-        self.assertEqual(generate.await_count, 2)
-
-    async def test_bad_json_skips_to_next_model(self):
-        generate = AsyncMock(side_effect=[
-            ai_reply('{"core_message": '), ai_reply(VALID_RESULT)
-        ])
-        with patch("features.tarot.ai.config.TAROT_FALLBACK_MODELS", [
-            "gemini-3.8-flash", "gemini-3.6-flash"
-        ]), patch("features.tarot.ai.bounded_ai_generate", new=generate):
-            result = await generate_tarot_reading_result("yes_no", [card()])
-        self.assertEqual(result.ai_model, "gemini-3.6-flash")
-        self.assertEqual(generate.await_count, 2)
+    async def test_empty_and_invalid_answers_keep_dictionary_fallback(self):
+        for text in ("", '{"core_message": '):
+            generate = AsyncMock(return_value=ai_reply(text))
+            with patch("features.tarot.ai.bounded_ai_generate", new=generate):
+                result = await generate_tarot_reading_result("yes_no", [card()])
+            self.assertTrue(result.ai_fallback)
+            self.assertEqual(result.ai_model, "")
+            self.assertEqual(generate.await_count, 1)
+            self.assertEqual(generate.await_args.kwargs["model"], "gemini-3.8-flash")
 
     async def test_schema_rejection_retries_same_model_without_schema(self):
         generate = AsyncMock(side_effect=[
