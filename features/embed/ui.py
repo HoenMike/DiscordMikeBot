@@ -87,25 +87,14 @@ class _EmbedActionControls:
             print(f"[EmbedCog] Manual preview change failed: {exc}", flush=True)
 
         if result is not None and result.success:
+            # Updated preview itself is the acknowledgment. A chat popup on
+            # every click makes both V1 and Components V2 unnecessarily noisy.
             self.stop()
-            await interaction.followup.send(
-                "Đã đổi nguồn trong cùng một tin nhắn." if self.payload.get("platform") == "facebook" else "Đã tải lại preview.",
-                ephemeral=True,
-            )
             return
 
         reason = getattr(result, "reason", "reload_failed")
-        messages = {
-            "no_proxy_sources": "Server chưa cấu hình nguồn proxy phù hợp.",
-            "single_proxy_source": "Hiện chỉ có một nguồn proxy để chọn.",
-            "stale_proxy_controls": "Nguồn đã đổi bởi thao tác khác. Hãy dùng nút trên preview mới nhất.",
-            "nsfw_blocked": "Nguồn này bị chặn theo cài đặt NSFW của server.",
-            "proxy_edit_uncertain": "Discord chưa xác nhận thao tác chỉnh sửa. Kiểm tra preview hiện tại trước khi thử lại.",
-        }
-        await interaction.followup.send(
-            messages.get(reason, f"Chưa đổi được nguồn (`{reason}`). Preview hiện tại được giữ nguyên."),
-            ephemeral=True,
-        )
+        print(f"[EmbedAction] Reload failed: reason={reason}", flush=True)
+        # The current preview and its owner-only controls stay usable.
 
     async def _remove(self, interaction: discord.Interaction):
         self._set_busy(True)
@@ -119,10 +108,6 @@ class _EmbedActionControls:
 
         if result is not None and result.success:
             self.stop()
-            await interaction.followup.send(
-                "Đã bỏ preview Asumi và khôi phục embed gốc của Discord.",
-                ephemeral=True,
-            )
             return
 
         self._set_busy(False)
@@ -130,12 +115,10 @@ class _EmbedActionControls:
             await interaction.message.edit(view=self)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
-
         reason = getattr(result, "reason", "revert_failed")
-        await interaction.followup.send(
-            f"Chưa thể khôi phục embed gốc (`{reason}`).",
-            ephemeral=True,
-        )
+        print(f"[EmbedAction] Revert failed: reason={reason}", flush=True)
+        # Avoid ephemeral feedback after the button, as requested; failures
+        # retain the preview and are recorded server-side instead.
 
 
 class EmbedActionView(_EmbedActionControls, discord.ui.View):
