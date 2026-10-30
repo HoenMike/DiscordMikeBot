@@ -7,6 +7,19 @@
 
 ---
 
+## 2026-10-30 — Replied product research + slow follow-up audit
+
+**Incident:** A user replied to a Discord comparison of two clearly named wireless mice with "tra thử hộ đê". Asumi instead asked for model confirmation; a short confirmation later received a generic chat timeout.
+
+**Confirmed code-level root cause:** choose_conversation_route used the current short utterance for tool selection even though ContextBuilder had the replied message. There was no privacy-safe public search subject. Live session replies intentionally bypassed tool routing (correct for mutating commands, too broad for explicit read-only research). The old prompt requested confirmation of public names merely because they appeared in private chat. Chat generation has a finite two-model timeout budget. Screenshot evidence does not prove which provider error occurred; no live provider logs were accessed.
+
+**Repair:** public_reference.py recognizes an explicit lookup of a directly replied, unambiguous two-product comparison, strips leading user mentions and reply metadata, validates the product labels and builds a bounded public comparison query. It never sends the original Discord quote, nearby 15-minute ambient messages, archive or private identifiers to Brave. Unclear/private cases fail closed. The router runs this explicitly authorized read-only search before session-followup chat, without reopening Tarot/summary/mutations. Short acknowledgments without a search intent use the fast tier. Web synthesis has a concise, evidence-bounded comparison mode.
+
+**Regression matrix:** reported wireless mouse comparison, alternative phone/mouse pairs, live follow-up research, short confirmation, unrelated/private messages and identifiers, ambient history, disabled auto-search, Tarot/Archive precedence, and no private username transfer. Cases are in the existing test_assistant_search_followup.py workflow suite.
+
+**Remaining limits / rollout:** Extraction is intentionally narrow: ambiguous models, longer lists and unsafe text still require the user to provide a public keyword. Live Brave quota, provider speed, Discord delivery and source relevance remain unverified until credentialed smoke testing. Roll back by reverting the contextual router change. ASUMI_AUTO_SEARCH_ENABLED=false (in core/constants.py) also disables it, but also disables other automatic search routing.
+
+
 ## Locked release mapping
 
 ```text
