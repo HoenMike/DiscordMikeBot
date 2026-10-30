@@ -7,19 +7,8 @@ from typing import Optional
 import config
 
 # Mô hình AI mặc định và danh sách dự phòng
-DEFAULT_CABIN_MODEL = getattr(config, "GEMINI_CABIN_MODEL", "gemini-3.8-flash")
-_raw_cabin_fallbacks = getattr(config, "CABIN_FALLBACK_MODELS", [
-    DEFAULT_CABIN_MODEL,
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
-    "gemma-4-31b-it",
-])
-_seen = set()
-CABIN_FALLBACK_MODELS = [m for m in _raw_cabin_fallbacks if m and not (m in _seen or _seen.add(m))]
+DEFAULT_CABIN_MODEL = config.GEMINI_CABIN_MODEL
+CABIN_FALLBACK_MODELS = [DEFAULT_CABIN_MODEL]  # Tiny-task model only; no crossover
 
 # Giới hạn thời gian và tham số vận hành
 MIN_DURATION_SECONDS = 60           # 1 phút
