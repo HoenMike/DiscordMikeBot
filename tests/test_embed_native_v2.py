@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import discord
 
 from features.embed.builder import PostData, NSFWFilterResult
-from features.embed.cog import EmbedCog, _preview_origin_header
-from features.embed.native_v2 import build_native_social_layout, can_render_native_social
+from features.embed.cog import EmbedCog, _preview_origin_header, _preview_presentation
+from features.embed.native_v2 import build_native_social_layout, build_native_social_notice, can_render_native_social
 from features.embed.result import PreviewResult
 from features.embed.ui import EmbedActionView, EmbedActionLayoutView
 
@@ -126,6 +126,63 @@ class NativeSocialLayoutTests(unittest.IsolatedAsyncioTestCase):
         item.media_urls = ["https://example.org/hi)there.jpg"]
         self.assertFalse(can_render_native_social(item, NSFWFilterResult(item), None))
 
+    async def test_text_only_social_post_uses_compact_v2_without_fake_gallery(self):
+        item = post("text", [])
+        decision = NSFWFilterResult(item)
+        self.assertTrue(can_render_native_social(item, decision, None))
+        layout = build_native_social_layout(
+            SimpleNamespace(), payload(), item, decision,
+            reply_url=JUMP, reply_author="Sender",
+        )
+        panel = layout.children[0]
+        self.assertIsInstance(panel, discord.ui.Container)
+        self.assertFalse(any(isinstance(x, discord.ui.MediaGallery) for x in panel.children))
+        self.assertIsInstance(panel.children[-1], discord.ui.ActionRow)
+        text = "\\n".join(
+            x.content for x in panel.children if isinstance(x, discord.ui.TextDisplay)
+        )
+        self.assertIn("Xem bài gốc", text)
+        self.assertIn("1.2K", text)
+
+    async def test_never_create_empty_or_fake_text_cards(self):
+        item = post("text", [])
+        item.text = ""
+        self.assertFalse(can_render_native_social(item, NSFWFilterResult(item), None))
+        item.text = "genuine public note"
+        item.url = "http://not-secure.example/test"
+        self.assertFalse(can_render_native_social(item, NSFWFilterResult(item), None))
+
+    async def test_v2_image_gallery_text_matrix_for_supported_social_sites(self):
+        # Structured fetcher content is handled consistently regardless of
+        # which supported platform produced it. Video-proxy paths are separate.
+        for name in ("twitter", "reddit", "tiktok", "bluesky", "pixiv", "threads"):
+            for kind, urls in (
+                ("text", []), ("image", ["https://example.org/img.png"]),
+                ("gallery", ["https://example.org/1.png", "https://example.org/2.png"]),
+            ):
+                with self.subTest(platform=name, media=kind):
+                    item = post(kind, urls)
+                    item.platform = name
+                    self.assertTrue(can_render_native_social(item, NSFWFilterResult(item), None))
+                    layout = build_native_social_layout(
+                        SimpleNamespace(), payload(), item, NSFWFilterResult(item),
+                        reply_url=JUMP, reply_author="Sender",
+                    )
+                    self.assertIsInstance(layout.children[0], discord.ui.Container)
+                    self.assertIsInstance(layout.children[0].children[-1], discord.ui.ActionRow)
+
+    async def test_compact_notice_has_no_video_thumbnail_or_proxy_unfurl(self):
+        layout = build_native_social_notice(
+            SimpleNamespace(), {**payload(), "platform": "facebook"},
+            reply_url=JUMP, reply_author="Sender",
+            platform="facebook", hint="Không lấy được video, chọn đổi nguồn",
+        )
+        self.assertIsInstance(layout, discord.ui.LayoutView)
+        self.assertFalse(any(
+            isinstance(x, discord.ui.MediaGallery) for x in layout.children[0].children
+        ))
+        self.assertIsInstance(layout.children[0].children[-1], discord.ui.ActionRow)
+
     async def test_legacy_view_remains_available_for_facebook_proxy(self):
         legacy = EmbedActionView(SimpleNamespace(), {
             **payload(), "platform": "facebook",
@@ -188,6 +245,55 @@ class NativeSocialPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(outcome)
         self.assertEqual(self.cog._send_embed_preview.await_count, 1)
         downloaded.close()
+
+    async def test_text_only_api_uses_v2_instead_of_legacy(self):
+        item = post("text", [])
+        self.cog._send_embed_preview = AsyncMock(return_value=SimpleNamespace(id=601))
+        with patch.dict("os.environ", {"ASUMI_SOCIAL_NATIVE_V2_ENABLED": "true"}), \\
+             patch.dict("features.embed.cog.FETCHER_MAP", {"bluesky": AsyncMock(return_value=item)}):
+            result = await self.cog._try_api_fetcher(self.msg, "bluesky", URL, None, self.config)
+        self.assertEqual(result.reason, "api_v2_preview_sent")
+        kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIsInstance(kwargs["view"], discord.ui.LayoutView)
+        self.assertNotIn("embeds", kwargs)
+        self.assertNotIn("content", kwargs)
+
+    async def test_unavailable_facebook_player_uses_v2_notice_not_fake_video(self):
+        self.cog._send_embed_preview = AsyncMock(return_value=SimpleNamespace(id=602))
+        with patch.dict("os.environ", {"ASUMI_SOCIAL_NATIVE_V2_ENABLED": "true"}):
+            result = await self.cog._offer_manual_fallback(
+                self.msg, "facebook", "https://www.facebook.com/share/v/123/",
+                reason="no_proxy_sources",
+            )
+        self.assertEqual(result.reason, "manual_fallback_v2_offered")
+        kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIsInstance(kwargs["view"], discord.ui.LayoutView)
+        self.assertNotIn("content", kwargs)
+        self.assertEqual(_preview_presentation(result), "components_v2")
+
+    async def test_emergency_disable_restores_legacy_notice(self):
+        self.cog._send_embed_preview = AsyncMock(return_value=SimpleNamespace(id=603))
+        with patch.dict("os.environ", {"ASUMI_SOCIAL_NATIVE_V2_ENABLED": "false"}):
+            result = await self.cog._offer_manual_fallback(
+                self.msg, "facebook", "https://www.facebook.com/share/v/123/",
+                reason="no_proxy_sources",
+            )
+        self.assertEqual(result.reason, "manual_fallback_offered")
+        kwargs = self.cog._send_embed_preview.await_args.kwargs
+        self.assertIn("content", kwargs)
+        self.assertNotIsInstance(kwargs["view"], discord.ui.LayoutView)
+        self.assertEqual(_preview_presentation(result), "legacy")
+
+    async def test_platform_presentation_reports_native_proxy_without_claiming_v2(self):
+        proxy = PreviewResult(
+            "success", "proxy", "proxy_sent_user_controlled", "facebook",
+            origin_message_id=10, preview_message_id=504,
+        )
+        self.assertEqual(_preview_presentation(proxy), "native_proxy_player")
+        self.assertEqual(_preview_presentation(PreviewResult(
+            "success", "api", "api_v2_preview_sent", "bluesky",
+            origin_message_id=10, preview_message_id=505,
+        )), "components_v2")
 
     async def test_facebook_proxy_never_changes_to_v2_even_with_flag(self):
         self.cog.config_manager = None
