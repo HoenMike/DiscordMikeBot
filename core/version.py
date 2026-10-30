@@ -12,12 +12,28 @@ import discord
 
 from core.branding import BOT_BRAND_NAME
 
-CURRENT_VERSION = "3.15.1"
-RELEASE_DATE = "2026-10-20"
-CODENAME = "Asumi 3.15.1 - Flash Routing and Time-Safe Search"
+CURRENT_VERSION = "3.15.2"
+RELEASE_DATE = "2026-10-30"
+CODENAME = "Asumi 3.15.2 - Reply-Aware Public Research"
 
 # Lịch sử chi tiết các phiên bản phát hành được đồng bộ trực tiếp từ Git Commit History (Mới nhất nằm ở đầu)
 CHANGELOG: List[Dict[str, Any]] = [
+    {
+        "version": "3.15.2", "date": "2026-10-30", "type": "bugfix",
+        "title": "Reply-Aware Public Product Research",
+        "summary": "Tra cứu sản phẩm trong tin được reply mà không hỏi lại tên model hoặc làm lộ chat Discord.",
+        "changes": [
+            {"category": "Assistant & Search", "items": [
+                "Nhận diện yêu cầu tra cứu ngắn khi reply một cặp sản phẩm công khai đủ rõ.",
+                "Chỉ gửi tên sản phẩm được lọc an toàn tới Brave, không gửi nguyên tin nhắn hay lịch sử Discord.",
+                "Phản hồi so sánh có dẫn chứng; không giả vờ đã tìm nếu không có dữ liệu web.",
+            ]},
+            {"category": "Session & Reliability", "items": [
+                "Cho phép explicit read-only research qua session, không tự gọi lại Tarot hoặc công cụ thay đổi dữ liệu.",
+                "Những câu xác nhận rất ngắn dùng fast model; vẫn báo đúng khi provider thật sự lỗi.",
+            ]},
+        ],
+    },
     {
         "version": "3.15.1", "date": "2026-10-20", "type": "bugfix",
         "title": "Gemini Flash 3.8 + Time-grounded Team Search",

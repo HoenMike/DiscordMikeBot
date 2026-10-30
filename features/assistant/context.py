@@ -38,6 +38,7 @@ class ContextLine:
     author: str
     content: str
     message_id: int | None = None
+    author_id: int | None = None
 
 
 @dataclass
@@ -274,6 +275,11 @@ def _line_from_message(message, max_chars: int = 1200) -> ContextLine:
         author=_author_name(message),
         content=content[:max_chars],
         message_id=getattr(message, "id", None),
+        author_id=(
+            getattr(getattr(message, "author", None), "id", None)
+            if isinstance(getattr(getattr(message, "author", None), "id", None), int)
+            else None
+        ),
     )
 
 

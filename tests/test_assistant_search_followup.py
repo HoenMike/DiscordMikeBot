@@ -117,5 +117,197 @@ class DashboardSearchTelemetryTests(unittest.TestCase):
             self.assertIn(expected, dashboard)
 
 
+class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
+    """Screenshot class: explicit lookup + replied product names + safe continuation."""
+
+    @staticmethod
+    def _context(text: str):
+        from features.assistant.context import AssistantContext, ContextLine
+        return AssistantContext(
+            requester="Mike",
+            reply=ContextLine(author="Another member", content=text),
+        )
+
+    def test_reported_mouse_comparison_extracts_only_public_models(self):
+        from features.assistant.public_reference import public_product_search_query
+        context = self._context(
+            "@Mike con ROG Strix Impact III Wireless với MCHOSE A7 Ultra\n"
+            "Con nào ok hơn m"
+        )
+        query = public_product_search_query("tra thử hộ đê", context)
+        self.assertIsNotNone(query)
+        self.assertIn("ROG Strix Impact III Wireless", query)
+        self.assertIn("MCHOSE A7 Ultra", query)
+        self.assertNotIn("Mike", query)
+        self.assertNotIn("Another member", query)
+        self.assertNotIn("Con nào", query)
+
+    async def test_short_replied_lookup_skips_clef_and_calls_web_tool(self):
+        context = self._context(
+            "[reply to Mike] @Mike con ROG Strix Impact III Wireless "
+            "với MCHOSE A7 Ultra"
+        )
+        clef = SimpleNamespace(enabled=True, classify=AsyncMock())
+        decision = await choose_conversation_route(
+            "tra thử hộ đê",
+            previous_session=None,
+            is_live_continuation=False,
+            has_images=False,
+            cloudflare_router=clef,
+            min_confidence=0.55,
+            context=context,
+        )
+        self.assertEqual(decision.tool, "web.search")
+        self.assertEqual(decision.source, "reply_public_product")
+        self.assertNotIn("@Mike", decision.arguments["query"])
+        clef.classify.assert_not_awaited()
+
+    async def test_explicit_replied_lookup_can_reopen_readonly_search_in_session(self):
+        decision = await choose_conversation_route(
+            "search thử hộ",
+            previous_session=SimpleNamespace(intent="chat", last_tool=None),
+            is_live_continuation=True,
+            has_images=False,
+            cloudflare_router=None,
+            min_confidence=0.55,
+            context=self._context(
+                "Logitech G Pro X Superlight 2 vs Razer Viper V3 Pro"
+            ),
+        )
+        self.assertEqual(decision.tool, "web.search")
+        self.assertIn("Razer Viper V3 Pro", decision.arguments["query"])
+
+    def test_equivalent_product_categories_and_privacy_fail_closed(self):
+        from features.assistant.public_reference import public_product_search_query
+        for quote in (
+            "iPhone 16 với Samsung Galaxy S25",
+            "Logitech G Pro X Superlight 2 vs Razer Viper V3 Pro",
+            "Xiaomi 17 so với Samsung Galaxy S25",
+        ):
+            with self.subTest(public=quote):
+                self.assertIsNotNone(public_product_search_query("tra giúp", self._context(quote)))
+
+        for quote in (
+            "con A với con B ai giỏi hơn?",
+            "Jerry với Samsung Galaxy S25",
+            "Nhà <@123456789> có Razer Viper V3 Pro với Logitech G102",
+            "địa chỉ nhà ở 12345 với iPhone 16",
+            "mình thấy con Logitech G102 với Razer Viper V3 Pro, nhà mình ở 12A",
+            "Razer Viper V3 Pro với Logitech G102 http://discord.com/channels/1",
+        ):
+            with self.subTest(private=quote):
+                self.assertIsNone(public_product_search_query("tra giúp", self._context(quote)))
+
+    async def test_no_private_chat_or_ambient_history_auto_search(self):
+        from features.assistant.context import AssistantContext, ContextLine
+        from features.assistant.public_reference import public_product_search_query
+        context = AssistantContext(recent=[
+            ContextLine(author="Member", content="Razer Viper V3 Pro với Logitech G102")
+        ])
+        self.assertIsNone(public_product_search_query("tra thử hộ", context))
+        context = self._context("Razer Viper V3 Pro với Logitech G102")
+        self.assertIsNone(public_product_search_query("tìm tin nhắn trên Discord", context))
+
+        # Explicit Tarot and Archive retain their deterministic tool precedence.
+        for user_query, expected_tool in (
+            ("tarot daily", "tarot.daily"),
+            ("tìm trong archive", "archive.search"),
+        ):
+            with self.subTest(tool=expected_tool):
+                decision = await choose_conversation_route(
+                    user_query,
+                    previous_session=None,
+                    is_live_continuation=False,
+                    has_images=False,
+                    cloudflare_router=None,
+                    min_confidence=0.55,
+                    context=context,
+                )
+                self.assertEqual(decision.tool, expected_tool)
+
+    async def test_auto_search_flag_disables_contextual_lookup(self):
+        with patch("core.constants.ASUMI_AUTO_SEARCH_ENABLED", False):
+            decision = await choose_conversation_route(
+                "tra thử hộ",
+                previous_session=None,
+                is_live_continuation=False,
+                has_images=False,
+                cloudflare_router=None,
+                min_confidence=0.55,
+                context=self._context("iPhone 16 với Samsung Galaxy S25"),
+            )
+        self.assertIsNone(decision.tool)
+
+    def test_different_member_confirmation_must_not_inherit_requester_session(self):
+        from features.assistant.session import SessionStore
+        store = SessionStore()
+        source = SimpleNamespace(guild=SimpleNamespace(id=10), channel=SimpleNamespace(id=20), author=SimpleNamespace(id=30), reference=None)
+        store.record_exchange(
+            source, 990, "tra thử hộ đê",
+            "Xác nhận hai sản phẩm này đúng không?", intent="chat",
+        )
+        # The original screenshot's confirmation came from another member.
+        other_member = SimpleNamespace(guild=source.guild, channel=source.channel, author=SimpleNamespace(id=31), reference=SimpleNamespace(message_id=990))
+        self.assertFalse(store.is_live_reply(other_member))
+        self.assertIsNone(store.get(other_member))
+
+    async def test_different_member_confirming_bot_question_gets_fast_chat(self):
+        from features.assistant.context import ContextLine
+        context = self._context("Vũ Lưu đang so sánh hai con chuột này đúng không?")
+        context.reply = ContextLine(
+            author="AsumiDaBot",
+            author_id=812345678901234567,
+            content="Vũ Lưu đang so sánh hai con chuột này đúng không?",
+        )
+        clef = SimpleNamespace(enabled=True, classify=AsyncMock())
+        decision = await choose_conversation_route(
+            "2 con này đúng r đó",
+            previous_session=None, is_live_continuation=False,
+            has_images=False, cloudflare_router=clef,
+            min_confidence=0.55, context=context,
+            bot_user_id=812345678901234567,
+        )
+        self.assertEqual(decision.intent, "chat")
+        self.assertIsNone(decision.tool)
+        self.assertEqual(decision.source, "bot_reply_acknowledgement")
+        self.assertEqual(decision.model_tier, "fast")
+        clef.classify.assert_not_awaited()
+
+    async def test_other_members_cannot_impersonate_bot_to_bypass_routing(self):
+        from features.assistant.context import ContextLine
+        context = self._context("đúng rồi")
+        context.reply = ContextLine(
+            author="AsumiDaBot", author_id=99999, content="đúng rồi",
+        )
+        clef = SimpleNamespace(
+            enabled=True,
+            classify=AsyncMock(return_value=None),
+        )
+        decision = await choose_conversation_route(
+            "2 con này đúng r đó", previous_session=None,
+            is_live_continuation=False, has_images=False,
+            cloudflare_router=clef, min_confidence=0.55,
+            context=context, bot_user_id=812345678901234567,
+        )
+        self.assertNotEqual(decision.source, "bot_reply_acknowledgement")
+        clef.classify.assert_awaited_once()
+
+    async def test_short_confirmation_uses_fast_tier_without_reopening_tools(self):
+        clef = SimpleNamespace(enabled=True, classify=AsyncMock())
+        decision = await choose_conversation_route(
+            "2 con này đúng rồi",
+            previous_session=SimpleNamespace(intent="chat", last_tool=None),
+            is_live_continuation=True,
+            has_images=False,
+            cloudflare_router=clef,
+            min_confidence=0.55,
+            context=self._context("iPhone 16 với Samsung Galaxy S25"),
+        )
+        self.assertIsNone(decision.tool)
+        self.assertEqual(decision.source, "session_followup")
+        self.assertEqual(decision.model_tier, "fast")
+        clef.classify.assert_not_awaited()
+
+
 if __name__ == "__main__":
     unittest.main()
