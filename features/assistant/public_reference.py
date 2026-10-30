@@ -72,7 +72,7 @@ def _clean_candidate(line: str) -> str:
 def _public_product_pair(line: str) -> tuple[str, str] | None:
     clause = line.split("?", 1)[0]
     clause = _clean_candidate(clause)
-    if _PRIVATE_REFERENCES.search(clause):
+    if _PRIVATE_REFERENCES.search(_fold(clause)):
         return None
     pieces = _PAIR_SEPARATOR.split(clause)
     if len(pieces) != 2:
