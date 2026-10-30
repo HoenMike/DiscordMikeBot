@@ -251,6 +251,47 @@ class RepliedPublicProductSearchTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(store.is_live_reply(other_member))
         self.assertIsNone(store.get(other_member))
 
+    async def test_different_member_confirming_bot_question_gets_fast_chat(self):
+        from features.assistant.context import ContextLine
+        context = self._context("Vũ Lưu đang so sánh hai con chuột này đúng không?")
+        context.reply = ContextLine(
+            author="AsumiDaBot",
+            author_id=812345678901234567,
+            content="Vũ Lưu đang so sánh hai con chuột này đúng không?",
+        )
+        clef = SimpleNamespace(enabled=True, classify=AsyncMock())
+        decision = await choose_conversation_route(
+            "2 con này đúng r đó",
+            previous_session=None, is_live_continuation=False,
+            has_images=False, cloudflare_router=clef,
+            min_confidence=0.55, context=context,
+            bot_user_id=812345678901234567,
+        )
+        self.assertEqual(decision.intent, "chat")
+        self.assertIsNone(decision.tool)
+        self.assertEqual(decision.source, "bot_reply_acknowledgement")
+        self.assertEqual(decision.model_tier, "fast")
+        clef.classify.assert_not_awaited()
+
+    async def test_other_members_cannot_impersonate_bot_to_bypass_routing(self):
+        from features.assistant.context import ContextLine
+        context = self._context("đúng rồi")
+        context.reply = ContextLine(
+            author="AsumiDaBot", author_id=99999, content="đúng rồi",
+        )
+        clef = SimpleNamespace(
+            enabled=True,
+            classify=AsyncMock(return_value=None),
+        )
+        decision = await choose_conversation_route(
+            "2 con này đúng r đó", previous_session=None,
+            is_live_continuation=False, has_images=False,
+            cloudflare_router=clef, min_confidence=0.55,
+            context=context, bot_user_id=812345678901234567,
+        )
+        self.assertNotEqual(decision.source, "bot_reply_acknowledgement")
+        clef.classify.assert_awaited_once()
+
     async def test_short_confirmation_uses_fast_tier_without_reopening_tools(self):
         clef = SimpleNamespace(enabled=True, classify=AsyncMock())
         decision = await choose_conversation_route(
